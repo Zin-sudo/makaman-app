@@ -8,7 +8,7 @@ export default function TopBar({ title }) {
   return (
     <div className="topbar">
       <Link to={homeHref} className="row" style={{ textDecoration: 'none', color: 'var(--text)' }}>
-        <img src="/logo.png" alt="Makaman" style={{ width: 28, height: 28 }} />
+        <img src="/mark.png" alt="Makaman" style={{ width: 28, height: 28 }} />
         <strong>{title}</strong>
       </Link>
       <div className="row">

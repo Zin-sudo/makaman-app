@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.png', 'favicon-32.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Makaman Job Tickets',
         short_name: 'Makaman',
