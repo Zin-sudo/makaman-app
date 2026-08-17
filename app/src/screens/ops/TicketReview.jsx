@@ -89,7 +89,15 @@ export default function TicketReview() {
   function onAddItemLookup() {
     const found = priceList.find((p) => p.item_number === newItemNumber.trim())
     const draft = found
-      ? { item_number: found.item_number, description: found.description, uom: found.uom, unit_cost: found.unit_cost, qty: 1 }
+      ? {
+          item_number: found.item_number,
+          description: found.description,
+          uom: found.uom,
+          unit_cost: found.unit_cost,
+          qty: 1,
+          _additionalDayCost: found.unit_cost_additional,
+          _currency: found.currency,
+        }
       : { item_number: newItemNumber.trim(), description: '', uom: '', unit_cost: 0, qty: 1 }
     setItems((prev) => [...prev, { ...draft, _new: true, sort_order: prev.length }])
     setNewItemNumber('')
@@ -238,7 +246,14 @@ export default function TicketReview() {
                   {items.map((it, idx) => (
                     <tr key={it.id || idx}>
                       <td><input style={{ width: 70 }} value={it.item_number} onChange={(e) => updateItemField(idx, 'item_number', e.target.value)} onBlur={() => persistItem(idx)} /></td>
-                      <td><input value={it.description} onChange={(e) => updateItemField(idx, 'description', e.target.value)} onBlur={() => persistItem(idx)} /></td>
+                      <td>
+                        <input value={it.description} onChange={(e) => updateItemField(idx, 'description', e.target.value)} onBlur={() => persistItem(idx)} />
+                        {it._additionalDayCost != null && (
+                          <div className="small muted">
+                            {it._currency || 'USD'} {it._additionalDayCost} after first day — add a 2nd line if this ran longer
+                          </div>
+                        )}
+                      </td>
                       <td><input type="number" style={{ width: 60 }} value={it.qty} onChange={(e) => updateItemField(idx, 'qty', e.target.value)} onBlur={() => persistItem(idx)} /></td>
                       <td><input style={{ width: 60 }} value={it.uom} onChange={(e) => updateItemField(idx, 'uom', e.target.value)} onBlur={() => persistItem(idx)} /></td>
                       <td><input type="number" style={{ width: 70 }} value={it.unit_cost} onChange={(e) => updateItemField(idx, 'unit_cost', e.target.value)} onBlur={() => persistItem(idx)} /></td>
