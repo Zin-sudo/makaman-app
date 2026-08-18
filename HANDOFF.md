@@ -832,6 +832,31 @@ Ops Manager when picking price-list items, Observer/Ops-Manager live-event-view
 after this edit, since the Inbox can now surface in-progress tickets), auto-sync timer
 (background sync on a time limit rather than only manual).
 
+---
+
+## Session checkpoint — prototype edit #11 complete: auto-sync timer
+
+**Edit #11 (`9acf67d`)** — sync is no longer manual-only. A second interval alongside the
+existing 30s clock tick now calls `autoSync()` on a real-world-realistic once-a-minute
+cadence (`AUTO_SYNC_INTERVAL_MS`, overridable via `window.__AUTO_SYNC_TEST_MS` for fast
+test verification): if the device is online, someone's logged in, and there are
+not-yet-synced tickets, they get marked synced automatically, same as the manual Sync
+button but silent and audit-logged as "Auto-synced from field device (...)" instead of
+"Uploaded from field device (...)" so the two paths stay distinguishable in the trail.
+Manual Sync is untouched — still there as an "upload right now" option. Updated the
+Field Device explainer copy and added a small "Last auto-synced ..." note once at least
+one has happened.
+Verified end-to-end with a shrunk test-only interval: seeded in-progress ticket (t3,
+"not synced") correctly flips to synced with the right audit text once the device goes
+online and the timer fires; pending-upload banner disappears; UI shows the new
+last-auto-synced note.
+
+**All four Q1 business-rule items, all four Q2 app-feature items, the in-progress
+presence badge, and the auto-sync timer are now complete** (edits #1-11). Remaining from
+the original punch list, not yet started: item search + behavioral suggestions for the
+Ops Manager when picking price-list items, and Observer/Ops-Manager live-event-view
+(real-time visibility into a technician's logging while connected).
+
 Operating mode for this stretch of work, per explicit user instruction: make one
 self-contained edit, verify with real interaction (not just a screenshot), commit+push
 immediately with a detailed message, move to the next item without stopping for
