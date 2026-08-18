@@ -256,3 +256,45 @@ These fold into the already-answered Q1 (business rules — the suggestion behav
 UX/workflow detail of "Ops Manager adds price-list items," not a new toggle) and Q2 (app
 features — navigation/back-button treatment applies across whichever screens get built).
 No new AskUserQuestion round needed for these two; they're direct instructions.
+
+---
+
+## Session checkpoint — Part B (four sheets) questions answered
+
+**Master workbook — ANSWERED: both.** A summary/index sheet at the front (one row per
+approved ticket: ticket no., client, dates, total, etc.) plus every approved ticket's full
+Service Ticket + Job Log sheets appended as their own tabs behind it.
+
+**Item-row overflow — ANSWERED, important correction to `CELL_MAPPING.md`'s row
+22/24 references:**
+- **No row is fixed in place.** Row 22 (surcharge) and row 24 (discount) in the earlier
+  cell mapping were just where they landed on that one sample ticket (HAROUGE/1897) —
+  not fixed positions. Do not treat them as constants.
+- **Use the real `Autofill_ServiceTikcet_System.xlsx` template file exactly as-is** —
+  never invent/recreate the sheet layout. Fetch ticket data and place it using the cell
+  mapping at fixed *header* cells (customer, ticket no., etc. — those stay fixed), but:
+  - **Job-log lines** are placed in the order they actually occurred (as logged by the
+    technician, editable/reorderable by Ops Manager).
+  - **Items** are placed in the order the Ops Manager selected them.
+- **Fillable region for items + surcharge + discount is rows 16–39** (not just 16–21).
+  Never a second page/continuation sheet — whatever fits in 16–39 is what fits; Ops
+  Manager arranges within that space as needed.
+- **Order preference within that region:** main items first (top), surcharge right after
+  the items, discount last (bottom-most of the three).
+- **Spacing preference (not mandatory, just preferred when room allows):** one blank row
+  between items and surcharge, another blank row between surcharge and discount.
+- Grand total row and everything below is unaffected by this — see next point.
+
+**Signature block — ANSWERED: do not touch rows 41–50 at all.** Not just the signature
+lines themselves (44/49) — the entire row range 41–50 stays exactly as the real template
+has it. No pre-filled names, nothing generated into that range.
+
+**Original vs. Copy sheets — ANSWERED: no difference, exact duplicate.** Both generated
+identically. Organizational purpose only: **Original goes to the client's finance
+department, Copy stays with Makaman's own finance department.** No visible "COPY" stamp
+or any other distinguishing mark.
+
+All Part B/four-sheets questions are now answered. Nothing else pending on this topic —
+build the generator against these answers when we get to that phase (after the whole
+visual/behavioural layer in the prototype is signed off, per the earlier backend-timing
+answer).
