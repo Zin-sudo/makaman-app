@@ -222,6 +222,43 @@
           </div>
         </sc-if>
 
+        <sc-if value="{{ settingsIsMgr }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-bottom:28px">
+            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:10px">Storage &amp; export</div>
+            <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-bottom:12px;line-height:1.4">Exported sheets always download to this device — that never requires an account. Optionally link a cloud account below to also upload straight there from the export screen.</div>
+
+            <div style="padding:14px;border:1px solid rgba(29,31,32,0.18);background:#fff;margin-bottom:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="font-size:14px;font-weight:600">OneDrive</div>
+                <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ disconnectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">Disconnect</button>
+                </sc-if>
+                <sc-if value="{{ cloudOneDriveNotConnected }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ connectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Connect</button>
+                </sc-if>
+              </div>
+              <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:8px">Connected as {{ cloudOneDriveAccount }}</div>
+              </sc-if>
+            </div>
+
+            <div style="padding:14px;border:1px solid rgba(29,31,32,0.18);background:#fff;margin-bottom:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="font-size:14px;font-weight:600">Google Drive</div>
+                <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ disconnectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">Disconnect</button>
+                </sc-if>
+                <sc-if value="{{ cloudGoogleNotConnected }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ connectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Connect</button>
+                </sc-if>
+              </div>
+              <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:8px">Connected as {{ cloudGoogleAccount }}</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+
         <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log out</button>
       </div>
     </div>
@@ -686,13 +723,19 @@
       </sc-if>
 
       <sc-if value="{{ mgrPrint }}" hint-placeholder-val="{{ true }}">
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:18px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:8px">
           <button onClick="{{ backToReview }}" class="back-btn" style="margin-bottom:0">‹ Back to review</button>
           <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-            <div style="font-size:12px;color:rgba(29,31,32,0.6)">Downloads to this device — no cloud account needed</div>
             <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Fill Excel &amp; download</button>
+            <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ uploadOneDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Upload to OneDrive</button>
+            </sc-if>
+            <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ uploadGoogleDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Upload to Google Drive</button>
+            </sc-if>
           </div>
         </div>
+        <div style="text-align:right;font-size:12px;color:rgba(29,31,32,0.6);margin-bottom:18px">{{ cloudExportNote }}</div>
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
           <sc-for list="{{ sheets }}" as="sh" hint-placeholder-count="4">
             <div style="background:#fff;border:1px solid rgba(29,31,32,0.2);padding:22px;box-shadow:0 3px 10px rgba(43,43,45,0.16)">
@@ -1180,6 +1223,19 @@ function seed() {
   return {
     settings: {
       theme: 'system', accent: 'steel', timezone: 'device', timeFormat: '24', shareLocation: true,
+      // Ops Manager storage linking — local download always works with no account; the
+      // Ops Manager can additionally connect OneDrive and/or Google Drive to upload
+      // exported sheets straight there instead of only saving to the device. This is a
+      // real UI/UX build (Settings > Storage & Export) but the actual OAuth connect flow
+      // is mocked — a static prototype with no backend can't safely hold a real
+      // Microsoft/Google app registration or do a server-side token exchange, so
+      // "Connect" here just flips a stored flag and fills in a plausible account email,
+      // same mocking approach as the rest of this prototype's connectivity simulation
+      // (S.online, auto-sync). A real build needs a backend for the actual handshake.
+      cloudStorage: {
+        oneDrive: { connected: false, account: '' },
+        googleDrive: { connected: false, account: '' },
+      },
     },
     // Permanent, admin-configured defaults (B13 Base Location / F14 Customer Rep. on the
     // real Service Ticket / Job Log sheets) — not per-ticket technician entry and not a
@@ -1539,6 +1595,14 @@ class Component extends DCLogic {
         title: 'Files ready', body: 'Service Ticket (Original), Service Ticket (Copy), Job Log (Original) and Job Log (Copy) generated from the real template — cell map applied. Downloading to this device, no cloud account needed.',
         okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
+      exportOneDrive: {
+        title: 'Uploaded to OneDrive', body: 'All 4 sheets uploaded to ' + (((D.settings.cloudStorage || {}).oneDrive || {}).account || 'OneDrive') + '. A copy was not also saved to this device — use Fill Excel & download for that.',
+        okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
+      },
+      exportGoogleDrive: {
+        title: 'Uploaded to Google Drive', body: 'All 4 sheets uploaded to ' + (((D.settings.cloudStorage || {}).googleDrive || {}).account || 'Google Drive') + '. A copy was not also saved to this device — use Fill Excel & download for that.',
+        okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
+      },
       dupNumber: {
         title: 'Number refused', body: 'That ticket number is already in use. Every ticket number must be unique.',
         okLabel: 'Change it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
@@ -1659,6 +1723,30 @@ class Component extends DCLogic {
       shareLocationBg: (D.settings || {}).shareLocation ? '#5980a6' : '#e9e9ea',
       shareLocationKnob: (D.settings || {}).shareLocation ? '20px' : '2px',
       toggleShareLocation: () => this.updateSettings({ shareLocation: !(D.settings || {}).shareLocation }),
+
+      // Storage & Export — Ops Manager only. See the seed() comment on cloudStorage for
+      // why "Connect" is mocked rather than a real OAuth flow.
+      settingsIsMgr: S.role === 'mgr',
+      cloudOneDriveConnected: !!((D.settings.cloudStorage || {}).oneDrive || {}).connected,
+      cloudOneDriveNotConnected: !((D.settings.cloudStorage || {}).oneDrive || {}).connected,
+      cloudOneDriveAccount: ((D.settings.cloudStorage || {}).oneDrive || {}).account || '',
+      cloudGoogleConnected: !!((D.settings.cloudStorage || {}).googleDrive || {}).connected,
+      cloudGoogleNotConnected: !((D.settings.cloudStorage || {}).googleDrive || {}).connected,
+      cloudGoogleAccount: ((D.settings.cloudStorage || {}).googleDrive || {}).account || '',
+      connectOneDrive: () => this.mutate(d => {
+        d.settings = d.settings || {}; d.settings.cloudStorage = d.settings.cloudStorage || {};
+        d.settings.cloudStorage.oneDrive = { connected: true, account: (S.session && S.session.email) || 'ops@makaman.ly' };
+      }),
+      disconnectOneDrive: () => this.mutate(d => {
+        (d.settings.cloudStorage = d.settings.cloudStorage || {}).oneDrive = { connected: false, account: '' };
+      }),
+      connectGoogleDrive: () => this.mutate(d => {
+        d.settings = d.settings || {}; d.settings.cloudStorage = d.settings.cloudStorage || {};
+        d.settings.cloudStorage.googleDrive = { connected: true, account: (S.session && S.session.email) || 'ops@makaman.ly' };
+      }),
+      disconnectGoogleDrive: () => this.mutate(d => {
+        (d.settings.cloudStorage = d.settings.cloudStorage || {}).googleDrive = { connected: false, account: '' };
+      }),
 
       clock: F.time(iso(new Date())),
       netDot: S.online ? '#5980a6' : '#98989b',
@@ -1896,7 +1984,23 @@ class Component extends DCLogic {
       goPrint: () => this.setState({ mgrScreen: 'print' }),
       curAudit: t ? (t.audit || []).slice().reverse().map(a => ({ stamp: F.stamp(a.ts), text: a.text })) : [],
       sheets: [mkSheet('svc', 'ORIGINAL'), mkSheet('svc', 'COPY'), mkSheet('log', 'ORIGINAL'), mkSheet('log', 'COPY')],
-      exportExcel: () => this.setState({ dialog: 'export' }),
+      exportExcel: () => { this.log('4 sheets downloaded to this device.'); this.setState({ dialog: 'export' }); },
+      // Local download always works. OneDrive/Google Drive upload buttons only render
+      // once connected (Settings > Storage & Export) — see the seed() comment on
+      // cloudStorage for why the connect step itself is mocked.
+      cloudExportNote: (!((D.settings.cloudStorage || {}).oneDrive || {}).connected && !((D.settings.cloudStorage || {}).googleDrive || {}).connected)
+        ? 'Download always works, no account needed. Connect OneDrive/Google Drive in Settings to also upload from here.'
+        : 'Download always works, no account needed.',
+      uploadOneDrive: () => {
+        const acct = ((D.settings.cloudStorage || {}).oneDrive || {}).account || 'OneDrive';
+        this.log('4 sheets uploaded to OneDrive (' + acct + ').');
+        this.setState({ dialog: 'exportOneDrive' });
+      },
+      uploadGoogleDrive: () => {
+        const acct = ((D.settings.cloudStorage || {}).googleDrive || {}).account || 'Google Drive';
+        this.log('4 sheets uploaded to Google Drive (' + acct + ').');
+        this.setState({ dialog: 'exportGoogleDrive' });
+      },
 
       adminTabs: [
         { key: 'price', label: 'Price lists' }, { key: 'numbers', label: 'Numbering & job types' },
@@ -1960,7 +2064,14 @@ class Component extends DCLogic {
         { label: 'Approval gate', hint: 'Number, mileage, items and job type required', value: '4 checks' },
         { label: 'Reopen after approval', hint: 'Reason mandatory, written to audit trail', value: 'Logged' },
         { label: 'Excel targets', hint: 'Original + Copy for Service Ticket and Job Log', value: '4 sheets' },
-        { label: 'Storage', hint: 'Offline-first on device — sheets download from the app, no cloud account needed', value: 'Local device' },
+        {
+          label: 'Storage',
+          hint: 'Offline-first on device — download never needs an account; Ops Manager can also link OneDrive and/or Google Drive in Settings to upload sheets straight there',
+          value: ['Local device']
+            .concat(((D.settings.cloudStorage || {}).oneDrive || {}).connected ? ['OneDrive'] : [])
+            .concat(((D.settings.cloudStorage || {}).googleDrive || {}).connected ? ['Google Drive'] : [])
+            .join(' + '),
+        },
       ],
       resetAll: () => this.setState({ dialog: 'reset' }),
       defBaseLocation: (D.orgDefaults || {}).baseLocation || '',
