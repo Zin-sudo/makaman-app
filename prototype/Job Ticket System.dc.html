@@ -533,7 +533,7 @@
             <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">3 · Job log from the field</div>
-                <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Editable — stamps are locked</div>
+                <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Line timestamps editable — every change is written to the audit trail</div>
               </div>
               <div style="margin-bottom:12px;max-width:420px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Job type (objective)</label>
@@ -542,7 +542,7 @@
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;gap:12px;padding:8px 0;border-top:1px solid rgba(29,31,32,0.1)">
-                    <div style="width:150px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;color:#416180">{{ e.stamp }}</div>
+                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
                     <input value="{{ e.text }}" onChange="{{ e.onChange }}" style="flex:1;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                   </div>
                 </sc-for>
@@ -554,11 +554,17 @@
             <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">Ticket header</div>
               <sc-for list="{{ headerFields }}" as="h" hint-placeholder-count="7">
-                <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(29,31,32,0.08);font-size:13px">
+                <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(29,31,32,0.08);font-size:13px;align-items:center">
                   <div style="width:104px;flex:none;color:rgba(29,31,32,0.55)">{{ h.label }}</div>
-                  <div style="flex:1;font-weight:500">{{ h.value }}</div>
+                  <sc-if value="{{ h.notEditable }}" hint-placeholder-val="{{ true }}">
+                    <div style="flex:1;font-weight:500">{{ h.value }}</div>
+                  </sc-if>
+                  <sc-if value="{{ h.editable }}" hint-placeholder-val="{{ false }}">
+                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                  </sc-if>
                 </div>
               </sc-for>
+              <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:8px">Arrival, Start job and End job are editable here and logged to the audit trail below.</div>
             </div>
 
             <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
@@ -966,6 +972,13 @@ const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
 function dt(s) { return s ? new Date(s) : null; }
+// datetime-local inputs need 'YYYY-MM-DDTHH:mm' in the browser's local time, no
+// timezone suffix — used for the Ops Manager/Admin line-timestamp edit control.
+function toLocalInput(s) {
+  const d = dt(s); if (!d) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
 
 // Timezone + 24h/12h are read from Settings (S.data.settings) — 'device' timezone means
 // no explicit IANA zone is passed to Intl, so the browser's own local zone is used.
@@ -1456,7 +1469,21 @@ class Component extends DCLogic {
       cur: view,
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
+        tsInput: toLocalInput(e.ts),
         onChange: ev => { const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
+        onTimeChange: ev => {
+          const raw = ev.target.value; if (!raw) return;
+          const newIso = iso(new Date(raw));
+          this.mutate(d => {
+            const x = d.tickets.find(y => y.id === t.id);
+            const oldStamp = F.stamp(x.events[i].ts);
+            x.events[i].ts = newIso;
+            (x.audit = x.audit || []).push({
+              ts: iso(new Date()),
+              text: 'Line ' + (i + 1) + ' timestamp changed by ' + ((S.session && S.session.name) || 'Ops Manager') + ': ' + oldStamp + ' → ' + F.stamp(newIso) + '.',
+            });
+          });
+        },
         remove: () => this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); }),
       })) : [],
       newEventText: S.newEventText,
@@ -1493,12 +1520,38 @@ class Component extends DCLogic {
       })),
       backToInbox: () => this.setState({ mgrScreen: 'inbox' }),
       backToReview: () => this.setState({ mgrScreen: 'review' }),
-      headerFields: t ? [
-        { label: 'Technician', value: t.tech }, { label: 'Customer', value: t.customer },
-        { label: 'Field', value: t.field }, { label: 'Well No.', value: t.well },
-        { label: 'Rig', value: t.rig }, { label: 'Arrival', value: F.stamp(t.arrival) },
-        { label: 'Start job', value: F.date(t.start) }, { label: 'End job', value: t.end ? F.date(t.end) : 'open' },
-      ] : [],
+      headerFields: t ? (() => {
+        // Arrival/Start/End are editable by Ops Manager/Admin, same as individual
+        // job-log line timestamps above — every change is written to the audit trail.
+        const stampField = (field, label) => {
+          const val = t[field];
+          return {
+            label: label, value: val ? F.stamp(val) : 'open', editable: true, notEditable: false,
+            tsInput: toLocalInput(val),
+            onChange: ev => {
+              const raw = ev.target.value; if (!raw) return;
+              const newIso = iso(new Date(raw));
+              this.mutate(d => {
+                const x = d.tickets.find(y => y.id === t.id);
+                const oldVal = x[field] ? F.stamp(x[field]) : 'open';
+                x[field] = newIso;
+                (x.audit = x.audit || []).push({
+                  ts: iso(new Date()),
+                  text: label + ' changed by ' + ((S.session && S.session.name) || 'Ops Manager') + ': ' + oldVal + ' → ' + F.stamp(newIso) + '.',
+                });
+              });
+            },
+          };
+        };
+        return [
+          { label: 'Technician', value: t.tech, editable: false, notEditable: true },
+          { label: 'Customer', value: t.customer, editable: false, notEditable: true },
+          { label: 'Field', value: t.field, editable: false, notEditable: true },
+          { label: 'Well No.', value: t.well, editable: false, notEditable: true },
+          { label: 'Rig', value: t.rig, editable: false, notEditable: true },
+          stampField('arrival', 'Arrival'), stampField('start', 'Start job'), stampField('end', 'End job'),
+        ];
+      })() : [],
       noMsg: issue.msg || '', noBorder: issue.bad ? '#8c3b3b' : 'rgba(29,31,32,0.16)',
       noMsgColor: issue.bad ? '#8c3b3b' : (issue.ok ? '#416180' : 'rgba(29,31,32,0.6)'),
       seriesBtns: D.series.map(s => ({
