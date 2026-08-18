@@ -474,3 +474,31 @@ Supabase `price_list_items` (2,274 rows, verified).
 **When Part B (the four sheets generator) is actually built:** use this file directly as
 the fill target (per the earlier answer — "use the real Autofill_ServiceTikcet_System
 exact format, don't invent a new file"). Don't re-request it from the user; it's here.
+
+---
+
+## Session checkpoint — baseline capture complete
+
+Captured the last two missing screens: Technician **New Job Ticket** (arrival stamp,
+technician name, customer/field/well/rig fields, "Start Logging" disabled until filled)
+and **Job Log** (header card, job events list, add-line input, "Log Line — stamps
+[time]", "Job Done" button). Both also show the plain-text "‹ Cancel" / "‹ All tickets"
+back links — same button-visibility fix already flagged applies here too, not just the
+Ops Manager screens.
+
+**Baseline is now fully captured, all 11 screens:**
+1. Technician — ticket list (default)
+2. Ops Manager — inbox
+3. Admin — Price Lists (default)
+4. Founder — report
+5. Ops Manager — Ticket View (Awaiting Review state)
+6. Ops Manager — Ticket View (Approved state)
+7. Admin — Numbering & Job Types (verified correct, no change needed)
+8. Admin — Users & Customers
+9. Admin — System (OneDrive copy flagged for fix)
+10. Technician — New Job Ticket
+11. Technician — Job Log
+
+Nothing left uncaptured before starting the first real edit pass. Given the token
+situation this session, the next session/turn should start directly with the first
+screenshot-gated edit — no more baseline work needed first.
