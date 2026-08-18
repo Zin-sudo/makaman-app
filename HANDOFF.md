@@ -502,3 +502,62 @@ Ops Manager screens.
 Nothing left uncaptured before starting the first real edit pass. Given the token
 situation this session, the next session/turn should start directly with the first
 screenshot-gated edit — no more baseline work needed first.
+
+---
+
+## Session checkpoint — Founder→"Observer" rename, live event visibility, online/offline badge, second-page overflow handling
+
+**Rename:** Founder role/view is renamed **"Observer"** everywhere (nav tab, section
+title, role label). Same read-only nature as before — this is a naming change only.
+
+**Live event visibility (Observer + Ops Manager):**
+- If a technician is online while a job ticket is open/logging, **Observers can see
+  their events logging live**, in real time, as lines get added.
+- **Ops Manager also gets this same live-view access** (Observer page/reports), not just
+  the existing Review dashboard — so an Ops Manager can inspect live event logging for
+  any technician with an active, connected ticket too.
+- If a ticket was done **fully offline** (technician never connected while working it),
+  it does **not** appear live to Observers/Ops Manager at all. It only shows up on the
+  **Ops Manager's Review dashboard** once synced, for approval — and only lands in the
+  **Observer reporting options** after approval (or when specifically requested/queried
+  there). No live visibility for fully-offline tickets, ever.
+
+**Online/offline status badge (per in-progress ticket):**
+- Technician opens ticket + logs first line while online, then loses connection → ticket
+  shows **"In Progress (Offline)"** until next sync.
+- Reconnects and syncs → flips to **"In Progress (Online)"**.
+- Style: **minimalist, small, but flashy** — reuse/extend the existing `.pulse-dot`
+  pattern already in the design system's CSS (small animated dot) rather than inventing a
+  new visual language.
+
+**Auto-sync rule:** don't rely only on the technician manually pressing Sync to update
+the Observer/Ops-Manager live view. The app should **auto-sync in the background on a
+time-limit** (periodic, debounced) while a ticket is being actively logged and the device
+has connectivity — specifically to keep live observation current — while still avoiding
+sync-spamming the server. Manual Sync button stays as-is for the technician's own offline
+queue; this is an additional background behavior, not a replacement.
+
+**Four-sheets generation — overflow / second-page handling (confirmed with the user,
+verbatim understanding accepted):**
+- Row caps on the real template: Service Ticket items fillable region ends at **row 39**;
+  Job Log events fillable region ends at **row 44** (consistent with the earlier
+  row-16–39 / row-20-plus-~25-lines notes — same limits, just now given as exact last
+  rows).
+- At generation time, if placing a ticket's items (Service Ticket) or job-log events (Job
+  Log) would exceed that row, **pop up a choice to the Ops Manager** — never silent,
+  never automatic:
+  1. **Add a second page** — same layout, stapled/paired with the first page, continuing
+     the overflow, submitted to finance as one attached set.
+  2. **Manually tick items/events on/off one-by-one** until the selected subset fits
+     within the single-page row limit, and generate just that one valid page.
+- Applies generally to any overflowing ticket, but the realistic/likely case flagged is
+  **Fishing (F-prefix) job types** (e.g. F700/F701/F702), which occasionally run long
+  jobs producing longer item lists or job logs.
+- The underlying ticket data in Supabase is never trimmed by choice (b) — only what gets
+  printed/downloaded onto that specific generated document is affected.
+
+This is Part B (four-sheets) + new "Observer" feature scope — still queued behind the
+prototype's visual/behavioural layer per the existing backend-timing answer (Q3: after
+the four sheets... wait, four sheets ARE Part B — sequencing stays: visual layer signed
+off first, then Part B/four-sheets + Observer live-view work, then final backend wiring
+for auth/roles). Nothing built yet, decisions recorded for when we get there.
