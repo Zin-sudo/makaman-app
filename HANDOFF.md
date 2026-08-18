@@ -717,3 +717,20 @@ panel at all in this zip, only Admin does), line-level job-log timestamp editing
 search + behavioral suggestions for Ops Manager, in-progress online/offline badge,
 Observer/Ops live-event-view, auto-sync timer, plus the hardcoded-technician-name fix
 noted above.
+
+---
+
+## Session checkpoint — all Q2 app-feature items complete (edits #1-6)
+
+All four Q2 items now built and verified in `prototype/Job Ticket System.dc.html`:
+Settings screen, real Login/Signup+approval, role management (Ops Manager Team screen +
+Admin promote dropdown), real Makaman logo. Plus the Observer rename and back-button
+visibility fix from Q1/general polish. 6 commits total, most recent `01c6931`.
+
+**Next up: Q1 business rules**, all still to build:
+1. Line-level job-log timestamp editing (Ops/Admin) + audit trail
+2. B13/F14 admin-configured permanent defaults (Base Location, Customer Rep.)
+3. 20% desert/marine surcharge as a waivable price-list item
+4. Discount as a discretionary price-list item
+Plus: item search + behavioral suggestions for Ops Manager, in-progress online/offline
+badge, Observer/Ops live-event-view, auto-sync timer — all still pending.
