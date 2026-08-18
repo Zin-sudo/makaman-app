@@ -458,3 +458,19 @@ tabs are still stale relative to this — they should get rewritten to reflect
 download-first + optional linked-drive + Supabase-backed admin preview, not "OneDrive" as
 a given. Still a deliberate fix for the edit phase, not urgent, but now has a concrete
 target to fix *to* instead of just a contradiction to flag.
+
+---
+
+## Session checkpoint — real Service Ticket/Job Log template saved durably in the repo
+
+`Autofill_ServiceTikcet_System.xlsx` (the real, filled workbook with the four sheets —
+`Service Ticket (Original/Copy)`, `Job Log (Original/Copy)` — used to build
+`CELL_MAPPING.md`) is now committed at `reference/Autofill_ServiceTikcet_System.xlsx` so
+it survives regardless of upload-folder/session lifetime. Verified byte-identical
+purpose: same four sheets present, plus the six price-list sheets (WAHA 1/2, AGOCO, HOO,
+SOC, Zueitina) which are intentionally ignored here — that data already lives in
+Supabase `price_list_items` (2,274 rows, verified).
+
+**When Part B (the four sheets generator) is actually built:** use this file directly as
+the fill target (per the earlier answer — "use the real Autofill_ServiceTikcet_System
+exact format, don't invent a new file"). Don't re-request it from the user; it's here.
