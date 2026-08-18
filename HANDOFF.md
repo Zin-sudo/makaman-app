@@ -965,5 +965,16 @@ screen (Ops Review) took 3 rounds of diagnosis to get fully clean at 375px — c
 with full-page screenshots showing a legible, fully editable single-column layout at
 both phone and tablet width.
 
+**User feedback + fix (`3bc9514`)**: the Admin tab bar's `overflow-x:auto` from edit #14
+hid the "System" tab behind a scroll on narrow phones — flagged as not practical.
+Standard clarified and applied: horizontal scroll is only for genuinely long/many-column
+data lists (tables); a small fixed set of options (tabs, a dropdown+button row) must
+always fit fully visible, shrinking margins/font-size per device instead. Fixed the tab
+bar (now a 2x2 wrap grid under 640px, unchanged single row at tablet+) and cleaned up two
+more cramped-but-technically-visible rows (Admin price-list top row, Ops print-screen
+header) to wrap cleanly rather than 3-way-squeeze. Tables (Inbox, Team/People user lists,
+price lists, Numbering series, Observer approved-jobs) intentionally kept scrollable —
+those are the "long list" exception.
+
 **Next up: item #15**, Ops Manager cloud storage linking (OneDrive + Google Drive +
 local) — not yet started.
