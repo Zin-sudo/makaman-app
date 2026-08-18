@@ -332,6 +332,7 @@
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
             <div style="font-size:13px;color:rgba(29,31,32,0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
           </div>
+          <button onClick="{{ goTeam }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Team</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
@@ -372,6 +373,66 @@
               </sc-for>
             </tbody>
           </table>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ mgrTeam }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Team</h2>
+        <div style="font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:20px">Approve signups and create technician accounts directly.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Users &amp; roles</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Name</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Role</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Base</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Last sync</th>
+                  <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
+                  <tr>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ u.name }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.75)">{{ u.base }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.6)">{{ u.lastSync }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right">
+                      <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Approve → Technician</button>
+                      </sc-if>
+                      <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
+                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:#fff;border:1px solid rgba(29,31,32,0.25);color:#1d1f20">
+                          <option value="tech">Technician</option>
+                          <option value="mgr">Ops Manager</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </sc-if>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Create a Technician account</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Full name</div>
+            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
+            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
+            <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+            <sc-if value="{{ newTechError }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ newTechError }}</div>
+            </sc-if>
+            <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:#2f8f5b;margin-bottom:10px">Account created — they can log in now.</div>
+            </sc-if>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Create account</button>
+          </div>
         </div>
       </sc-if>
 
@@ -743,6 +804,13 @@
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
                         <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Approve → Technician</button>
                       </sc-if>
+                      <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
+                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:#fff;border:1px solid rgba(29,31,32,0.25);color:#1d1f20">
+                          <option value="tech">Technician</option>
+                          <option value="mgr">Ops Manager</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </sc-if>
                     </td>
                   </tr>
                 </sc-for>
@@ -766,6 +834,22 @@
             <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(29,31,32,0.16)">
               <div style="font-size:12px;color:rgba(29,31,32,0.7)">Excel output cell maps — Service Ticket and Job Log templates on OneDrive; each field's target cell is configured here once the layouts are supplied.</div>
             </div>
+          </div>
+          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Create a Technician account</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Full name</div>
+            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
+            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
+            <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+            <sc-if value="{{ newTechError }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ newTechError }}</div>
+            </sc-if>
+            <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:#2f8f5b;margin-bottom:10px">Account created — they can log in now.</div>
+            </sc-if>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Create account</button>
           </div>
         </div>
       </sc-if>
@@ -1021,6 +1105,7 @@ class Component extends DCLogic {
       founderCount: 10, tick: 0, showSettings: false,
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
       authFullName: '', authConfirm: '', authError: '', signupDone: false,
+      newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
     }, this.load());
   }
 
@@ -1123,7 +1208,8 @@ class Component extends DCLogic {
     const t = this.ticket();
     const view = t ? this.ticketView(t) : {};
     const unsynced = D.tickets.filter(x => !x.synced);
-    const myTickets = D.tickets.filter(x => x.tech === 'Yousef Al-Harbi');
+    const myName = (S.session && S.session.name) || '';
+    const myTickets = D.tickets.filter(x => x.tech === myName);
     const issue = t ? this.numberIssue(t) : {};
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
@@ -1243,6 +1329,20 @@ class Component extends DCLogic {
       this.setState({ signupDone: true, authError: '' });
     };
     const doLogout = () => { this.persistSession(null); this.setState({ session: null, showSettings: false, dialog: null }); };
+    const createTechnician = () => {
+      const name = (S.newTechName || '').trim();
+      const email = (S.newTechEmail || '').trim().toLowerCase();
+      const pass = S.newTechPassword || '';
+      if (!name || !email || pass.length < 8) { this.setState({ newTechError: 'Full name, email, and an 8+ character password are required.', newTechDone: false }); return; }
+      if ((D.users || []).some(u => (u.email || '').toLowerCase() === email)) { this.setState({ newTechError: 'An account with that email already exists.', newTechDone: false }); return; }
+      this.mutate(d => {
+        (d.users = d.users || []).push({
+          name: name, role: 'Field Technician', roleKey: 'tech', email: email, password: pass,
+          base: '—', lastSync: '—', status: 'active',
+        });
+      });
+      this.setState({ newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: true });
+    };
 
     return {
       loggedIn: !!S.session && S.session.status === 'active',
@@ -1258,6 +1358,9 @@ class Component extends DCLogic {
       doLogin: doLogin,
       doSignup: doSignup,
       doLogout: doLogout,
+      createTechnician: createTechnician,
+      newTechName: S.newTechName, newTechEmail: S.newTechEmail, newTechPassword: S.newTechPassword,
+      newTechError: S.newTechError, newTechDone: S.newTechDone,
       pendingCheckAgain: () => {
         const email = (S.session && S.session.email) || '';
         const user = (D.users || []).find(u => (u.email || '').toLowerCase() === email.toLowerCase());
@@ -1326,13 +1429,13 @@ class Component extends DCLogic {
         this.setState({ dialog: 'synced' });
       },
 
-      techName: 'Yousef Al-Harbi',
+      techName: myName,
       myCount: myTickets.length + ' on device',
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
       myTickets: myTickets.slice().reverse().map(x => Object.assign(this.ticketView(x), {
         open: () => this.setState({ activeId: x.id, techScreen: 'log' }),
       })),
-      startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: 'Yousef Al-Harbi', customer: '', field: '', well: '', rig: '' } }),
+      startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: myName, customer: '', field: '', well: '', rig: '' } }),
       backToList: () => this.setState({ techScreen: 'list', draft: null }),
       draftArrival: S.draft ? F.stamp(S.draft.arrival) : F.stamp(iso(new Date())),
       d: S.draft || { tech: '', customer: '', field: '', well: '', rig: '' },
@@ -1375,6 +1478,8 @@ class Component extends DCLogic {
       })),
 
       mgrInbox: S.mgrScreen === 'inbox', mgrReview: S.mgrScreen === 'review', mgrPrint: S.mgrScreen === 'print',
+      mgrTeam: S.mgrScreen === 'team',
+      goTeam: () => this.setState({ mgrScreen: 'team' }),
       awaitingCount: awaiting.length,
       mgrStats: [
         { label: 'Awaiting review', value: String(awaiting.length), color: '#5980a6' },
@@ -1504,6 +1609,17 @@ class Component extends DCLogic {
           const target = (d.users || []).find(x => x.email === u.email);
           if (target) { target.role = 'Field Technician'; target.roleKey = 'tech'; target.status = 'active'; }
         }),
+        showPromote: S.role === 'admin' && u.status !== 'pending',
+        promoteDisabled: u.email === (S.session && S.session.email),
+        roleKeySafe: u.roleKey || 'tech',
+        promote: e => {
+          const val = e.target.value;
+          const labelMap = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin' };
+          this.mutate(d => {
+            const target = (d.users || []).find(x => x.email === u.email);
+            if (target) { target.roleKey = val; target.role = labelMap[val] || target.role; }
+          });
+        },
       })),
       clientCards: D.clients.map(c => ({ name: c.name, fields: c.fields, rigs: c.rigs, itemCount: c.items.length })),
       systemRows: [
@@ -1546,6 +1662,9 @@ class Component extends DCLogic {
         authPassword: e => this.setState({ authPassword: e.target.value, authError: '' }),
         authFullName: e => this.setState({ authFullName: e.target.value, authError: '' }),
         authConfirm: e => this.setState({ authConfirm: e.target.value, authError: '' }),
+        newTechName: e => this.setState({ newTechName: e.target.value, newTechError: '', newTechDone: false }),
+        newTechEmail: e => this.setState({ newTechEmail: e.target.value, newTechError: '', newTechDone: false }),
+        newTechPassword: e => this.setState({ newTechPassword: e.target.value, newTechError: '', newTechDone: false }),
       },
     };
   }
