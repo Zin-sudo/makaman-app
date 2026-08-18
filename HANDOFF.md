@@ -657,3 +657,40 @@ User confirmed both URLs from the previous checkpoint load correctly:
 Same pattern as the earlier Vercel incident: tools reported not-found/empty while the
 deployment was genuinely live. Confirmed once again — trust the user's direct check over
 these tools for Vercel state in this session.
+
+---
+
+## Session checkpoint — Part B/prototype edits #1-4 complete (Q2 items underway)
+
+Working directly in `prototype/Job Ticket System.dc.html` now, per the "keep going, show
+previews, I'll stop you when necessary" instruction — no more per-step approval gating,
+but still small commits + screenshots for every change.
+
+1. **Founder → Observer rename** — nav tab, heading, dialog copy, Users table role tag.
+2. **Back-navigation as visible buttons** — new `.back-btn` class, applied to all 4
+   plain-text back links across Technician/Ops screens.
+3. **Settings screen** (Q2 item 5) — gear icon in nav opens a full-screen overlay:
+   Appearance (theme+accent, stored but not yet live-applied — flagged honestly in-UI),
+   Date & time (timezone + 24h/12h — **genuinely functional**, refactored `fdate/fshort/
+   ftime/fstamp` to a `fmt()` helper reading `data.settings`, threaded through every call
+   site), Technician-only share-location toggle (stored, capture-wiring is a follow-up),
+   red Logout button (honest placeholder dialog since real auth doesn't exist yet).
+   **Bug found+fixed during this step**: inline ternaries inside `{{ }}` template
+   bindings aren't supported by this dc-runtime — confirmed by grep, every other
+   conditional style in the file is precomputed in JS. Don't reintroduce this pattern.
+4. **Real Makaman logo** (Q2 item 8) — extracted from the real uploaded PNG (already had
+   a transparent alpha channel), trimmed to two crops: full lockup + icon-only mark, saved
+   to `prototype/uploads/makaman-logo-{full,mark}.png`. Icon mark in top nav, full lockup
+   (medium) on Settings. "Large on Login/Signup" pending that screen's existence.
+
+**Remaining Q1/Q2 items still to build:** real Login/Signup + approval flow (item 6, the
+big structural one — replaces the demo role-switcher), role management/create-technician
+(item 7), line-level job-log timestamp editing + audit (Q1), B13/F14 admin defaults (Q1),
+surcharge/discount as price-list items (Q1), item search + behavioral suggestions for Ops
+Manager, in-progress online/offline badge, Observer/Ops live-event-view, auto-sync timer.
+
+All 4 edits committed and pushed individually to `claude/makaman-app`. Server-serving
+note for future screenshot passes: `python3 -m http.server 8000` from `prototype/` dies
+between tool calls in this sandbox — always re-check with curl before assuming it's up,
+and prefer `setsid nohup ... < /dev/null &` over plain `&` + `disown`, don't `pkill` in
+the same command block as starting a new one (causes exit 144 with nothing captured).
