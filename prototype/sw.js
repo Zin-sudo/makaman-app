@@ -1,0 +1,46 @@
+// Minimal service worker — exists so the app is genuinely installable (Add to Home
+// Screen / Install app) on any device, not just usable as a plain browser tab. This is a
+// prototype: the strategy is deliberately simple (network-first, falling back to a small
+// same-origin cache) rather than a full offline-first asset pipeline. The app's own data
+// layer already handles offline logging via localStorage (see the Field Device notes in
+// the technician screen) — this cache only covers the app shell itself so the page can
+// still load if the device has no signal when it's opened.
+const CACHE = 'makaman-jobtickets-shell-v1';
+const SHELL = [
+  './',
+  './Job Ticket System.dc.html',
+  './support.js',
+  './manifest.webmanifest',
+  './uploads/icon-192.png',
+  './uploads/icon-512.png',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => {})
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  event.respondWith(
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(req, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(req))
+  );
+});

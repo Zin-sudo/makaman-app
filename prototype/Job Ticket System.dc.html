@@ -9,6 +9,12 @@
 <x-dc>
 <helmet>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- PWA installability — lets any role add this to a phone/tablet/laptop home screen
+     and open it like a native app on whatever device they have on hand, not just their
+     usual one. manifest.webmanifest + sw.js are sibling files next to this .dc.html. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d2d3d">
+<link rel="apple-touch-icon" href="uploads/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap">
 <style>
@@ -21,6 +27,52 @@
   :focus { outline:none; }
   :focus-visible { outline:2px solid #5980a6; outline-offset:2px; }
   @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.35 } }
+  /* Cross-device responsiveness — every role must be usable on phone, tablet, laptop
+     and desktop (someone may have to log in from an unfamiliar device). The screens
+     below are built with inline styles as the desktop/default layout (kept as-is, since
+     it's the design system's source of truth); these classes only override what needs to
+     change per breakpoint. The !important is required because an inline style attribute
+     always wins over an external stylesheet rule regardless of selector specificity —
+     there's no other way to override it from here. Table wrappers get a plain
+     `overflow-x:auto` added inline instead (no breakpoint needed — harmless at any
+     width, so it doesn't need a class or a query).
+     Breakpoints: 980px roughly separates laptop/desktop from tablet-portrait-and-below;
+     640px roughly separates tablet from phone. */
+  /* Grid items default to min-width:auto, which floors their track at the item's
+     content min-content width and defeats "1fr" shrinking entirely — the classic CSS
+     Grid overflow gotcha. Needed unconditionally (not just under the breakpoint) so a
+     collapsed .mk-2col column can actually shrink to the real viewport width instead of
+     staying pinned to its widest child's natural size. */
+  .mk-2col > * { min-width: 0; }
+  @media (max-width: 980px) {
+    .mk-2col { grid-template-columns: 1fr !important; }
+    .mk-stats4 { grid-template-columns: repeat(2,1fr) !important; }
+  }
+  @media (max-width: 480px) {
+    /* Top nav: logo + session pill + gear button don't all fit next to the full
+       "MAKAMAN / JOB TICKETS" wordmark and role label on a real phone width — drop the
+       two purely decorative text pieces so the bar stays one line and nothing clips. */
+    .mk-nav-title { display:none !important; }
+    .mk-nav-role { display:none !important; }
+  }
+  @media (max-width: 640px) {
+    .mk-stats4 { grid-template-columns: 1fr !important; }
+    .mk-page { padding-left:14px !important; padding-right:14px !important; }
+    /* Collapse the decorative "phone mockup" frame into a plain full-width mobile page
+       once the viewport actually is phone-sized — the frame/bezel/fixed 398px width only
+       make sense as a design-review aid on a wide desktop screen; on a real phone they'd
+       just overflow and force horizontal scrolling. */
+    .mk-phone-shell { justify-content:flex-start !important; padding:0 !important; gap:0 !important; }
+    /* flex:none on the frame (flex-shrink:0) is what makes the desktop mockup hold its
+       exact 398px size against a squeezed container — that's the opposite of what a real
+       phone viewport needs, so it has to be overridden too, not just width. */
+    .mk-phone-frame { width:100% !important; max-width:100% !important; flex:1 1 auto !important; padding:0 !important; background:transparent !important; border-radius:0 !important; box-shadow:none !important; }
+    .mk-phone-screen { border-radius:0 !important; height:auto !important; min-height:100vh !important; }
+    /* The "Field Device" explainer sidebar exists to tell a desktop reviewer what the
+       phone mockup represents — meaningless (and just takes up space) on an actual
+       phone, which doesn't need to be told what a phone looks like. */
+    .mk-field-note { display:none !important; }
+  }
   /* Back-navigation as a visible, bounded button rather than a plain text link —
      some field/office staff being trained on this aren't habitual app/mobile users,
      so a same-color underline-less text link is too easy to miss or mistake for a label. */
@@ -105,11 +157,11 @@
   <div style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:#1d2d3d;color:#f2f2f3">
     <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
+      <div class="mk-nav-title" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(242,242,243,0.22);font-size:13px">
       <span style="font-weight:600">{{ sessionName }}</span>
-      <span style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
+      <span class="mk-nav-role" style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
     </div>
     <button onClick="{{ openSettings }}" title="Settings" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:transparent;border:1px solid rgba(242,242,243,0.28);color:#f2f2f3">⚙</button>
   </div>
@@ -172,9 +224,9 @@
 
   <!-- ══ TECHNICIAN ══ -->
   <sc-if value="{{ isTech }}" hint-placeholder-val="{{ true }}">
-    <div style="display:flex;justify-content:center;gap:36px;padding:34px 22px 60px">
-      <div style="width:398px;flex:none;padding:9px;background:#1d1f20;border-radius:34px;box-shadow:0 12px 32px rgba(43,43,45,0.22)">
-        <div style="background:#f2f2f3;border-radius:26px;overflow:hidden;height:806px;display:flex;flex-direction:column">
+    <div class="mk-phone-shell" style="display:flex;justify-content:center;gap:36px;padding:34px 22px 60px">
+      <div class="mk-phone-frame" style="width:398px;flex:none;padding:9px;background:#1d1f20;border-radius:34px;box-shadow:0 12px 32px rgba(43,43,45,0.22)">
+        <div class="mk-phone-screen" style="background:#f2f2f3;border-radius:26px;overflow:hidden;height:806px;display:flex;flex-direction:column">
 
           <div style="display:flex;align-items:center;gap:8px;padding:11px 18px 6px;font-size:11px;letter-spacing:0.04em;color:rgba(29,31,32,0.6)">
             <span>{{ clock }}</span>
@@ -316,7 +368,7 @@
         </div>
       </div>
 
-      <div style="width:290px;flex:none;padding-top:14px;font-size:13px;color:rgba(29,31,32,0.7)">
+      <div class="mk-field-note" style="width:290px;flex:none;padding-top:14px;font-size:13px;color:rgba(29,31,32,0.7)">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">Field device</div>
         <p style="margin:0 0 10px">Everything here works with no connection. Arrival, every log line, Start Job and End Job are stamped from the device clock and stored locally.</p>
         <p style="margin:0 0 10px">Tap the status pill at the top of the phone to simulate regaining signal. Pending tickets upload automatically in the background once signal returns — tap <strong>Sync</strong> to upload immediately instead of waiting. Only uploaded <em>Job Done</em> tickets reach the operations manager.</p>
@@ -330,7 +382,7 @@
 
   <!-- ══ OPERATIONS MANAGER ══ -->
   <sc-if value="{{ isMgr }}" hint-placeholder-val="{{ true }}">
-    <div style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
+    <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
 
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
@@ -340,7 +392,7 @@
           </div>
           <button onClick="{{ goTeam }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Team</button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+        <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
             <div style="padding:13px 14px;border:1px solid rgba(29,31,32,0.16)">
               <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(29,31,32,0.55)">{{ s.label }}</div>
@@ -348,7 +400,7 @@
             </div>
           </sc-for>
         </div>
-        <div style="border:1px solid rgba(29,31,32,0.16)">
+        <div style="border:1px solid rgba(29,31,32,0.16);overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:14px">
             <thead>
               <tr>
@@ -393,8 +445,8 @@
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Team</h2>
         <div style="font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:20px">Approve signups and create technician accounts directly.</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+        <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Users &amp; roles</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
@@ -464,12 +516,12 @@
           </span>
         </div>
 
-        <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start">
+        <div class="mk-2col" style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start">
           <div style="display:flex;flex-direction:column;gap:22px">
 
             <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">1 · Ticket number &amp; mileage</div>
-              <div style="display:flex;gap:16px;align-items:flex-start">
+              <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Ticket No. (unique)</label>
                   <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid {{ noBorder }};color:#1d1f20">
@@ -491,7 +543,7 @@
               </div>
             </div>
 
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">2 · Charged items</div>
                 <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Price list: {{ cur.customer }}</div>
@@ -505,8 +557,8 @@
                   </sc-for>
                 </div>
               </sc-if>
-              <div style="display:flex;gap:8px;margin-bottom:12px">
-                <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
                   <option value="">Add item from price list…</option>
                   <sc-for list="{{ priceOptions }}" as="p" hint-placeholder-count="5">
                     <option value="{{ p.code }}">{{ p.label }}</option>
@@ -568,9 +620,9 @@
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
-                  <div style="display:flex;gap:12px;padding:8px 0;border-top:1px solid rgba(29,31,32,0.1)">
+                  <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(29,31,32,0.1)">
                     <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
-                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" style="flex:1;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                   </div>
                 </sc-for>
               </div>
@@ -636,7 +688,7 @@
             <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Fill Excel &amp; download</button>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+        <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
           <sc-for list="{{ sheets }}" as="sh" hint-placeholder-count="4">
             <div style="background:#fff;border:1px solid rgba(29,31,32,0.2);padding:22px;box-shadow:0 3px 10px rgba(43,43,45,0.16)">
               <div style="display:flex;align-items:flex-start;gap:10px;border-bottom:2px solid #1d2d3d;padding-bottom:8px;margin-bottom:12px">
@@ -724,10 +776,10 @@
 
   <!-- ══ ADMIN ══ -->
   <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
-    <div style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
+    <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
       <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Admin</h2>
       <div style="font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:18px">Price lists, customers, numbering and job types — all editable without a release.</div>
-      <div style="display:flex;border:1px solid rgba(29,31,32,0.16);margin-bottom:22px">
+      <div style="display:flex;border:1px solid rgba(29,31,32,0.16);margin-bottom:22px;overflow-x:auto">
         <sc-for list="{{ adminTabs }}" as="t" hint-placeholder-count="4">
           <button onClick="{{ t.pick }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;border:0;border-right:1px solid rgba(29,31,32,0.16);background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
         </sc-for>
@@ -746,7 +798,7 @@
           <div style="font-size:12px;color:rgba(29,31,32,0.6);padding-bottom:9px">{{ adminPriceNote }}</div>
           <button onClick="{{ addPriceRow }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">+ Add item</button>
         </div>
-        <div style="border:1px solid rgba(29,31,32,0.16);padding:14px">
+        <div style="border:1px solid rgba(29,31,32,0.16);padding:14px;overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead>
               <tr>
@@ -773,8 +825,8 @@
       </sc-if>
 
       <sc-if value="{{ adminNumbers }}" hint-placeholder-val="{{ false }}">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+        <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Numbering series</div>
             <div style="font-size:12px;color:rgba(29,31,32,0.65);margin-bottom:14px">Enter the last number you reached on paper. The system continues from there and refuses any number already used.</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -816,8 +868,8 @@
       </sc-if>
 
       <sc-if value="{{ adminPeople }}" hint-placeholder-val="{{ false }}">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+        <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Users &amp; roles</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
@@ -891,7 +943,7 @@
       </sc-if>
 
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
+        <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Charging &amp; export rules</div>
             <div style="display:flex;flex-direction:column;gap:12px">
@@ -926,7 +978,7 @@
 
   <!-- ══ FOUNDER (read-only) ══ -->
   <sc-if value="{{ isFounder }}" hint-placeholder-val="{{ false }}">
-    <div style="padding:26px 30px 70px;max-width:1180px;margin:0 auto">
+    <div class="mk-page" style="padding:26px 30px 70px;max-width:1180px;margin:0 auto">
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px">
         <div>
           <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Observer View</h2>
@@ -934,7 +986,7 @@
         </div>
         <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:#eef6ff;color:#2c455d;letter-spacing:0.05em">OBSERVER</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+      <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
         <sc-for list="{{ founderStats }}" as="s" hint-placeholder-count="4">
           <div style="padding:13px 14px;border:1px solid rgba(29,31,32,0.16)">
             <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(29,31,32,0.55)">{{ s.label }}</div>
@@ -979,7 +1031,7 @@
         </div>
         <button onClick="{{ generateReport }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Generate report</button>
       </div>
-      <div style="border:1px solid rgba(29,31,32,0.16)">
+      <div style="border:1px solid rgba(29,31,32,0.16);overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:14px">
           <thead>
             <tr>
@@ -1245,6 +1297,13 @@ class Component extends DCLogic {
   componentDidMount() {
     this.timer = setInterval(() => this.setState({ tick: Date.now() }), 30000);
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
+    // Registers sw.js so the app is a real installable PWA on any device (see the
+    // <link rel="manifest"> in <helmet>). Swallows failures silently — e.g. when run
+    // from file:// or a sandboxed preview with no service-worker support — since this is
+    // a progressive enhancement, not something the app depends on to function.
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
   }
   componentWillUnmount() { clearInterval(this.timer); clearInterval(this.autoSyncTimer); }
 
