@@ -771,7 +771,7 @@
               </div>
               <div style="display:flex;align-items:stretch;gap:0;border:1px solid rgba(29,31,32,0.3);margin-bottom:0">
                 <div style="flex:1;padding:8px 10px;border-right:1px solid rgba(29,31,32,0.3)">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.03em">MAKAMAN OILFIELD SERVICES</div>
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN LIBYA OIL SERVICES INC.</div>
                   <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(29,31,32,0.6);margin-top:2px">{{ sh.title }} ({{ sh.mark }}){{ sh.pageLabel }}</div>
                 </div>
                 <div style="width:96px;flex:none;padding:6px 8px;text-align:center;background:#eef3f8">
@@ -1644,13 +1644,16 @@ class Component extends DCLogic {
     // its Job Log table runs rows 20-44 (25 rows) before the signature block — both
     // ranges hold that shape whether or not every row is filled in, so the printed page
     // always shows the same number of ruled lines. Padding sheetItems/sheetEvents out to
-    // a fixed count (below) reproduces that. The real counts (24/25) don't fit this
-    // preview's fixed A4-proportioned card once every row — not just the filled ones —
-    // gets real height (19px, matching a filled row) instead of collapsing to near-zero;
-    // trimmed down so the ruled table reaches close to the signature block without
-    // pushing it off the bottom of the page.
-    const ITEM_ROW_CAP = 20;
-    const LOG_ROW_CAP = 22;
+    // a fixed count (below) reproduces that.
+    // These caps match the real template exactly (24/25). An earlier pass had these
+    // trimmed to 20/22 because the on-screen preview card was capped at max-width:640px
+    // for on-screen readability, and 24/25 real rows at 19px each didn't fit that smaller
+    // box without shoving the signature block off the bottom. Measured against the true
+    // full-size A4 print page (the actual PDF export target, ~297mm/1122px tall) instead,
+    // the real 24/25 counts fit with ~195-210px (10+ rows) to spare before the signature
+    // block, so the on-screen cap was the artificial constraint, not the page itself.
+    const ITEM_ROW_CAP = 24;
+    const LOG_ROW_CAP = 25;
     const sheetItemsReal = t ? (t.items || []).map(i => ({
       code: i.code, desc: i.desc,
       qty: i.kind === 'percent' ? '—' : String(i.qty),
@@ -2129,9 +2132,10 @@ class Component extends DCLogic {
       curAudit: t ? (t.audit || []).slice().reverse().map(a => ({ stamp: F.stamp(a.ts), text: a.text })) : [],
       sheets: [].concat(mkSvcPages('ORIGINAL'), mkSvcPages('COPY'), mkLogPages('ORIGINAL'), mkLogPages('COPY')),
       // Surfaced on the print/preview screen when a ticket has more charged items or
-      // job-log lines than fit the one-page cap (ITEM_ROW_CAP=20 / LOG_ROW_CAP=22) —
-      // extra pages are already added automatically above, this just tells the Ops
-      // Manager that happened and offers the alternative of trimming lines instead.
+      // job-log lines than fit the one-page cap (ITEM_ROW_CAP=24 / LOG_ROW_CAP=25,
+      // matching the real template's row counts) — extra pages are already added
+      // automatically above, this just tells the Ops Manager that happened and offers
+      // the alternative of trimming lines instead.
       printOverflow: svcOverflow || logOverflow,
       printOverflowText: (() => {
         const bits = [];
