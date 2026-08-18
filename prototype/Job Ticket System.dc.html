@@ -44,7 +44,61 @@
         <button onClick="{{ r.pick }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-left:1px solid rgba(242,242,243,0.18);background:{{ r.bg }};color:{{ r.fg }}">{{ r.label }}</button>
       </sc-for>
     </div>
+    <button onClick="{{ openSettings }}" title="Settings" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:transparent;border:1px solid rgba(242,242,243,0.28);color:#f2f2f3">⚙</button>
   </div>
+
+  <!-- ══ SETTINGS (overlay, any role) ══ -->
+  <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:#f2f2f3;z-index:50;overflow-y:auto">
+      <div style="max-width:480px;margin:0 auto;padding:26px 22px 60px">
+        <button onClick="{{ closeSettings }}" class="back-btn">‹ Close</button>
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
+
+        <div style="margin-bottom:28px">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:10px">Appearance</div>
+          <div style="display:flex;border:1px solid rgba(29,31,32,0.22);margin-bottom:16px">
+            <sc-for list="{{ themeOptions }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(29,31,32,0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <sc-for list="{{ accentSwatches }}" as="a" hint-placeholder-count="5">
+              <span onClick="{{ a.pick }}" style="width:26px;height:26px;border-radius:50%;background:{{ a.color }};box-shadow:0 0 0 2px #f2f2f3, 0 0 0 4px {{ a.color }};cursor:pointer;display:inline-block"></span>
+            </sc-for>
+          </div>
+          <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:10px">Dark mode and accent colour are saved here now — applying them across every screen is a separate follow-up pass, not done yet.</div>
+        </div>
+
+        <div style="margin-bottom:28px">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:10px">Date &amp; time</div>
+          <select value="{{ timezoneValue }}" onChange="{{ setTimezone }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:14px;background:#fff;border:1px solid rgba(29,31,32,0.22);color:#1d1f20;margin-bottom:12px">
+            <sc-for list="{{ timezoneOptions }}" as="z" hint-placeholder-count="7">
+              <option value="{{ z.value }}">{{ z.label }}</option>
+            </sc-for>
+          </select>
+          <div style="display:flex;border:1px solid rgba(29,31,32,0.22)">
+            <sc-for list="{{ timeFormatOptions }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(29,31,32,0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ settingsIsTech }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-bottom:28px;padding:14px;border:1px solid rgba(29,31,32,0.18);background:#fff">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div style="font-size:14px;font-weight:600">Share my arrival location with the Ops Manager</div>
+              <button onClick="{{ toggleShareLocation }}" style="width:42px;height:24px;flex:none;padding:0;border:1px solid rgba(29,31,32,0.3);background:{{ shareLocationBg }};position:relative;cursor:pointer">
+                <span style="position:absolute;top:1px;left:{{ shareLocationKnob }};width:18px;height:18px;background:#fff"></span>
+              </button>
+            </div>
+            <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:8px;line-height:1.4">Captured silently on arrival when a connection is available. Visible only to the Ops Manager — never shown on your screen.</div>
+          </div>
+        </sc-if>
+
+        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log out</button>
+      </div>
+    </div>
+  </sc-if>
 
   <!-- ══ TECHNICIAN ══ -->
   <sc-if value="{{ isTech }}" hint-placeholder-val="{{ true }}">
@@ -748,10 +802,37 @@ const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
 function dt(s) { return s ? new Date(s) : null; }
-function fdate(s) { const d = dt(s); return d ? d.getDate() + ' ' + MO[d.getMonth()] + ' ' + d.getFullYear() : '—'; }
-function fshort(s) { const d = dt(s); return d ? d.getDate() + ' ' + MO[d.getMonth()] : '—'; }
-function ftime(s) { const d = dt(s); if (!d) return '—'; const h = String(d.getHours()).padStart(2, '0'); return h + ':' + String(d.getMinutes()).padStart(2, '0'); }
-function fstamp(s) { return s ? fdate(s) + ' · ' + ftime(s) : '—'; }
+
+// Timezone + 24h/12h are read from Settings (S.data.settings) — 'device' timezone means
+// no explicit IANA zone is passed to Intl, so the browser's own local zone is used.
+const TIMEZONES = [
+  { id: 'device', label: 'Device timezone' },
+  { id: 'Africa/Tripoli', label: 'Tripoli (Libya)' },
+  { id: 'Africa/Cairo', label: 'Cairo' },
+  { id: 'Asia/Riyadh', label: 'Riyadh' },
+  { id: 'Asia/Dubai', label: 'Dubai' },
+  { id: 'Europe/London', label: 'London' },
+  { id: 'UTC', label: 'UTC' },
+];
+function fdate(s, tz) {
+  const d = dt(s); if (!d) return '—';
+  const opt = { day: 'numeric', month: 'short', year: 'numeric' };
+  if (tz && tz !== 'device') opt.timeZone = tz;
+  return new Intl.DateTimeFormat('en-GB', opt).format(d);
+}
+function fshort(s, tz) {
+  const d = dt(s); if (!d) return '—';
+  const opt = { day: 'numeric', month: 'short' };
+  if (tz && tz !== 'device') opt.timeZone = tz;
+  return new Intl.DateTimeFormat('en-GB', opt).format(d);
+}
+function ftime(s, tz, hour12) {
+  const d = dt(s); if (!d) return '—';
+  const opt = { hour: 'numeric', minute: '2-digit', hour12: !!hour12 };
+  if (tz && tz !== 'device') opt.timeZone = tz;
+  return new Intl.DateTimeFormat('en-GB', opt).format(d);
+}
+function fstamp(s, tz, hour12) { return s ? fdate(s, tz) + ' · ' + ftime(s, tz, hour12) : '—'; }
 function money(n) { return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 const BASE_ITEMS = [
@@ -772,6 +853,9 @@ function priceList(mult) {
 
 function seed() {
   return {
+    settings: {
+      theme: 'system', accent: 'steel', timezone: 'device', timeFormat: '24', shareLocation: true,
+    },
     clients: [
       { name: 'Kuwait Oil Group', fields: 'Burgan North, Raudhatain', rigs: 'WS-11, WS-14, RIG-208', items: priceList(1) },
       { name: 'Al-Dhafra Energy', fields: 'Ruwais West, Bab', rigs: 'AD-3, AD-7', items: priceList(1.08) },
@@ -853,7 +937,7 @@ class Component extends DCLogic {
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: 'price',
       activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
-      founderCount: 10, tick: 0,
+      founderCount: 10, tick: 0, showSettings: false,
     }, this.load());
   }
 
@@ -884,6 +968,9 @@ class Component extends DCLogic {
     const id = this.state.activeId;
     this.mutate(d => { const t = d.tickets.find(x => x.id === id); if (t) Object.assign(t, patch); });
   }
+  updateSettings(patch) {
+    this.mutate(d => { d.settings = Object.assign({}, d.settings, patch); });
+  }
   log(text) {
     const id = this.state.activeId;
     this.mutate(d => { const t = d.tickets.find(x => x.id === id); if (t) (t.audit = t.audit || []).push({ ts: iso(new Date()), text: text }); });
@@ -892,6 +979,16 @@ class Component extends DCLogic {
   itemTotal(it) { return (Number(it.qty) || 0) * (Number(it.cost) || 0); }
   ticketTotal(t) { return (t.items || []).reduce((s, i) => s + this.itemTotal(i), 0); }
 
+  fmt() {
+    const s = (this.state.data && this.state.data.settings) || {};
+    const tz = s.timezone, hr12 = s.timeFormat === '12';
+    return {
+      date: v => fdate(v, tz),
+      short: v => fshort(v, tz),
+      time: v => ftime(v, tz, hr12),
+      stamp: v => fstamp(v, tz, hr12),
+    };
+  }
   statusChip(t) {
     if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: '#1d2d3d', chipFg: '#f2f2f3' };
     if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: '#eef6ff', chipFg: '#2c455d' };
@@ -899,13 +996,14 @@ class Component extends DCLogic {
   }
   ticketView(t) {
     const chip = this.statusChip(t);
+    const F = this.fmt();
     return Object.assign({
       id: t.id, customer: t.customer, tech: t.tech, well: t.well, jobType: t.jobType || '—',
       locLine: [t.field, t.well, t.rig].filter(Boolean).join(' · '),
-      arrivalShort: fstamp(t.arrival), startShort: fshort(t.start), endShort: t.end ? fshort(t.end) : 'open',
-      dateRange: t.start ? fdate(t.start) + ' → ' + (t.end ? fdate(t.end) : 'open') : '—',
+      arrivalShort: F.stamp(t.arrival), startShort: F.short(t.start), endShort: t.end ? F.short(t.end) : 'open',
+      dateRange: t.start ? F.date(t.start) + ' → ' + (t.end ? F.date(t.end) : 'open') : '—',
       eventCount: (t.events || []).length,
-      syncLabel: t.synced ? fstamp(t.syncedAt) : 'not synced',
+      syncLabel: t.synced ? F.stamp(t.syncedAt) : 'not synced',
       noLabel: t.ticketNo || '— unassigned —',
       value: money(this.ticketTotal(t)),
       isApproved: t.status === 'approved',
@@ -926,6 +1024,7 @@ class Component extends DCLogic {
 
   renderVals() {
     const S = this.state, D = S.data, self = this;
+    const F = this.fmt();
     const roundTrip = this.props.roundTripFactor ?? 2;
     const t = this.ticket();
     const view = t ? this.ticketView(t) : {};
@@ -949,22 +1048,22 @@ class Component extends DCLogic {
 
     const sheetRowsService = t ? [
       { a: 'Customer', b: t.customer, c: 'Ticket No.', d: t.ticketNo || '—' },
-      { a: 'Field', b: t.field, c: 'Start job', d: fdate(t.start) },
-      { a: 'Well No.', b: t.well, c: 'End job', d: t.end ? fdate(t.end) : '—' },
+      { a: 'Field', b: t.field, c: 'Start job', d: F.date(t.start) },
+      { a: 'Well No.', b: t.well, c: 'End job', d: t.end ? F.date(t.end) : '—' },
       { a: 'Rig', b: t.rig, c: 'Mileage', d: t.mileage ? t.mileage + ' km × ' + roundTrip : '—' },
       { a: 'Technician', b: t.tech, c: 'Job type', d: t.jobType || '—' },
     ] : [];
     const sheetRowsLog = t ? [
       { a: 'Customer', b: t.customer, c: 'Ticket No.', d: t.ticketNo || '—' },
-      { a: 'Field', b: t.field, c: 'Arrival', d: fstamp(t.arrival) },
-      { a: 'Well No.', b: t.well, c: 'Start job', d: fdate(t.start) },
-      { a: 'Rig', b: t.rig, c: 'End job', d: t.end ? fdate(t.end) : '—' },
+      { a: 'Field', b: t.field, c: 'Arrival', d: F.stamp(t.arrival) },
+      { a: 'Well No.', b: t.well, c: 'Start job', d: F.date(t.start) },
+      { a: 'Rig', b: t.rig, c: 'End job', d: t.end ? F.date(t.end) : '—' },
       { a: 'Technician', b: t.tech, c: 'Job type', d: t.jobType || '—' },
     ] : [];
     const sheetItems = t ? (t.items || []).map(i => ({
       code: i.code, desc: i.desc, qty: String(i.qty), uom: i.uom, unit: money(i.cost), total: money(this.itemTotal(i)),
     })) : [];
-    const sheetEvents = t ? (t.events || []).map(e => ({ date: fshort(e.ts), time: ftime(e.ts), text: e.text })) : [];
+    const sheetEvents = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), text: e.text })) : [];
     const mkSheet = (kind, mark) => ({
       title: kind === 'svc' ? 'Service Ticket' : 'Job Log', mark: mark, no: t ? (t.ticketNo || '—') : '—',
       isService: kind === 'svc', isLog: kind === 'log',
@@ -974,7 +1073,7 @@ class Component extends DCLogic {
 
     const dialogs = {
       done: {
-        title: 'Mark job as done?', body: 'End Job will be stamped ' + fstamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
+        title: 'Mark job as done?', body: 'End Job will be stamped ' + F.stamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
         okLabel: 'Yes, job done', cancelLabel: 'Keep logging', hasCancel: true,
         confirm: () => { this.patchTicket({ status: 'done', end: iso(new Date()) }); this.log('Marked Job Done on device.'); this.setState({ dialog: null }); },
       },
@@ -1020,6 +1119,10 @@ class Component extends DCLogic {
         okLabel: 'Reset', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => { const s = seed(); this.persist(s); this.setState({ data: s, dialog: null, activeId: 't3', mgrScreen: 'inbox', techScreen: 'list' }); },
       },
+      logoutInfo: {
+        title: 'Logout', body: 'Real sign-out arrives with real Login/Signup, not built yet in this prototype. For now, switch roles from the tabs at the top.',
+        okLabel: 'Got it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
+      },
     };
 
     return {
@@ -1033,7 +1136,41 @@ class Component extends DCLogic {
       })),
       isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
 
-      clock: ftime(iso(new Date())),
+      showSettings: S.showSettings,
+      openSettings: () => this.setState({ showSettings: true }),
+      closeSettings: () => this.setState({ showSettings: false }),
+      settingsIsTech: S.role === 'tech',
+      themeOptions: ['system', 'light', 'dark'].map(k => ({
+        key: k, label: k.charAt(0).toUpperCase() + k.slice(1),
+        bg: (D.settings || {}).theme === k ? '#5980a6' : 'transparent',
+        fg: (D.settings || {}).theme === k ? '#f2f2f3' : '#1d1f20',
+        pick: () => this.updateSettings({ theme: k }),
+      })),
+      accentSwatches: [
+        { key: 'steel', color: '#5980a6' }, { key: 'graphite', color: '#4a4a4d' },
+        { key: 'teal', color: '#2c7a72' }, { key: 'indigo', color: '#4c5c9e' },
+        { key: 'terracotta', color: '#b0644a' },
+      ].map(a => ({
+        key: a.key, color: a.color,
+        ring: (D.settings || {}).accent === a.key ? '2px solid #1d1f20' : '2px solid transparent',
+        pick: () => this.updateSettings({ accent: a.key }),
+      })),
+      timezoneOptions: TIMEZONES.map(z => ({ value: z.id, label: z.label })),
+      timezoneValue: (D.settings || {}).timezone || 'device',
+      setTimezone: e => this.updateSettings({ timezone: e.target.value }),
+      timeFormatOptions: [{ k: '24', l: '24-hour' }, { k: '12', l: '12-hour' }].map(o => ({
+        key: o.k, label: o.l,
+        bg: (D.settings || {}).timeFormat === o.k ? '#5980a6' : 'transparent',
+        fg: (D.settings || {}).timeFormat === o.k ? '#f2f2f3' : '#1d1f20',
+        pick: () => this.updateSettings({ timeFormat: o.k }),
+      })),
+      shareLocation: !!(D.settings || {}).shareLocation,
+      shareLocationBg: (D.settings || {}).shareLocation ? '#5980a6' : '#e9e9ea',
+      shareLocationKnob: (D.settings || {}).shareLocation ? '20px' : '2px',
+      toggleShareLocation: () => this.updateSettings({ shareLocation: !(D.settings || {}).shareLocation }),
+      doLogout: () => this.setState({ showSettings: false, dialog: 'logoutInfo' }),
+
+      clock: F.time(iso(new Date())),
       netDot: S.online ? '#5980a6' : '#98989b',
       netLabel: S.online ? 'ONLINE' : 'NO SIGNAL',
       toggleOnline: () => this.setState({ online: !S.online }),
@@ -1063,7 +1200,7 @@ class Component extends DCLogic {
       })),
       startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: 'Yousef Al-Harbi', customer: '', field: '', well: '', rig: '' } }),
       backToList: () => this.setState({ techScreen: 'list', draft: null }),
-      draftArrival: S.draft ? fstamp(S.draft.arrival) : fstamp(iso(new Date())),
+      draftArrival: S.draft ? F.stamp(S.draft.arrival) : F.stamp(iso(new Date())),
       d: S.draft || { tech: '', customer: '', field: '', well: '', rig: '' },
       clientNames: D.clients.map(c => ({ name: c.name })),
       createDisabled: !(S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig),
@@ -1081,7 +1218,7 @@ class Component extends DCLogic {
 
       cur: view,
       curEvents: t ? (t.events || []).map((e, i) => ({
-        dateLine: fshort(e.ts), timeLine: ftime(e.ts), stamp: fstamp(e.ts), text: e.text,
+        dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         onChange: ev => { const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
         remove: () => this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); }),
       })) : [],
@@ -1120,8 +1257,8 @@ class Component extends DCLogic {
       headerFields: t ? [
         { label: 'Technician', value: t.tech }, { label: 'Customer', value: t.customer },
         { label: 'Field', value: t.field }, { label: 'Well No.', value: t.well },
-        { label: 'Rig', value: t.rig }, { label: 'Arrival', value: fstamp(t.arrival) },
-        { label: 'Start job', value: fdate(t.start) }, { label: 'End job', value: t.end ? fdate(t.end) : 'open' },
+        { label: 'Rig', value: t.rig }, { label: 'Arrival', value: F.stamp(t.arrival) },
+        { label: 'Start job', value: F.date(t.start) }, { label: 'End job', value: t.end ? F.date(t.end) : 'open' },
       ] : [],
       noMsg: issue.msg || '', noBorder: issue.bad ? '#8c3b3b' : 'rgba(29,31,32,0.16)',
       noMsgColor: issue.bad ? '#8c3b3b' : (issue.ok ? '#416180' : 'rgba(29,31,32,0.6)'),
@@ -1185,7 +1322,7 @@ class Component extends DCLogic {
       },
       askReopen: () => this.setState({ dialog: 'reopen', reasonText: '' }),
       goPrint: () => this.setState({ mgrScreen: 'print' }),
-      curAudit: t ? (t.audit || []).slice().reverse().map(a => ({ stamp: fstamp(a.ts), text: a.text })) : [],
+      curAudit: t ? (t.audit || []).slice().reverse().map(a => ({ stamp: F.stamp(a.ts), text: a.text })) : [],
       sheets: [mkSheet('svc', 'ORIGINAL'), mkSheet('svc', 'COPY'), mkSheet('log', 'ORIGINAL'), mkSheet('log', 'COPY')],
       exportExcel: () => this.setState({ dialog: 'export' }),
 
