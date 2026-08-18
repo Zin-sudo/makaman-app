@@ -38,7 +38,10 @@
 <div style="min-height:100vh;background:#f2f2f3">
 
   <div style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:#1d2d3d;color:#f2f2f3">
-    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em;margin-right:auto">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
+      <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
+    </div>
     <div style="display:flex;gap:0;border:1px solid rgba(242,242,243,0.28)">
       <sc-for list="{{ roles }}" as="r" hint-placeholder-count="4">
         <button onClick="{{ r.pick }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-left:1px solid rgba(242,242,243,0.18);background:{{ r.bg }};color:{{ r.fg }}">{{ r.label }}</button>
@@ -52,6 +55,9 @@
     <div style="position:fixed;inset:0;background:#f2f2f3;z-index:50;overflow-y:auto">
       <div style="max-width:480px;margin:0 auto;padding:26px 22px 60px">
         <button onClick="{{ closeSettings }}" class="back-btn">‹ Close</button>
+        <div style="display:flex;justify-content:center;margin:8px 0 20px">
+          <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:40px;width:auto">
+        </div>
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
 
         <div style="margin-bottom:28px">
