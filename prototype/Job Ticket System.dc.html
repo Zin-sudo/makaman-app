@@ -803,7 +803,7 @@
                   </thead>
                   <tbody>
                     <sc-for list="{{ sh.items }}" as="i" hint-placeholder-count="4">
-                      <tr>
+                      <tr style="height:19px">
                         <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);white-space:nowrap">{{ i.code }}</td>
                         <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3)">{{ i.desc }}</td>
                         <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right">{{ i.qty }}</td>
@@ -855,7 +855,7 @@
                   </thead>
                   <tbody>
                     <sc-for list="{{ sh.events }}" as="e" hint-placeholder-count="5">
-                      <tr>
+                      <tr style="height:19px">
                         <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);white-space:nowrap">{{ e.date }}</td>
                         <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);white-space:nowrap">{{ e.time }}</td>
                         <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;color:rgba(29,31,32,0.5)">{{ e.pressure }}</td>
@@ -1628,10 +1628,14 @@ class Component extends DCLogic {
     // The real template's item table runs rows 16-39 (24 rows) before the Total row, and
     // its Job Log table runs rows 20-44 (25 rows) before the signature block — both
     // ranges hold that shape whether or not every row is filled in, so the printed page
-    // always shows the same number of ruled lines. Padding out to those same counts here
-    // keeps the on-screen preview's proportions honest to what the real form looks like.
-    const ITEM_ROW_CAP = 24;
-    const LOG_ROW_CAP = 25;
+    // always shows the same number of ruled lines. Padding sheetItems/sheetEvents out to
+    // a fixed count (below) reproduces that. The real counts (24/25) don't fit this
+    // preview's fixed A4-proportioned card once every row — not just the filled ones —
+    // gets real height (19px, matching a filled row) instead of collapsing to near-zero;
+    // trimmed down so the ruled table reaches close to the signature block without
+    // pushing it off the bottom of the page.
+    const ITEM_ROW_CAP = 20;
+    const LOG_ROW_CAP = 22;
     const sheetItemsReal = t ? (t.items || []).map(i => ({
       code: i.code, desc: i.desc,
       qty: i.kind === 'percent' ? '—' : String(i.qty),
