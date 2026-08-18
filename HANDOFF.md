@@ -332,3 +332,21 @@ unpkg.com URLs to the local files for rendering purposes only. Nothing in
 setup for every future preview until vendoring those libraries locally becomes the real,
 intentional fix (part of the already-flagged offline/installable work — not something to
 do early/quietly).
+
+---
+
+## Session checkpoint — baseline preview corrected: Ops Manager Ticket View was missing
+
+User caught that the first baseline preview batch (4 role-landing screens) skipped the
+Ops Manager's **Ticket View / Review Detail** screen (opened by clicking Review/View from
+the Inbox — sections "1 Ticket Number & Mileage", "2 Charged Items", "3 Job Log From The
+Field", "4 Approval", right column Ticket Header + Audit Trail). Captured both states now:
+- Approved (Kuwait Oil Group · BG-214, $27,920.40) — confirmed exact match to the user's
+  own screenshot of this screen.
+- Awaiting Review (Al-Dhafra Energy · RW-98) — same template, unapproved state.
+
+**Lesson for future baseline/preview passes:** the four top-level role landings are not
+the whole app — each role has sub-screens reached by navigation (ticket detail, new
+ticket, job log, settings, etc.) that also need covering before calling a baseline (or
+any "after a major step" preview) complete. Don't assume the landing screens alone
+satisfy the "preview after every major step" standing rule.
