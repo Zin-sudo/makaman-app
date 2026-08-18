@@ -157,3 +157,36 @@ Generation should be a Supabase Edge Function, not the browser, using the real `
 - Role changes to Admin or Ops Manager are restricted to Admins inside that function, independently of what the UI shows.
 - The seeded Admin password was shared in a chat transcript and should be rotated.
 - The Admin's first-boot seed used a direct `insert into auth.users` (with `crypt()`/pgcrypto for the password hash) plus a matching `auth.identities` row, because no MCP tool exposed an "create auth user directly" action. This is an unsupported-but-commonly-used pattern for bootstrapping the first account; verify login works and don't repeat it for anyone else — use `admin-actions`'s `create_technician` action (or the real signup+approve flow) for every subsequent account.
+
+---
+
+## Session checkpoint — paused for Claude Pro usage reset
+
+Working from the other session's handoff bundle (`NEXT_SESSION_BRIEF.md`, `CELL_MAPPING.md`,
+`REQUESTS_TO_FLAG.md`, `Field_Technician_Logging_App.zip`). Plan agreed with the user:
+work only inside `Job Ticket System.dc.html` (never port frameworks, never touch
+`support.js`, never restyle), cheap-first with a screenshot preview after every change,
+backend/Vercel untouched until the whole visual layer is signed off. Prototype not yet
+committed into this repo (still pending the `prototype/` baseline commit step).
+
+**AskUserQuestion phase (4 questions total, per the other session's pre-batching) — status:**
+
+- **Q1 (business rules, items 1–4)** — not asked yet.
+- **Q2 (app-level features, items 5–8) — ANSWERED.** User selected **all four**:
+  - Settings screen (Light/Dark/System + accent, timezone, 12h/24h, silent-location
+    toggle, red full-width Logout)
+  - Real Login/Signup (replaces the demo role-switcher; signups pending, Ops Manager
+    approval auto-assigns Technician)
+  - Role management (Admin promotes to Admin/Ops Manager; Admin **and** Ops Manager can
+    create Technician accounts directly)
+  - Real Makaman logo (swap text branding for the real lockup — large/centred on
+    Login/Signup, medium on Settings)
+  - (Item 9 — ticket-level Arrival/Start/End editable by Ops Manager + audit trail — was
+    folded into this question's context as "already partially there, verify it," not a
+    separate toggle. Still needs explicit confirmation once we're back in the zip.)
+- **Q3 (backend timing: now vs. after the four sheets)** — not asked yet.
+- **Q4 (Pressure/Total columns on job-log lines)** — not asked yet.
+
+**Resume point:** ask Q1, Q3, Q4 (can combine into remaining AskUserQuestion calls, cap 4
+questions/call), then start the `prototype/` baseline commit + first screenshot-gated
+edit pass. Do not re-ask Q2 — already answered above.
