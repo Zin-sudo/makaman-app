@@ -561,3 +561,33 @@ prototype's visual/behavioural layer per the existing backend-timing answer (Q3:
 the four sheets... wait, four sheets ARE Part B — sequencing stays: visual layer signed
 off first, then Part B/four-sheets + Observer live-view work, then final backend wiring
 for auth/roles). Nothing built yet, decisions recorded for when we get there.
+
+---
+
+## Session checkpoint — renamed: branch, Vercel project, Supabase project
+
+User renamed all three for consistent naming:
+- **Branch**: `claude/job-log-timestamps-locked-8m5mz0` → **`claude/makaman-app`**
+  (renamed on GitHub directly; local checkout switched and tracking updated). This is now
+  the working branch for all future commits/pushes in this repo.
+- **Vercel project**: `makaman-job-ticket` → `makaman-app`.
+- **Supabase project**: `makaman-job-tickets` → `makaman-app` (display name only —
+  project ref `igutjfezxkdncrcpvnqx` and API URL unchanged).
+- **GitHub repo itself** did NOT change name — still `Zin-sudo/makaman-app`. Only the
+  branch was renamed.
+
+**Verified no further action needed:**
+- No open PRs existed, so nothing to redirect there.
+- Supabase requires zero config changes anywhere — ref/URL are immutable, unrelated to
+  display name.
+- Vercel's OIDC-claims rename warning is boilerplate that fires on every rename; doesn't
+  apply here since this project uses a plain Supabase URL + anon key, not OIDC
+  federation.
+- Vercel env vars (`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`) should be unaffected
+  since the Supabase URL didn't change — **not yet verified live** (Vercel MCP connector
+  was disconnected in this session when this was checked) — worth a quick manual glance
+  in Vercel → Settings → Environment Variables to confirm, or re-verify via tools next
+  session once the connector's back.
+- Vercel's own default deployment URL DID change (was `makaman-job-tickets.vercel.app`,
+  now presumably `makaman-app.vercel.app` or similar) — re-test the live app at the new
+  URL, the old bookmark won't resolve.
