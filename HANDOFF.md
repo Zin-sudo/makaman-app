@@ -309,3 +309,26 @@ after every major step** (not just individual small edits) — e.g. after a scre
 built out, after a batch of related changes lands, after backend wiring goes in, after a
 deploy. Don't let this rule get lost/skipped as the work progresses — check back against
 it before declaring any major step "done."
+
+---
+
+## Session checkpoint — baseline preview rendered, CDN-block confirmed independently
+
+Rendered the untouched zip's `Job Ticket System.dc.html` (Technician, Ops Manager,
+Admin, Founder views) as the "before" baseline, before any edits. Screenshots sent to
+the user, not stored in the repo (scratchpad only, regenerate on demand).
+
+**Confirms the brief's flagged contradiction independently, from a different angle:**
+this session's own sandbox network policy blocks `unpkg.com` outbound (proxy denial log
+shows explicit 403 on CONNECT to unpkg.com). The prototype could not render at all until
+worked around — real, first-hand evidence the app cannot boot without that CDN reachable,
+not just a theoretical concern from the brief.
+
+**Preview workaround used (does not touch the prototype):** npm-installed the identical
+`react@18.3.1`, `react-dom@18.3.1`, `@babel/standalone@7.29.0` packages into the
+scratchpad, then used Playwright's `page.route()` to redirect just those three exact
+unpkg.com URLs to the local files for rendering purposes only. Nothing in
+`Job Ticket System.dc.html` or `support.js` was modified. Reuse this same interception
+setup for every future preview until vendoring those libraries locally becomes the real,
+intentional fix (part of the already-flagged offline/installable work — not something to
+do early/quietly).
