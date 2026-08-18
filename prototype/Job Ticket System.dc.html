@@ -738,10 +738,18 @@
         <div style="text-align:right;font-size:12px;color:rgba(29,31,32,0.6);margin-bottom:18px">{{ cloudExportNote }}</div>
         <!-- This preview reproduces the real "Autofill_ServiceTikcet_System.xlsx" template
              field-by-field (labels, grouping and row order taken from its actual Service
-             Ticket / Job Log sheets) rather than a from-scratch design. -->
-        <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+             Ticket / Job Log sheets) rather than a from-scratch design. All 4 of that
+             workbook's sheets are set to portrait page orientation (confirmed via
+             ws.page_setup.orientation), so each card below is locked to a fixed A4
+             portrait aspect ratio (210:297, aspect-ratio CSS) rather than stretching to
+             fit its content — one page-shaped card per row, closer to what actually
+             prints than a 2-up landscape-feeling grid. A ticket with more content than
+             fits one A4 page scrolls inside the card (matching a real print run that
+             would spill onto a second physical page) instead of growing the card taller
+             than a real page. -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:22px">
           <sc-for list="{{ sheets }}" as="sh" hint-placeholder-count="4">
-            <div style="background:#fff;border:1px solid rgba(29,31,32,0.3);padding:18px;box-shadow:0 3px 10px rgba(43,43,45,0.16);font-size:11px">
+            <div style="width:100%;max-width:640px;aspect-ratio:210/297;overflow-y:auto;background:#fff;border:1px solid rgba(29,31,32,0.3);padding:18px;box-shadow:0 3px 10px rgba(43,43,45,0.16);font-size:11px">
               <div style="display:flex;align-items:stretch;gap:0;border:1px solid rgba(29,31,32,0.3);margin-bottom:0">
                 <div style="flex:1;padding:8px 10px;border-right:1px solid rgba(29,31,32,0.3)">
                   <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.03em">MAKAMAN OILFIELD SERVICES</div>
