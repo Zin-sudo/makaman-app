@@ -734,3 +734,46 @@ visibility fix from Q1/general polish. 6 commits total, most recent `01c6931`.
 4. Discount as a discretionary price-list item
 Plus: item search + behavioral suggestions for Ops Manager, in-progress online/offline
 badge, Observer/Ops live-event-view, auto-sync timer — all still pending.
+
+---
+
+## Session checkpoint — prototype edits #7 and #8 complete (Q1 items 1 and 2)
+
+**Edit #7 (`9c9e96c`)** — job-log line timestamps are no longer locked. Every job-log
+line under "3 · Job log from the field" now has a `datetime-local` input (was a plain
+div), editable by Ops Manager/Admin, same audit-trail pattern as everything else. Ticket-
+level Arrival/Start job/End job (in the "Ticket header" box) got the same treatment —
+previously read-only text, now editable inputs. This reverses the original handoff's
+"stays locked" default per the user's explicit correction mid-session ("YES i mean those
+from individual job-log line timestamps too").
+Verified: typed a new value into a job-log line's timestamp AND into the ticket-level
+Arrival field independently (had to be careful — DOM order puts job-log lines before the
+ticket-header box, so naive `.first()`/`.nth()` selection across all 8 datetime-local
+inputs on the page grabs the wrong one; counted all 8 and confirmed indices 0-4 are
+job-log lines, 5-7 are Arrival/Start/End before touching anything). Both edits produced
+correct audit-trail entries.
+
+**Edit #8 (`751fb3a`)** — B13 (Base Location) / F14 (Customer Rep.) are now permanent,
+admin-configured defaults instead of unset per-ticket text. Added `d.orgDefaults` to seed
+data, a "Ticket Defaults" box on Admin's System tab to edit the org-wide values, and
+pulled those defaults into every new ticket at draft time. Ops Manager/Admin can still
+override either field per-ticket from the Ticket header box (third field-type alongside
+the existing read-only and datetime-editable ones) — every override is audit-logged with
+old value shown as `"(default)"` when never touched before.
+Also folded in a fix for 5 stale "OneDrive" text references left over from an earlier,
+since-superseded storage decision (System tab, mgrPrint screen, Admin footnote, seed
+ticket audit entry, export dialog) — all now say "downloaded from the app" consistently.
+Verified end-to-end: typed real values into both fields on the seeded Al-Dhafra Energy /
+RW-98 ticket, confirmed they persisted, confirmed exact audit-trail wording matches the
+`<label> changed by <name>: "<old>" -> "<new>"` pattern used elsewhere.
+
+**Q1 remaining: items 3 and 4** — 20% desert/marine surcharge and discretionary discount
+as selectable, waivable price-list items (kind: percent-of-subtotal, sign +/-, surcharge
+carries a default-add-on-draft flag). This is the next item up. Also still pending: item
+search + behavioral suggestions for Ops Manager, in-progress online/offline badge,
+Observer/Ops live-event-view, auto-sync timer.
+
+Operating mode for this stretch of work, per explicit user instruction: make one
+self-contained edit, verify with real interaction (not just a screenshot), commit+push
+immediately with a detailed message, move to the next item without stopping for
+approval — only stop if the user interjects.
