@@ -1039,3 +1039,12 @@ sweep, still 0 overflow.
 
 Excel-fill/download logic itself and the app's business math were deliberately not
 touched — this was scoped to the on-screen preview layout only.
+
+**Follow-up (`89631eb`)**: user asked for portrait, not landscape, to match real
+printing. Switched the 4 sheets from a 2-up grid to one centered column (one page per
+row), then — second round of feedback — locked each card to a fixed A4 aspect ratio
+(210:297 via CSS `aspect-ratio`, ~640x905px) instead of letting height follow content,
+since all 4 real sheets are configured portrait in their own page setup. Content past
+one page's worth scrolls inside the card rather than stretching it, mirroring a real
+print run spilling onto a second page. Re-verified 0 overflow across all 16
+role/viewport combinations.
