@@ -37,15 +37,79 @@
 
 <div style="min-height:100vh;background:#f2f2f3">
 
+  <!-- ══ LOGIN / SIGNUP (logged out) ══ -->
+  <sc-if value="{{ loggedOut }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
+      <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:56px;width:auto;margin-bottom:34px">
+
+      <sc-if value="{{ authIsLogin }}" hint-placeholder-val="{{ true }}">
+        <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14)">
+          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Makaman Job Tickets</h2>
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Password</div>
+          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+          <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ authError }}</div>
+          </sc-if>
+          <button onClick="{{ doLogin }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log in</button>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(29,31,32,0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ authIsSignup }}" hint-placeholder-val="{{ false }}">
+        <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14)">
+          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Full name</div>
+          <input value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Password</div>
+          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Confirm password</div>
+          <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+          <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ authError }}</div>
+          </sc-if>
+          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Request account</button>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(29,31,32,0.6)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ signupDone }}" hint-placeholder-val="{{ false }}">
+        <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14);text-align:center">
+          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Request sent</h2>
+          <p style="font-size:14px;color:rgba(29,31,32,0.7);line-height:1.5;margin:0 0 20px">An Ops Manager needs to approve your account before you can log in. You'll be assigned the Field Technician role automatically once approved.</p>
+          <button onClick="{{ goToLogin }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Back to login</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ══ PENDING APPROVAL (logged in, not yet approved) ══ -->
+  <sc-if value="{{ isPendingUser }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
+      <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:56px;width:auto;margin-bottom:34px">
+      <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14);text-align:center">
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Waiting for approval</h2>
+        <p style="font-size:14px;color:rgba(29,31,32,0.7);line-height:1.5;margin:0 0 20px">Signed in as {{ sessionName }}. An Ops Manager or Admin still needs to approve your account.</p>
+        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Check again</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log out</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ MAIN APP (logged in) ══ -->
+  <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}">
+
   <div style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:#1d2d3d;color:#f2f2f3">
     <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
-    <div style="display:flex;gap:0;border:1px solid rgba(242,242,243,0.28)">
-      <sc-for list="{{ roles }}" as="r" hint-placeholder-count="4">
-        <button onClick="{{ r.pick }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-left:1px solid rgba(242,242,243,0.18);background:{{ r.bg }};color:{{ r.fg }}">{{ r.label }}</button>
-      </sc-for>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(242,242,243,0.22);font-size:13px">
+      <span style="font-weight:600">{{ sessionName }}</span>
+      <span style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
     </div>
     <button onClick="{{ openSettings }}" title="Settings" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:transparent;border:1px solid rgba(242,242,243,0.28);color:#f2f2f3">⚙</button>
   </div>
@@ -665,15 +729,21 @@
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Role</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Base</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Last sync</th>
+                  <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)"></th>
                 </tr>
               </thead>
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ u.name }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)"><span style="font-size:11px;padding:3px 9px;background:#eef6ff;color:#2c455d">{{ u.role }}</span></td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.75)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.6)">{{ u.lastSync }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right">
+                      <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Approve → Technician</button>
+                      </sc-if>
+                    </td>
                   </tr>
                 </sc-for>
               </tbody>
@@ -798,11 +868,15 @@
       </div>
     </div>
   </sc-if>
+
+  </sc-if>
+  <!-- end loggedIn -->
 </div>
 
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;roundTripFactor&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:1,&quot;max&quot;:3,&quot;section&quot;:&quot;Charging&quot;},&quot;strictNumberFormat&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Rules&quot;}}">
 const K = 'makaman.jobtickets.v2';
+const SK = 'makaman.jobtickets.session.v1';
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function iso(d) { return new Date(d).toISOString(); }
@@ -878,10 +952,11 @@ function seed() {
       'RBP FOR WELLHEAD MAINTENANCE', 'COMBINATION FOR LOCATE LEAK',
     ],
     users: [
-      { name: 'Yousef Al-Harbi', role: 'Field Technician', base: 'Ahmadi Base', lastSync: '2 h ago' },
-      { name: 'Mahmoud Zaki', role: 'Field Technician', base: 'Ahmadi Base', lastSync: 'yesterday' },
-      { name: 'Omar Al-Saleh', role: 'Operations Manager', base: 'Ahmadi Base', lastSync: 'live' },
-      { name: 'R. Makaman', role: 'Observer', base: '—', lastSync: 'live' },
+      { name: 'Yousef Al-Harbi', role: 'Field Technician', roleKey: 'tech', email: 'yousef@makaman.ly', base: 'Ahmadi Base', lastSync: '2 h ago', status: 'active' },
+      { name: 'Mahmoud Zaki', role: 'Field Technician', roleKey: 'tech', email: 'mahmoud@makaman.ly', base: 'Ahmadi Base', lastSync: 'yesterday', status: 'active' },
+      { name: 'Omar Al-Saleh', role: 'Operations Manager', roleKey: 'mgr', email: 'omar@makaman.ly', base: 'Ahmadi Base', lastSync: 'live', status: 'active' },
+      { name: 'M. Lateri', role: 'Admin', roleKey: 'admin', email: 'lateri@makaman.ly', base: 'Ahmadi Base', lastSync: 'live', status: 'active' },
+      { name: 'R. Makaman', role: 'Observer', roleKey: 'founder', email: 'founder@makaman.ly', base: '—', lastSync: 'live', status: 'active' },
     ],
     tickets: [
       {
@@ -944,6 +1019,8 @@ class Component extends DCLogic {
       activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false,
+      session: null, authScreen: 'login', authEmail: '', authPassword: '',
+      authFullName: '', authConfirm: '', authError: '', signupDone: false,
     }, this.load());
   }
 
@@ -953,7 +1030,18 @@ class Component extends DCLogic {
       const raw = localStorage.getItem(K);
       if (raw) data = Object.assign(data, JSON.parse(raw));
     } catch (e) { /* first run */ }
-    return { data: data };
+    let session = null;
+    try {
+      const rawS = localStorage.getItem(SK);
+      if (rawS) session = JSON.parse(rawS);
+    } catch (e) { /* first run */ }
+    return session ? { data: data, session: session, role: session.roleKey } : { data: data };
+  }
+  persistSession(session) {
+    try {
+      if (session) localStorage.setItem(SK, JSON.stringify(session));
+      else localStorage.removeItem(SK);
+    } catch (e) { /* quota */ }
   }
   persist(data) {
     try { localStorage.setItem(K, JSON.stringify(data)); } catch (e) { /* quota */ }
@@ -1125,22 +1213,63 @@ class Component extends DCLogic {
         okLabel: 'Reset', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => { const s = seed(); this.persist(s); this.setState({ data: s, dialog: null, activeId: 't3', mgrScreen: 'inbox', techScreen: 'list' }); },
       },
-      logoutInfo: {
-        title: 'Logout', body: 'Real sign-out arrives with real Login/Signup, not built yet in this prototype. For now, switch roles from the tabs at the top.',
-        okLabel: 'Got it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
-      },
     };
 
+    const doLogin = () => {
+      const email = (S.authEmail || '').trim().toLowerCase();
+      const pass = S.authPassword || '';
+      if (!email || !pass) { this.setState({ authError: 'Enter your email and password.' }); return; }
+      const user = (D.users || []).find(u => (u.email || '').toLowerCase() === email);
+      if (!user) { this.setState({ authError: 'No account with that email.' }); return; }
+      const session = { email: user.email, name: user.name, roleKey: user.roleKey, status: user.status };
+      this.persistSession(session);
+      this.setState({ session: session, role: user.roleKey || S.role, authEmail: '', authPassword: '', authError: '' });
+    };
+    const doSignup = () => {
+      const name = (S.authFullName || '').trim();
+      const email = (S.authEmail || '').trim().toLowerCase();
+      const pass = S.authPassword || '';
+      const confirm = S.authConfirm || '';
+      if (!name || !email || !pass || !confirm) { this.setState({ authError: 'Fill in every field.' }); return; }
+      if (pass.length < 8) { this.setState({ authError: 'Password must be at least 8 characters.' }); return; }
+      if (pass !== confirm) { this.setState({ authError: 'Passwords do not match.' }); return; }
+      if ((D.users || []).some(u => (u.email || '').toLowerCase() === email)) { this.setState({ authError: 'An account with that email already exists.' }); return; }
+      this.mutate(d => {
+        (d.users = d.users || []).push({
+          name: name, role: 'Pending', roleKey: null, email: email, password: pass,
+          base: '—', lastSync: '—', status: 'pending',
+        });
+      });
+      this.setState({ signupDone: true, authError: '' });
+    };
+    const doLogout = () => { this.persistSession(null); this.setState({ session: null, showSettings: false, dialog: null }); };
+
     return {
-      roles: [
-        { key: 'tech', label: 'Technician' }, { key: 'mgr', label: 'Ops Manager' },
-        { key: 'admin', label: 'Admin' }, { key: 'founder', label: 'Observer' },
-      ].map(r => ({
-        label: r.label, bg: S.role === r.key ? '#5980a6' : 'transparent',
-        fg: S.role === r.key ? '#f2f2f3' : 'rgba(242,242,243,0.75)',
-        pick: () => this.setState({ role: r.key }),
-      })),
+      loggedIn: !!S.session && S.session.status === 'active',
+      isPendingUser: !!S.session && S.session.status === 'pending',
+      loggedOut: !S.session,
+      authIsLogin: S.authScreen === 'login' && !S.signupDone,
+      authIsSignup: S.authScreen === 'signup' && !S.signupDone,
+      signupDone: S.signupDone,
+      authError: S.authError,
+      sessionName: S.session ? S.session.name : '',
+      goToLogin: () => this.setState({ authScreen: 'login', authError: '', signupDone: false }),
+      goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
+      doLogin: doLogin,
+      doSignup: doSignup,
+      doLogout: doLogout,
+      pendingCheckAgain: () => {
+        const email = (S.session && S.session.email) || '';
+        const user = (D.users || []).find(u => (u.email || '').toLowerCase() === email.toLowerCase());
+        if (user && user.status === 'active') {
+          const session = { email: user.email, name: user.name, roleKey: user.roleKey, status: 'active' };
+          this.persistSession(session);
+          this.setState({ session: session, role: user.roleKey });
+        }
+      },
+
       isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
+      currentRoleLabel: { tech: 'Technician', mgr: 'Ops Manager', admin: 'Admin', founder: 'Observer' }[S.role] || '',
 
       showSettings: S.showSettings,
       openSettings: () => this.setState({ showSettings: true }),
@@ -1174,7 +1303,6 @@ class Component extends DCLogic {
       shareLocationBg: (D.settings || {}).shareLocation ? '#5980a6' : '#e9e9ea',
       shareLocationKnob: (D.settings || {}).shareLocation ? '20px' : '2px',
       toggleShareLocation: () => this.updateSettings({ shareLocation: !(D.settings || {}).shareLocation }),
-      doLogout: () => this.setState({ showSettings: false, dialog: 'logoutInfo' }),
 
       clock: F.time(iso(new Date())),
       netDot: S.online ? '#5980a6' : '#98989b',
@@ -1367,7 +1495,16 @@ class Component extends DCLogic {
         this.mutate(d => { if (d.jobTypes.indexOf(v) < 0) d.jobTypes.push(v); });
         this.setState({ newJobType: '' });
       },
-      users: D.users,
+      users: (D.users || []).map(u => ({
+        name: u.name, role: u.status === 'pending' ? 'Pending approval' : u.role, base: u.base, lastSync: u.lastSync,
+        isPending: u.status === 'pending',
+        roleBg: u.status === 'pending' ? 'rgba(181,121,12,0.14)' : '#eef6ff',
+        roleFg: u.status === 'pending' ? '#8a5b09' : '#2c455d',
+        approve: () => this.mutate(d => {
+          const target = (d.users || []).find(x => x.email === u.email);
+          if (target) { target.role = 'Field Technician'; target.roleKey = 'tech'; target.status = 'active'; }
+        }),
+      })),
       clientCards: D.clients.map(c => ({ name: c.name, fields: c.fields, rigs: c.rigs, itemCount: c.items.length })),
       systemRows: [
         { label: 'Mileage charging', hint: 'One-way KM entered, charged both ways', value: '× ' + roundTrip },
@@ -1405,6 +1542,10 @@ class Component extends DCLogic {
         newJobType: e => this.setState({ newJobType: e.target.value }),
         reason: e => this.setState({ reasonText: e.target.value }),
         founderCount: e => this.setState({ founderCount: Number(e.target.value) }),
+        authEmail: e => this.setState({ authEmail: e.target.value, authError: '' }),
+        authPassword: e => this.setState({ authPassword: e.target.value, authError: '' }),
+        authFullName: e => this.setState({ authFullName: e.target.value, authError: '' }),
+        authConfirm: e => this.setState({ authConfirm: e.target.value, authError: '' }),
       },
     };
   }
