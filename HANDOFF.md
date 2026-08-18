@@ -605,3 +605,18 @@ Both match the project ref exactly, confirming the rename to `makaman-app` didn'
 either value (as expected — they're keyed off the immutable ref, not the display name).
 **No action needed on Vercel or Supabase — the connection is correct as-is.** Rename
 follow-up (branch/Vercel/Supabase naming + cross-service check) is now fully closed out.
+
+---
+
+## Session checkpoint — connections check (GitHub / Supabase / Vercel)
+
+- **GitHub**: connected, working. `get_me` succeeded.
+- **Supabase**: connected, working. `list_projects` succeeded — confirmed project
+  **`Makaman-app`** (`igutjfezxkdncrcpvnqx`), `ACTIVE_HEALTHY`. Rename is live on the API
+  side, not just the dashboard.
+- **Vercel**: connection itself works (no auth error), but `list_projects` returned
+  empty and `get_project("makaman-app")` returned 404, despite the project genuinely
+  existing (user just renamed it via their own dashboard). **Same read-visibility bug
+  already documented earlier this session** — Vercel's connection accepts calls but its
+  list/get responses are unreliable in this session. Treat the user's own Vercel
+  dashboard as ground truth, not these tools, until this clears up.
