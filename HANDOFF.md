@@ -1048,3 +1048,20 @@ since all 4 real sheets are configured portrait in their own page setup. Content
 one page's worth scrolls inside the card rather than stretching it, mirroring a real
 print run spilling onto a second page. Re-verified 0 overflow across all 16
 role/viewport combinations.
+
+**Follow-up (`f608cc3`)**: three more fixes closing the gap with the real form —
+(1) added the real letterhead (extracted from the workbook's drawing XML: English
+WordArt block + Makaman logo + Arabic WordArt block, none of it invented) as free space
+above the title bar; (2) item/log tables now pad out with blank rows to the real
+template's row counts (24 items, 25 log lines) instead of stopping at just the real
+data; (3) the signature block is pinned to the bottom of the card via `margin-top:auto`
+on a flex column instead of floating directly under whatever content ends above it.
+
+**Follow-up (`2c8f9dc`)**: padding to 24/25 rows made every row genuinely tall (previously
+empty rows collapsed to near-zero height since they had no text) but overflowed the
+fixed A4 card by 50-110px, pushing Total/signatures off-page. Measured the actual
+layout via Playwright instead of guessing again — settled on 19px row height (matches a
+filled row) and trimmed the caps to 20/22 (user explicitly OK'd fewer empty rows to make
+it fit). Re-measured all 4 cards: `scrollHeight` (903px) now sits just under the fixed
+card height (905px), zero overflow, table reaches close to the signature block which
+sits fully visible at the bottom of every page.
