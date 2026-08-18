@@ -660,7 +660,7 @@
     <div style="padding:26px 30px 70px;max-width:1180px;margin:0 auto">
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px">
         <div>
-          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Founder View</h2>
+          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Observer View</h2>
           <div style="font-size:13px;color:rgba(29,31,32,0.6)">Read-only. Approved jobs only — nothing here can be edited.</div>
         </div>
         <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:#eef6ff;color:#2c455d;letter-spacing:0.05em">OBSERVER</span>
@@ -780,7 +780,7 @@ function seed() {
       { name: 'Yousef Al-Harbi', role: 'Field Technician', base: 'Ahmadi Base', lastSync: '2 h ago' },
       { name: 'Mahmoud Zaki', role: 'Field Technician', base: 'Ahmadi Base', lastSync: 'yesterday' },
       { name: 'Omar Al-Saleh', role: 'Operations Manager', base: 'Ahmadi Base', lastSync: 'live' },
-      { name: 'R. Makaman', role: 'Founder (observer)', base: '—', lastSync: 'live' },
+      { name: 'R. Makaman', role: 'Observer', base: '—', lastSync: 'live' },
     ],
     tickets: [
       {
@@ -1001,7 +1001,7 @@ class Component extends DCLogic {
         okLabel: 'Change it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
       report: {
-        title: 'Report generated', body: 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary. Founder view cannot modify ticket data.',
+        title: 'Report generated', body: 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary. Observer view cannot modify ticket data.',
         okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
       reset: {
@@ -1014,7 +1014,7 @@ class Component extends DCLogic {
     return {
       roles: [
         { key: 'tech', label: 'Technician' }, { key: 'mgr', label: 'Ops Manager' },
-        { key: 'admin', label: 'Admin' }, { key: 'founder', label: 'Founder' },
+        { key: 'admin', label: 'Admin' }, { key: 'founder', label: 'Observer' },
       ].map(r => ({
         label: r.label, bg: S.role === r.key ? '#5980a6' : 'transparent',
         fg: S.role === r.key ? '#f2f2f3' : 'rgba(242,242,243,0.75)',
