@@ -736,84 +736,123 @@
           </div>
         </div>
         <div style="text-align:right;font-size:12px;color:rgba(29,31,32,0.6);margin-bottom:18px">{{ cloudExportNote }}</div>
+        <!-- This preview reproduces the real "Autofill_ServiceTikcet_System.xlsx" template
+             field-by-field (labels, grouping and row order taken from its actual Service
+             Ticket / Job Log sheets) rather than a from-scratch design. -->
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
           <sc-for list="{{ sheets }}" as="sh" hint-placeholder-count="4">
-            <div style="background:#fff;border:1px solid rgba(29,31,32,0.2);padding:22px;box-shadow:0 3px 10px rgba(43,43,45,0.16)">
-              <div style="display:flex;align-items:flex-start;gap:10px;border-bottom:2px solid #1d2d3d;padding-bottom:8px;margin-bottom:12px">
-                <div>
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;letter-spacing:0.04em">MAKAMAN OILFIELD SERVICES</div>
-                  <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(29,31,32,0.6)">{{ sh.title }}</div>
+            <div style="background:#fff;border:1px solid rgba(29,31,32,0.3);padding:18px;box-shadow:0 3px 10px rgba(43,43,45,0.16);font-size:11px">
+              <div style="display:flex;align-items:stretch;gap:0;border:1px solid rgba(29,31,32,0.3);margin-bottom:0">
+                <div style="flex:1;padding:8px 10px;border-right:1px solid rgba(29,31,32,0.3)">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.03em">MAKAMAN OILFIELD SERVICES</div>
+                  <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(29,31,32,0.6);margin-top:2px">{{ sh.title }} ({{ sh.mark }})</div>
                 </div>
-                <div style="margin-left:auto;text-align:right">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.1em;color:#416180">({{ sh.mark }})</div>
-                  <div style="font-size:11px;color:rgba(29,31,32,0.6)">No. {{ sh.no }}</div>
+                <div style="width:96px;flex:none;padding:6px 8px;text-align:center;background:#eef3f8">
+                  <div style="font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(29,31,32,0.6)">Ticket NO:</div>
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:24px;color:#1d2d3d;line-height:1.1">{{ sh.no }}</div>
                 </div>
               </div>
-              <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px">
-                <tbody>
-                  <sc-for list="{{ sh.rows }}" as="r" hint-placeholder-count="4">
-                    <tr>
-                      <td style="padding:3px 6px;border:1px solid rgba(29,31,32,0.25);width:88px;letter-spacing:0.05em;text-transform:uppercase;color:rgba(29,31,32,0.6)">{{ r.a }}</td>
-                      <td style="padding:3px 6px;border:1px solid rgba(29,31,32,0.25)">{{ r.b }}</td>
-                      <td style="padding:3px 6px;border:1px solid rgba(29,31,32,0.25);width:88px;letter-spacing:0.05em;text-transform:uppercase;color:rgba(29,31,32,0.6)">{{ r.c }}</td>
-                      <td style="padding:3px 6px;border:1px solid rgba(29,31,32,0.25)">{{ r.d }}</td>
-                    </tr>
-                  </sc-for>
-                </tbody>
-              </table>
+
               <sc-if value="{{ sh.isService }}" hint-placeholder-val="{{ true }}">
-                <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+                <sc-for list="{{ sh.svcRows }}" as="r" hint-placeholder-count="6">
+                  <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0">
+                    <div style="flex:1;display:flex;align-items:center">
+                      <div style="width:110px;flex:none;padding:3px 7px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-right:1px solid rgba(29,31,32,0.3)">{{ r.labelA }}</div>
+                      <div style="flex:1;padding:3px 7px;font-weight:600">{{ r.valueA }}</div>
+                    </div>
+                    <sc-if value="{{ r.hasB }}" hint-placeholder-val="{{ true }}">
+                      <div style="flex:1;display:flex;align-items:center;border-left:1px solid rgba(29,31,32,0.3)">
+                        <div style="width:110px;flex:none;padding:3px 7px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-right:1px solid rgba(29,31,32,0.3)">{{ r.labelB }}</div>
+                        <div style="flex:1;padding:3px 7px;font-weight:600">{{ r.valueB }}</div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <div style="padding:6px 8px;border:1px solid rgba(29,31,32,0.3);border-top:0;background:#eef3f8;font-weight:700;text-align:center">{{ sh.jobType }}</div>
+                <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:10px">
                   <thead>
                     <tr>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:left;background:#eef6ff;letter-spacing:0.04em">ITEM No.</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:left;background:#eef6ff;letter-spacing:0.04em">DESCRIPTION</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:right;background:#eef6ff">QTY</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:left;background:#eef6ff">U/M</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:right;background:#eef6ff">UNIT</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:right;background:#eef6ff">TOTAL</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Item no.</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Item Description</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea">Qty</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Unit</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea">Unit Cost</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea">Total Cost</th>
                     </tr>
                   </thead>
                   <tbody>
                     <sc-for list="{{ sh.items }}" as="i" hint-placeholder-count="4">
                       <tr>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25);white-space:nowrap">{{ i.code }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25)">{{ i.desc }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25);text-align:right">{{ i.qty }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25)">{{ i.uom }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25);text-align:right">{{ i.unit }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25);text-align:right">{{ i.total }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);white-space:nowrap">{{ i.code }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3)">{{ i.desc }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right">{{ i.qty }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3)">{{ i.uom }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right">{{ i.unit }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right">{{ i.total }}</td>
                       </tr>
                     </sc-for>
-                    <tr>
-                      <td colspan="5" style="padding:5px;border:1px solid rgba(29,31,32,0.25);text-align:right;letter-spacing:0.06em">TOTAL</td>
-                      <td style="padding:5px;border:1px solid rgba(29,31,32,0.25);text-align:right;font-weight:700">{{ sh.total }}</td>
-                    </tr>
                   </tbody>
                 </table>
+                <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0;background:#e9e9ea">
+                  <div style="flex:1;padding:6px 8px;text-align:right;font-weight:700">Total =</div>
+                  <div style="width:110px;flex:none;padding:6px 8px;text-align:right;font-weight:700;border-left:1px solid rgba(29,31,32,0.3)">{{ sh.total }}</div>
+                </div>
               </sc-if>
+
               <sc-if value="{{ sh.isLog }}" hint-placeholder-val="{{ false }}">
-                <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+                <sc-for list="{{ sh.logRows }}" as="r" hint-placeholder-count="4">
+                  <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0">
+                    <div style="flex:1;display:flex;align-items:center">
+                      <div style="width:96px;flex:none;padding:3px 7px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-right:1px solid rgba(29,31,32,0.3)">{{ r.labelA }}</div>
+                      <div style="flex:1;padding:3px 7px;font-weight:600">{{ r.valueA }}</div>
+                    </div>
+                    <sc-if value="{{ r.hasB }}" hint-placeholder-val="{{ true }}">
+                      <div style="flex:1;display:flex;align-items:center;border-left:1px solid rgba(29,31,32,0.3)">
+                        <div style="width:96px;flex:none;padding:3px 7px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-right:1px solid rgba(29,31,32,0.3)">{{ r.labelB }}</div>
+                        <div style="flex:1;padding:3px 7px;font-weight:600">{{ r.valueB }}</div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0">
+                  <sc-for list="{{ sh.logTimes }}" as="lt" hint-placeholder-count="3">
+                    <div style="flex:1;text-align:center;border-right:1px solid rgba(29,31,32,0.3)">
+                      <div style="padding:3px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-bottom:1px solid rgba(29,31,32,0.3)">{{ lt.label }}</div>
+                      <div style="padding:4px;font-weight:600">{{ lt.value }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:10px">
                   <thead>
                     <tr>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:left;background:#eef6ff;width:66px">DATE</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:left;background:#eef6ff;width:52px">TIME</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.25);text-align:left;background:#eef6ff">JOB EVENT</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:56px">Date</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:46px">Time</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:44px">Pressure</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:36px">Total</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Details of the Job</th>
                     </tr>
                   </thead>
                   <tbody>
                     <sc-for list="{{ sh.events }}" as="e" hint-placeholder-count="5">
                       <tr>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25);white-space:nowrap">{{ e.date }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25)">{{ e.time }}</td>
-                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.25)">{{ e.text }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);white-space:nowrap">{{ e.date }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);white-space:nowrap">{{ e.time }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;color:rgba(29,31,32,0.5)">{{ e.pressure }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;color:rgba(29,31,32,0.5)">{{ e.durTotal }}</td>
+                        <td style="padding:3px 5px;border:1px solid rgba(29,31,32,0.3)">{{ e.text }}</td>
                       </tr>
                     </sc-for>
                   </tbody>
                 </table>
               </sc-if>
-              <div style="display:flex;gap:20px;margin-top:16px;font-size:10px;color:rgba(29,31,32,0.6)">
-                <div style="flex:1;border-top:1px solid rgba(29,31,32,0.4);padding-top:4px">TECHNICIAN</div>
-                <div style="flex:1;border-top:1px solid rgba(29,31,32,0.4);padding-top:4px">CUSTOMER REPRESENTATIVE</div>
+
+              <div style="display:flex;gap:20px;margin-top:20px;font-size:10px;text-align:center">
+                <div style="flex:1;border-top:1px solid rgba(29,31,32,0.5);padding-top:4px">Customer or his agent</div>
+                <div style="flex:1;border-top:1px solid rgba(29,31,32,0.5);padding-top:4px">{{ sh.signee2 }}</div>
+              </div>
+              <div style="display:flex;gap:20px;margin-top:20px;font-size:10px;text-align:center;color:rgba(29,31,32,0.6)">
+                <div style="flex:1;border-top:1px solid rgba(29,31,32,0.5);padding-top:4px">Representative Signature</div>
+                <div style="flex:1;border-top:1px solid rgba(29,31,32,0.5);padding-top:4px">Representative Signature</div>
               </div>
             </div>
           </sc-for>
@@ -1531,19 +1570,33 @@ class Component extends DCLogic {
     ] : [];
     const canApprove = checks.every(c => c.pass);
 
-    const sheetRowsService = t ? [
-      { a: 'Customer', b: t.customer, c: 'Ticket No.', d: t.ticketNo || '—' },
-      { a: 'Field', b: t.field, c: 'Start job', d: F.date(t.start) },
-      { a: 'Well No.', b: t.well, c: 'End job', d: t.end ? F.date(t.end) : '—' },
-      { a: 'Rig', b: t.rig, c: 'Mileage', d: t.mileage ? t.mileage + ' km × ' + roundTrip : '—' },
-      { a: 'Technician', b: t.tech, c: 'Job type', d: t.jobType || '—' },
+    // Sheet preview layout — reproduces the field order, grouping and labels of the real
+    // "Autofill_ServiceTikcet_System.xlsx" template (Service Ticket / Job Log sheets)
+    // cell-by-cell, not a from-scratch design. Two fields in the real template have no
+    // matching data in this app's model and are shown as '—': "MKN Supervisor" (mapped
+    // to the assigned technician, the closest concept this app tracks) and per-line
+    // "Pressure"/"Total" columns in the Job Log table (not logged anywhere yet).
+    const pairRow = (labelA, valueA, labelB, valueB) => ({
+      labelA: labelA, valueA: valueA || '—', labelB: labelB || '', valueB: valueB || '—', hasB: !!labelB,
+    });
+    const svcRows = t ? [
+      pairRow('Customer:', t.customer),
+      pairRow('Field Name:', t.field),
+      pairRow('Well No:', t.well, 'MKN Supervisor:', t.tech),
+      pairRow('Rig Name:', t.rig, 'Start Job:', F.date(t.start)),
+      pairRow('Mileage (Km):', t.mileage === 0 ? '0' : (t.mileage || ''), 'End Job:', t.end ? F.date(t.end) : ''),
+      pairRow('Base Location:', t.baseLocation),
     ] : [];
-    const sheetRowsLog = t ? [
-      { a: 'Customer', b: t.customer, c: 'Ticket No.', d: t.ticketNo || '—' },
-      { a: 'Field', b: t.field, c: 'Arrival', d: F.stamp(t.arrival) },
-      { a: 'Well No.', b: t.well, c: 'Start job', d: F.date(t.start) },
-      { a: 'Rig', b: t.rig, c: 'End job', d: t.end ? F.date(t.end) : '—' },
-      { a: 'Technician', b: t.tech, c: 'Job type', d: t.jobType || '—' },
+    const logRows = t ? [
+      pairRow('Customer:', t.customer, 'Date:', t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '')),
+      pairRow('Field:', t.field, 'Job Type:', t.jobType),
+      pairRow('Well No:', t.well, 'Customer Rep.:', t.customerRep),
+      pairRow('Job Supervisor:', t.tech, 'Rig Name:', t.rig),
+    ] : [];
+    const logTimes = t ? [
+      { label: 'Start Job', value: F.date(t.start) },
+      { label: 'End Job', value: t.end ? F.date(t.end) : '—' },
+      { label: 'Arrived To Location', value: F.stamp(t.arrival) },
     ] : [];
     const sheetItems = t ? (t.items || []).map(i => ({
       code: i.code, desc: i.desc,
@@ -1552,12 +1605,14 @@ class Component extends DCLogic {
       unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost),
       total: money(this.itemTotal(i, t)),
     })) : [];
-    const sheetEvents = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), text: e.text })) : [];
+    const sheetEvents = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), pressure: '—', durTotal: '—', text: e.text })) : [];
     const mkSheet = (kind, mark) => ({
       title: kind === 'svc' ? 'Service Ticket' : 'Job Log', mark: mark, no: t ? (t.ticketNo || '—') : '—',
       isService: kind === 'svc', isLog: kind === 'log',
-      rows: kind === 'svc' ? sheetRowsService : sheetRowsLog,
+      svcRows: svcRows, logRows: logRows, logTimes: logTimes,
       items: sheetItems, events: sheetEvents, total: t ? money(this.ticketTotal(t)) : money(0),
+      jobType: t ? (t.jobType || '—') : '—',
+      signee2: 'MAKAMAN LIBYA',
     });
 
     const dialogs = {
