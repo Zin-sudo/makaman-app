@@ -206,6 +206,9 @@
                   <div onClick="{{ t.open }}" style="position:relative;padding:12px;border:1px solid rgba(29,31,32,0.16);cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+                      <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(29,31,32,0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
+                      </sc-if>
                       <span style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.5)">{{ t.syncLabel }}</span>
                     </div>
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
@@ -365,7 +368,14 @@
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.tech }}</td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);font-size:13px;color:rgba(29,31,32,0.75)">{{ t.dateRange }}</td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.eventCount }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span></td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+                      <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(29,31,32,0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
+                      </sc-if>
+                    </div>
+                  </td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right">
                     <button onClick="{{ t.review }}" style="padding:6px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">{{ t.actionLabel }}</button>
                   </td>
@@ -443,7 +453,12 @@
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:rgba(29,31,32,0.45)">· {{ cur.well }}</span></h2>
             <div style="font-size:13px;color:rgba(29,31,32,0.65)">{{ cur.locLine }} · {{ cur.tech }} · uploaded {{ cur.syncLabel }}</div>
           </div>
-          <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:{{ cur.chipBg }};color:{{ cur.chipFg }};letter-spacing:0.04em">{{ cur.statusLabel }}</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
+            <sc-if value="{{ cur.presenceShow }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(29,31,32,0.65)"><span style="width:8px;height:8px;border-radius:50%;background:{{ cur.presenceDot }}"></span>{{ cur.presenceLabel }}</span>
+            </sc-if>
+            <span style="font-size:11px;padding:4px 10px;background:{{ cur.chipBg }};color:{{ cur.chipFg }};letter-spacing:0.04em">{{ cur.statusLabel }}</span>
+          </span>
         </div>
 
         <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start">
@@ -1236,6 +1251,12 @@ class Component extends DCLogic {
   ticketView(t) {
     const chip = this.statusChip(t);
     const F = this.fmt();
+    // In-progress presence badge — only meaningful while a ticket is still being logged
+    // in the field (not yet marked Job Done). This prototype models one shared device
+    // connectivity flag (the header's Online/No signal toggle) rather than per-technician
+    // live presence, so every in-progress ticket currently reflects that same flag.
+    const showPresence = t.status === 'logging';
+    const online = !!this.state.online;
     return Object.assign({
       id: t.id, customer: t.customer, tech: t.tech, well: t.well, jobType: t.jobType || '—',
       locLine: [t.field, t.well, t.rig].filter(Boolean).join(' · '),
@@ -1249,6 +1270,9 @@ class Component extends DCLogic {
       yearFolder: String(new Date(t.arrival).getFullYear()),
       mileage: t.mileage === 0 ? '0' : (t.mileage || ''),
       ticketNo: t.ticketNo || '',
+      presenceShow: showPresence,
+      presenceDot: online ? '#2f8f5b' : '#98989b',
+      presenceLabel: online ? 'Online' : 'Offline',
     }, chip);
   }
 
