@@ -412,3 +412,49 @@ Admin section of the baseline is now fully captured: Price Lists, Numbering & Jo
 (verified correct, no change needed), Users & Customers, System (OneDrive copy needs
 fixing later). Still not yet captured for baseline: Technician's New Ticket / Job Log
 screens, Settings screen (not built yet per Q2), Login/Signup (not built yet per Q2).
+
+---
+
+## Session checkpoint — Part B storage decision finalized (resolves the earlier OneDrive flag)
+
+This resolves the "OneDrive vs. download-from-app" contradiction flagged in the previous
+checkpoint. The reasoning that led here (from the other session, carried over verbatim
+since it's sound and the user is keeping it):
+
+> Writing to OneDrive/SharePoint means Microsoft Graph — Azure AD app registration,
+> tenant ID, client ID/secret, admin consent for Files.ReadWrite.All or
+> Sites.ReadWrite.All. That's a request sitting in someone else's queue for days if you're
+> not the M365 admin. Download-only needs no credentials, no admin approval, works the
+> day it's built. If the Ops Manager's PC has the OneDrive desktop folder synced, saving
+> the download into that folder puts the file on OneDrive anyway, in the right place, with
+> zero integration work. Building the generator so its output is a file buffer (not
+> written straight to disk) means a storage adapter can be bolted on later to push that
+> buffer to OneDrive/Drive without touching generation logic.
+
+**Final decision, per-artifact:**
+
+1. **The four per-ticket sheets** (Service Ticket Original/Copy, Job Log Original/Copy) —
+   **download only**, Excel + PDF, from the app. Unchanged, no cloud integration.
+
+2. **The running master workbook** gets three access paths, all built:
+   - **Download** — same as the per-ticket sheets, a plain file download.
+   - **Upload to a linked drive account** — optional, user-initiated. An Admin can link a
+     drive account (OneDrive/Google Drive); once linked, the master workbook can be
+     pushed there. This is exactly the "storage adapter on a file buffer" pattern already
+     planned — build it as an add-on to the generator, not baked into generation logic.
+     Not required to work day one; the download path is what ships first and always
+     works regardless of whether a drive is linked.
+   - **In-app preview backed by Supabase** — the master record is also queryable/viewable
+     directly inside the **Admin panel**, not just as a downloadable file. **Visible to
+     Admin, Ops Manager, and Founder. Not visible to Technician.** This is a new
+     role-gated screen/section, and it means the master-record data needs to live in
+     Supabase (ticket data queried live), not just get generated into a workbook on
+     demand — so this piece naturally lands in the backend-wiring phase (already answered
+     as "after the four sheets" in Q3), same as the rest of the real data wiring.
+
+**Update to the earlier flag:** the "Storage: Local + OneDrive" copy and the "Excel
+output cell maps ... on OneDrive" footnote in the current zip's System / Users & Customers
+tabs are still stale relative to this — they should get rewritten to reflect
+download-first + optional linked-drive + Supabase-backed admin preview, not "OneDrive" as
+a given. Still a deliberate fix for the edit phase, not urgent, but now has a concrete
+target to fix *to* instead of just a contradiction to flag.
