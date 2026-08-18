@@ -901,10 +901,42 @@ line count, and presence badge, matching the technician's own screen.
 **Every item on the original Q1/Q2 punch list, plus every follow-up item (presence
 badge, auto-sync timer, item search/suggestions, live-event-view), is now complete —
 13 edits total (`f3831d1` through `69475e9`), each verified end-to-end with Playwright
-and committed/pushed individually to `claude/makaman-app`.** No further punch-list items
-are outstanding as of this checkpoint; next steps are whatever the user directs.
+and committed/pushed individually to `claude/makaman-app`.**
 
 Operating mode for this stretch of work, per explicit user instruction: make one
 self-contained edit, verify with real interaction (not just a screenshot), commit+push
 immediately with a detailed message, move to the next item without stopping for
 approval — only stop if the user interjects.
+
+---
+
+## New plan items added by the user (2026-08-18, after the 13-edit checkpoint)
+
+Two new requirements to add to the punch list, not yet started:
+
+14. **Cross-device access for all roles.** Every role (Technician, Ops Manager, Admin,
+    Observer) must be usable on phone, tablet, laptop, and desktop — someone may have to
+    log in from an unfamiliar device, not just their usual one. Current state as of this
+    note: the technician screen is hard-wrapped in a fixed-size (398px/806px) decorative
+    "phone mockup" frame with a desktop-only "Field Device" explainer sidebar next to it
+    — fine for a desktop design review, but it would overflow/break on an actual narrow
+    phone viewport. The Ops Manager/Admin/Observer screens use fixed 2-column grids,
+    4-column stat grids, and wide multi-column tables with no responsive fallback at all
+    — no `@media` queries exist anywhere in the file yet. Login itself has no
+    device/role coupling (any role can already reach the login screen from any device),
+    so this is a CSS/layout responsiveness problem, not an access-control one. Also
+    covers real PWA installability (manifest + service worker + icons) so the app can be
+    added to a homescreen on any device, not just opened as a plain browser tab.
+15. **Ops Manager cloud storage linking.** Add the option to link and upload exported
+    sheets to OneDrive and Google Drive, in addition to local download. Note: this
+    reverses/extends an earlier settled decision from before this session
+    ("download from app, no cloud account needed" — the 5 stale OneDrive references
+    fixed in edit #8 were removed *because* of that decision). The user has now
+    explicitly asked for OneDrive + Google Drive + local as options, so that supersedes
+    the earlier simplification. Since this is a static prototype with no backend, real
+    OAuth linking to Microsoft/Google isn't achievable honestly without a real app
+    registration + server-side token exchange — plan is to build the UI/UX (a
+    Storage & Export panel with mocked connect/disconnect state per provider, matching
+    the existing shareLocation-toggle pattern) and flag clearly in the commit message
+    that the actual OAuth handshake is out of reach for a static file and needs a real
+    backend to finish.
