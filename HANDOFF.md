@@ -374,3 +374,41 @@ screens).
 
 **No change needed here — confirmed working as intended, not a gap.** Keep this numbering
 model as-is when we get to the edit phase; don't "fix" or redesign it.
+
+---
+
+## Session checkpoint — Admin "Users & Customers" and "System" tabs captured; OneDrive contradiction found
+
+Captured the remaining two Admin tabs (user sent screenshots directly; re-captured myself
+too for a consistent baseline set):
+
+**Users & Customers:**
+- Users & Roles table: Yousef Al-Harbi (Field Technician, Ahmadi Base, synced 2h ago),
+  Mahmoud Zaki (Field Technician, Ahmadi Base, yesterday), Omar Al-Saleh (Operations
+  Manager, Ahmadi Base, live), R. Makaman (Founder (observer), —, live).
+- Customers, Fields & Rigs cards: Kuwait Oil Group / Al-Dhafra Energy / Northern Gulf
+  Petroleum, each showing field/rig lists and "8 priced items" (demo data — real clients
+  are the 6 in Supabase, not these 3 demo names).
+
+**System:**
+- Charging & Export Rules: Mileage charging ×2 (one-way KM entered, charged both ways) —
+  consistent with the ticket-view screen. Approval gate: 4 checks. Reopen after approval:
+  logged, reason mandatory. Excel targets: 4 sheets (Original + Copy for Service Ticket
+  and Job Log) — consistent with Part B decisions.
+- Danger Zone: "Reset Demo Data" button — resets the prototype's local data back to seeded
+  demo tickets/price lists. Harmless dev/demo control.
+
+**Contradiction found — flag, don't silently fix:** both this System tab ("Storage: Local
++ OneDrive — offline-first on device, synced on demand") and the Users & Customers tab's
+footnote ("Excel output cell maps — Service Ticket and Job Log templates on **OneDrive**;
+each field's target cell is configured here once the layouts are supplied") describe
+OneDrive as the storage/export target. This directly contradicts the already-settled Part
+B decision: **download from the app, no OneDrive/Google Drive, no cloud credentials
+needed.** This baseline copy predates that decision. Same category as the CDN/offline
+contradiction already flagged — needs a deliberate fix during the edit phase, not a quiet
+one, and not something to leave inconsistent.
+
+Admin section of the baseline is now fully captured: Price Lists, Numbering & Job Types
+(verified correct, no change needed), Users & Customers, System (OneDrive copy needs
+fixing later). Still not yet captured for baseline: Technician's New Ticket / Job Log
+screens, Settings screen (not built yet per Q2), Login/Signup (not built yet per Q2).
