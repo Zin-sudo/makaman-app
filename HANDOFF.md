@@ -940,3 +940,30 @@ Two new requirements to add to the punch list, not yet started:
     the existing shareLocation-toggle pattern) and flag clearly in the commit message
     that the actual OAuth handshake is out of reach for a static file and needs a real
     backend to finish.
+
+---
+
+## Session checkpoint — prototype edit #14 complete: cross-device + PWA (item #14)
+
+**Edit #14 (`20d46fe`)** — item #14 done. Added the first `@media` queries in the file
+(none existed before): the technician "phone mockup" bezel now collapses into a real
+full-width mobile page under 640px instead of overflowing an actual phone; the four
+2-column detail grids collapse to 1 column and the two 4-column stat grids collapse to
+2-then-1 column under 980px/640px; all 5 major tables scroll within their own box
+instead of blowing out the page. New `manifest.webmanifest` + `sw.js` + generated app
+icons (`prototype/uploads/icon-*.png`) give real PWA installability.
+Two classic CSS gotchas hit and fixed along the way, both worth remembering for any
+future layout work in this file: (1) `flex:none` (flex-shrink:0) holds a flex item at
+its content width even after overriding `width` — the phone frame needed `flex` itself
+overridden too, not just width; (2) grid items default to `min-width:auto`, which floors
+a `1fr` track at its content's min-content size and silently defeats all shrinking —
+fixed with a blanket `.mk-2col > * { min-width:0 }` rule.
+Verified with an automated sweep: all 4 roles x 4 viewports (phone/tablet/laptop/desktop)
+= 16 combinations, each checked for zero page-level horizontal overflow via
+`document.documentElement.scrollWidth === clientWidth`. All 16 pass. The worst-case
+screen (Ops Review) took 3 rounds of diagnosis to get fully clean at 375px — confirmed
+with full-page screenshots showing a legible, fully editable single-column layout at
+both phone and tablet width.
+
+**Next up: item #15**, Ops Manager cloud storage linking (OneDrive + Google Drive +
+local) — not yet started.
