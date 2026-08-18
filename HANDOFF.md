@@ -857,6 +857,28 @@ the original punch list, not yet started: item search + behavioral suggestions f
 Ops Manager when picking price-list items, and Observer/Ops-Manager live-event-view
 (real-time visibility into a technician's logging while connected).
 
+---
+
+## Session checkpoint — prototype edit #12 complete: item search + suggestions
+
+**Edit #12 (`5ed03f4`)** — the "Add item from price list" dropdown in the Ops Review
+Charged Items box now has a live search input above it (filters by code or description
+substring) and a "Frequently added" quick-add chip row showing the top 3 items charged
+most often on that customer's *other* tickets, excluding whatever's already on this one.
+Clicking a chip adds the line directly, no dropdown needed. Both the dropdown's Add line
+button and the chips now go through one shared `addItemByCode()` closure so the
+percent-item/mileage-qty/log-line logic isn't duplicated.
+Verified end-to-end: a client (Kuwait Oil Group) with one existing 4-item approved ticket
+correctly suggested those items' codes as chips on a brand-new, item-empty ticket for the
+same client; clicking a chip added it and it dropped off the chip row immediately;
+searching "supervisor" correctly narrowed the dropdown to just the one matching item.
+
+**Only one item remains from the original punch list, not yet started**:
+Observer/Ops-Manager live-event-view — real-time visibility into a technician's job-log
+entries while they're still logging (not yet synced/Job-Done). Edit #10's presence badge
+and the fact that in-progress tickets now surface in the Ops Manager Inbox once synced
+once (edit #10/#11) are the groundwork this would build on.
+
 Operating mode for this stretch of work, per explicit user instruction: make one
 self-contained edit, verify with real interaction (not just a screenshot), commit+push
 immediately with a detailed message, move to the next item without stopping for
