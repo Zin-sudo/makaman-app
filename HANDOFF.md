@@ -1065,3 +1065,20 @@ filled row) and trimmed the caps to 20/22 (user explicitly OK'd fewer empty rows
 it fit). Re-measured all 4 cards: `scrollHeight` (903px) now sits just under the fixed
 card height (905px), zero overflow, table reaches close to the signature block which
 sits fully visible at the bottom of every page.
+
+**Follow-up (`b46ae67`)**: user asked how many rows the cap actually is (20 items / 22
+log lines — confirmed, unchanged from the previous entry), acknowledged it's a real
+per-page cap, and asked what happens when the Ops Manager exceeds it. Answer: real
+pagination now, not a silent ceiling. `paginate()`/`mkSvcPages()`/`mkLogPages()` split a
+ticket's real items/events into cap-sized pages — each still padded to a full page,
+only the last page of each type gets the Total row / signature block, non-final pages
+show a "Continued on next page…" footer, and the title area gets a "Page X of Y" suffix
+once there's more than one. A warning banner above the grid appears only when something
+actually overflows, states the exact overage, and offers "‹ Back to review" so the Ops
+Manager can trim lines instead if they'd rather keep it to one page (reuses the existing
+item-remove/log-line-remove UI already on the Review screen — nothing duplicated here).
+Verified: baseline ticket renders identically to before (no warning, single page each);
+added 22 items via the real review-screen UI (2 over cap) and confirmed the warning
+text, correct 2-page split with the right item counts per page, correct grand total on
+the final page only, and Job Log staying single-page since it wasn't pushed over its
+own cap. Full responsive sweep still 0 overflow.
