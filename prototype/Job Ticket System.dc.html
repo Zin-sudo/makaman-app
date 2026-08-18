@@ -319,8 +319,11 @@
       <div style="width:290px;flex:none;padding-top:14px;font-size:13px;color:rgba(29,31,32,0.7)">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">Field device</div>
         <p style="margin:0 0 10px">Everything here works with no connection. Arrival, every log line, Start Job and End Job are stamped from the device clock and stored locally.</p>
-        <p style="margin:0 0 10px">Tap the status pill at the top of the phone to simulate regaining signal, then <strong>Sync</strong> to upload. Only uploaded <em>Job Done</em> tickets reach the operations manager.</p>
-        <p style="margin:0">A Job Done ticket stays editable — reopening it for corrections keeps the original stamps.</p>
+        <p style="margin:0 0 10px">Tap the status pill at the top of the phone to simulate regaining signal. Pending tickets upload automatically in the background once signal returns — tap <strong>Sync</strong> to upload immediately instead of waiting. Only uploaded <em>Job Done</em> tickets reach the operations manager.</p>
+        <p style="margin:0 0 10px">A Job Done ticket stays editable — reopening it for corrections keeps the original stamps.</p>
+        <sc-if value="{{ lastAutoSyncLabel }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;color:rgba(29,31,32,0.5)">{{ lastAutoSyncLabel }}</p>
+        </sc-if>
       </div>
     </div>
   </sc-if>
@@ -1006,6 +1009,12 @@ function toLocalInput(s) {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
+// Background auto-sync cadence — field connectivity is intermittent, so the device
+// auto-uploads any pending tickets on this timer once signal is back, rather than relying
+// on the technician remembering to tap Sync. window.__AUTO_SYNC_TEST_MS overrides it for
+// fast automated verification; production uses a realistic once-a-minute cadence.
+const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 60000;
+
 // Timezone + 24h/12h are read from Settings (S.data.settings) — 'device' timezone means
 // no explicit IANA zone is passed to Intl, so the browser's own local zone is used.
 const TIMEZONES = [
@@ -1165,7 +1174,7 @@ class Component extends DCLogic {
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: 'price',
       activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
-      founderCount: 10, tick: 0, showSettings: false,
+      founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
       authFullName: '', authConfirm: '', authError: '', signupDone: false,
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
@@ -1196,14 +1205,34 @@ class Component extends DCLogic {
   }
   componentDidMount() {
     this.timer = setInterval(() => this.setState({ tick: Date.now() }), 30000);
+    this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
   }
-  componentWillUnmount() { clearInterval(this.timer); }
+  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.autoSyncTimer); }
 
   mutate(fn) {
     const data = JSON.parse(JSON.stringify(this.state.data));
     fn(data);
     this.persist(data);
     this.setState({ data: data });
+  }
+  // Background sync — runs on a timer instead of only when the technician remembers to
+  // tap Sync. Same effect as the manual Sync button (uploads every not-yet-synced
+  // ticket) but silent: no confirmation dialog, and audit entries say "Auto-synced"
+  // instead of "Uploaded" so the trail shows which happened. Only runs once someone is
+  // logged in and the device currently has signal, and no-ops when nothing is pending.
+  autoSync() {
+    const S = this.state;
+    if (!S.online || !S.session) return;
+    const pending = (S.data.tickets || []).filter(x => !x.synced);
+    if (!pending.length) return;
+    const now = iso(new Date());
+    this.mutate(d => d.tickets.forEach(x => {
+      if (!x.synced) {
+        x.synced = true; x.syncedAt = now;
+        (x.audit = x.audit || []).push({ ts: now, text: 'Auto-synced from field device (' + x.tech + ').' });
+      }
+    }));
+    this.setState({ lastAutoSyncAt: now });
   }
   ticket(id) { return this.state.data.tickets.find(t => t.id === (id || this.state.activeId)); }
   patchTicket(patch) {
@@ -1504,8 +1533,9 @@ class Component extends DCLogic {
       bannerBorder: S.online ? '#5980a6' : 'rgba(29,31,32,0.16)',
       bannerDot: S.online ? '#5980a6' : '#98989b',
       bannerText: S.online
-        ? unsynced.length + ' ticket(s) pending upload — connection available.'
+        ? unsynced.length + ' ticket(s) auto-syncing in the background — connection available.'
         : 'Offline · ' + unsynced.length + ' ticket(s) stored on this device, waiting for signal.',
+      lastAutoSyncLabel: S.lastAutoSyncAt ? 'Last auto-synced ' + F.stamp(S.lastAutoSyncAt) : '',
       syncDisabled: !S.online,
       syncBg: S.online ? '#5980a6' : 'transparent',
       syncFg: S.online ? '#f2f2f3' : '#416180',
