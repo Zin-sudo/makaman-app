@@ -942,6 +942,36 @@
           </div>
         </sc-for>
       </div>
+      <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;margin-bottom:24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#2f8f5b;animation:pulse 2s infinite"></span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">Live activity — in the field right now</div>
+          <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.5)">Read-only · refreshes automatically</div>
+        </div>
+        <sc-if value="{{ hasLiveTickets }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ liveTickets }}" as="lt" hint-placeholder-count="2">
+              <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(29,31,32,0.1);background:rgba(41,143,91,0.03)">
+                <div style="width:230px;flex:none">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
+                  <div style="font-size:12px;color:rgba(29,31,32,0.6)">{{ lt.tech }} · {{ lt.locLine }}</div>
+                </div>
+                <div style="flex:1">
+                  <div style="font-size:13px;color:#1d1f20">{{ lt.lastLogText }}</div>
+                  <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:3px">{{ lt.lastLogTime }} · {{ lt.eventCount }} log lines</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;flex:none;font-size:11px;color:rgba(29,31,32,0.6)">
+                  <span style="width:7px;height:7px;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noLiveTickets }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:13px;color:rgba(29,31,32,0.5)">Nothing in progress right now — all field tickets are either synced-and-done or approved.</div>
+        </sc-if>
+      </div>
+
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:12px">
         <div style="flex:1;max-width:420px">
           <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Report size — last {{ founderCount }} approved jobs</label>
@@ -1881,6 +1911,25 @@ class Component extends DCLogic {
       founderCount: S.founderCount,
       founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => this.ticketView(x)),
       generateReport: () => this.setState({ dialog: 'report' }),
+
+      // Live activity — the only view in the app that shows tickets still being logged
+      // in the field to the Observer, who otherwise only ever sees already-approved
+      // jobs. Gated on synced, same as the Ops Manager Inbox (see edit #10/#11): a
+      // ticket that has never synced only exists on that technician's own device, so
+      // no one else could see it yet in a real system. "Real-time" here means it
+      // re-renders on the same 30s tick used for the clock and reflects whatever's
+      // currently in D.tickets — this prototype has one shared local data store rather
+      // than a live multi-device feed, so it's honest to call it "refreshes
+      // automatically," not a push subscription.
+      liveTickets: D.tickets.filter(x => x.status === 'logging' && x.synced).slice().reverse().map(x => {
+        const lastEvent = (x.events || [])[x.events.length - 1];
+        return Object.assign(this.ticketView(x), {
+          lastLogText: lastEvent ? lastEvent.text : 'No log lines yet.',
+          lastLogTime: lastEvent ? F.stamp(lastEvent.ts) : '—',
+        });
+      }),
+      hasLiveTickets: D.tickets.some(x => x.status === 'logging' && x.synced),
+      noLiveTickets: !D.tickets.some(x => x.status === 'logging' && x.synced),
 
       hasDialog: !!S.dialog,
       dialog: Object.assign({ title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true, needsReason: false, confirm: () => this.setState({ dialog: null }) }, dialogs[S.dialog] || {}),
