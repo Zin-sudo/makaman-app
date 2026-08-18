@@ -496,6 +496,15 @@
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">2 · Charged items</div>
                 <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Price list: {{ cur.customer }}</div>
               </div>
+              <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" placeholder="Search item no. or description…" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:8px">
+              <sc-if value="{{ showSuggested }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+                  <span style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(29,31,32,0.5)">Frequently added:</span>
+                  <sc-for list="{{ suggestedItems }}" as="sug" hint-placeholder-count="3">
+                    <button onClick="{{ sug.add }}" style="padding:5px 10px;font-size:12px;cursor:pointer;background:#eef6ff;border:1px solid #5980a6;color:#2c455d">+ {{ sug.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
               <div style="display:flex;gap:8px;margin-bottom:12px">
                 <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
                   <option value="">Add item from price list…</option>
@@ -1172,7 +1181,7 @@ class Component extends DCLogic {
     super(props);
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: 'price',
-      activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '',
+      activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
@@ -1328,6 +1337,39 @@ class Component extends DCLogic {
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
+
+    // Shared by the "Add item from price list" dropdown and the "Frequently added"
+    // quick-add chips — both just need to push a price-list line onto the current ticket.
+    const addItemByCode = (code) => {
+      if (!code || !t || !curClient) return;
+      const src = curClient.items.find(i => i.code === code); if (!src) return;
+      const isPercent = src.kind === 'percent';
+      const qty = isPercent ? '' : (src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1);
+      this.mutate(d => {
+        const x = d.tickets.find(y => y.id === t.id);
+        const line = { code: src.code, desc: src.desc, qty: qty, uom: src.uom, cost: src.cost, ov: {} };
+        if (isPercent) { line.kind = 'percent'; line.sign = src.sign; }
+        (x.items = x.items || []).push(line);
+      });
+      this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.');
+    };
+    // Behavioral suggestion: up to 3 items charged most often on this client's other
+    // tickets that aren't already on this one — lets the Ops Manager one-click the items
+    // they reach for on nearly every job instead of searching/scrolling the price list.
+    const usageCounts = {};
+    if (curClient) {
+      D.tickets.filter(x => x.customer === curClient.name).forEach(x => (x.items || []).forEach(it => {
+        if (it.kind === 'percent') return;
+        usageCounts[it.code] = (usageCounts[it.code] || 0) + 1;
+      }));
+    }
+    const curCodes = new Set(t ? (t.items || []).map(it => it.code) : []);
+    const suggestedItems = curClient ? curClient.items
+      .filter(i => i.kind !== 'percent' && usageCounts[i.code] && !curCodes.has(i.code))
+      .sort((a, b) => (usageCounts[b.code] || 0) - (usageCounts[a.code] || 0))
+      .slice(0, 3)
+      .map(i => ({ code: i.code, label: i.code + ' — ' + i.desc, add: () => addItemByCode(i.code) }))
+      : [];
 
     const setDraft = k => e => this.setState({ draft: Object.assign({}, S.draft, { [k]: e.target.value }) });
 
@@ -1704,27 +1746,27 @@ class Component extends DCLogic {
       })),
       mileageNote: t && t.mileage ? 'Round trip charged: ' + (Number(t.mileage) * roundTrip) + ' km' : 'Charged as round trip (×' + roundTrip + ').',
 
-      priceOptions: (curClient ? curClient.items : []).map(i => ({
+      // Shared by the dropdown's Add line button and the "Frequently added" quick-add
+      // chips below — both just need to push a price-list line onto the current ticket.
+      itemSearch: S.itemSearch || '',
+      priceOptions: (curClient ? curClient.items : []).filter(i => {
+        const q = (S.itemSearch || '').trim().toLowerCase();
+        if (!q) return true;
+        return i.code.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q);
+      }).map(i => ({
         code: i.code,
         label: i.kind === 'percent'
           ? i.code + ' — ' + i.desc + ' (' + i.cost + '% of subtotal, ' + (i.sign < 0 ? 'discount' : 'surcharge') + ')'
           : i.code + ' — ' + i.desc + ' (' + money(i.cost) + ' / ' + i.uom + ')',
       })),
       pickItem: S.pickItem,
-      addItem: () => {
-        if (!S.pickItem || !t || !curClient) return;
-        const src = curClient.items.find(i => i.code === S.pickItem); if (!src) return;
-        const isPercent = src.kind === 'percent';
-        const qty = isPercent ? '' : (src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1);
-        this.mutate(d => {
-          const x = d.tickets.find(y => y.id === t.id);
-          const line = { code: src.code, desc: src.desc, qty: qty, uom: src.uom, cost: src.cost, ov: {} };
-          if (isPercent) { line.kind = 'percent'; line.sign = src.sign; }
-          (x.items = x.items || []).push(line);
-        });
-        this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.');
-        this.setState({ pickItem: '' });
-      },
+      addItem: () => { addItemByCode(S.pickItem); this.setState({ pickItem: '' }); },
+      // Behavioral suggestion: the up-to-3 items charged most often on this client's
+      // other tickets, that aren't already on this one — a quick-add shortcut so the
+      // Ops Manager doesn't have to search/scroll the full price list for the items they
+      // reach for on nearly every job.
+      suggestedItems: suggestedItems,
+      showSuggested: suggestedItems.length > 0,
       curItems: t ? (t.items || []).map((it, i) => {
         const setField = (k, ovKey) => ev => {
           const v = ev.target.value;
@@ -1853,6 +1895,7 @@ class Component extends DCLogic {
         ticketNo: e => { const v = e.target.value; this.patchTicket({ ticketNo: v }); },
         mileage: e => { const v = e.target.value; this.patchTicket({ mileage: v === '' ? '' : Number(v) }); },
         pickItem: e => this.setState({ pickItem: e.target.value }),
+        itemSearch: e => this.setState({ itemSearch: e.target.value }),
         adminClient: e => this.setState({ adminClient: e.target.value }),
         newJobType: e => this.setState({ newJobType: e.target.value }),
         reason: e => this.setState({ reasonText: e.target.value }),
