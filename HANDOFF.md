@@ -298,3 +298,14 @@ All Part B/four-sheets questions are now answered. Nothing else pending on this 
 build the generator against these answers when we get to that phase (after the whole
 visual/behavioural layer in the prototype is signed off, per the earlier backend-timing
 answer).
+
+---
+
+## Standing rule — preview after every major step
+
+In addition to the per-change screenshot-gated workflow already agreed (small edit →
+render → screenshot → get a yes), the user wants a **preview of the PWA itself shown
+after every major step** (not just individual small edits) — e.g. after a screen is fully
+built out, after a batch of related changes lands, after backend wiring goes in, after a
+deploy. Don't let this rule get lost/skipped as the work progresses — check back against
+it before declaring any major step "done."
