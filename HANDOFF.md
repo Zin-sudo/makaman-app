@@ -773,6 +773,38 @@ carries a default-add-on-draft flag). This is the next item up. Also still pendi
 search + behavioral suggestions for Ops Manager, in-progress online/offline badge,
 Observer/Ops live-event-view, auto-sync timer.
 
+---
+
+## Session checkpoint — prototype edit #9 complete: surcharge/discount as price-list items
+
+**Edit #9 (`50437d7`)** — closes Q1 items 3 and 4, the last of the four business-rule
+items. Surcharge (20% desert/marine, standard-but-waivable) and discount (discretionary,
+variable, never defaulted) are now a new "percent of subtotal" kind of price-list item,
+not hardcoded ticket-total math. Both live in every client's price list next to the flat
+items (new `SPECIAL_ITEMS` constant, appended in `priceList(mult)`), so the Ops Manager
+picks/removes them from the exact same "Add item from price list" dropdown and table as
+any other line — no new markup was needed anywhere. `itemTotal()`/`ticketTotal()` now
+branch on `kind: 'percent'`: the percentage (stored in `cost`) is applied to
+`flatSubtotal(t)` — the subtotal of non-percent items only, so surcharge and discount
+never compound on each other. The surcharge (only) carries `defaultAddOnDraft: true`,
+read by `createTicket()` to pre-add it when a technician starts a new job; the Ops
+Manager waives it with the existing per-line × remove button, same as waiving any item.
+`money()` was fixed to format negative totals as `-$113.40` instead of `$-113.40`, now
+that a discount line can drive a total negative.
+Verified end-to-end: technician-created ticket auto-carries the surcharge line
+(localStorage read-back); Ops Manager review screen — added a flat item ($1,134.00),
+added the surcharge (correctly $226.80, 20% of the flat subtotal), added the discount and
+typed 10% into it (correctly -$113.40, 10% of the *flat* subtotal, not the post-surcharge
+figure — confirms no compounding), grand total $1,247.40 exactly right; removed
+(waived) the surcharge row, total dropped to $1,020.60, exactly right.
+
+**All four Q1 business-rule items and all four Q2 app-feature items are now complete**
+(edits #1-9). Remaining from the original punch list, none yet started: item search +
+behavioral suggestions for the Ops Manager when picking price-list items, in-progress
+online/offline badge on tickets, Observer/Ops-Manager live-event-view (real-time
+visibility into a technician's logging while connected), auto-sync timer (background sync
+on a time limit rather than only manual).
+
 Operating mode for this stretch of work, per explicit user instruction: make one
 self-contained edit, verify with real interaction (not just a screenshot), commit+push
 immediately with a detailed message, move to the next item without stopping for
