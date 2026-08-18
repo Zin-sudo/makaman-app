@@ -620,3 +620,28 @@ follow-up (branch/Vercel/Supabase naming + cross-service check) is now fully clo
   already documented earlier this session** — Vercel's connection accepts calls but its
   list/get responses are unreliable in this session. Treat the user's own Vercel
   dashboard as ground truth, not these tools, until this clears up.
+
+---
+
+## Session checkpoint — Supabase agent-skills installed; new Vercel deployment (unverifiable from tools again)
+
+**Supabase agent-skills installed** via `npx skills add supabase/agent-skills` — two
+skills added: `supabase` and `supabase-postgres-best-practices`, at
+`.agents/skills/*` (symlinked from `.claude/skills/*`), committed to the repo so they're
+available in future sessions too. Load `supabase-postgres-best-practices` before any
+schema/migration/RLS work in Part B or the backend-wiring phase.
+
+**New Vercel deployment reported by user** (post project-rename), two URLs:
+- `https://makaman-6q85nzsz4-midolateri-2760s-projects.vercel.app/`
+- `https://makaman-app-git-claude-makaman-app-midolateri-2760s-projects.vercel.app/`
+  (git-branch preview URL, tracking `claude/makaman-app`)
+- Referenced commit: `0234adb` (the connections-check checkpoint).
+
+**Could not verify from tools — same persistent bug as before, not new:**
+`mcp__Vercel__list_projects` returns empty, `get_deployment` 404s, and both
+`web_fetch_vercel_url` and general `WebFetch` fail (egress-blocked / can't create
+shareable URL) for these exact hosts. This matches the earlier-documented Vercel
+read-visibility bug — last time this happened, the deployment was actually fine and the
+tools were wrong, confirmed by the user's own dashboard. Treat that as the likely case
+again unless the user reports otherwise. **Not yet confirmed working by the user as of
+this checkpoint** — ask/verify next time before assuming.
