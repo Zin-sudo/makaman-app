@@ -591,3 +591,17 @@ User renamed all three for consistent naming:
 - Vercel's own default deployment URL DID change (was `makaman-job-tickets.vercel.app`,
   now presumably `makaman-app.vercel.app` or similar) — re-test the live app at the new
   URL, the old bookmark won't resolve.
+
+---
+
+## Session checkpoint — Vercel↔Supabase association verified correct (manual check)
+
+User manually checked Vercel's env vars post-rename and confirmed:
+- `VITE_SUPABASE_URL` = `https://igutjfezxkdncrcpvnqx.supabase.co`
+- `VITE_SUPABASE_ANON_KEY` decoded payload: `{iss: supabase, ref: igutjfezxkdncrcpvnqx,
+  role: anon, ...}`
+
+Both match the project ref exactly, confirming the rename to `makaman-app` didn't affect
+either value (as expected — they're keyed off the immutable ref, not the display name).
+**No action needed on Vercel or Supabase — the connection is correct as-is.** Rename
+follow-up (branch/Vercel/Supabase naming + cross-service check) is now fully closed out.
