@@ -694,3 +694,26 @@ note for future screenshot passes: `python3 -m http.server 8000` from `prototype
 between tool calls in this sandbox — always re-check with curl before assuming it's up,
 and prefer `setsid nohup ... < /dev/null &` over plain `&` + `disown`, don't `pkill` in
 the same command block as starting a new one (causes exit 144 with nothing captured).
+
+---
+
+## Session checkpoint — prototype edit #5 complete: real Login/Signup + approval flow
+
+Q2 item 6 done — full auth flow replacing the demo role-switcher, verified end-to-end
+(signup → pending → admin approves → new technician logs in correctly). Details in the
+commit message (`a4fc276`). Session persists across reloads via a separate localStorage
+key. Admin's Users & Customers table now has a working Approve action for pending
+signups.
+
+**Flagged, not fixed (pre-existing, not introduced by this edit):** Technician screen's
+ticket list filters by hardcoded name `'Yousef Al-Harbi'` instead of the logged-in
+session's name — a technician other than Yousef currently sees his demo tickets. Worth
+fixing alongside role management (item 7), next up.
+
+**Remaining Q1/Q2 items:** role management (item 7 — Admin promote to Admin/Ops Manager,
+Ops Manager also create-technician directly; Ops Manager currently has NO Users/Team
+panel at all in this zip, only Admin does), line-level job-log timestamp editing + audit
+(Q1), B13/F14 admin defaults (Q1), surcharge/discount as price-list items (Q1), item
+search + behavioral suggestions for Ops Manager, in-progress online/offline badge,
+Observer/Ops live-event-view, auto-sync timer, plus the hardcoded-technician-name fix
+noted above.
