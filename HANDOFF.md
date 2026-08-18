@@ -645,3 +645,15 @@ read-visibility bug — last time this happened, the deployment was actually fin
 tools were wrong, confirmed by the user's own dashboard. Treat that as the likely case
 again unless the user reports otherwise. **Not yet confirmed working by the user as of
 this checkpoint** — ask/verify next time before assuming.
+
+---
+
+## Session checkpoint — new Vercel deployment confirmed working by user
+
+User confirmed both URLs from the previous checkpoint load correctly:
+- `https://makaman-6q85nzsz4-midolateri-2760s-projects.vercel.app/`
+- `https://makaman-app-git-claude-makaman-app-midolateri-2760s-projects.vercel.app/`
+
+Same pattern as the earlier Vercel incident: tools reported not-found/empty while the
+deployment was genuinely live. Confirmed once again — trust the user's direct check over
+these tools for Vercel state in this session.
