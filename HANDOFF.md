@@ -350,3 +350,27 @@ the whole app — each role has sub-screens reached by navigation (ticket detail
 ticket, job log, settings, etc.) that also need covering before calling a baseline (or
 any "after a major step" preview) complete. Don't assume the landing screens alone
 satisfy the "preview after every major step" standing rule.
+
+---
+
+## Session checkpoint — Numbering & Job Types (Admin) verified against the real business rule
+
+Captured the Admin → **Numbering & Job Types** tab (also missing from the first baseline
+batch — same lesson as the Ops Manager Ticket View gap above). It already implements
+exactly the per-category numbering scheme the user described:
+
+- **Special Tools** — no letter prefix, plain digits (baseline: last used 1883 → next
+  1884). Matches the user's rule: 4-digit, e.g. 1880/1881/1882.
+- **Fishing** — `F` prefix (baseline: last used 702 → next F703). Matches: `F` + digits,
+  e.g. F800/F801/F802.
+- **Drilling** — `D` prefix (baseline: last used 5023 → next D5024). Matches: `D` +
+  digits, e.g. D5040/D5041/D5042.
+
+Behavior: admin enters the last number reached on paper, system continues from there and
+refuses any number already used. The ticket-view screen's "Take next from series" buttons
+(section 1) read live off this same table — cross-checked consistent with the user's
+attached screenshot (Special Tools → 1884, Fishing → F703, Drilling → D5024 match on both
+screens).
+
+**No change needed here — confirmed working as intended, not a gap.** Keep this numbering
+model as-is when we get to the edit phase; don't "fix" or redesign it.
