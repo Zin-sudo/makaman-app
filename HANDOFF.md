@@ -976,5 +976,30 @@ header) to wrap cleanly rather than 3-way-squeeze. Tables (Inbox, Team/People us
 price lists, Numbering series, Observer approved-jobs) intentionally kept scrollable —
 those are the "long list" exception.
 
-**Next up: item #15**, Ops Manager cloud storage linking (OneDrive + Google Drive +
-local) — not yet started.
+---
+
+## Session checkpoint — prototype edit #15 complete: cloud storage linking (item #15)
+
+**Edit #15 (`45f3d1d`)** — closes the last plan item. New Settings > "Storage & export"
+section, Ops-Manager-only, with Connect/Disconnect for OneDrive and Google Drive
+(matches the existing shareLocation-toggle role-gating pattern). Local download always
+works with no account, unchanged. Once connected, the print/export screen shows
+"Upload to OneDrive"/"Upload to Google Drive" buttons next to "Fill Excel & download" —
+each writes an audit-trail entry and confirms with a dialog naming the linked account.
+Admin's System tab "Storage" row is now dynamic (`Local device + OneDrive` etc.) instead
+of a hardcoded string.
+**Important, flagged in the code and here**: the OAuth connect flow is mocked — "Connect"
+just stores the session's email and flips a flag, since a static-file prototype has
+nowhere safe to hold a real Microsoft/Google app registration or do a server-side token
+exchange. A real build needs a backend for the actual handshake; this is UI/UX only.
+Verified end-to-end: Technician correctly doesn't see the section; Ops Manager connect/
+disconnect both providers works and shows the right account; upload buttons appear only
+once connected; upload produces the correct audit entry and confirmation dialog; Admin's
+System tab correctly reflects the live connected state.
+
+**Both user-requested plan items (#14 cross-device/PWA, #15 cloud storage linking) are
+now complete**, on top of the original 13-edit punch list — 16 edits total
+(`f3831d1` through `45f3d1d`). Also fixed, per user feedback mid-stream: the Admin tab
+bar and two other rows were hiding options behind an unnecessary horizontal scroll on
+narrow viewports (`3bc9514`) — small option sets now always fit visible, scroll is
+reserved for genuinely long data tables. Nothing outstanding as of this checkpoint.
