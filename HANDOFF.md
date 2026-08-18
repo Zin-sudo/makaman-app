@@ -1002,4 +1002,40 @@ now complete**, on top of the original 13-edit punch list — 16 edits total
 (`f3831d1` through `45f3d1d`). Also fixed, per user feedback mid-stream: the Admin tab
 bar and two other rows were hiding options behind an unnecessary horizontal scroll on
 narrow viewports (`3bc9514`) — small option sets now always fit visible, scroll is
-reserved for genuinely long data tables. Nothing outstanding as of this checkpoint.
+reserved for genuinely long data tables.
+
+---
+
+## Session checkpoint — sheet preview now matches the real Excel template (`dbe860a`)
+
+**User feedback**: the "Preview 4 sheets" screen was a from-scratch mockup layout, not
+the real `reference/Autofill_ServiceTikcet_System.xlsx` template already saved in the
+repo. Asked for the preview to reproduce that file's actual layout.
+
+Inspected the real workbook cell-by-cell with openpyxl (values, merges, styles) to get
+the exact field order/labels — confirmed along the way that the real template's
+surcharge/discount rows and B13/F14 cell references match what edits #9/#8 already
+built. **Tried LibreOffice headless rendering first** (would have given a pixel-exact
+image preview) but `soffice --convert-to pdf` is non-functional in this sandbox — fails
+on even a trivial txt file with "source file could not be loaded" / silent exit 81, not
+a permissions/sandbox issue (ruled out explicitly). **If a working LibreOffice becomes
+available in a future session, image-based rendering of the real sheets would be a
+strictly more faithful upgrade over the HTML reconstruction below — worth revisiting.**
+
+Rebuilt the preview as a faithful HTML/CSS reconstruction instead: same field labels,
+grouping and order as the real sheets (Customer/Field Name/Well No+MKN Supervisor/Rig
+Name+Start Job/Mileage+End Job/Base Location → job-type banner → Item no./Item
+Description/Qty/Unit/Unit Cost/Total Cost table → "Total =" row for Service Ticket;
+Customer+Date/Field+Job Type/Well No+Customer Rep./Job Supervisor+Rig Name → Start/End/
+Arrived band → Date/Time/Pressure/Total/Details of the Job table for Job Log), a
+prominent "TICKET NO:" box matching the real sheet's oversized number cell, and the
+real two-tier signature block ("Customer or his agent"/"MAKAMAN LIBYA" then
+"Representative Signature" x2). Two real-template fields have no data source in this
+app yet and show "—": "MKN Supervisor" (mapped to the technician, closest existing
+concept) and per-line Pressure/Total columns in the Job Log table.
+Verified with a fully-populated ticket (Kuwait Oil Group/1882, $27,920.40) — matches
+the source workbook's structure field-for-field; re-ran the 16-combination responsive
+sweep, still 0 overflow.
+
+Excel-fill/download logic itself and the app's business math were deliberately not
+touched — this was scoped to the on-screen preview layout only.
