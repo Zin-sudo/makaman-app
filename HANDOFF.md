@@ -190,3 +190,32 @@ committed into this repo (still pending the `prototype/` baseline commit step).
 **Resume point:** ask Q1, Q3, Q4 (can combine into remaining AskUserQuestion calls, cap 4
 questions/call), then start the `prototype/` baseline commit + first screenshot-gated
 edit pass. Do not re-ask Q2 — already answered above.
+
+---
+
+## Session checkpoint — all 4 AskUserQuestion rounds now answered
+
+**Q1 (business rules) — ANSWERED, all four selected:**
+- Line-level job-log timestamps editable by Ops Manager/Admin, audited
+- `B13`/`F14` as permanent admin-configured defaults, Ops-Manager-overridable per ticket
+- 20% desert/marine surcharge as a real price-list item (percent-of-subtotal), auto-added
+  on draft, Ops Manager can remove per ticket
+- Discount as a price-list item (percent-of-subtotal, negative sign), manual, variable
+  rate, never defaulted
+
+**Q3 (backend timing) — ANSWERED: after the four sheets.** Finish and sign off the whole
+visual/behavioural layer in the prototype (including Part B's four sheets) before
+touching Supabase/Vercel wiring.
+
+**Q4 (Pressure/Total on job-log lines) — ANSWERED: optional per line.** Add Pressure and
+Total as fields on every job-log line, matching Job Log sheet columns C/D, but leave them
+blank-by-default/optional since not every job type has a reading to log.
+
+All 4 questions from the other session's pre-batched plan are now answered (Q2 was
+answered in the prior checkpoint above — Settings screen, real Login/Signup, role
+management, real logo, all four selected).
+
+**Next up:** commit the untouched zip contents as the `prototype/` baseline, then begin
+screenshot-gated edits to `Job Ticket System.dc.html` one change at a time, starting with
+whichever screen makes sense first (likely Login/Signup, since Settings/logo/role-mgmt
+all touch it).
