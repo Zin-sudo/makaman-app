@@ -1021,7 +1021,12 @@ function ftime(s, tz, hour12) {
   return new Intl.DateTimeFormat('en-GB', opt).format(d);
 }
 function fstamp(s, tz, hour12) { return s ? fdate(s, tz) + ' · ' + ftime(s, tz, hour12) : '—'; }
-function money(n) { return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function money(n) {
+  const v = Number(n) || 0;
+  // Discount lines produce negative item/ticket totals — show the minus sign before the
+  // $ (-$150.00), not after it ($-150.00).
+  return (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 const BASE_ITEMS = [
   ['MKN-1801', 'Pick-up with tools travelling to wells', 'Km', 3.9],
@@ -1033,10 +1038,22 @@ const BASE_ITEMS = [
   ['MKN-1829', 'Retrievable Bridge Plug Size Thru 7": Add Day', 'Day', 800],
   ['MKN-1842', 'Fishing tool string per day or fraction', 'Day', 1400],
 ];
+// Surcharge and discount are ordinary, selectable price-list items — a "percent of
+// subtotal" kind rather than a fixed qty × unit-cost line. `cost` holds the percentage
+// (editable per ticket by the Ops Manager), `sign` fixes the direction. The 20%
+// desert/marine surcharge carries `defaultAddOnDraft` so it's pre-added when a
+// technician starts a new ticket; the Ops Manager can remove it (waive as a goodwill
+// gesture) or leave it, same as any other line. Discount is never defaulted on — added
+// manually at whatever percentage fits, at the Ops Manager's discretion during review.
+const SPECIAL_ITEMS = [
+  { code: 'MKN-SURCHARGE', desc: 'Desert / Marine Surcharge', uom: '%', kind: 'percent', sign: 1, cost: 20, defaultAddOnDraft: true },
+  { code: 'MKN-DISCOUNT', desc: 'Discount', uom: '%', kind: 'percent', sign: -1, cost: 0, defaultAddOnDraft: false },
+];
 function priceList(mult) {
-  return BASE_ITEMS.map(function (r) {
+  const flat = BASE_ITEMS.map(function (r) {
     return { code: r[0], desc: r[1], uom: r[2], cost: Math.round(r[3] * mult * 100) / 100 };
   });
+  return flat.concat(SPECIAL_ITEMS.map(function (s) { return Object.assign({}, s); }));
 }
 
 function seed() {
@@ -1186,8 +1203,20 @@ class Component extends DCLogic {
     this.mutate(d => { const t = d.tickets.find(x => x.id === id); if (t) (t.audit = t.audit || []).push({ ts: iso(new Date()), text: text }); });
   }
   client(name) { return this.state.data.clients.find(c => c.name === name); }
-  itemTotal(it) { return (Number(it.qty) || 0) * (Number(it.cost) || 0); }
-  ticketTotal(t) { return (t.items || []).reduce((s, i) => s + this.itemTotal(i), 0); }
+  // Flat (non-percent) items only — the base that surcharge/discount percentages are
+  // computed against, so a surcharge and a discount on the same ticket don't compound
+  // on top of each other.
+  flatSubtotal(t) {
+    return (t.items || []).filter(i => i.kind !== 'percent').reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.cost) || 0), 0);
+  }
+  // Percent-of-subtotal items (20% desert/marine surcharge, discretionary discount) store
+  // their percentage in `cost` and a +1/-1 `sign`; everything else is the existing
+  // qty × unit-cost line item.
+  itemTotal(it, t) {
+    if (it.kind === 'percent') return this.flatSubtotal(t || { items: [] }) * (Number(it.cost) || 0) / 100 * (it.sign || 1);
+    return (Number(it.qty) || 0) * (Number(it.cost) || 0);
+  }
+  ticketTotal(t) { return (t.items || []).reduce((s, i) => s + this.itemTotal(i, t), 0); }
 
   fmt() {
     const s = (this.state.data && this.state.data.settings) || {};
@@ -1272,7 +1301,11 @@ class Component extends DCLogic {
       { a: 'Technician', b: t.tech, c: 'Job type', d: t.jobType || '—' },
     ] : [];
     const sheetItems = t ? (t.items || []).map(i => ({
-      code: i.code, desc: i.desc, qty: String(i.qty), uom: i.uom, unit: money(i.cost), total: money(this.itemTotal(i)),
+      code: i.code, desc: i.desc,
+      qty: i.kind === 'percent' ? '—' : String(i.qty),
+      uom: i.uom,
+      unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost),
+      total: money(this.itemTotal(i, t)),
     })) : [];
     const sheetEvents = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), text: e.text })) : [];
     const mkSheet = (kind, mark) => ({
@@ -1476,14 +1509,23 @@ class Component extends DCLogic {
       createTicket: () => {
         const dr = S.draft; if (!dr) return;
         const id = 'k' + Date.now();
-        this.mutate(d => d.tickets.push({
-          id: id, tech: dr.tech, customer: dr.customer, field: dr.field, well: dr.well, rig: dr.rig,
-          jobType: '', arrival: dr.arrival, start: '', end: '', status: 'logging', synced: false, syncedAt: '',
-          ticketNo: '', mileage: '', events: [], items: [], audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.' }],
-          // B13/F14 — permanent admin-configured defaults, pre-filled here, only the
-          // Ops Manager can change them afterwards (see the review screen).
-          baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',
-        }));
+        this.mutate(d => {
+          const client = d.clients.find(c => c.name === dr.customer);
+          // 20% desert/marine surcharge is standard on nearly every ticket — pre-added
+          // here from the price list's defaultAddOnDraft items; the Ops Manager can
+          // remove it per ticket as a goodwill gesture during review.
+          const defaultItems = (client ? client.items : []).filter(i => i.defaultAddOnDraft).map(i => ({
+            code: i.code, desc: i.desc, qty: '', uom: i.uom, cost: i.cost, ov: {}, kind: i.kind, sign: i.sign,
+          }));
+          d.tickets.push({
+            id: id, tech: dr.tech, customer: dr.customer, field: dr.field, well: dr.well, rig: dr.rig,
+            jobType: '', arrival: dr.arrival, start: '', end: '', status: 'logging', synced: false, syncedAt: '',
+            ticketNo: '', mileage: '', events: [], items: defaultItems, audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.' }],
+            // B13/F14 — permanent admin-configured defaults, pre-filled here, only the
+            // Ops Manager can change them afterwards (see the review screen).
+            baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',
+          });
+        });
         this.setState({ activeId: id, techScreen: 'log', draft: null });
       },
 
@@ -1608,15 +1650,23 @@ class Component extends DCLogic {
       })),
       mileageNote: t && t.mileage ? 'Round trip charged: ' + (Number(t.mileage) * roundTrip) + ' km' : 'Charged as round trip (×' + roundTrip + ').',
 
-      priceOptions: (curClient ? curClient.items : []).map(i => ({ code: i.code, label: i.code + ' — ' + i.desc + ' (' + money(i.cost) + ' / ' + i.uom + ')' })),
+      priceOptions: (curClient ? curClient.items : []).map(i => ({
+        code: i.code,
+        label: i.kind === 'percent'
+          ? i.code + ' — ' + i.desc + ' (' + i.cost + '% of subtotal, ' + (i.sign < 0 ? 'discount' : 'surcharge') + ')'
+          : i.code + ' — ' + i.desc + ' (' + money(i.cost) + ' / ' + i.uom + ')',
+      })),
       pickItem: S.pickItem,
       addItem: () => {
         if (!S.pickItem || !t || !curClient) return;
         const src = curClient.items.find(i => i.code === S.pickItem); if (!src) return;
-        const qty = src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1;
+        const isPercent = src.kind === 'percent';
+        const qty = isPercent ? '' : (src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1);
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
-          (x.items = x.items || []).push({ code: src.code, desc: src.desc, qty: qty, uom: src.uom, cost: src.cost, ov: {} });
+          const line = { code: src.code, desc: src.desc, qty: qty, uom: src.uom, cost: src.cost, ov: {} };
+          if (isPercent) { line.kind = 'percent'; line.sign = src.sign; }
+          (x.items = x.items || []).push(line);
         });
         this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.');
         this.setState({ pickItem: '' });
@@ -1633,7 +1683,7 @@ class Component extends DCLogic {
         const ov = it.ov || {};
         return {
           code: it.code, desc: it.desc, qty: it.qty, uom: it.uom, cost: it.cost,
-          total: money(this.itemTotal(it)),
+          total: money(this.itemTotal(it, t)),
           descBg: ov.desc ? '#eef6ff' : '#e9e9ea',
           uomBg: ov.uom ? '#eef6ff' : '#e9e9ea',
           costBg: ov.cost ? '#eef6ff' : '#e9e9ea',
