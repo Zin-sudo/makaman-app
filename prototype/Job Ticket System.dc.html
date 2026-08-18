@@ -72,6 +72,11 @@
        phone mockup represents — meaningless (and just takes up space) on an actual
        phone, which doesn't need to be told what a phone looks like. */
     .mk-field-note { display:none !important; }
+    /* A small fixed set of options (tabs, segmented controls) should stay fully visible
+       and tappable, never partially hidden behind a horizontal scroll — that's reserved
+       for genuinely long lists (data tables). Wrap into an even 2-column grid instead of
+       squeezing 4 tabs into one unreadable scrollable row. */
+    .mk-tabbar-btn { flex-basis:50% !important; font-size:11px !important; padding:8px 6px !important; }
   }
   /* Back-navigation as a visible, bounded button rather than a plain text link —
      some field/office staff being trained on this aren't habitual app/mobile users,
@@ -681,9 +686,9 @@
       </sc-if>
 
       <sc-if value="{{ mgrPrint }}" hint-placeholder-val="{{ true }}">
-        <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:18px">
-          <button onClick="{{ backToReview }}" class="back-btn">‹ Back to review</button>
-          <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:18px">
+          <button onClick="{{ backToReview }}" class="back-btn" style="margin-bottom:0">‹ Back to review</button>
+          <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             <div style="font-size:12px;color:rgba(29,31,32,0.6)">Downloads to this device — no cloud account needed</div>
             <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Fill Excel &amp; download</button>
           </div>
@@ -779,15 +784,15 @@
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
       <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Admin</h2>
       <div style="font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:18px">Price lists, customers, numbering and job types — all editable without a release.</div>
-      <div style="display:flex;border:1px solid rgba(29,31,32,0.16);margin-bottom:22px;overflow-x:auto">
+      <div class="mk-tabbar" style="display:flex;flex-wrap:wrap;border:1px solid rgba(29,31,32,0.16);margin-bottom:22px">
         <sc-for list="{{ adminTabs }}" as="t" hint-placeholder-count="4">
-          <button onClick="{{ t.pick }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;border:0;border-right:1px solid rgba(29,31,32,0.16);background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+          <button onClick="{{ t.pick }}" class="mk-tabbar-btn" style="flex:1;min-width:120px;padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-right:1px solid rgba(29,31,32,0.16);background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
         </sc-for>
       </div>
 
       <sc-if value="{{ adminPrice }}" hint-placeholder-val="{{ true }}">
-        <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px">
-          <div style="width:280px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-bottom:14px">
+          <div style="width:280px;max-width:100%">
             <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Customer price list</label>
             <select value="{{ adminClient }}" onChange="{{ f.adminClient }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
               <sc-for list="{{ clientNames }}" as="c" hint-placeholder-count="3">
