@@ -799,11 +799,38 @@ figure — confirms no compounding), grand total $1,247.40 exactly right; remove
 (waived) the surcharge row, total dropped to $1,020.60, exactly right.
 
 **All four Q1 business-rule items and all four Q2 app-feature items are now complete**
-(edits #1-9). Remaining from the original punch list, none yet started: item search +
-behavioral suggestions for the Ops Manager when picking price-list items, in-progress
-online/offline badge on tickets, Observer/Ops-Manager live-event-view (real-time
-visibility into a technician's logging while connected), auto-sync timer (background sync
-on a time limit rather than only manual).
+(edits #1-9). Remaining from the original punch list: item search + behavioral
+suggestions for the Ops Manager when picking price-list items, in-progress online/offline
+badge on tickets, Observer/Ops-Manager live-event-view (real-time visibility into a
+technician's logging while connected), auto-sync timer (background sync on a time limit
+rather than only manual).
+
+---
+
+## Session checkpoint — prototype edit #10 complete: in-progress presence badge
+
+**Edit #10 (`a532b49`)** — tickets still being logged in the field (status 'logging',
+not yet Job Done) now show a small Online/Offline presence badge next to the existing
+status chip, in three places: the technician's own ticket list, the Ops Manager Inbox
+table, and the Ops Review screen header. All three read from the same new
+`ticketView()` fields (`presenceShow`/`presenceDot`/`presenceLabel`).
+Important simplification, noted in the code and worth carrying forward: this prototype
+only ever modeled one shared device-connectivity flag (the header's Online/No-signal
+toggle), not real per-technician live presence — so today every in-progress ticket
+reflects that same single flag rather than that specific technician's actual device
+state. A real backend would need per-session/per-device presence to make this fully
+honest; flagged for whoever builds that.
+Verified end-to-end: toggled the connectivity pill as Yousef, confirmed the badge flips
+color/label live on his own ticket list; synced while online, switched to Omar (Ops
+Manager), confirmed the still-in-progress ticket appears in the Inbox and its Review
+screen both carrying the badge, while Approved/Awaiting-review tickets correctly show no
+badge at all.
+
+**Remaining from the original punch list**: item search + behavioral suggestions for the
+Ops Manager when picking price-list items, Observer/Ops-Manager live-event-view
+(real-time visibility into a technician's logging while connected — natural next step
+after this edit, since the Inbox can now surface in-progress tickets), auto-sync timer
+(background sync on a time limit rather than only manual).
 
 Operating mode for this stretch of work, per explicit user instruction: make one
 self-contained edit, verify with real interaction (not just a screenshot), commit+push
