@@ -219,3 +219,40 @@ management, real logo, all four selected).
 screenshot-gated edits to `Job Ticket System.dc.html` one change at a time, starting with
 whichever screen makes sense first (likely Login/Signup, since Settings/logo/role-mgmt
 all touch it).
+
+---
+
+## Session checkpoint — two more decisions (previously lost to an interrupted tool call, now captured)
+
+**Item search + behavioral item suggestions for the Ops Manager (price list, during ticket
+review/drafting):**
+- **Search by item no.** — Ops Manager can search/filter a client's price list by item
+  number instead of scrolling a long list every time.
+- **Behavioral suggestions** — track which items a given Ops Manager actually adds for a
+  given *client* over time. Next time the same client is being served, surface the most
+  likely next item as a suggestion.
+  - Show **one suggestion at a time**, not a list.
+  - If the offered suggestion is picked, immediately offer the *next* item in that
+    client's behavioral sequence.
+  - Keep offering the next-most-likely item until the behavioral pattern runs out, then
+    stop — let the Ops Manager finish adding items manually, don't clutter the screen with
+    suggestions that aren't backed by real behavior.
+  - Real-world sequence example the client described: **Transportation → Engineer → Tool:
+    first day → Tool: additional/after-first day → Desert/Marine surcharge** (surcharge
+    not applicable to every client — matches the existing surcharge business rule).
+  - Goal stated explicitly: speed up filling out the service ticket before approval, not
+    to replace manual selection.
+
+**"Previous page" / back navigation — needs to be a visible button, not plain text.**
+- E.g. the "‹ All tickets" back link (visible in the annotated screenshot,
+  `draw-2d624c37...png`) reads as plain text today, which is easy to miss for someone who
+  isn't a habitual app/mobile user.
+- Client's stated reason: some of the people being trained on this app aren't very
+  tech-comfortable, so back/previous navigation needs an actual button treatment (visible
+  bounds, not just a text link) wherever it appears in the prototype, not just on that one
+  screen.
+
+These fold into the already-answered Q1 (business rules — the suggestion behavior is a
+UX/workflow detail of "Ops Manager adds price-list items," not a new toggle) and Q2 (app
+features — navigation/back-button treatment applies across whichever screens get built).
+No new AskUserQuestion round needed for these two; they're direct instructions.
