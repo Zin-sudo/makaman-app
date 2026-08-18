@@ -879,6 +879,31 @@ entries while they're still logging (not yet synced/Job-Done). Edit #10's presen
 and the fact that in-progress tickets now surface in the Ops Manager Inbox once synced
 once (edit #10/#11) are the groundwork this would build on.
 
+---
+
+## Session checkpoint — prototype edit #13 complete: Observer live-event-view
+
+**Edit #13 (`69475e9`)** — the last item on the punch list. New "Live activity" box on
+the Observer screen lists every currently-in-progress (status 'logging', synced at least
+once) ticket company-wide: customer, technician, location, most recent job-log line +
+timestamp, log-line count, and the same online/offline presence badge from edit #10.
+Empty state reads "Nothing in progress right now" rather than showing a blank box.
+Gated on `synced` for the same reason the Ops Manager Inbox is — consistent visibility
+rule, not extra access for Observer. Documented in-code that "real-time" here means
+"re-renders on the app's existing 30s tick," not a real push feed — this prototype has
+one shared local data store, not a multi-device backend, and the comment says so
+explicitly for whoever builds the real thing.
+Verified end-to-end: Observer view showed the correct empty state before anything
+synced; after the technician went online and synced their in-progress ticket, the
+Observer's Live Activity box picked it up with the real last-log-line text/timestamp,
+line count, and presence badge, matching the technician's own screen.
+
+**Every item on the original Q1/Q2 punch list, plus every follow-up item (presence
+badge, auto-sync timer, item search/suggestions, live-event-view), is now complete —
+13 edits total (`f3831d1` through `69475e9`), each verified end-to-end with Playwright
+and committed/pushed individually to `claude/makaman-app`.** No further punch-list items
+are outstanding as of this checkpoint; next steps are whatever the user directs.
+
 Operating mode for this stretch of work, per explicit user instruction: make one
 self-contained edit, verify with real interaction (not just a screenshot), commit+push
 immediately with a detailed message, move to the next item without stopping for
