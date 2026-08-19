@@ -600,6 +600,22 @@
             <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ false }}">
               <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Account</h2>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
+              <sc-if value="{{ showProfile }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:14px">
+                  <sc-for list="{{ profileRows }}" as="r" hint-placeholder-count="4">
+                    <div style="display:flex;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px">
+                      <div style="width:78px;flex:none;color:rgba(var(--ink-rgb),0.55)">{{ r.label }}</div>
+                      <div style="flex:1;min-width:0;font-weight:500">{{ r.value }}</div>
+                    </div>
+                  </sc-for>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px">
+                    <div style="font-size:13px">Share my position with the office</div>
+                    <button onClick="{{ toggleShareLocation }}" style="width:42px;height:24px;flex:none;padding:0;border:1px solid rgba(var(--ink-rgb),0.3);background:{{ shareLocationBg }};position:relative;cursor:pointer">
+                      <span style="position:absolute;top:1px;left:{{ shareLocationKnob }};width:18px;height:18px;background:var(--surface)"></span>
+                    </button>
+                  </div>
+                </div>
+              </sc-if>
               <div style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="2">
                   <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:12px;padding:13px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
@@ -1440,13 +1456,8 @@
         </sc-if>
       </div>
 
-      <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:12px">
-        <div style="flex:1;max-width:420px">
-          <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Report size — last {{ founderCount }} approved jobs</label>
-          <input type="range" min="5" max="50" step="1" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;accent-color:var(--accent)">
-        </div>
-        <button onClick="{{ generateReport }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate report</button>
-      </div>
+      <!-- The report controls moved to Account: producing a report is something you
+           do with your account, not part of reading the work. -->
       <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:14px">
           <thead>
@@ -1510,23 +1521,32 @@
         </sc-if>
       </sc-if>
 
+      <!-- The office end of "what hasn't reached us yet" is about devices, not this
+           device: an office user never creates tickets, so their own pending list is
+           permanently empty and tells them nothing. -->
       <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Sync</h2>
-        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Last upload: {{ syncLastLabel }}</div>
-        <sc-if value="{{ syncNothingPending }}" hint-placeholder-val="{{ true }}">
-          <div style="padding:30px 0;font-size:14px;color:rgba(var(--ink-rgb),0.5)">Everything has been uploaded.</div>
-        </sc-if>
-        <sc-if value="{{ syncHasPending }}" hint-placeholder-val="{{ false }}">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">{{ syncPendingLabel }}</div>
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Field devices</h2>
+        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Longest out of contact first. Positions refresh only while a job is open.</div>
+        <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column;gap:10px">
-            <sc-for list="{{ syncRows }}" as="t" hint-placeholder-count="2">
-              <div class="mk-ticket-card" style="display:flex;align-items:center;gap:12px;padding:13px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }}">
-                <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
+            <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid rgba(var(--ink-rgb),0.16)">
+                <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:6px"></span>
                 <div style="flex:1;min-width:0">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px">{{ t.customer }}</div>
-                  <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ t.locLine }} · {{ t.tech }}</div>
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px">{{ d.name }}</div>
+                  <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ d.base }} · {{ d.openLabel }}</div>
+                  <sc-if value="{{ d.showPos }}" hint-placeholder-val="{{ true }}">
+                    <div style="font-size:12px;font-variant-numeric:tabular-nums;color:rgba(var(--ink-rgb),0.75);margin-top:6px">{{ d.posText }}</div>
+                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45)">{{ d.posStamp }}</div>
+                  </sc-if>
                 </div>
-                <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+                <div style="flex:none;text-align:right">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Last contact</div>
+                  <div style="font-size:13px">{{ d.lastLabel }}</div>
+                  <sc-if value="{{ d.showPending }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--warning);margin-top:4px">{{ d.pendingLabel }}</div>
+                  </sc-if>
+                </div>
               </div>
             </sc-for>
           </div>
@@ -1536,6 +1556,14 @@
       <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ true }}">
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Account</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
+        <sc-if value="{{ showReports }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
+            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Reports</div>
+            <label style="display:block;font-size:13px;margin-bottom:8px;color:rgba(var(--ink-rgb),0.75)">Report size — last {{ founderCount }} approved jobs</label>
+            <input type="range" min="5" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:12px">
+            <button onClick="{{ generateReport }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate report</button>
+          </div>
+        </sc-if>
         <div style="display:flex;flex-direction:column;gap:10px">
           <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="5">
             <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:13px;padding:15px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
@@ -2781,6 +2809,47 @@ class Component extends DCLogic {
       syncPendingLabel: unsynced.length === 1 ? '1 ticket waiting to upload' : unsynced.length + ' tickets waiting to upload',
       syncLastLabel: S.lastAutoSyncAt ? F.stamp(S.lastAutoSyncAt) : 'No upload yet on this device',
 
+      // ── Field devices (office roles) ───────────────────────────────────────
+      // A technician's Sync answers "what is still on my device". The office end of
+      // the same question is "whose device is holding work I cannot see yet" —
+      // which is answerable, and tells a manager who to call.
+      //
+      // Last contact is derived from the newest syncedAt across that technician's
+      // tickets, not from users[].lastSync: that field is seeded text that nothing
+      // in the app ever updates, so a technician could upload all day and still
+      // read "2 h ago".
+      fieldDevices: (() => {
+        const techs = (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active');
+        const now = Date.now();
+        return techs.map(u => {
+          const mine = D.tickets.filter(x => x.tech === u.name);
+          const stamps = mine.map(x => x.syncedAt).filter(Boolean).map(s => new Date(s).getTime());
+          const lastAt = stamps.length ? Math.max.apply(null, stamps) : null;
+          const openCount = mine.filter(x => x.status === 'logging').length;
+          const pending = mine.filter(x => !x.synced).length;
+          // Newest position across their tickets. Only refreshes while they have a
+          // job open, so it is where they last were on a job — not live tracking.
+          const fixes = mine.map(x => (x.geo || {}).last).filter(Boolean)
+            .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+          const fix = fixes[0];
+          const hours = lastAt === null ? Infinity : (now - lastAt) / 3600000;
+          return {
+            name: u.name, base: u.base || '—',
+            sortKey: lastAt === null ? -Infinity : lastAt,
+            lastLabel: lastAt === null ? 'Never synced' : F.stamp(iso(new Date(lastAt))),
+            // Amber past a shift, red past a day: how overdue a check-in is.
+            dot: hours > 24 ? 'var(--danger)' : (hours > 12 ? 'var(--warning)' : 'var(--success)'),
+            openLabel: openCount === 1 ? '1 job open' : openCount + ' jobs open',
+            pendingLabel: pending ? (pending === 1 ? '1 not uploaded' : pending + ' not uploaded') : '',
+            showPending: pending > 0,
+            posText: fix ? geoText(fix) : '',
+            posStamp: fix ? F.stamp(fix.ts) : '',
+            showPos: !!fix,
+          };
+        }).sort((a, b) => a.sortKey - b.sortKey); // longest out of contact first
+      })(),
+      hasFieldDevices: (D.users || []).some(u => u.roleKey === 'tech' && u.status === 'active'),
+
       // ── Account ────────────────────────────────────────────────────────────
       // The tools each role can reach from the account tab. Admin's four are the
       // ones that used to sit behind a flat tab strip; the others lead to screens
@@ -2810,6 +2879,21 @@ class Component extends DCLogic {
         }
         return [settings];
       })(),
+      // The signed-in user's own record, for the technician's Account tab. Identity
+      // rather than statistics: their numbers belong on Tickets, where the tickets are.
+      profileRows: (() => {
+        const me = (D.users || []).find(u => u.email === ((S.session && S.session.email) || ''));
+        return [
+          { label: 'Name', value: (S.session && S.session.name) || '—' },
+          { label: 'Email', value: (S.session && S.session.email) || '—' },
+          { label: 'Base', value: (me && me.base) || '—' },
+          { label: 'Role', value: { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' }[S.role] || '—' },
+        ];
+      })(),
+      showProfile: S.role === 'tech',
+      // Report controls, moved off the Observer's ticket list — generating a report is
+      // an account action, not part of reading the work.
+      showReports: S.role === 'founder',
 
       showSettings: S.showSettings,
       openSettings: () => this.setState({ showSettings: true }),
