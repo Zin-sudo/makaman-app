@@ -8,7 +8,7 @@
 const CACHE = 'makaman-jobtickets-shell-v1';
 const SHELL = [
   './',
-  './Job Ticket System.dc.html',
+  './index.html',
   './support.js',
   './manifest.webmanifest',
   './uploads/icon-192.png',

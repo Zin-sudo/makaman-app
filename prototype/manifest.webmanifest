@@ -2,15 +2,30 @@
   "name": "Makaman Job Tickets",
   "short_name": "Job Tickets",
   "description": "Makaman Libya field job ticket, review, and approval system.",
-  "start_url": "./Job Ticket System.dc.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f2f2f3",
   "theme_color": "#1d2d3d",
   "icons": [
-    { "src": "uploads/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "uploads/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "uploads/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "uploads/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "uploads/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "uploads/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
