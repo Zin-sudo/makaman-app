@@ -1820,6 +1820,13 @@ class Component extends DCLogic {
       authIsSignup: S.authScreen === 'signup' && !S.signupDone,
       signupDone: S.signupDone,
       authError: S.authError,
+      // The four auth inputs bind value="{{ authEmail }}" etc. Without these the
+      // view never receives the typed value, so React re-rendered them back to ''
+      // on every keystroke and the login/signup fields could not be typed into.
+      authEmail: S.authEmail || '',
+      authPassword: S.authPassword || '',
+      authFullName: S.authFullName || '',
+      authConfirm: S.authConfirm || '',
       sessionName: S.session ? S.session.name : '',
       goToLogin: () => this.setState({ authScreen: 'login', authError: '', signupDone: false }),
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
