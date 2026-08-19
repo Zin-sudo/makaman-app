@@ -36,14 +36,70 @@
 <link rel="apple-touch-icon" href="uploads/icon-192.png">
 <link rel="stylesheet" href="vendor/fonts.css">
 <style>
-  body { margin:0; background:#f2f2f3; color:#1d1f20; font-family:"Barlow",system-ui,sans-serif; font-size:15px; line-height:1.55; }
+  /* ══ THEME TOKENS ══
+     Every colour in the app resolves through one of these. The light values are
+     byte-identical to the literals they replaced, so the light theme renders exactly as
+     the app did before the migration — which is what let the change be verified by
+     screenshotting all 26 screens before and after and requiring a zero pixel diff.
+
+     The printed A4 sheets deliberately do NOT use these. They are client documents that
+     get signed and stamped, so they keep their own literal black-on-white and stay
+     paper whichever theme the app is in.
+
+     data-mkn-theme is stamped on <html> from Settings; when it is 'system' the media
+     query decides. */
+  :root {
+    --ground:#f2f2f3; --surface:#ffffff; --field:#e9e9ea; --bezel:#1d1f20;
+    --ink:#1d1f20; --ink-dim:#4a4a4d; --ink-faint:#5d5d60; --ink-ghost:#98989b;
+    --ink-rgb:29,31,32;
+    --on-accent:#f2f2f3; --on-accent-strong:#ffffff;
+    --accent:#5980a6; --accent-deep:#416180; --accent-ink:#2c455d;
+    --accent-rgb:89,128,166; --accent-deep-rgb:65,97,128;
+    --accent-wash:#eef6ff; --accent-wash-2:#eef3f8; --accent-wash-3:#e2ebf3;
+    --navbar:#1d2d3d; --navbar-ink:#f2f2f3; --on-navbar-rgb:242,242,243;
+    --ink-strong:#1d2d3d; --brand:#b0413a;
+    --chip-ok-bg:#1d2d3d; --chip-ok-fg:#f2f2f3;
+    --danger:#b0413a; --danger-deep:#8c3b3b;
+    --warning:#b5790c; --warning-ink:#8a5b09; --warning-deep:#7a5109; --warning-rgb:181,121,12;
+    --success:#2f8f5b; --success-rgb:41,143,91;
+    --hue-teal:#2c7a72; --hue-indigo:#4c5c9e; --hue-clay:#b0644a;
+    --shadow-rgb:43,43,45; --scrim:rgba(43,43,45,0.55);
+    --radius:0px; --radius-lg:0px;
+  }
+  /* Night Shift — the palette from the reference screenshots. Near-black ground, one
+     lifted card surface, and saturated hues that carry meaning rather than decoration. */
+  :root[data-mkn-theme="dark"] {
+    --ground:#000000; --surface:#1a1a1d; --field:#232326; --bezel:#26262a;
+    --ink:#f5f5f7; --ink-dim:#a1a1a8; --ink-faint:#8e8e93; --ink-ghost:#6e6e76;
+    --ink-rgb:245,245,247;
+    --on-accent:#ffffff; --on-accent-strong:#ffffff;
+    --accent:#0a84ff; --accent-deep:#4da2ff; --accent-ink:#8fc8ff;
+    --accent-rgb:10,132,255; --accent-deep-rgb:77,162,255;
+    --accent-wash:rgba(10,132,255,0.16); --accent-wash-2:rgba(10,132,255,0.10); --accent-wash-3:rgba(10,132,255,0.22);
+    --navbar:#0e0e10; --navbar-ink:#f5f5f7; --on-navbar-rgb:245,245,247;
+    --ink-strong:#f5f5f7; --brand:#e05a4e;
+    --chip-ok-bg:rgba(48,209,88,0.18); --chip-ok-fg:#30d158;
+    --danger:#ff453a; --danger-deep:#ff6961;
+    --warning:#ff9f0a; --warning-ink:#ffcf70; --warning-deep:#ffbf4d; --warning-rgb:255,159,10;
+    --success:#30d158; --success-rgb:48,209,88;
+    --hue-teal:#40c8e0; --hue-indigo:#bf5af2; --hue-clay:#ff9f0a;
+    --shadow-rgb:0,0,0; --scrim:rgba(0,0,0,0.72);
+    --radius:12px; --radius-lg:16px;
+  }
+  /* Native controls (date pickers, select arrows, scrollbars) follow the theme too —
+     without this a dark page still gets a white date-picker panel. */
+  :root[data-mkn-theme="dark"] { color-scheme: dark; }
+  :root[data-mkn-theme="light"] { color-scheme: light; }
+</style>
+<style>
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:"Barlow",system-ui,sans-serif; font-size:15px; line-height:1.55; }
   *,*::before,*::after { box-sizing:border-box; }
   input,select,textarea,button { font-family:inherit; }
-  a { color:#416180; text-underline-offset:3px; }
-  a:hover { color:#5980a6; }
-  ::selection { background:rgba(89,128,166,0.3); }
+  a { color:var(--accent-deep); text-underline-offset:3px; }
+  a:hover { color:var(--accent); }
+  ::selection { background:rgba(var(--accent-rgb),0.3); }
   :focus { outline:none; }
-  :focus-visible { outline:2px solid #5980a6; outline-offset:2px; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.35 } }
   /* Cross-device responsiveness — every role must be usable on phone, tablet, laptop
      and desktop (someone may have to log in from an unfamiliar device). The screens
@@ -103,14 +159,14 @@
     display:inline-flex; align-items:center; gap:5px;
     padding:6px 12px; margin-bottom:10px;
     font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.02em;
-    color:#2c455d; background:#eef3f8; border:1px solid rgba(65,97,128,0.35);
+    color:var(--accent-ink); background:var(--accent-wash-2); border:1px solid rgba(var(--accent-deep-rgb),0.35);
     cursor:pointer;
   }
-  .back-btn:hover { background:#e2ebf3; border-color:#416180; }
+  .back-btn:hover { background:var(--accent-wash-3); border-color:var(--accent-deep); }
 </style>
 </helmet>
 
-<div style="min-height:100vh;background:#f2f2f3">
+<div style="min-height:100vh;background:var(--ground)">
 
   <!-- ══ LOGIN / SIGNUP (logged out) ══ -->
   <sc-if value="{{ loggedOut }}" hint-placeholder-val="{{ false }}">
@@ -118,44 +174,44 @@
       <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:56px;width:auto;margin-bottom:34px">
 
       <sc-if value="{{ authIsLogin }}" hint-placeholder-val="{{ true }}">
-        <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14)">
+        <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
           <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Makaman Job Tickets</h2>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Password</div>
-          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Password</div>
+          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ authError }}</div>
+            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
-          <button onClick="{{ doLogin }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log in</button>
-          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(29,31,32,0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
+          <button onClick="{{ doLogin }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand)">Log in</button>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
         </div>
       </sc-if>
 
       <sc-if value="{{ authIsSignup }}" hint-placeholder-val="{{ false }}">
-        <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14)">
+        <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
           <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Full name</div>
-          <input value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Password</div>
-          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Confirm password</div>
-          <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Full name</div>
+          <input value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Password</div>
+          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Confirm password</div>
+          <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ authError }}</div>
+            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
-          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Request account</button>
-          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(29,31,32,0.6)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
+          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Request account</button>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
         </div>
       </sc-if>
 
       <sc-if value="{{ signupDone }}" hint-placeholder-val="{{ false }}">
-        <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14);text-align:center">
+        <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14);text-align:center">
           <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Request sent</h2>
-          <p style="font-size:14px;color:rgba(29,31,32,0.7);line-height:1.5;margin:0 0 20px">An Ops Manager needs to approve your account before you can log in. You'll be assigned the Field Technician role automatically once approved.</p>
-          <button onClick="{{ goToLogin }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Back to login</button>
+          <p style="font-size:14px;color:rgba(var(--ink-rgb),0.7);line-height:1.5;margin:0 0 20px">An Ops Manager needs to approve your account before you can log in. You'll be assigned the Field Technician role automatically once approved.</p>
+          <button onClick="{{ goToLogin }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to login</button>
         </div>
       </sc-if>
     </div>
@@ -165,11 +221,11 @@
   <sc-if value="{{ isPendingUser }}" hint-placeholder-val="{{ false }}">
     <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
       <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:56px;width:auto;margin-bottom:34px">
-      <div style="width:100%;max-width:360px;padding:26px;background:#fff;border:1px solid rgba(29,31,32,0.14);text-align:center">
+      <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14);text-align:center">
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Waiting for approval</h2>
-        <p style="font-size:14px;color:rgba(29,31,32,0.7);line-height:1.5;margin:0 0 20px">Signed in as {{ sessionName }}. An Ops Manager or Admin still needs to approve your account.</p>
-        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Check again</button>
-        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log out</button>
+        <p style="font-size:14px;color:rgba(var(--ink-rgb),0.7);line-height:1.5;margin:0 0 20px">Signed in as {{ sessionName }}. An Ops Manager or Admin still needs to approve your account.</p>
+        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Check again</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
   </sc-if>
@@ -177,21 +233,21 @@
   <!-- ══ MAIN APP (logged in) ══ -->
   <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}">
 
-  <div style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:#1d2d3d;color:#f2f2f3">
+  <div style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:var(--navbar);color:var(--on-accent)">
     <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
       <div class="mk-nav-title" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(242,242,243,0.22);font-size:13px">
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:13px">
       <span style="font-weight:600">{{ sessionName }}</span>
       <span class="mk-nav-role" style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
     </div>
-    <button onClick="{{ openSettings }}" title="Settings" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:transparent;border:1px solid rgba(242,242,243,0.28);color:#f2f2f3">⚙</button>
+    <button onClick="{{ openSettings }}" title="Settings" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:transparent;border:1px solid rgba(var(--on-navbar-rgb),0.28);color:var(--on-accent)">⚙</button>
   </div>
 
   <!-- ══ SETTINGS (overlay, any role) ══ -->
   <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
-    <div style="position:fixed;inset:0;background:#f2f2f3;z-index:50;overflow-y:auto">
+    <div style="position:fixed;inset:0;background:var(--ground);z-index:50;overflow-y:auto">
       <div style="max-width:480px;margin:0 auto;padding:26px 22px 60px">
         <button onClick="{{ closeSettings }}" class="back-btn">‹ Close</button>
         <div style="display:flex;justify-content:center;margin:8px 0 20px">
@@ -200,84 +256,84 @@
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
 
         <div style="margin-bottom:28px">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:10px">Appearance</div>
-          <div style="display:flex;border:1px solid rgba(29,31,32,0.22);margin-bottom:16px">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Appearance</div>
+          <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22);margin-bottom:16px">
             <sc-for list="{{ themeOptions }}" as="o" hint-placeholder-count="3">
-              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(29,31,32,0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
           </div>
           <div style="display:flex;gap:12px;align-items:center">
             <sc-for list="{{ accentSwatches }}" as="a" hint-placeholder-count="5">
-              <span onClick="{{ a.pick }}" style="width:26px;height:26px;border-radius:50%;background:{{ a.color }};box-shadow:0 0 0 2px #f2f2f3, 0 0 0 4px {{ a.color }};cursor:pointer;display:inline-block"></span>
+              <span onClick="{{ a.pick }}" style="width:26px;height:26px;border-radius:50%;background:{{ a.color }};box-shadow:0 0 0 2px var(--ground), 0 0 0 4px {{ a.color }};cursor:pointer;display:inline-block"></span>
             </sc-for>
           </div>
-          <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:10px">Dark mode and accent colour are saved here now — applying them across every screen is a separate follow-up pass, not done yet.</div>
+          <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:10px">Dark mode applies across every screen. Accent colour is saved but not applied yet.</div>
         </div>
 
         <div style="margin-bottom:28px">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:10px">Date &amp; time</div>
-          <select value="{{ timezoneValue }}" onChange="{{ setTimezone }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:14px;background:#fff;border:1px solid rgba(29,31,32,0.22);color:#1d1f20;margin-bottom:12px">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Date &amp; time</div>
+          <select value="{{ timezoneValue }}" onChange="{{ setTimezone }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:14px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.22);color:var(--ink);margin-bottom:12px">
             <sc-for list="{{ timezoneOptions }}" as="z" hint-placeholder-count="7">
               <option value="{{ z.value }}">{{ z.label }}</option>
             </sc-for>
           </select>
-          <div style="display:flex;border:1px solid rgba(29,31,32,0.22)">
+          <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22)">
             <sc-for list="{{ timeFormatOptions }}" as="o" hint-placeholder-count="2">
-              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(29,31,32,0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
           </div>
         </div>
 
         <sc-if value="{{ settingsIsTech }}" hint-placeholder-val="{{ true }}">
-          <div style="margin-bottom:28px;padding:14px;border:1px solid rgba(29,31,32,0.18);background:#fff">
+          <div style="margin-bottom:28px;padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
               <div style="font-size:14px;font-weight:600">Share my arrival location with the Ops Manager</div>
-              <button onClick="{{ toggleShareLocation }}" style="width:42px;height:24px;flex:none;padding:0;border:1px solid rgba(29,31,32,0.3);background:{{ shareLocationBg }};position:relative;cursor:pointer">
-                <span style="position:absolute;top:1px;left:{{ shareLocationKnob }};width:18px;height:18px;background:#fff"></span>
+              <button onClick="{{ toggleShareLocation }}" style="width:42px;height:24px;flex:none;padding:0;border:1px solid rgba(var(--ink-rgb),0.3);background:{{ shareLocationBg }};position:relative;cursor:pointer">
+                <span style="position:absolute;top:1px;left:{{ shareLocationKnob }};width:18px;height:18px;background:var(--surface)"></span>
               </button>
             </div>
-            <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:8px;line-height:1.4">Captured silently on arrival when a connection is available. Visible only to the Ops Manager — never shown on your screen.</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px;line-height:1.4">Captured silently on arrival when a connection is available. Visible only to the Ops Manager — never shown on your screen.</div>
           </div>
         </sc-if>
 
         <sc-if value="{{ settingsIsMgr }}" hint-placeholder-val="{{ false }}">
           <div style="margin-bottom:28px">
-            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:10px">Storage &amp; export</div>
-            <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-bottom:12px;line-height:1.4">Exported sheets always download to this device — that never requires an account. Optionally link a cloud account below to also upload straight there from the export screen.</div>
+            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Storage &amp; export</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-bottom:12px;line-height:1.4">Exported sheets always download to this device — that never requires an account. Optionally link a cloud account below to also upload straight there from the export screen.</div>
 
-            <div style="padding:14px;border:1px solid rgba(29,31,32,0.18);background:#fff;margin-bottom:10px">
+            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:10px">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div style="font-size:14px;font-weight:600">OneDrive</div>
                 <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-                  <button onClick="{{ disconnectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">Disconnect</button>
+                  <button onClick="{{ disconnectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
                 </sc-if>
                 <sc-if value="{{ cloudOneDriveNotConnected }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ connectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Connect</button>
+                  <button onClick="{{ connectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
                 </sc-if>
               </div>
               <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-                <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:8px">Connected as {{ cloudOneDriveAccount }}</div>
+                <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px">Connected as {{ cloudOneDriveAccount }}</div>
               </sc-if>
             </div>
 
-            <div style="padding:14px;border:1px solid rgba(29,31,32,0.18);background:#fff;margin-bottom:10px">
+            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:10px">
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div style="font-size:14px;font-weight:600">Google Drive</div>
                 <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-                  <button onClick="{{ disconnectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">Disconnect</button>
+                  <button onClick="{{ disconnectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
                 </sc-if>
                 <sc-if value="{{ cloudGoogleNotConnected }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ connectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Connect</button>
+                  <button onClick="{{ connectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
                 </sc-if>
               </div>
               <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-                <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:8px">Connected as {{ cloudGoogleAccount }}</div>
+                <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px">Connected as {{ cloudGoogleAccount }}</div>
               </sc-if>
             </div>
           </div>
         </sc-if>
 
-        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#b0413a;color:#fff;border:1px solid #b0413a">Log out</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
   </sc-if>
@@ -285,10 +341,10 @@
   <!-- ══ TECHNICIAN ══ -->
   <sc-if value="{{ isTech }}" hint-placeholder-val="{{ true }}">
     <div class="mk-phone-shell" style="display:flex;justify-content:center;gap:36px;padding:34px 22px 60px">
-      <div class="mk-phone-frame" style="width:398px;flex:none;padding:9px;background:#1d1f20;border-radius:34px;box-shadow:0 12px 32px rgba(43,43,45,0.22)">
-        <div class="mk-phone-screen" style="background:#f2f2f3;border-radius:26px;overflow:hidden;height:806px;display:flex;flex-direction:column">
+      <div class="mk-phone-frame" style="width:398px;flex:none;padding:9px;background:var(--bezel);border-radius:34px;box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.22)">
+        <div class="mk-phone-screen" style="background:var(--ground);border-radius:26px;overflow:hidden;height:806px;display:flex;flex-direction:column">
 
-          <div style="display:flex;align-items:center;gap:8px;padding:11px 18px 6px;font-size:11px;letter-spacing:0.04em;color:rgba(29,31,32,0.6)">
+          <div style="display:flex;align-items:center;gap:8px;padding:11px 18px 6px;font-size:11px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.6)">
             <span>{{ clock }}</span>
             <span style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer" onClick="{{ toggleOnline }}">
               <span style="width:7px;height:7px;background:{{ netDot }}"></span>{{ netLabel }}
@@ -298,8 +354,8 @@
           <sc-if value="{{ showBanner }}" hint-placeholder-val="{{ true }}">
             <div style="display:flex;align-items:center;gap:10px;margin:6px 14px 0;padding:9px 11px;background:{{ bannerBg }};border:1px solid {{ bannerBorder }}">
               <span style="width:8px;height:8px;flex:none;background:{{ bannerDot }};animation:pulse 2s infinite"></span>
-              <div style="flex:1;font-size:12px;line-height:1.35;color:#1d2d3d">{{ bannerText }}</div>
-              <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;border:1px solid #5980a6;background:{{ syncBg }};color:{{ syncFg }};opacity:{{ syncOpacity }}">SYNC</button>
+              <div style="flex:1;font-size:12px;line-height:1.35;color:var(--ink-strong)">{{ bannerText }}</div>
+              <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;border:1px solid var(--accent);background:{{ syncBg }};color:{{ syncFg }};opacity:{{ syncOpacity }}">SYNC</button>
             </div>
           </sc-if>
 
@@ -310,22 +366,22 @@
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
                 <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">My Job Tickets</h2>
               </div>
-              <div style="font-size:12px;color:rgba(29,31,32,0.55);margin-bottom:14px">{{ techName }} · {{ myCount }}</div>
-              <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">+ New Job Ticket</button>
-              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.5);margin:20px 0 8px">On this device</div>
+              <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:14px">{{ techName }} · {{ myCount }}</div>
+              <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
+              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:20px 0 8px">On this device</div>
               <div style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
-                  <div onClick="{{ t.open }}" style="position:relative;padding:12px;border:1px solid rgba(29,31,32,0.16);cursor:pointer;background:transparent">
+                  <div onClick="{{ t.open }}" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
-                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(29,31,32,0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
+                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(var(--ink-rgb),0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
                       </sc-if>
-                      <span style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.5)">{{ t.syncLabel }}</span>
+                      <span style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ t.syncLabel }}</span>
                     </div>
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
-                    <div style="font-size:13px;color:rgba(29,31,32,0.7)">{{ t.locLine }}</div>
-                    <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(29,31,32,0.08);font-size:11px;color:rgba(29,31,32,0.55)">
+                    <div style="font-size:13px;color:rgba(var(--ink-rgb),0.7)">{{ t.locLine }}</div>
+                    <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(var(--ink-rgb),0.08);font-size:11px;color:rgba(var(--ink-rgb),0.55)">
                       <span>Arrived {{ t.arrivalShort }}</span>
                       <span>{{ t.eventCount }} log lines</span>
                     </div>
@@ -338,18 +394,18 @@
             <sc-if value="{{ techNew }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ backToList }}" class="back-btn">‹ Cancel</button>
               <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0 0 12px">New Job Ticket</h2>
-              <div style="padding:11px 12px;border:1px solid #5980a6;background:#eef6ff;margin-bottom:16px">
-                <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:#416180">Arrival to location — stamped</div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;color:#1d2d3d">{{ draftArrival }}</div>
+              <div style="padding:11px 12px;border:1px solid var(--accent);background:var(--accent-wash);margin-bottom:16px">
+                <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--accent-deep)">Arrival to location — stamped</div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;color:var(--ink-strong)">{{ draftArrival }}</div>
               </div>
               <div style="display:flex;flex-direction:column;gap:13px">
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Technician Name</label>
-                  <input value="{{ d.tech }}" onChange="{{ f.tech }}" placeholder="Full name" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Technician Name</label>
+                  <input value="{{ d.tech }}" onChange="{{ f.tech }}" placeholder="Full name" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Customer</label>
-                  <select value="{{ d.customer }}" onChange="{{ f.customer }}" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Customer</label>
+                  <select value="{{ d.customer }}" onChange="{{ f.customer }}" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                     <option value="">Select customer…</option>
                     <sc-for list="{{ clientNames }}" as="c" hint-placeholder-count="3">
                       <option value="{{ c.name }}">{{ c.name }}</option>
@@ -357,22 +413,22 @@
                   </select>
                 </div>
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Field Name</label>
-                  <input value="{{ d.field }}" onChange="{{ f.field }}" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Field Name</label>
+                  <input value="{{ d.field }}" onChange="{{ f.field }}" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div style="display:flex;gap:12px">
                   <div style="flex:1">
-                    <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Well No.</label>
-                    <input value="{{ d.well }}" onChange="{{ f.well }}" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                    <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Well No.</label>
+                    <input value="{{ d.well }}" onChange="{{ f.well }}" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   </div>
                   <div style="flex:1">
-                    <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Rig Name</label>
-                    <input value="{{ d.rig }}" onChange="{{ f.rig }}" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                    <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Rig Name</label>
+                    <input value="{{ d.rig }}" onChange="{{ f.rig }}" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   </div>
                 </div>
               </div>
-              <button onClick="{{ createTicket }}" disabled="{{ createDisabled }}" style="width:100%;min-height:52px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6;opacity:{{ createOpacity }}">Start Logging</button>
-              <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:8px;text-align:center">Saved on the device. No connection needed.</div>
+              <button onClick="{{ createTicket }}" disabled="{{ createDisabled }}" style="width:100%;min-height:52px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ createOpacity }}">Start Logging</button>
+              <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px;text-align:center">Saved on the device. No connection needed.</div>
             </sc-if>
 
             <!-- technician: job log -->
@@ -381,60 +437,60 @@
               <div style="display:flex;align-items:flex-start;gap:8px">
                 <div style="flex:1">
                   <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:23px;line-height:1.15">{{ cur.customer }}</div>
-                  <div style="font-size:12px;color:rgba(29,31,32,0.65)">{{ cur.locLine }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.65)">{{ cur.locLine }}</div>
                 </div>
                 <span style="font-size:11px;padding:3px 9px;background:{{ cur.chipBg }};color:{{ cur.chipFg }};letter-spacing:0.04em">{{ cur.statusLabel }}</span>
               </div>
-              <div style="display:flex;gap:0;margin:12px 0 4px;border:1px solid rgba(29,31,32,0.16)">
-                <div style="flex:1;padding:7px 9px;border-right:1px solid rgba(29,31,32,0.16)">
-                  <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.5)">Arrival</div>
+              <div style="display:flex;gap:0;margin:12px 0 4px;border:1px solid rgba(var(--ink-rgb),0.16)">
+                <div style="flex:1;padding:7px 9px;border-right:1px solid rgba(var(--ink-rgb),0.16)">
+                  <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Arrival</div>
                   <div style="font-size:12px">{{ cur.arrivalShort }}</div>
                 </div>
-                <div style="flex:1;padding:7px 9px;border-right:1px solid rgba(29,31,32,0.16)">
-                  <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.5)">Start job</div>
+                <div style="flex:1;padding:7px 9px;border-right:1px solid rgba(var(--ink-rgb),0.16)">
+                  <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Start job</div>
                   <div style="font-size:12px">{{ cur.startShort }}</div>
                 </div>
                 <div style="flex:1;padding:7px 9px">
-                  <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.5)">End job</div>
+                  <div style="font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">End job</div>
                   <div style="font-size:12px">{{ cur.endShort }}</div>
                 </div>
               </div>
               <div style="margin:14px 0 4px">
-                <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Job type (objective)</label>
-                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;text-transform:uppercase">
+                <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Job type (objective)</label>
+                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
                 <datalist id="jobtypes">
                   <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="4">
                     <option value="{{ j.name }}"></option>
                   </sc-for>
                 </datalist>
               </div>
-              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.5);margin:18px 0 8px">Job events — {{ cur.eventCount }} lines</div>
+              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:18px 0 8px">Job events — {{ cur.eventCount }} lines</div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
-                  <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(29,31,32,0.1)">
-                    <div style="width:74px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;line-height:1.25">{{ e.dateLine }}<br><span style="color:rgba(29,31,32,0.55)">{{ e.timeLine }}</span></div>
-                    <textarea value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20;resize:vertical"></textarea>
-                    <button onClick="{{ e.remove }}" title="Delete line" style="width:26px;flex:none;font-size:15px;color:rgba(29,31,32,0.45);background:none;border:0;cursor:pointer">×</button>
+                  <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
+                    <div style="width:74px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:rgba(var(--ink-rgb),0.55)">{{ e.timeLine }}</span></div>
+                    <textarea value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
+                    <button onClick="{{ e.remove }}" title="Delete line" style="width:26px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
                   </div>
                 </sc-for>
               </div>
-              <div style="border-top:1px solid rgba(29,31,32,0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
-                <textarea value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;resize:vertical"></textarea>
-                <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Log line — stamps {{ clock }}</button>
-                <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.4)">{{ doneLabel }}</button>
+              <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
+                <textarea value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
+                <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
+                <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
               </div>
             </sc-if>
           </div>
         </div>
       </div>
 
-      <div class="mk-field-note" style="width:290px;flex:none;padding-top:14px;font-size:13px;color:rgba(29,31,32,0.7)">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">Field device</div>
+      <div class="mk-field-note" style="width:290px;flex:none;padding-top:14px;font-size:13px;color:rgba(var(--ink-rgb),0.7)">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Field device</div>
         <p style="margin:0 0 10px">Everything here works with no connection. Arrival, every log line, Start Job and End Job are stamped from the device clock and stored locally.</p>
         <p style="margin:0 0 10px">Tap the status pill at the top of the phone to simulate regaining signal. Pending tickets upload automatically in the background once signal returns — tap <strong>Sync</strong> to upload immediately instead of waiting. Only uploaded <em>Job Done</em> tickets reach the operations manager.</p>
         <p style="margin:0 0 10px">A Job Done ticket stays editable — reopening it for corrections keeps the original stamps.</p>
         <sc-if value="{{ lastAutoSyncLabel }}" hint-placeholder-val="{{ false }}">
-          <p style="margin:0;color:rgba(29,31,32,0.5)">{{ lastAutoSyncLabel }}</p>
+          <p style="margin:0;color:rgba(var(--ink-rgb),0.5)">{{ lastAutoSyncLabel }}</p>
         </sc-if>
       </div>
     </div>
@@ -448,51 +504,51 @@
         <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
           <div>
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
-            <div style="font-size:13px;color:rgba(29,31,32,0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
+            <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
           </div>
-          <button onClick="{{ goTeam }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Team</button>
+          <button onClick="{{ goTeam }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Team</button>
         </div>
         <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
-            <div style="padding:13px 14px;border:1px solid rgba(29,31,32,0.16)">
-              <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(29,31,32,0.55)">{{ s.label }}</div>
+            <div style="padding:13px 14px;border:1px solid rgba(var(--ink-rgb),0.16)">
+              <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55)">{{ s.label }}</div>
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:{{ s.color }}">{{ s.value }}</div>
             </div>
           </sc-for>
         </div>
-        <div style="border:1px solid rgba(29,31,32,0.16);overflow-x:auto">
+        <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:14px">
             <thead>
               <tr>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Ticket No.</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Customer</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Field / Well / Rig</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Technician</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Job dates</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Lines</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Status</th>
-                <th style="border-bottom:1px solid rgba(29,31,32,0.16)"></th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Field / Well / Rig</th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Technician</th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Job dates</th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Lines</th>
+                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Status</th>
+                <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
               </tr>
             </thead>
             <tbody>
               <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
                 <tr>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.customer }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.75)">{{ t.locLine }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.tech }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);font-size:13px;color:rgba(29,31,32,0.75)">{{ t.dateRange }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.eventCount }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ t.locLine }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.tech }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.eventCount }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <div style="display:flex;align-items:center;gap:8px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
-                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(29,31,32,0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
+                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(var(--ink-rgb),0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
                       </sc-if>
                     </div>
                   </td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right">
-                    <button onClick="{{ t.review }}" style="padding:6px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">{{ t.actionLabel }}</button>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
+                    <button onClick="{{ t.review }}" style="padding:6px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ t.actionLabel }}</button>
                   </td>
                 </tr>
               </sc-for>
@@ -504,33 +560,33 @@
       <sc-if value="{{ mgrTeam }}" hint-placeholder-val="{{ false }}">
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Team</h2>
-        <div style="font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:20px">Approve signups and create technician accounts directly.</div>
+        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Approve signups and create technician accounts directly.</div>
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Users &amp; roles</div>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
                 <tr>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Name</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Role</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Base</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Last sync</th>
-                  <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)"></th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Name</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last sync</th>
+                  <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ u.name }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.75)">{{ u.base }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.6)">{{ u.lastSync }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right">
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ u.name }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ u.base }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6)">{{ u.lastSync }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Approve → Technician</button>
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
-                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:#fff;border:1px solid rgba(29,31,32,0.25);color:#1d1f20">
+                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
                           <option value="tech">Technician</option>
                           <option value="mgr">Ops Manager</option>
                           <option value="admin">Admin</option>
@@ -542,21 +598,21 @@
               </tbody>
             </table>
           </div>
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Create a Technician account</div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Full name</div>
-            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
-            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
-            <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Full name</div>
+            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
+            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
+            <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
             <sc-if value="{{ newTechError }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ newTechError }}</div>
+              <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ newTechError }}</div>
             </sc-if>
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:#2f8f5b;margin-bottom:10px">Account created — they can log in now.</div>
+              <div style="font-size:13px;color:var(--success);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
-            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Create account</button>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
           </div>
         </div>
       </sc-if>
@@ -565,12 +621,12 @@
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
         <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:18px">
           <div>
-            <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:rgba(29,31,32,0.45)">· {{ cur.well }}</span></h2>
-            <div style="font-size:13px;color:rgba(29,31,32,0.65)">{{ cur.locLine }} · {{ cur.tech }} · uploaded {{ cur.syncLabel }}</div>
+            <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:rgba(var(--ink-rgb),0.45)">· {{ cur.well }}</span></h2>
+            <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ cur.locLine }} · {{ cur.tech }} · uploaded {{ cur.syncLabel }}</div>
           </div>
           <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
             <sc-if value="{{ cur.presenceShow }}" hint-placeholder-val="{{ false }}">
-              <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(29,31,32,0.65)"><span style="width:8px;height:8px;border-radius:50%;background:{{ cur.presenceDot }}"></span>{{ cur.presenceLabel }}</span>
+              <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(var(--ink-rgb),0.65)"><span style="width:8px;height:8px;border-radius:50%;background:{{ cur.presenceDot }}"></span>{{ cur.presenceLabel }}</span>
             </sc-if>
             <span style="font-size:11px;padding:4px 10px;background:{{ cur.chipBg }};color:{{ cur.chipFg }};letter-spacing:0.04em">{{ cur.statusLabel }}</span>
           </span>
@@ -579,119 +635,119 @@
         <div class="mk-2col" style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start">
           <div style="display:flex;flex-direction:column;gap:22px">
 
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">1 · Ticket number &amp; mileage</div>
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">1 · Ticket number &amp; mileage</div>
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Ticket No. (unique)</label>
-                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" disabled="{{ ticketLocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid {{ noBorder }};color:#1d1f20">
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Ticket No. (unique)</label>
+                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" disabled="{{ ticketLocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
                 </div>
                 <div style="flex:1">
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Take next from series</label>
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Take next from series</label>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <sc-for list="{{ seriesBtns }}" as="s" hint-placeholder-count="3">
-                      <button onClick="{{ s.take }}" disabled="{{ ticketLocked }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">{{ s.label }} → {{ s.next }}</button>
+                      <button onClick="{{ s.take }}" disabled="{{ ticketLocked }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ s.label }} → {{ s.next }}</button>
                     </sc-for>
                   </div>
                 </div>
                 <div style="width:230px">
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Mileage one way (KM)</label>
-                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
-                  <div style="font-size:11px;margin-top:5px;color:rgba(29,31,32,0.6)">{{ mileageNote }}</div>
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Mileage one way (KM)</label>
+                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.6)">{{ mileageNote }}</div>
                 </div>
               </div>
             </div>
 
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">2 · Charged items</div>
-                <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Price list: {{ cur.customer }}</div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">2 · Charged items</div>
+                <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.6)">Price list: {{ cur.customer }}</div>
               </div>
-              <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" placeholder="Search item no. or description…" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:8px">
+              <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" placeholder="Search item no. or description…" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:8px">
               <sc-if value="{{ showSuggestedEditable }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-                  <span style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(29,31,32,0.5)">Frequently added:</span>
+                  <span style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Frequently added:</span>
                   <sc-for list="{{ suggestedItems }}" as="sug" hint-placeholder-count="3">
-                    <button onClick="{{ sug.add }}" style="padding:5px 10px;font-size:12px;cursor:pointer;background:#eef6ff;border:1px solid #5980a6;color:#2c455d">+ {{ sug.label }}</button>
+                    <button onClick="{{ sug.add }}" style="padding:5px 10px;font-size:12px;cursor:pointer;background:var(--accent-wash);border:1px solid var(--accent);color:var(--accent-ink)">+ {{ sug.label }}</button>
                   </sc-for>
                 </div>
               </sc-if>
               <sc-if value="{{ ticketEditable }}" hint-placeholder-val="{{ true }}">
                 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-                  <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                  <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                     <option value="">Add item from price list…</option>
                     <sc-for list="{{ priceOptions }}" as="p" hint-placeholder-count="5">
                       <option value="{{ p.code }}">{{ p.label }}</option>
                     </sc-for>
                   </select>
-                  <button onClick="{{ addItem }}" style="padding:7px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Add line</button>
+                  <button onClick="{{ addItem }}" style="padding:7px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Add line</button>
                 </div>
               </sc-if>
               <sc-if value="{{ ticketLocked }}" hint-placeholder-val="{{ false }}">
-                <div style="display:flex;gap:9px;align-items:baseline;margin-bottom:12px;padding:9px 11px;background:#eef6ff;border-left:3px solid #416180;font-size:12px;color:#2c455d">
+                <div style="display:flex;gap:9px;align-items:baseline;margin-bottom:12px;padding:9px 11px;background:var(--accent-wash);border-left:3px solid var(--accent-deep);font-size:12px;color:var(--accent-ink)">
                   <span style="flex:none">🔒</span><span>{{ lockedNote }}</span>
                 </div>
               </sc-if>
               <table style="width:100%;border-collapse:collapse;font-size:13px">
                 <thead>
                   <tr>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Item No.</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Description</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:74px">Qty</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:74px">U/M</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:104px">Unit cost</th>
-                    <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:112px">Total</th>
-                    <th style="border-bottom:1px solid rgba(29,31,32,0.16);width:28px"></th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Item No.</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Description</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:74px">Qty</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:74px">U/M</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:104px">Unit cost</th>
+                    <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:112px">Total</th>
+                    <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:28px"></th>
                   </tr>
                 </thead>
                 <tbody>
                   <sc-for list="{{ curItems }}" as="it" hint-placeholder-count="3">
                     <tr>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                         <sc-if value="{{ it.showRemove }}" hint-placeholder-val="{{ true }}">
-                          <button onClick="{{ it.remove }}" title="Remove line" style="width:22px;font-size:15px;color:rgba(29,31,32,0.45);background:none;border:0;cursor:pointer">×</button>
+                          <button onClick="{{ it.remove }}" title="Remove line" style="width:22px;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
                         </sc-if>
                       </td>
                     </tr>
                   </sc-for>
                 </tbody>
               </table>
-              <div style="display:flex;align-items:baseline;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(29,31,32,0.16)">
-                <div style="font-size:11px;color:rgba(29,31,32,0.6)">Overridden cells are tinted — price-list value kept in the audit trail.</div>
-                <div style="margin-left:auto;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(29,31,32,0.55)">Ticket total</div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1;color:#1d2d3d;font-variant-numeric:tabular-nums">{{ grandTotal }}</div>
+              <div style="display:flex;align-items:baseline;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16)">
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.6)">Overridden cells are tinted — price-list value kept in the audit trail.</div>
+                <div style="margin-left:auto;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55)">Ticket total</div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums">{{ grandTotal }}</div>
               </div>
             </div>
 
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">3 · Job log from the field</div>
-                <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Line timestamps editable — every change is written to the audit trail</div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">3 · Job log from the field</div>
+                <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.6)">Line timestamps editable — every change is written to the audit trail</div>
               </div>
               <div style="margin-bottom:12px;max-width:420px">
-                <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Job type (objective)</label>
-                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;text-transform:uppercase">
+                <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Job type (objective)</label>
+                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
-                  <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(29,31,32,0.1)">
-                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
-                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                  <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
+                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);padding:6px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35)">
+                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                   </div>
                 </sc-for>
               </div>
@@ -699,27 +755,27 @@
           </div>
 
           <div style="display:flex;flex-direction:column;gap:18px;position:sticky;top:18px">
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">Ticket header</div>
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket header</div>
               <sc-for list="{{ headerFields }}" as="h" hint-placeholder-count="7">
-                <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(29,31,32,0.08);font-size:13px;align-items:center">
-                  <div style="width:104px;flex:none;color:rgba(29,31,32,0.55)">{{ h.label }}</div>
+                <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;align-items:center">
+                  <div style="width:104px;flex:none;color:rgba(var(--ink-rgb),0.55)">{{ h.label }}</div>
                   <sc-if value="{{ h.notEditable }}" hint-placeholder-val="{{ true }}">
                     <div style="flex:1;font-weight:500">{{ h.value }}</div>
                   </sc-if>
                   <sc-if value="{{ h.editable }}" hint-placeholder-val="{{ false }}">
-                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35);color:var(--ink)">
                   </sc-if>
                   <sc-if value="{{ h.isTextField }}" hint-placeholder-val="{{ false }}">
-                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35);color:var(--ink)">
                   </sc-if>
                 </div>
               </sc-for>
-              <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:8px">Arrival, Start job, End job, Base Location and Customer Rep. are editable here and logged to the audit trail below.</div>
+              <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px">Arrival, Start job, End job, Base Location and Customer Rep. are editable here and logged to the audit trail below.</div>
             </div>
 
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">4 · Approval</div>
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">4 · Approval</div>
               <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
                 <sc-for list="{{ checks }}" as="c" hint-placeholder-count="3">
                   <div style="display:flex;gap:9px;font-size:13px;color:{{ c.color }}">
@@ -727,19 +783,19 @@
                   </div>
                 </sc-for>
               </div>
-              <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6;opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
-              <button onClick="{{ goPrint }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Preview 4 sheets</button>
+              <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
+              <button onClick="{{ goPrint }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Preview 4 sheets</button>
               <sc-if value="{{ cur.isApproved }}" hint-placeholder-val="{{ false }}">
-                <button onClick="{{ askReopen }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#416180;border:1px solid rgba(29,31,32,0.3)">Reopen ticket</button>
+                <button onClick="{{ askReopen }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent-deep);border:1px solid rgba(var(--ink-rgb),0.3)">Reopen ticket</button>
               </sc-if>
             </div>
 
-            <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:10px">Audit trail</div>
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Audit trail</div>
               <div style="display:flex;flex-direction:column;gap:8px">
                 <sc-for list="{{ curAudit }}" as="a" hint-placeholder-count="3">
                   <div style="font-size:12px;line-height:1.4">
-                    <div style="color:rgba(29,31,32,0.5)">{{ a.stamp }}</div>
+                    <div style="color:rgba(var(--ink-rgb),0.5)">{{ a.stamp }}</div>
                     <div>{{ a.text }}</div>
                   </div>
                 </sc-for>
@@ -753,20 +809,20 @@
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:8px">
           <button onClick="{{ backToReview }}" class="back-btn" style="margin-bottom:0">‹ Back to review</button>
           <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-            <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Fill Excel &amp; download</button>
+            <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Fill Excel &amp; download</button>
             <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ uploadOneDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Upload to OneDrive</button>
+              <button onClick="{{ uploadOneDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to OneDrive</button>
             </sc-if>
             <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ uploadGoogleDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">Upload to Google Drive</button>
+              <button onClick="{{ uploadGoogleDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to Google Drive</button>
             </sc-if>
           </div>
         </div>
-        <div style="text-align:right;font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:18px">{{ cloudExportNote }}</div>
+        <div style="text-align:right;font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">{{ cloudExportNote }}</div>
         <sc-if value="{{ printOverflow }}" hint-placeholder-val="{{ false }}">
-          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;border:1px solid #b5790c;background:rgba(181,121,12,0.1)">
-            <div style="flex:1;min-width:220px;font-size:14px;line-height:1.4;color:#1d1f20">{{ printOverflowText }}</div>
-            <button onClick="{{ backToReview }}" style="padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid #b5790c;color:#7a5109">‹ Back to review</button>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.1)">
+            <div style="flex:1;min-width:220px;font-size:14px;line-height:1.4;color:var(--ink)">{{ printOverflowText }}</div>
+            <button onClick="{{ backToReview }}" style="padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--warning);color:var(--warning-deep)">‹ Back to review</button>
           </div>
         </sc-if>
         <!-- This preview reproduces the real "Autofill_ServiceTikcet_System.xlsx" template
@@ -934,45 +990,45 @@
   <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
       <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Admin</h2>
-      <div style="font-size:13px;color:rgba(29,31,32,0.6);margin-bottom:18px">Price lists, customers, numbering and job types — all editable without a release.</div>
-      <div class="mk-tabbar" style="display:flex;flex-wrap:wrap;border:1px solid rgba(29,31,32,0.16);margin-bottom:22px">
+      <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">Price lists, customers, numbering and job types — all editable without a release.</div>
+      <div class="mk-tabbar" style="display:flex;flex-wrap:wrap;border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:22px">
         <sc-for list="{{ adminTabs }}" as="t" hint-placeholder-count="4">
-          <button onClick="{{ t.pick }}" class="mk-tabbar-btn" style="flex:1;min-width:120px;padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-right:1px solid rgba(29,31,32,0.16);background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+          <button onClick="{{ t.pick }}" class="mk-tabbar-btn" style="flex:1;min-width:120px;padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-right:1px solid rgba(var(--ink-rgb),0.16);background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
         </sc-for>
       </div>
 
       <sc-if value="{{ adminPrice }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-bottom:14px">
           <div style="width:280px;max-width:100%">
-            <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Customer price list</label>
-            <select value="{{ adminClient }}" onChange="{{ f.adminClient }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+            <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Customer price list</label>
+            <select value="{{ adminClient }}" onChange="{{ f.adminClient }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
               <sc-for list="{{ clientNames }}" as="c" hint-placeholder-count="3">
                 <option value="{{ c.name }}">{{ c.name }}</option>
               </sc-for>
             </select>
           </div>
-          <div style="font-size:12px;color:rgba(29,31,32,0.6);padding-bottom:9px">{{ adminPriceNote }}</div>
-          <button onClick="{{ addPriceRow }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">+ Add item</button>
+          <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);padding-bottom:9px">{{ adminPriceNote }}</div>
+          <button onClick="{{ addPriceRow }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add item</button>
         </div>
-        <div style="border:1px solid rgba(29,31,32,0.16);padding:14px;overflow-x:auto">
+        <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead>
               <tr>
-                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:130px">Item No.</th>
-                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Description</th>
-                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:100px">U/M</th>
-                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:130px">Unit cost</th>
-                <th style="border-bottom:1px solid rgba(29,31,32,0.16);width:30px"></th>
+                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:130px">Item No.</th>
+                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Description</th>
+                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:100px">U/M</th>
+                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:130px">Unit cost</th>
+                <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:30px"></th>
               </tr>
             </thead>
             <tbody>
               <sc-for list="{{ priceRows }}" as="p" hint-placeholder-count="5">
                 <tr>
-                  <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)"><input value="{{ p.code }}" onChange="{{ p.onCode }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)"><input value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)"><input value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)"><input value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)"><button onClick="{{ p.remove }}" style="width:22px;font-size:15px;color:rgba(29,31,32,0.45);background:none;border:0;cursor:pointer">×</button></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.code }}" onChange="{{ p.onCode }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><button onClick="{{ p.remove }}" style="width:22px;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button></td>
                 </tr>
               </sc-for>
             </tbody>
@@ -982,74 +1038,74 @@
 
       <sc-if value="{{ adminNumbers }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Numbering series</div>
-            <div style="font-size:12px;color:rgba(29,31,32,0.65);margin-bottom:14px">Enter the last number you reached on paper. The system continues from there and refuses any number already used.</div>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Numbering series</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.65);margin-bottom:14px">Enter the last number you reached on paper. The system continues from there and refuses any number already used.</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
                 <tr>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Series</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:96px">Prefix</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:120px">Last used</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16);width:100px">Next</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Series</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:96px">Prefix</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:120px">Last used</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:100px">Next</th>
                 </tr>
               </thead>
               <tbody>
                 <sc-for list="{{ seriesRows }}" as="s" hint-placeholder-count="3">
                   <tr>
-                    <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ s.label }}</td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600">{{ s.prefix }}</td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)"><input value="{{ s.last }}" onChange="{{ s.onLast }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20"></td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;color:#416180">{{ s.next }}</td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ s.label }}</td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600">{{ s.prefix }}</td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ s.last }}" onChange="{{ s.onLast }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;color:var(--accent-deep)">{{ s.next }}</td>
                   </tr>
                 </sc-for>
               </tbody>
             </table>
-            <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(29,31,32,0.16);font-size:12px;color:rgba(29,31,32,0.6)">Numbers in use: {{ usedNumbers }}</div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16);font-size:12px;color:rgba(var(--ink-rgb),0.6)">Numbers in use: {{ usedNumbers }}</div>
           </div>
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Job types</div>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Job types</div>
             <div style="display:flex;gap:8px;margin-bottom:12px">
-              <input value="{{ newJobType }}" onChange="{{ f.newJobType }}" placeholder="e.g. COMBINATION FOR LOCATE LEAK" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;text-transform:uppercase">
-              <button onClick="{{ addJobType }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Add</button>
+              <input value="{{ newJobType }}" onChange="{{ f.newJobType }}" placeholder="e.g. COMBINATION FOR LOCATE LEAK" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+              <button onClick="{{ addJobType }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Add</button>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="6">
-                <span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:5px 10px;background:#eef6ff;color:#2c455d">{{ j.name }}<button onClick="{{ j.remove }}" style="font-size:13px;color:#416180;background:none;border:0;cursor:pointer;padding:0">×</button></span>
+                <span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:5px 10px;background:var(--accent-wash);color:var(--accent-ink)">{{ j.name }}<button onClick="{{ j.remove }}" style="font-size:13px;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0">×</button></span>
               </sc-for>
             </div>
-            <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-top:14px">Technicians can also type a job type freehand; the manager corrects it during review.</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:14px">Technicians can also type a job type freehand; the manager corrects it during review.</div>
           </div>
         </div>
       </sc-if>
 
       <sc-if value="{{ adminPeople }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Users &amp; roles</div>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
                 <tr>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Name</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Role</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Base</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)">Last sync</th>
-                  <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:7px 6px;border-bottom:1px solid rgba(29,31,32,0.16)"></th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Name</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last sync</th>
+                  <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ u.name }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.75)">{{ u.base }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.6)">{{ u.lastSync }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right">
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ u.name }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ u.base }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6)">{{ u.lastSync }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Approve → Technician</button>
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
-                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:#fff;border:1px solid rgba(29,31,32,0.25);color:#1d1f20">
+                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
                           <option value="tech">Technician</option>
                           <option value="mgr">Ops Manager</option>
                           <option value="admin">Admin</option>
@@ -1061,71 +1117,71 @@
               </tbody>
             </table>
           </div>
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Customers, fields &amp; rigs</div>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Customers, fields &amp; rigs</div>
             <div style="display:flex;flex-direction:column;gap:12px">
               <sc-for list="{{ clientCards }}" as="c" hint-placeholder-count="2">
-                <div style="border:1px solid rgba(29,31,32,0.12);padding:12px">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.12);padding:12px">
                   <div style="display:flex;align-items:baseline;gap:8px">
                     <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px">{{ c.name }}</div>
-                    <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.55)">{{ c.itemCount }} priced items</div>
+                    <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ c.itemCount }} priced items</div>
                   </div>
-                  <div style="font-size:12px;color:rgba(29,31,32,0.7);margin-top:6px">Fields: {{ c.fields }}</div>
-                  <div style="font-size:12px;color:rgba(29,31,32,0.7)">Rigs: {{ c.rigs }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);margin-top:6px">Fields: {{ c.fields }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7)">Rigs: {{ c.rigs }}</div>
                 </div>
               </sc-for>
             </div>
-            <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(29,31,32,0.16)">
-              <div style="font-size:12px;color:rgba(29,31,32,0.7)">Excel output cell maps — fills the real Service Ticket and Job Log templates, downloaded from the app; each field's target cell is configured here once the layouts are supplied.</div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16)">
+              <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7)">Excel output cell maps — fills the real Service Ticket and Job Log templates, downloaded from the app; each field's target cell is configured here once the layouts are supplied.</div>
             </div>
           </div>
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Create a Technician account</div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Full name</div>
-            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Email</div>
-            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
-            <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:6px">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Full name</div>
+            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
+            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
+            <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
             <sc-if value="{{ newTechError }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:#b0413a;margin-bottom:10px">{{ newTechError }}</div>
+              <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ newTechError }}</div>
             </sc-if>
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:#2f8f5b;margin-bottom:10px">Account created — they can log in now.</div>
+              <div style="font-size:13px;color:var(--success);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
-            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#fff;border:1px solid #5980a6">Create account</button>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
           </div>
         </div>
       </sc-if>
 
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Charging &amp; export rules</div>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Charging &amp; export rules</div>
             <div style="display:flex;flex-direction:column;gap:12px">
               <sc-for list="{{ systemRows }}" as="s" hint-placeholder-count="4">
-                <div style="display:flex;gap:12px;align-items:center;padding-bottom:10px;border-bottom:1px solid rgba(29,31,32,0.08)">
+                <div style="display:flex;gap:12px;align-items:center;padding-bottom:10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                   <div style="flex:1">
                     <div style="font-size:14px">{{ s.label }}</div>
-                    <div style="font-size:11px;color:rgba(29,31,32,0.55)">{{ s.hint }}</div>
+                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ s.hint }}</div>
                   </div>
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;color:#416180">{{ s.value }}</div>
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;color:var(--accent-deep)">{{ s.value }}</div>
                 </div>
               </sc-for>
             </div>
           </div>
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Ticket defaults</div>
-            <div style="font-size:12px;color:rgba(29,31,32,0.6);margin-bottom:14px">Pre-filled onto every new ticket. Stays constant unless the Ops Manager changes it for one specific ticket during review — not technician input, not a formula.</div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Base Location</div>
-            <input value="{{ defBaseLocation }}" onChange="{{ f.defBaseLocation }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(29,31,32,0.55);margin-bottom:4px">Customer Rep.</div>
-            <input value="{{ defCustomerRep }}" onChange="{{ f.defCustomerRep }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Ticket defaults</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-bottom:14px">Pre-filled onto every new ticket. Stays constant unless the Ops Manager changes it for one specific ticket during review — not technician input, not a formula.</div>
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Base Location</div>
+            <input value="{{ defBaseLocation }}" onChange="{{ f.defBaseLocation }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Customer Rep.</div>
+            <input value="{{ defCustomerRep }}" onChange="{{ f.defCustomerRep }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
           </div>
-          <div style="border:1px solid rgba(29,31,32,0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180;margin-bottom:12px">Danger zone</div>
-            <div style="font-size:12px;color:rgba(29,31,32,0.7);margin-bottom:12px">Resets this prototype's local data back to the seeded demo tickets and price lists.</div>
-            <button onClick="{{ resetAll }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.4)">Reset demo data</button>
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Danger zone</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);margin-bottom:12px">Resets this prototype's local data back to the seeded demo tickets and price lists.</div>
+            <button onClick="{{ resetAll }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Reset demo data</button>
           </div>
         </div>
       </sc-if>
@@ -1138,37 +1194,37 @@
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px">
         <div>
           <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Observer View</h2>
-          <div style="font-size:13px;color:rgba(29,31,32,0.6)">Read-only. Approved jobs only — nothing here can be edited.</div>
+          <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Read-only. Approved jobs only — nothing here can be edited.</div>
         </div>
-        <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:#eef6ff;color:#2c455d;letter-spacing:0.05em">OBSERVER</span>
+        <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:var(--accent-wash);color:var(--accent-ink);letter-spacing:0.05em">OBSERVER</span>
       </div>
       <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
         <sc-for list="{{ founderStats }}" as="s" hint-placeholder-count="4">
-          <div style="padding:13px 14px;border:1px solid rgba(29,31,32,0.16)">
-            <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(29,31,32,0.55)">{{ s.label }}</div>
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:#1d2d3d">{{ s.value }}</div>
+          <div style="padding:13px 14px;border:1px solid rgba(var(--ink-rgb),0.16)">
+            <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55)">{{ s.label }}</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:var(--ink-strong)">{{ s.value }}</div>
           </div>
         </sc-for>
       </div>
-      <div style="border:1px solid rgba(29,31,32,0.16);padding:16px;margin-bottom:24px">
+      <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:24px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="width:8px;height:8px;border-radius:50%;background:#2f8f5b;animation:pulse 2s infinite"></span>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#416180">Live activity — in the field right now</div>
-          <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.5)">Read-only · refreshes automatically</div>
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite"></span>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Live activity — in the field right now</div>
+          <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">Read-only · refreshes automatically</div>
         </div>
         <sc-if value="{{ hasLiveTickets }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column;gap:10px">
             <sc-for list="{{ liveTickets }}" as="lt" hint-placeholder-count="2">
-              <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(29,31,32,0.1);background:rgba(41,143,91,0.03)">
+              <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(var(--ink-rgb),0.1);background:rgba(var(--success-rgb),0.03)">
                 <div style="width:230px;flex:none">
                   <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
-                  <div style="font-size:12px;color:rgba(29,31,32,0.6)">{{ lt.tech }} · {{ lt.locLine }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6)">{{ lt.tech }} · {{ lt.locLine }}</div>
                 </div>
                 <div style="flex:1">
-                  <div style="font-size:13px;color:#1d1f20">{{ lt.lastLogText }}</div>
-                  <div style="font-size:11px;color:rgba(29,31,32,0.5);margin-top:3px">{{ lt.lastLogTime }} · {{ lt.eventCount }} log lines</div>
+                  <div style="font-size:13px;color:var(--ink)">{{ lt.lastLogText }}</div>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:3px">{{ lt.lastLogTime }} · {{ lt.eventCount }} log lines</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:4px;flex:none;font-size:11px;color:rgba(29,31,32,0.6)">
+                <div style="display:flex;align-items:center;gap:4px;flex:none;font-size:11px;color:rgba(var(--ink-rgb),0.6)">
                   <span style="width:7px;height:7px;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}
                 </div>
               </div>
@@ -1176,38 +1232,38 @@
           </div>
         </sc-if>
         <sc-if value="{{ noLiveTickets }}" hint-placeholder-val="{{ false }}">
-          <div style="font-size:13px;color:rgba(29,31,32,0.5)">Nothing in progress right now — all field tickets are either synced-and-done or approved.</div>
+          <div style="font-size:13px;color:rgba(var(--ink-rgb),0.5)">Nothing in progress right now — all field tickets are either synced-and-done or approved.</div>
         </sc-if>
       </div>
 
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:12px">
         <div style="flex:1;max-width:420px">
-          <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Report size — last {{ founderCount }} approved jobs</label>
-          <input type="range" min="5" max="50" step="1" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;accent-color:#5980a6">
+          <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Report size — last {{ founderCount }} approved jobs</label>
+          <input type="range" min="5" max="50" step="1" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;accent-color:var(--accent)">
         </div>
-        <button onClick="{{ generateReport }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Generate report</button>
+        <button onClick="{{ generateReport }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate report</button>
       </div>
-      <div style="border:1px solid rgba(29,31,32,0.16);overflow-x:auto">
+      <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:14px">
           <thead>
             <tr>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Ticket No.</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Customer</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Well</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Job type</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Dates</th>
-              <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(29,31,32,0.6);padding:9px 12px;border-bottom:1px solid rgba(29,31,32,0.16)">Value</th>
+              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
+              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
+              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Well</th>
+              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Job type</th>
+              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Dates</th>
+              <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Value</th>
             </tr>
           </thead>
           <tbody>
             <sc-for list="{{ founderRows }}" as="t" hint-placeholder-count="3">
               <tr>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.customer }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08)">{{ t.well }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);color:rgba(29,31,32,0.75);font-size:13px">{{ t.jobType }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);font-size:13px;color:rgba(29,31,32,0.75)">{{ t.dateRange }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right;font-variant-numeric:tabular-nums">{{ t.value }}</td>
+                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
+                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.well }}</td>
+                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75);font-size:13px">{{ t.jobType }}</td>
+                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
+                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ t.value }}</td>
               </tr>
             </sc-for>
           </tbody>
@@ -1218,18 +1274,18 @@
 
   <!-- ══ DIALOG ══ -->
   <sc-if value="{{ hasDialog }}" hint-placeholder-val="{{ false }}">
-    <div style="position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:rgba(43,43,45,0.55);z-index:50">
-      <div style="width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:20px;background:#f2f2f3;border:1px solid rgba(29,31,32,0.3);box-shadow:0 12px 32px rgba(43,43,45,0.32)">
+    <div style="position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:var(--scrim);z-index:50">
+      <div style="width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--ground);border:1px solid rgba(var(--ink-rgb),0.3);box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.32)">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px">{{ dialog.title }}</div>
-        <div style="font-size:14px;color:rgba(29,31,32,0.8)">{{ dialog.body }}</div>
+        <div style="font-size:14px;color:rgba(var(--ink-rgb),0.8)">{{ dialog.body }}</div>
         <sc-if value="{{ dialog.needsReason }}" hint-placeholder-val="{{ false }}">
-          <textarea value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="Reason for reopening — recorded in the audit trail" style="width:100%;padding:8px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;resize:vertical"></textarea>
+          <textarea value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="Reason for reopening — recorded in the audit trail" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
         </sc-if>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
           <sc-if value="{{ dialog.hasCancel }}" hint-placeholder-val="{{ true }}">
-            <button onClick="{{ closeDialog }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:#1d1f20;border:1px solid rgba(29,31,32,0.3)">{{ dialog.cancelLabel }}</button>
+            <button onClick="{{ closeDialog }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">{{ dialog.cancelLabel }}</button>
           </sc-if>
-          <button onClick="{{ dialog.confirm }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">{{ dialog.okLabel }}</button>
+          <button onClick="{{ dialog.confirm }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">{{ dialog.okLabel }}</button>
         </div>
       </div>
     </div>
@@ -1364,7 +1420,7 @@ function seed() {
       // Libya time by default, not the device's. Every operation is at the Ahmadi base,
       // and the payroll month rule keys off the job end date — so a technician whose
       // phone is on the wrong zone must not be able to move a ticket into another month.
-      theme: 'system', accent: 'steel', timezone: 'Africa/Tripoli', timeFormat: '24', shareLocation: true,
+      theme: 'dark', accent: 'steel', timezone: 'Africa/Tripoli', timeFormat: '24', shareLocation: true,
       // Ops Manager storage linking — local download always works with no account; the
       // Ops Manager can additionally connect OneDrive and/or Google Drive to upload
       // exported sheets straight there instead of only saving to the device. This is a
@@ -1480,7 +1536,18 @@ class Component extends DCLogic {
     let data = seed();
     try {
       const raw = localStorage.getItem(K);
-      if (raw) data = Object.assign(data, JSON.parse(raw));
+      if (raw) {
+        const saved = JSON.parse(raw);
+        // Settings merge key-by-key over the seeded defaults. A plain Object.assign
+        // swaps the whole settings object for the persisted one, so every key added to
+        // the defaults since a device last saved comes back undefined on that device —
+        // a phone that saved before the Libya timezone default existed would silently
+        // fall back to device time, which is exactly what the payroll rule cannot
+        // tolerate. Found by the theme migration's screenshot diff.
+        const settings = Object.assign({}, data.settings, saved.settings || {});
+        data = Object.assign(data, saved);
+        data.settings = settings;
+      }
     } catch (e) { /* first run */ }
     let session = null;
     try {
@@ -1498,7 +1565,27 @@ class Component extends DCLogic {
   persist(data) {
     try { localStorage.setItem(K, JSON.stringify(data)); } catch (e) { /* quota */ }
   }
+  // Settings stores 'system' | 'light' | 'dark'; the token blocks key off a
+  // data-mkn-theme attribute on <html>. 'system' resolves through the OS preference and
+  // re-resolves if the user flips their device theme while the app is open.
+  applyTheme() {
+    const want = ((this.state.data || {}).settings || {}).theme || 'system';
+    const dark = want === 'dark' || (want === 'system' && typeof matchMedia === 'function'
+      && matchMedia('(prefers-color-scheme: dark)').matches);
+    const el = document.documentElement;
+    el.setAttribute('data-mkn-theme', dark ? 'dark' : 'light');
+    // Browser chrome (the address bar, the PWA title bar) should match the page.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#0e0e10' : '#1d2d3d');
+  }
   componentDidMount() {
+    this.applyTheme();
+    if (typeof matchMedia === 'function') {
+      this.mq = matchMedia('(prefers-color-scheme: dark)');
+      this.mqListener = () => this.applyTheme();
+      if (this.mq.addEventListener) this.mq.addEventListener('change', this.mqListener);
+      else if (this.mq.addListener) this.mq.addListener(this.mqListener);
+    }
     this.timer = setInterval(() => this.setState({ tick: Date.now() }), 30000);
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
     // Registers sw.js so the app is a real installable PWA on any device (see the
@@ -1509,7 +1596,13 @@ class Component extends DCLogic {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
   }
-  componentWillUnmount() { clearInterval(this.timer); clearInterval(this.autoSyncTimer); }
+  componentWillUnmount() {
+    clearInterval(this.timer); clearInterval(this.autoSyncTimer);
+    if (this.mq && this.mqListener) {
+      if (this.mq.removeEventListener) this.mq.removeEventListener('change', this.mqListener);
+      else if (this.mq.removeListener) this.mq.removeListener(this.mqListener);
+    }
+  }
 
   mutate(fn) {
     const data = JSON.parse(JSON.stringify(this.state.data));
@@ -1566,6 +1659,7 @@ class Component extends DCLogic {
   }
   updateSettings(patch) {
     this.mutate(d => { d.settings = Object.assign({}, d.settings, patch); });
+    if (patch.theme !== undefined) setTimeout(() => this.applyTheme(), 0);
   }
   log(text) {
     const id = this.state.activeId;
@@ -1602,9 +1696,9 @@ class Component extends DCLogic {
     };
   }
   statusChip(t) {
-    if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: '#1d2d3d', chipFg: '#f2f2f3' };
-    if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: '#eef6ff', chipFg: '#2c455d' };
-    return { statusLabel: 'IN PROGRESS', chipBg: '#e9e9ea', chipFg: '#5d5d60' };
+    if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
+    if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
+    return { statusLabel: 'IN PROGRESS', chipBg: 'var(--field)', chipFg: 'var(--ink-faint)' };
   }
   ticketView(t) {
     const chip = this.statusChip(t);
@@ -1629,7 +1723,7 @@ class Component extends DCLogic {
       mileage: t.mileage === 0 ? '0' : (t.mileage || ''),
       ticketNo: t.ticketNo || '',
       presenceShow: showPresence,
-      presenceDot: online ? '#2f8f5b' : '#98989b',
+      presenceDot: online ? 'var(--success)' : 'var(--ink-ghost)',
       presenceLabel: online ? 'Online' : 'Offline',
     }, chip);
   }
@@ -1954,8 +2048,8 @@ class Component extends DCLogic {
       settingsIsTech: S.role === 'tech',
       themeOptions: ['system', 'light', 'dark'].map(k => ({
         key: k, label: k.charAt(0).toUpperCase() + k.slice(1),
-        bg: (D.settings || {}).theme === k ? '#5980a6' : 'transparent',
-        fg: (D.settings || {}).theme === k ? '#f2f2f3' : '#1d1f20',
+        bg: (D.settings || {}).theme === k ? 'var(--accent)' : 'transparent',
+        fg: (D.settings || {}).theme === k ? 'var(--on-accent)' : 'var(--ink)',
         pick: () => this.updateSettings({ theme: k }),
       })),
       accentSwatches: [
@@ -1964,7 +2058,7 @@ class Component extends DCLogic {
         { key: 'terracotta', color: '#b0644a' },
       ].map(a => ({
         key: a.key, color: a.color,
-        ring: (D.settings || {}).accent === a.key ? '2px solid #1d1f20' : '2px solid transparent',
+        ring: (D.settings || {}).accent === a.key ? '2px solid var(--ink)' : '2px solid transparent',
         pick: () => this.updateSettings({ accent: a.key }),
       })),
       timezoneOptions: TIMEZONES.map(z => ({ value: z.id, label: z.label })),
@@ -1972,12 +2066,12 @@ class Component extends DCLogic {
       setTimezone: e => this.updateSettings({ timezone: e.target.value }),
       timeFormatOptions: [{ k: '24', l: '24-hour' }, { k: '12', l: '12-hour' }].map(o => ({
         key: o.k, label: o.l,
-        bg: (D.settings || {}).timeFormat === o.k ? '#5980a6' : 'transparent',
-        fg: (D.settings || {}).timeFormat === o.k ? '#f2f2f3' : '#1d1f20',
+        bg: (D.settings || {}).timeFormat === o.k ? 'var(--accent)' : 'transparent',
+        fg: (D.settings || {}).timeFormat === o.k ? 'var(--on-accent)' : 'var(--ink)',
         pick: () => this.updateSettings({ timeFormat: o.k }),
       })),
       shareLocation: !!(D.settings || {}).shareLocation,
-      shareLocationBg: (D.settings || {}).shareLocation ? '#5980a6' : '#e9e9ea',
+      shareLocationBg: (D.settings || {}).shareLocation ? 'var(--accent)' : 'var(--field)',
       shareLocationKnob: (D.settings || {}).shareLocation ? '20px' : '2px',
       toggleShareLocation: () => this.updateSettings({ shareLocation: !(D.settings || {}).shareLocation }),
 
@@ -2006,20 +2100,20 @@ class Component extends DCLogic {
       }),
 
       clock: F.time(iso(new Date())),
-      netDot: S.online ? '#5980a6' : '#98989b',
+      netDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       netLabel: S.online ? 'ONLINE' : 'NO SIGNAL',
       toggleOnline: () => this.setState({ online: !S.online }),
       showBanner: unsynced.length > 0,
-      bannerBg: S.online ? '#eef6ff' : '#e9e9ea',
-      bannerBorder: S.online ? '#5980a6' : 'rgba(29,31,32,0.16)',
-      bannerDot: S.online ? '#5980a6' : '#98989b',
+      bannerBg: S.online ? 'var(--accent-wash)' : 'var(--field)',
+      bannerBorder: S.online ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.16)',
+      bannerDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       bannerText: S.online
         ? unsynced.length + ' ticket(s) auto-syncing in the background — connection available.'
         : 'Offline · ' + unsynced.length + ' ticket(s) stored on this device, waiting for signal.',
       lastAutoSyncLabel: S.lastAutoSyncAt ? 'Last auto-synced ' + F.stamp(S.lastAutoSyncAt) : '',
       syncDisabled: !S.online,
-      syncBg: S.online ? '#5980a6' : 'transparent',
-      syncFg: S.online ? '#f2f2f3' : '#416180',
+      syncBg: S.online ? 'var(--accent)' : 'transparent',
+      syncFg: S.online ? 'var(--on-accent)' : 'var(--accent-deep)',
       syncOpacity: S.online ? 1 : 0.45,
       sync: () => {
         if (!S.online) return;
@@ -2112,10 +2206,10 @@ class Component extends DCLogic {
       goTeam: () => this.setState({ mgrScreen: 'team' }),
       awaitingCount: awaiting.length,
       mgrStats: [
-        { label: 'Awaiting review', value: String(awaiting.length), color: '#5980a6' },
-        { label: 'Approved', value: String(approved.length), color: '#1d2d3d' },
-        { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: '#1d2d3d' },
-        { label: 'Approved value', value: money(approved.reduce((s, x) => s + this.ticketTotal(x), 0)), color: '#1d2d3d' },
+        { label: 'Awaiting review', value: String(awaiting.length), color: 'var(--accent)' },
+        { label: 'Approved', value: String(approved.length), color: 'var(--ink-strong)' },
+        { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
+        { label: 'Approved value', value: money(approved.reduce((s, x) => s + this.ticketTotal(x), 0)), color: 'var(--ink-strong)' },
       ],
       inboxRows: D.tickets.filter(x => x.synced).slice().reverse().map(x => Object.assign(this.ticketView(x), {
         actionLabel: x.status === 'approved' ? 'View' : 'Review',
@@ -2186,8 +2280,8 @@ class Component extends DCLogic {
           textField('baseLocation', 'Base Location'), textField('customerRep', 'Customer Rep.'),
         ];
       })() : [],
-      noMsg: issue.msg || '', noBorder: issue.bad ? '#8c3b3b' : 'rgba(29,31,32,0.16)',
-      noMsgColor: issue.bad ? '#8c3b3b' : (issue.ok ? '#416180' : 'rgba(29,31,32,0.6)'),
+      noMsg: issue.msg || '', noBorder: issue.bad ? 'var(--danger-deep)' : 'rgba(var(--ink-rgb),0.16)',
+      noMsgColor: issue.bad ? 'var(--danger-deep)' : (issue.ok ? 'var(--accent-deep)' : 'rgba(var(--ink-rgb),0.6)'),
       seriesBtns: D.series.map(s => ({
         label: s.label, next: s.prefix + (s.last + 1),
         take: () => {
@@ -2238,9 +2332,9 @@ class Component extends DCLogic {
           locked: locked, showRemove: !locked,
           code: it.code, desc: it.desc, qty: it.qty, uom: it.uom, cost: it.cost,
           total: money(this.itemTotal(it, t)),
-          descBg: ov.desc ? '#eef6ff' : '#e9e9ea',
-          uomBg: ov.uom ? '#eef6ff' : '#e9e9ea',
-          costBg: ov.cost ? '#eef6ff' : '#e9e9ea',
+          descBg: ov.desc ? 'var(--accent-wash)' : 'var(--field)',
+          uomBg: ov.uom ? 'var(--accent-wash)' : 'var(--field)',
+          costBg: ov.cost ? 'var(--accent-wash)' : 'var(--field)',
           onDesc: setField('desc', 'desc'), onQty: setField('qty'), onUom: setField('uom', 'uom'), onCost: setField('cost', 'cost'),
           remove: () => {
             if (locked) return;
@@ -2254,7 +2348,7 @@ class Component extends DCLogic {
         ? 'Approved ' + F.stamp(t.approvedAt) + ' by ' + (t.approvedBy || 'Ops Manager') + '. Prices and lines are frozen — reopen the ticket to change anything.'
         : 'This ticket is approved and frozen. Reopen it to change anything.',
       grandTotal: t ? money(this.ticketTotal(t)) : money(0),
-      checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? '#416180' : 'rgba(29,31,32,0.55)' })),
+      checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? 'var(--accent-deep)' : 'rgba(var(--ink-rgb),0.55)' })),
       approveDisabled: !canApprove || (t && t.status === 'approved'),
       approveOpacity: (!canApprove || (t && t.status === 'approved')) ? 0.45 : 1,
       approveLabel: t && t.status === 'approved' ? 'Approved' : 'Approve ticket',
@@ -2323,8 +2417,8 @@ class Component extends DCLogic {
         { key: 'price', label: 'Price lists' }, { key: 'numbers', label: 'Numbering & job types' },
         { key: 'people', label: 'Users & customers' }, { key: 'system', label: 'System' },
       ].map(x => ({
-        label: x.label, bg: S.adminTab === x.key ? '#5980a6' : 'transparent',
-        fg: S.adminTab === x.key ? '#f2f2f3' : '#1d1f20',
+        label: x.label, bg: S.adminTab === x.key ? 'var(--accent)' : 'transparent',
+        fg: S.adminTab === x.key ? 'var(--on-accent)' : 'var(--ink)',
         pick: () => this.setState({ adminTab: x.key }),
       })),
       adminPrice: S.adminTab === 'price', adminNumbers: S.adminTab === 'numbers',
@@ -2357,8 +2451,8 @@ class Component extends DCLogic {
       users: (D.users || []).map(u => ({
         name: u.name, role: u.status === 'pending' ? 'Pending approval' : u.role, base: u.base, lastSync: u.lastSync,
         isPending: u.status === 'pending',
-        roleBg: u.status === 'pending' ? 'rgba(181,121,12,0.14)' : '#eef6ff',
-        roleFg: u.status === 'pending' ? '#8a5b09' : '#2c455d',
+        roleBg: u.status === 'pending' ? 'rgba(var(--warning-rgb),0.14)' : 'var(--accent-wash)',
+        roleFg: u.status === 'pending' ? 'var(--warning-ink)' : 'var(--accent-ink)',
         approve: () => this.mutate(d => {
           const target = (d.users || []).find(x => x.email === u.email);
           if (target) { target.role = 'Field Technician'; target.roleKey = 'tech'; target.status = 'active'; }
