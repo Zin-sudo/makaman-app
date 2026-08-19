@@ -192,6 +192,9 @@
     border-radius:var(--radius);
   }
   .mk-icon-chip-sm { width:30px; height:30px; }
+  /* The office roles' pages scroll under a bar pinned to the viewport, so the last
+     row of every dashboard needs room to clear it. */
+  .mk-page { padding-bottom:96px; }
   /* A ticket card: coloured rule down the leading edge, per status. */
   .mk-ticket-card { border-left-width:3px; border-left-style:solid; }
 </style>
@@ -639,7 +642,7 @@
   </sc-if>
 
   <!-- ══ OPERATIONS MANAGER ══ -->
-  <sc-if value="{{ isMgr }}" hint-placeholder-val="{{ true }}">
+  <sc-if value="{{ showMgrPage }}" hint-placeholder-val="{{ true }}">
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
 
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
@@ -1144,7 +1147,7 @@
   </sc-if>
 
   <!-- ══ ADMIN ══ -->
-  <sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+  <sc-if value="{{ showAdminPage }}" hint-placeholder-val="{{ false }}">
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
       <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Admin</h2>
       <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">Price lists, customers, numbering and job types — all editable without a release.</div>
@@ -1353,7 +1356,7 @@
   </sc-if>
 
   <!-- ══ FOUNDER (read-only) ══ -->
-  <sc-if value="{{ isFounder }}" hint-placeholder-val="{{ false }}">
+  <sc-if value="{{ showFounderPage }}" hint-placeholder-val="{{ false }}">
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1180px;margin:0 auto">
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px">
         <div>
@@ -1433,6 +1436,91 @@
           </tbody>
         </table>
       </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ ACTIVITY / SYNC / ACCOUNT (office roles) ══
+       The technician's copies of these live inside the phone frame, sized for a
+       phone card. These are the same three destinations laid out for a desk. -->
+  <sc-if value="{{ deskTabs }}" hint-placeholder-val="{{ false }}">
+    <div class="mk-page" style="padding:26px 30px 96px;max-width:900px;margin:0 auto">
+
+      <sc-if value="{{ navActivity }}" hint-placeholder-val="{{ false }}">
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Activity</h2>
+        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">{{ activityScope }} · newest first</div>
+        <sc-if value="{{ hasActivity }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column">
+            <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="8">
+              <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:14px;line-height:1.45">{{ a.text }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.5);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noActivity }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:30px 0;font-size:14px;color:rgba(var(--ink-rgb),0.5)">Nothing logged yet. Entries appear here as tickets are worked on.</div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Sync</h2>
+        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Last upload: {{ syncLastLabel }}</div>
+        <sc-if value="{{ syncNothingPending }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:30px 0;font-size:14px;color:rgba(var(--ink-rgb),0.5)">Everything has been uploaded.</div>
+        </sc-if>
+        <sc-if value="{{ syncHasPending }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">{{ syncPendingLabel }}</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ syncRows }}" as="t" hint-placeholder-count="2">
+              <div class="mk-ticket-card" style="display:flex;align-items:center;gap:12px;padding:13px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }}">
+                <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px">{{ t.customer }}</div>
+                  <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ t.locLine }} · {{ t.tech }}</div>
+                </div>
+                <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ true }}">
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Account</h2>
+        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="5">
+            <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:13px;padding:15px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <div class="mk-icon-chip" style="background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.glyph }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px">{{ m.label }}</div>
+                <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">{{ m.hint }}</div>
+              </div>
+              <span style="flex:none;color:rgba(var(--ink-rgb),0.35)">{{ m.chevron }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
+        <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.3);margin-top:14px">BUILD {{ buildStamp }}</div>
+      </sc-if>
+
+    </div>
+  </sc-if>
+
+  <!-- The office roles have no phone frame for the bar to sit inside, so it is
+       pinned to the viewport at every width. -->
+  <sc-if value="{{ showDeskNav }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface);padding-bottom:env(safe-area-inset-bottom)">
+      <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.pick }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
+          {{ n.glyph }}
+          <span style="font-size:10px;letter-spacing:0.03em;font-weight:{{ n.weight }}">{{ n.label }}</span>
+        </button>
+      </sc-for>
     </div>
   </sc-if>
 
@@ -2308,6 +2396,17 @@ class Component extends DCLogic {
 
       isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
       currentRoleLabel: { tech: 'Technician', mgr: 'Ops Manager', admin: 'Admin', founder: 'Observer' }[S.role] || '',
+      // The office roles' own dashboards are what the Tickets destination shows; the
+      // other three destinations replace the page rather than nesting inside it.
+      // (The technician's tabs live inside the phone frame instead, so isTech is
+      // unconditional and the switching happens one level further in.)
+      showMgrPage: S.role === 'mgr' && S.roleTab === 'tickets',
+      showAdminPage: S.role === 'admin' && S.roleTab === 'tickets',
+      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets',
+      // Activity/Sync/Account are written once for the office roles and once, styled
+      // for a phone card, inside the technician frame.
+      deskTabs: S.role !== 'tech' && S.roleTab !== 'tickets',
+      showDeskNav: S.role !== 'tech',
 
       // ── Bottom navigation ──────────────────────────────────────────────────
       // Four destinations, the same for every role: the work itself, what has been
