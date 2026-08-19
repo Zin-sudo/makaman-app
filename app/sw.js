@@ -5,12 +5,20 @@
 // layer already handles offline logging via localStorage (see the Field Device notes in
 // the technician screen) — this cache only covers the app shell itself so the page can
 // still load if the device has no signal when it's opened.
-const CACHE = 'makaman-jobtickets-shell-v1';
+const CACHE = 'makaman-jobtickets-shell-v2';
+// The React/Babel bundles and the fonts are part of the shell now, not remote assets.
+// Without them precached the app would show a blank page on an offline cold start, since
+// support.js cannot boot without React. Bumping the cache name retires the v1 shell,
+// which cached neither.
 const SHELL = [
   './',
   './index.html',
   './support.js',
   './manifest.webmanifest',
+  './vendor/react.production.min.js',
+  './vendor/react-dom.production.min.js',
+  './vendor/babel.min.js',
+  './vendor/fonts.css',
   './uploads/icon-192.png',
   './uploads/icon-512.png',
 ];

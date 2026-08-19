@@ -4,6 +4,24 @@
 <meta charset="utf-8">
 <title>Makaman Job Tickets</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Self-hosted runtime. support.js otherwise pulls React, ReactDOM and
+     @babel/standalone from unpkg.com on every cold start, and a CDN it cannot reach
+     means the app does not boot at all — which defeats the point of an offline-first
+     PWA at a field base with thin connectivity.
+
+     Loading them here first is enough: loadReactUmd() returns early when window.React
+     and window.ReactDOM already exist, and the Babel loader does the same for
+     window.Babel, so support.js never reaches for the network and stays unmodified.
+     These are the exact builds it pins, each verified byte-for-byte against the SRI
+     hashes support.js carries.
+
+     Do NOT switch this to window.__resources. That hook also tells the runtime a
+     bundler has supplied the template, so it skips re-fetching and re-parsing this
+     file (support.js line 158) and every sc-for renders as its empty placeholder
+     skeleton instead of real rows. -->
+<script src="./vendor/react.production.min.js"></script>
+<script src="./vendor/react-dom.production.min.js"></script>
+<script src="./vendor/babel.min.js"></script>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -16,8 +34,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1d2d3d">
 <link rel="apple-touch-icon" href="uploads/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap">
+<link rel="stylesheet" href="vendor/fonts.css">
 <style>
   body { margin:0; background:#f2f2f3; color:#1d1f20; font-family:"Barlow",system-ui,sans-serif; font-size:15px; line-height:1.55; }
   *,*::before,*::after { box-sizing:border-box; }
