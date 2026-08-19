@@ -550,13 +550,13 @@
               <sc-if value="{{ hasActivity }}" hint-placeholder-val="{{ true }}">
                 <div style="display:flex;flex-direction:column;gap:2px">
                   <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="6">
-                    <div style="display:flex;gap:11px;padding:11px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <button onClick="{{ a.open }}" style="width:100%;display:flex;gap:11px;padding:11px 0;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);background:transparent;text-align:left;cursor:pointer">
                       <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
                       <div style="flex:1;min-width:0">
                         <div style="font-size:13px;line-height:1.4;color:var(--ink)">{{ a.text }}</div>
                         <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
                       </div>
-                    </div>
+                    </button>
                   </sc-for>
                 </div>
               </sc-if>
@@ -651,7 +651,12 @@
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
             <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
           </div>
-          <button onClick="{{ goTeam }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Team</button>
+          <select value="{{ techFilterValue }}" onChange="{{ setTechFilter }}" style="margin-left:auto;min-height:36px;padding:7px 10px;font-size:13px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
+            <sc-for list="{{ techFilterOptions }}" as="o" hint-placeholder-count="3">
+              <option value="{{ o.name }}">{{ o.label }}</option>
+            </sc-for>
+          </select>
+          <button onClick="{{ goTeam }}" style="padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Team</button>
         </div>
         <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
@@ -1480,16 +1485,23 @@
       <sc-if value="{{ navActivity }}" hint-placeholder-val="{{ false }}">
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Activity</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">{{ activityScope }} · newest first</div>
+        <sc-if value="{{ showActivityChips }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:8px;margin-bottom:18px">
+            <sc-for list="{{ activityChips }}" as="c" hint-placeholder-count="3">
+              <button onClick="{{ c.pick }}" style="padding:6px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:{{ c.bg }};color:{{ c.fg }};border:1px solid rgba(var(--ink-rgb),0.22)">{{ c.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
         <sc-if value="{{ hasActivity }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column">
             <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="8">
-              <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+              <button onClick="{{ a.open }}" style="width:100%;display:flex;gap:12px;padding:12px 0;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
                 <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:14px;line-height:1.45">{{ a.text }}</div>
                   <div style="font-size:12px;color:rgba(var(--ink-rgb),0.5);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
                 </div>
-              </div>
+              </button>
             </sc-for>
           </div>
         </sc-if>
@@ -1900,6 +1912,10 @@ class Component extends DCLogic {
       // Which of the four bottom-nav destinations is showing. One key rather than one
       // per role: only ever one role is signed in, so they cannot both be in play.
       roleTab: 'tickets',
+      // '' means every technician. Office roles only.
+      techFilter: '',
+      // 'all' | 'lifecycle' | 'edit' — which slice of the Activity feed is showing.
+      activityKind: 'all',
     }, this.load());
   }
 
@@ -2301,6 +2317,18 @@ class Component extends DCLogic {
     const issue = t ? this.numberIssue(t) : {};
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
+
+    // Every ticket list reads top to bottom in the order the work needs attention:
+    // still out in the field, then waiting on someone in the office, then finished.
+    // Newest first inside each band.
+    //
+    // Until now no list was sorted at all — they reversed the order tickets happened
+    // to be created in, so a job needing approval today could sit below one closed
+    // last month. One helper rather than a sort per screen, so the three roles cannot
+    // drift into three different ideas of what "first" means.
+    const TICKET_BAND = { logging: 0, done: 1, approved: 2 };
+    const bandOf = (x) => (TICKET_BAND[x.status] === undefined ? 3 : TICKET_BAND[x.status]);
+    const bandedTickets = (list) => list.slice().reverse().sort((a, b) => bandOf(a) - bandOf(b));
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
 
@@ -2687,33 +2715,62 @@ class Component extends DCLogic {
           glyph: icon(x.key, 21),
           color: on ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.45)',
           weight: on ? '600' : '500',
-          pick: () => this.setState({ roleTab: x.key }),
+          // Returning to Tickets lands on the list, not on whatever detail screen was
+          // open when the tab was left. roleTab and mgrScreen/techScreen are separate,
+          // so without this a manager who wandered off the print preview came back to
+          // the print preview rather than the inbox.
+          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list' }),
         };
       }),
 
       // ── Activity ───────────────────────────────────────────────────────────
-      // There is no organisation-wide log to read: this.log() appends to the audit
-      // trail of one ticket. The feed is therefore assembled by walking every
-      // ticket's own trail. A technician sees only their own tickets; everyone else
-      // sees the whole operation, which is the difference between "what did I do"
-      // and "what is my team doing".
+      // There is no organisation-wide log to read: log() appends to the audit trail
+      // of one ticket. The feed is therefore assembled by walking every ticket's own
+      // trail and merging them.
+      //
+      // Everyone sees the whole company's work, not just their own — a technician
+      // coming on shift should be able to see that the job they are inheriting was
+      // approved, or that a colleague finished at the next well. What differs is
+      // depth, not scope: technicians see the stages a job passed through, while the
+      // office also sees who changed what. Someone's pay is computed from these
+      // tickets, so who altered a figure is the office's business, not the crew's.
       activityFeed: (() => {
-        const mine = S.role === 'tech';
+        const deep = S.role !== 'tech';
+        const want = S.activityKind || 'all';
         return D.tickets
-          .filter(x => !mine || x.tech === myName)
           .reduce((acc, x) => acc.concat((x.audit || []).map(a => ({
             ts: a.ts,
+            kind: auditKind(a),
             text: a.text,
             stamp: F.stamp(a.ts),
             where: (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
             edge: this.cardTreatment(x).edge,
+            open: () => this.setState(S.role === 'tech'
+              ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
+              : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
           }))), [])
+          .filter(a => (deep || a.kind === 'lifecycle') && (want === 'all' || a.kind === want))
           .sort((a, b) => new Date(b.ts) - new Date(a.ts))
           .slice(0, 60);
       })(),
-      hasActivity: D.tickets.some(x => (S.role !== 'tech' || x.tech === myName) && (x.audit || []).length),
-      noActivity: !D.tickets.some(x => (S.role !== 'tech' || x.tech === myName) && (x.audit || []).length),
-      activityScope: S.role === 'tech' ? 'Your tickets' : 'All tickets',
+      hasActivity: D.tickets.some(x => (x.audit || []).some(a => S.role !== 'tech' || auditKind(a) === 'lifecycle')),
+      noActivity: !D.tickets.some(x => (x.audit || []).some(a => S.role !== 'tech' || auditKind(a) === 'lifecycle')),
+      activityScope: S.role === 'tech' ? 'Job stages, company-wide' : 'Everything, company-wide',
+      // Chips only exist for roles that have two kinds to choose between.
+      showActivityChips: S.role !== 'tech',
+      activityChips: [
+        { key: 'all', label: 'All' },
+        { key: 'lifecycle', label: 'Status changes' },
+        { key: 'edit', label: 'Edits' },
+      ].map(c => {
+        const on = (S.activityKind || 'all') === c.key;
+        return {
+          label: c.label,
+          bg: on ? 'var(--accent)' : 'transparent',
+          fg: on ? 'var(--on-accent)' : 'var(--ink)',
+          pick: () => this.setState({ activityKind: c.key }),
+        };
+      }),
 
       // ── Sync ───────────────────────────────────────────────────────────────
       // Promotes what was a one-line banner into somewhere you can actually look:
@@ -2837,7 +2894,7 @@ class Component extends DCLogic {
       techName: myName,
       myCount: myTickets.length + ' on device',
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
-      myTickets: myTickets.slice().reverse().map(x => Object.assign(this.ticketView(x), {
+      myTickets: bandedTickets(myTickets).map(x => Object.assign(this.ticketView(x), {
         open: () => this.setState({ activeId: x.id, techScreen: 'log' }),
       })),
       startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: myName, customer: '', field: '', well: '', rig: '' } }),
@@ -2958,10 +3015,18 @@ class Component extends DCLogic {
         { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
         { label: 'Approved value', value: money(approved.reduce((s, x) => s + this.ticketTotal(x), 0)), color: 'var(--ink-strong)' },
       ],
-      inboxRows: D.tickets.filter(x => x.synced).slice().reverse().map(x => Object.assign(this.ticketView(x), {
-        actionLabel: x.status === 'approved' ? 'View' : 'Review',
-        review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
-      })),
+      inboxRows: bandedTickets(D.tickets.filter(x => x.synced && (!S.techFilter || x.tech === S.techFilter)))
+        .map(x => Object.assign(this.ticketView(x), {
+          actionLabel: x.status === 'approved' ? 'View' : 'Review',
+          review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+        })),
+      // Built from the technicians who actually have tickets rather than from the
+      // user list, so the filter never offers a name that would return nothing.
+      techFilterValue: S.techFilter || '',
+      techFilterOptions: [{ name: '', label: 'All technicians' }].concat(
+        Array.from(new Set(D.tickets.filter(x => x.synced).map(x => x.tech).filter(Boolean)))
+          .sort().map(n => ({ name: n, label: n }))),
+      setTechFilter: e => this.setState({ techFilter: e.target.value }),
       backToInbox: () => this.setState({ mgrScreen: 'inbox' }),
       backToReview: () => this.setState({ mgrScreen: 'review' }),
       headerFields: t ? (() => {
@@ -3029,7 +3094,11 @@ class Component extends DCLogic {
       })() : [],
       noMsg: issue.msg || '', noBorder: issue.bad ? 'var(--danger-deep)' : 'rgba(var(--ink-rgb),0.16)',
       noMsgColor: issue.bad ? 'var(--danger-deep)' : (issue.ok ? 'var(--accent-deep)' : 'rgba(var(--ink-rgb),0.6)'),
-      seriesBtns: D.series.map(s => {
+      // Guarded on there being an open ticket. These buttons compare candidate numbers
+      // against `t.id`, and renderVals() runs for every screen, not only the review
+      // one — so if the remembered ticket is not in the data (restored from another
+      // device, or removed), the whole app rendered an error page instead of a screen.
+      seriesBtns: !t ? [] : D.series.map(s => {
         // A technician can type a ticket number by hand that happens to land inside a
         // series' own range (e.g. "1885" typed manually before anyone took it from the
         // series). Walking forward from s.last+1 past any number already in use — on
