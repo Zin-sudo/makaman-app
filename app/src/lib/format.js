@@ -64,3 +64,17 @@ export function isoToLocalInput(isoString, timezone) {
 export const TIMEZONES = [
   'UTC', 'Africa/Tripoli', 'Europe/London', 'Europe/Berlin', 'Asia/Dubai', 'America/New_York',
 ]
+
+// Display label for each role. The "founder" DB/RLS role key is intentionally unchanged
+// (schema + policies reference it) -- only the user-visible label was renamed to
+// "Observer", matching the prototype's edit #1.
+export const ROLE_LABELS = {
+  technician: 'Technician',
+  ops_manager: 'Ops Manager',
+  admin: 'Admin',
+  founder: 'Observer',
+}
+
+export function roleLabel(role) {
+  return ROLE_LABELS[role] || role || '—'
+}

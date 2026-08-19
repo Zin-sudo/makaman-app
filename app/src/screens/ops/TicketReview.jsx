@@ -240,29 +240,31 @@ export default function TicketReview() {
 
             <div className="card stack">
               <strong>Charged Items</strong>
-              <table>
-                <thead><tr><th>#</th><th>Desc</th><th>Qty</th><th>UoM</th><th>Cost</th><th>Total</th><th /></tr></thead>
-                <tbody>
-                  {items.map((it, idx) => (
-                    <tr key={it.id || idx}>
-                      <td><input style={{ width: 70 }} value={it.item_number} onChange={(e) => updateItemField(idx, 'item_number', e.target.value)} onBlur={() => persistItem(idx)} /></td>
-                      <td>
-                        <input value={it.description} onChange={(e) => updateItemField(idx, 'description', e.target.value)} onBlur={() => persistItem(idx)} />
-                        {it._additionalDayCost != null && (
-                          <div className="small muted">
-                            {it._currency || 'USD'} {it._additionalDayCost} after first day — add a 2nd line if this ran longer
-                          </div>
-                        )}
-                      </td>
-                      <td><input type="number" style={{ width: 60 }} value={it.qty} onChange={(e) => updateItemField(idx, 'qty', e.target.value)} onBlur={() => persistItem(idx)} /></td>
-                      <td><input style={{ width: 60 }} value={it.uom} onChange={(e) => updateItemField(idx, 'uom', e.target.value)} onBlur={() => persistItem(idx)} /></td>
-                      <td><input type="number" style={{ width: 70 }} value={it.unit_cost} onChange={(e) => updateItemField(idx, 'unit_cost', e.target.value)} onBlur={() => persistItem(idx)} /></td>
-                      <td className="mono">{(Number(it.qty || 0) * Number(it.unit_cost || 0)).toFixed(2)}</td>
-                      <td><button className="ghost" onClick={() => removeItem(idx)}>✕</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ overflowX: 'auto' }}>
+                <table>
+                  <thead><tr><th>#</th><th>Desc</th><th>Qty</th><th>UoM</th><th>Cost</th><th>Total</th><th /></tr></thead>
+                  <tbody>
+                    {items.map((it, idx) => (
+                      <tr key={it.id || idx}>
+                        <td><input style={{ width: 70 }} value={it.item_number} onChange={(e) => updateItemField(idx, 'item_number', e.target.value)} onBlur={() => persistItem(idx)} /></td>
+                        <td>
+                          <input style={{ minWidth: 160 }} value={it.description} onChange={(e) => updateItemField(idx, 'description', e.target.value)} onBlur={() => persistItem(idx)} />
+                          {it._additionalDayCost != null && (
+                            <div className="small muted">
+                              {it._currency || 'USD'} {it._additionalDayCost} after first day — add a 2nd line if this ran longer
+                            </div>
+                          )}
+                        </td>
+                        <td><input type="number" style={{ width: 60 }} value={it.qty} onChange={(e) => updateItemField(idx, 'qty', e.target.value)} onBlur={() => persistItem(idx)} /></td>
+                        <td><input style={{ width: 60 }} value={it.uom} onChange={(e) => updateItemField(idx, 'uom', e.target.value)} onBlur={() => persistItem(idx)} /></td>
+                        <td><input type="number" style={{ width: 70 }} value={it.unit_cost} onChange={(e) => updateItemField(idx, 'unit_cost', e.target.value)} onBlur={() => persistItem(idx)} /></td>
+                        <td className="mono">{(Number(it.qty || 0) * Number(it.unit_cost || 0)).toFixed(2)}</td>
+                        <td><button className="ghost" onClick={() => removeItem(idx)}>✕</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               <div className="row">
                 <input placeholder="Item number…" value={newItemNumber} onChange={(e) => setNewItemNumber(e.target.value)} />
                 <button className="secondary" onClick={onAddItemLookup} style={{ whiteSpace: 'nowrap' }}>Add Item</button>

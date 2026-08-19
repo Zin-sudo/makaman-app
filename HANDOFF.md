@@ -82,11 +82,43 @@ HANDOFF.md                  this file
 - Admin seeded: `Lateri@makaman.ly` — **tell the user to rotate this password**, it was typed into a chat transcript.
 - **Email confirmation has NOT been turned off.** No MCP tool in this session exposed Auth config, and no documented Management API path was found either — this needs a human to flip "Confirm email" off under Authentication → Providers → Email in the Supabase dashboard. Required, not optional (see original A.1 rationale below).
 
-### 3a. Vercel — created but NOT verified live
+### 3a. Vercel — NOT live, blocked on a real account-permission issue (confirmed 2026-08-19)
 
-A Vercel project (`makaman-job-tickets`) was created and linked to `Zin-sudo/makaman-app`, with production branch set to `claude/job-log-timestamps-locked-8m5mz0` (`create_git_project` reported success and a real 409-conflict on retry confirms it exists). **But every read call after that — `list_projects`, `get_project`, `get_deployment`, even `web_fetch_vercel_url` — returned 403/404**, across three separate pushes over 30+ minutes. This looks like a permissions/scoping bug specific to that session's Vercel MCP tools, not a real absence, but it was never confirmed live from inside the session. **Check the Vercel dashboard directly first** before assuming this step needs to be redone — if the project is there and deployed, just set env vars (below) if missing and move on to A.5 verification.
+**This needs the account owner, not another coding session.** A fresh check this session
+(2026-08-19) confirms the earlier "maybe just a tool-scoping bug" theory was wrong — it's
+a real permission restriction:
 
-If it's genuinely not there: root directory `app`, framework Vite, build command `npm run build`, output directory `dist`. Env vars — `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — are already committed in `app/.env.production` (Vite reads this automatically for production builds; this is safe because the anon key is meant to be public and RLS is what actually protects data), so no manual env var step should even be needed unless that file is missing or stale.
+- `list_teams` → one team, `midolateri-2760's projects` (`team_A2oAoC4hOKAGYM8kULx2ylNv`).
+- `list_projects` on that team → **empty**, both before and immediately after creating a
+  project (see next line). Confirms the earlier `makaman-job-tickets` project referenced
+  below is really gone/inaccessible now, not just unlisted by a buggy read.
+- `create_git_project` (repo `Zin-sudo/makaman-app`, root `app`) → **succeeds**, returns a
+  real project id (`prj_SFT9XWc70QHCWAqHfivKM6xXGojM`), confirms it's linked to the GitHub
+  repo. But the automatic first deployment it tries to trigger fails:
+  `403 forbidden: "You don't have permission to create a Production Deployment for this
+  project."` (links to `vercel.com/docs/accounts/team-members-and-roles`).
+- Every subsequent read (`get_project`, `list_projects`, `list_deployments`) on that same
+  project also returns `403`/`404` immediately after — not eventual consistency, not a
+  transient blip.
+
+**Conclusion: the Vercel account/token this MCP connector is using does not have deploy
+permission on this team** (most likely role is below "Member" for deployments, or the
+team's plan/token scope excludes production deploys). Project creation still works
+because that's a lower-privilege action. **A coding session cannot fix this — the account
+owner needs to check vercel.com dashboard directly**: confirm project
+`makaman-job-tickets` (id `prj_SFT9XWc70QHCWAqHfivKM6xXGojM`) exists under
+`midolateri-2760's projects`, check the connected token/integration's role has deploy
+permission (Project Settings → or Team Settings → Members), and either fix the role or
+manually trigger the first deploy from the dashboard. Once that's done, a session can
+pick up at A.5 (verify the live URL) — don't re-attempt `create_git_project`, it already
+worked and re-running just risks a 409 on the existing project.
+
+Root directory `app`, framework Vite, build command `npm run build`, output directory
+`dist` — already correct on the created project (Vite auto-detected). Env vars —
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — are already committed in
+`app/.env.production` (Vite reads this automatically for production builds; safe because
+the anon key is meant to be public and RLS is what actually protects data), so no manual
+env var step should be needed once deploys are actually permitted.
 
 ### A.5 Verify on the live URL (do this whenever the URL is confirmed live)
 
@@ -1082,3 +1114,118 @@ added 22 items via the real review-screen UI (2 over cap) and confirmed the warn
 text, correct 2-page split with the right item counts per page, correct grand total on
 the final page only, and Job Log staying single-page since it wasn't pushed over its
 own cap. Full responsive sweep still 0 overflow.
+
+---
+
+## Session checkpoint — sheet preview polish: company name, real row caps, column alignment, mileage label (2026-08-19)
+
+Four more rounds of prototype (`prototype/Job Ticket System.dc.html`) refinement, all
+verified via Playwright measurement (not eyeballing), commits `a968010` → `60f06e4`:
+
+- **Company name + row caps**: title changed "Makaman Oilfield Services" → "Makaman
+  Libya Oil Services Inc.", 17px → 19px. Re-measured the true full-A4 print page (not
+  the smaller 640px on-screen box the 20/22 caps were tuned against) and found the real
+  template's actual counts — **24 item rows / 25 log rows** — fit with 195-210px to
+  spare, so restored `ITEM_ROW_CAP`/`LOG_ROW_CAP` from 20/22 back to the real 24/25
+  instead of inventing a bigger number. Zero overflow confirmed on all 4 sheets, signature
+  block still flush at the bottom.
+- **Font sizes bumped** everywhere it didn't cause wrapping or push past the A4 budget —
+  toolbar buttons, sheet-card base, letterhead, subtitle, Ticket NO, signature captions,
+  etc. Item/log table body (10px) and most field-row labels (9.5px) deliberately left
+  alone — bumping wrapped 3 real labels, verified then reverted. Found and fixed a
+  **pre-existing bug** while at it: the Job Log label column (96px) was narrower than
+  Service Ticket's (110px) despite longer label text, wrapping "Job Supervisor:" /
+  "Customer Rep.:" to 2 lines — confirmed via `git show HEAD` this predated the session,
+  widened to 108px.
+- **Item table column alignment fixed** to match the user's stated rule: Item no. /
+  Description always left, Qty / Unit always center (were right/left), Unit Cost / Total
+  Cost always right (already correct). Job Log table's columns are different
+  (Date/Time/Pressure/Total/Details) so the rule doesn't apply there.
+- **Mileage labeled "(One Way)"** right next to the entered value on the Service Ticket,
+  so the client can see why the Qty on the mileage line item further down reads double
+  that number (round trip = 2x one-way) instead of it looking like a discrepancy.
+
+---
+
+## PART C — Porting the prototype's UX work into the real `app/` PWA (started 2026-08-19)
+
+**Critical gap found this session**: `app/` (the real deployable Vite+React+Supabase PWA)
+was last touched `2026-08-17 22:20` (`b1deaa4`). Every session since then — 16+ rounds of
+real UX work (Founder→Observer rename, full cross-device/mobile responsiveness, PWA
+installability polish, cloud-storage-linking UI, item search suggestions, auto-sync
+timer, presence badges, and the entire sheet-preview rebuild to match the real Excel
+template) — was done in `prototype/Job Ticket System.dc.html`, a separate static HTML
+mockup (dc-runtime, `localStorage`, no Supabase). **None of it exists in `app/` yet.**
+`HANDOFF.md §2 Repository layout` doesn't even list `prototype/` — it drifted from being
+tracked as part of "the plan." User confirmed (2026-08-19): finish all three, in order —
+(1) get `app/` genuinely live on Vercel, (2) port the prototype's UX into `app/`, (3)
+build Part B (real Excel/PDF generation) for real. This section tracks (2).
+
+**Ported so far, this session:**
+- **Founder → Observer, display-label only** (matches prototype edit #1 exactly): DB/RLS
+  role key stays `founder` (schema untouched), only user-facing text changed. Added
+  `roleLabel()` / `ROLE_LABELS` to `src/lib/format.js` as the one source of truth for
+  role display text (also fixed a latent bug: `Users.jsx`'s role badge was rendering the
+  raw `founder`/`ops_manager` DB string with no title-casing — now uses the map).
+- **Cross-device/mobile responsiveness** (plan item #14, ported from prototype edit
+  #14 + its `3bc9514` follow-up): unlike the prototype (inline styles everywhere,
+  needed per-element fixes), the real app already uses actual CSS classes in
+  `theme.css`, so this was centralized there instead of touched file-by-file:
+  - Wrapped every un-scrolled `<table>` in `overflowX:auto` (`Users.jsx` active-users
+    table, `FounderReport.jsx` ticket table, `TicketReview.jsx` charged-items table —
+    `PriceLists.jsx` already had this pattern, copied from there) instead of letting a
+    6-7-column table blow out a narrow phone's page width.
+  - `.card` got a blanket `max-width:100%; overflow-x:auto` fallback in case anything
+    else was missed.
+  - `.topbar` (sticky, present on every screen) got `flex-wrap:wrap` and the
+    corner name/settings link got `max-width:40vw` + ellipsis — an unusually long
+    technician name was the one thing that could overflow every screen at once.
+  - `OpsQueue.jsx`'s 2-tab bar got `wrap` added (small option set, must always stay
+    fully visible per the same standard the prototype settled on).
+  - `@media (max-width: 640px)`: tighter `.page`/`.topbar`/`.card` padding, and
+    `.log-line`'s 3-column grid (128px fixed + 1fr + auto) collapses to a single
+    column — same "fixed grid column gets tight next to a real control on a phone"
+    problem the prototype hit and fixed.
+  - `AdminHome.jsx` needed no change — it's already a vertical card-link stack, not a
+    horizontal tab bar or wide grid.
+- **Verified**: `npm run build` clean before and after. Login/Signup (the only screens
+  reachable without real credentials) checked live via Playwright at 375/768/1280px —
+  zero horizontal overflow (`scrollWidth === clientWidth`) at all three. **Authenticated
+  screens (Ops/Admin/Technician/Observer) were NOT live-verified** — no test credentials
+  were available this session (the two confirmed `auth.users` rows are the real seeded
+  Admin, flagged for password rotation, and the actual account owner's own email; neither
+  password is known, and creating a throwaway account requires an existing Admin/Ops
+  login to approve it — circular). Fixes above are reasoned from the same DOM
+  structure/CSS that was actually measured on the public screens, not guessed, but a real
+  role-by-role responsive pass (matching the prototype's 16-combination sweep) still
+  needs doing once either test credentials exist or Vercel is live for the user to check
+  directly.
+
+**Still not ported (queued, priority order):**
+1. **PWA installability polish** — `app/` already has `vite-plugin-pwa` (real manifest +
+   service worker, unlike the prototype which had to add these from scratch in edit
+   #14), so this is lower priority than it looks; verify install prompts/icons actually
+   work end-to-end once live rather than assume vite-plugin-pwa's defaults are sufficient.
+2. **Sheet-preview rebuild to match the real Excel template** — `PrintPreview.jsx` is
+   still the original from-scratch mockup layout; the prototype's whole print-screen
+   history (`dbe860a` through `60f06e4` — real letterhead, real field order/labels, A4
+   aspect-ratio cards, row-capped + paginated tables at the real 24/25 counts, bottom-
+   anchored signatures, column alignment, mileage "(One Way)" label) needs porting.
+   This overlaps heavily with Part B below — probably worth doing together rather than
+   porting the static layout now and rewiring it for real generation later.
+3. **Cloud storage linking UI** (plan item #15 / prototype edit #15) — Settings section +
+   export-screen upload buttons. Prototype's OAuth is explicitly mocked (flagged
+   in-code); a real port still needs a real backend token exchange to be honest, not
+   just copied UI — decide whether to port the mocked UI now (matches app's current
+   "everything real, nothing pretend" bar less well) or scope real OAuth as its own item.
+4. **Item search + behavioral suggestions** (prototype edit #12) — ops item-lookup UX
+   improvement on top of the price-list data `app/` already has.
+5. **Auto-sync timer** (prototype edit #11) — background sync beyond the existing manual
+   Sync button; `app/`'s offline queue (`src/lib/offlineQueue.js`) already exists, this
+   is a scheduling layer on top of it.
+6. **In-progress presence badge / live event visibility for Observer** (prototype edits
+   #10 and #13) — online/offline badge on in-progress tickets, and letting the Observer
+   role see live in-progress events, not just approved-ticket history.
+
+Each of these should get its own commit + build-verify pass, same discipline as the
+prototype's edit-by-edit history, rather than one giant unreviewable port.

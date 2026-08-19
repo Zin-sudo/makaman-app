@@ -103,6 +103,11 @@ label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bot
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 1.25rem;
+  /* Belt-and-suspenders: most tables that can genuinely outgrow a narrow phone are
+     already wrapped in their own overflowX:auto div, but this catches anything missed
+     without silently breaking any card that never overflows in the first place. */
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .page {
@@ -156,8 +161,18 @@ th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transf
   border-bottom: 1px solid var(--border);
   padding: 0.75rem 1rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.4rem 1rem;
+}
+/* A long technician/user name in the corner link must never be the thing that forces
+   this sticky bar to overflow horizontally on a narrow phone. */
+.topbar .row a {
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logo-lg { height: 56px; width: auto; max-width: 260px; object-fit: contain; }
@@ -193,4 +208,21 @@ th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; text-transf
   padding: 0.4rem;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+/* Cross-device access (plan item #14, ported from the prototype's edit #14/#3bc9514):
+   every role needs to work on a phone, not just desktop. Two rules there governed all of
+   it and still do here: genuinely long/many-column data (tables) gets its own scroll box
+   instead of blowing out the page (handled per-table above, plus the .card fallback);
+   small fixed option sets (tabs, nav links) must always fit fully visible via wrapping/
+   shrinking, never hidden behind an unexpected scroll. */
+html, body { overflow-x: hidden; }
+
+@media (max-width: 640px) {
+  .page { padding: 1rem 0.75rem 3rem; }
+  .topbar { padding: 0.6rem 0.75rem; }
+  .card { padding: 1rem; }
+  /* The 128px-fixed-column log-line grid gets tight next to a real edit control on a
+     narrow phone -- stack it instead of squeezing three columns into ~300px. */
+  .log-line { grid-template-columns: 1fr; gap: 0.3rem; }
 }

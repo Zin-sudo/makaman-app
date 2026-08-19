@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
+import { roleLabel } from '../../lib/format'
 import TopBar from '../TopBar'
 
 export default function Users() {
@@ -87,28 +88,30 @@ export default function Users() {
 
         <div className="card stack">
           <strong>Active Users</strong>
-          <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th>{role === 'admin' && <th>Change role</th>}</tr></thead>
-            <tbody>
-              {active.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.full_name}</td>
-                  <td className="small">{p.email}</td>
-                  <td><span className="badge accent">{p.role?.replace('_', ' ')}</span></td>
-                  {role === 'admin' && (
-                    <td>
-                      <select value={p.role} onChange={(e) => promote(p.id, e.target.value)}>
-                        <option value="technician">Technician</option>
-                        <option value="ops_manager">Ops Manager</option>
-                        <option value="admin">Admin</option>
-                        <option value="founder">Founder</option>
-                      </select>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th>{role === 'admin' && <th>Change role</th>}</tr></thead>
+              <tbody>
+                {active.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.full_name}</td>
+                    <td className="small">{p.email}</td>
+                    <td><span className="badge accent">{roleLabel(p.role)}</span></td>
+                    {role === 'admin' && (
+                      <td>
+                        <select value={p.role} onChange={(e) => promote(p.id, e.target.value)}>
+                          <option value="technician">Technician</option>
+                          <option value="ops_manager">Ops Manager</option>
+                          <option value="admin">Admin</option>
+                          <option value="founder">Observer</option>
+                        </select>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

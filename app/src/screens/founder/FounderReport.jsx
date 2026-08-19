@@ -4,7 +4,9 @@ import { useSettings } from '../../context/SettingsContext'
 import { formatDate } from '../../lib/format'
 import TopBar from '../TopBar'
 
-// Founder: read-only report across all approved tickets. No edit affordances anywhere on this screen.
+// Observer (internal role key stays "founder" -- DB enum / RLS policies unchanged, this
+// is a display-label-only rename to match the prototype's edit #1): read-only report
+// across all approved tickets. No edit affordances anywhere on this screen.
 export default function FounderReport() {
   const { settings } = useSettings()
   const [tickets, setTickets] = useState([])
@@ -22,7 +24,7 @@ export default function FounderReport() {
 
   return (
     <div>
-      <TopBar title="Founder Report" />
+      <TopBar title="Observer Report" />
       <div className="page page-wide stack">
         <div className="row wrap" style={{ gap: '1rem' }}>
           <div className="card" style={{ flex: 1, minWidth: 160 }}>
@@ -36,22 +38,24 @@ export default function FounderReport() {
         </div>
 
         <div className="card">
-          <table>
-            <thead><tr><th>#</th><th>Customer</th><th>Field / Well</th><th>Technician</th><th>Done</th><th>Total</th></tr></thead>
-            <tbody>
-              {tickets.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.ticket_number}</td>
-                  <td>{t.customer}</td>
-                  <td>{t.field_name} {t.well_no}</td>
-                  <td>{t.profiles?.full_name}</td>
-                  <td>{formatDate(t.end_job_at, settings)}</td>
-                  <td className="mono">{(t.ticket_items || []).reduce((s, i) => s + Number(i.total_cost || 0), 0).toFixed(2)}</td>
-                </tr>
-              ))}
-              {tickets.length === 0 && <tr><td colSpan={6} className="muted">No approved tickets yet.</td></tr>}
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr><th>#</th><th>Customer</th><th>Field / Well</th><th>Technician</th><th>Done</th><th>Total</th></tr></thead>
+              <tbody>
+                {tickets.map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.ticket_number}</td>
+                    <td>{t.customer}</td>
+                    <td>{t.field_name} {t.well_no}</td>
+                    <td>{t.profiles?.full_name}</td>
+                    <td>{formatDate(t.end_job_at, settings)}</td>
+                    <td className="mono">{(t.ticket_items || []).reduce((s, i) => s + Number(i.total_cost || 0), 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+                {tickets.length === 0 && <tr><td colSpan={6} className="muted">No approved tickets yet.</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

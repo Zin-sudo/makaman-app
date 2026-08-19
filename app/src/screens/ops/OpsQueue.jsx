@@ -34,7 +34,7 @@ export default function OpsQueue() {
     <div>
       <TopBar title="Ticket Review" />
       <div className="page page-wide stack">
-        <div className="row">
+        <div className="row wrap">
           {TABS.map((t) => (
             <button key={t.key} className={tab === t.key ? '' : 'secondary'} onClick={() => setTab(t.key)}>
               {t.label}
