@@ -584,20 +584,20 @@
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Ticket No. (unique)</label>
-                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid {{ noBorder }};color:#1d1f20">
+                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" disabled="{{ ticketLocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid {{ noBorder }};color:#1d1f20">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
                 </div>
                 <div style="flex:1">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Take next from series</label>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <sc-for list="{{ seriesBtns }}" as="s" hint-placeholder-count="3">
-                      <button onClick="{{ s.take }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">{{ s.label }} → {{ s.next }}</button>
+                      <button onClick="{{ s.take }}" disabled="{{ ticketLocked }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(29,31,32,0.3);color:#1d1f20">{{ s.label }} → {{ s.next }}</button>
                     </sc-for>
                   </div>
                 </div>
                 <div style="width:230px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Mileage one way (KM)</label>
-                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
                   <div style="font-size:11px;margin-top:5px;color:rgba(29,31,32,0.6)">{{ mileageNote }}</div>
                 </div>
               </div>
@@ -609,7 +609,7 @@
                 <div style="margin-left:auto;font-size:11px;color:rgba(29,31,32,0.6)">Price list: {{ cur.customer }}</div>
               </div>
               <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" placeholder="Search item no. or description…" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;margin-bottom:8px">
-              <sc-if value="{{ showSuggested }}" hint-placeholder-val="{{ false }}">
+              <sc-if value="{{ showSuggestedEditable }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
                   <span style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(29,31,32,0.5)">Frequently added:</span>
                   <sc-for list="{{ suggestedItems }}" as="sug" hint-placeholder-count="3">
@@ -617,15 +617,22 @@
                   </sc-for>
                 </div>
               </sc-if>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-                <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
-                  <option value="">Add item from price list…</option>
-                  <sc-for list="{{ priceOptions }}" as="p" hint-placeholder-count="5">
-                    <option value="{{ p.code }}">{{ p.label }}</option>
-                  </sc-for>
-                </select>
-                <button onClick="{{ addItem }}" style="padding:7px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Add line</button>
-              </div>
+              <sc-if value="{{ ticketEditable }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+                  <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20">
+                    <option value="">Add item from price list…</option>
+                    <sc-for list="{{ priceOptions }}" as="p" hint-placeholder-count="5">
+                      <option value="{{ p.code }}">{{ p.label }}</option>
+                    </sc-for>
+                  </select>
+                  <button onClick="{{ addItem }}" style="padding:7px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:#5980a6;color:#f2f2f3;border:1px solid #5980a6">Add line</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ ticketLocked }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:9px;align-items:baseline;margin-bottom:12px;padding:9px 11px;background:#eef6ff;border-left:3px solid #416180;font-size:12px;color:#2c455d">
+                  <span style="flex:none">🔒</span><span>{{ lockedNote }}</span>
+                </div>
+              </sc-if>
               <table style="width:100%;border-collapse:collapse;font-size:13px">
                 <thead>
                   <tr>
@@ -643,20 +650,22 @@
                     <tr>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(29,31,32,0.08)">
-                        <button onClick="{{ it.remove }}" title="Remove line" style="width:22px;font-size:15px;color:rgba(29,31,32,0.45);background:none;border:0;cursor:pointer">×</button>
+                        <sc-if value="{{ it.showRemove }}" hint-placeholder-val="{{ true }}">
+                          <button onClick="{{ it.remove }}" title="Remove line" style="width:22px;font-size:15px;color:rgba(29,31,32,0.45);background:none;border:0;cursor:pointer">×</button>
+                        </sc-if>
                       </td>
                     </tr>
                   </sc-for>
@@ -676,13 +685,13 @@
               </div>
               <div style="margin-bottom:12px;max-width:420px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(29,31,32,0.7)">Job type (objective)</label>
-                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;text-transform:uppercase">
+                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.16);color:#1d1f20;text-transform:uppercase">
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(29,31,32,0.1)">
-                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
-                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
+                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
+                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                   </div>
                 </sc-for>
               </div>
@@ -699,10 +708,10 @@
                     <div style="flex:1;font-weight:500">{{ h.value }}</div>
                   </sc-if>
                   <sc-if value="{{ h.editable }}" hint-placeholder-val="{{ false }}">
-                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" onBlur="{{ h.onCommit }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
                   </sc-if>
                   <sc-if value="{{ h.isTextField }}" hint-placeholder-val="{{ false }}">
-                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
                   </sc-if>
                 </div>
               </sc-for>
@@ -1649,10 +1658,17 @@ class Component extends DCLogic {
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
 
+    // Approval is meant to lock the ticket — the Reopen button and its mandatory reason
+    // only make sense if something was actually sealed. Until now "locked" applied to the
+    // technician alone: the Ops Manager could still change a quantity, a unit cost or an
+    // arrival stamp on an approved ticket with no reopen and no explanation, which is
+    // exactly the ticket most likely to have been printed, signed and invoiced already.
+    const locked = !!(t && t.status === 'approved');
+
     // Shared by the "Add item from price list" dropdown and the "Frequently added"
     // quick-add chips — both just need to push a price-list line onto the current ticket.
     const addItemByCode = (code) => {
-      if (!code || !t || !curClient) return;
+      if (locked || !code || !t || !curClient) return;
       const src = curClient.items.find(i => i.code === code); if (!src) return;
       const isPercent = src.kind === 'percent';
       const qty = isPercent ? '' : (src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1);
@@ -1812,12 +1828,16 @@ class Component extends DCLogic {
       },
       reopen: {
         title: 'Reopen approved ticket', body: 'A reason is required and will be recorded against the ticket.',
-        okLabel: 'Reopen &amp; log', cancelLabel: 'Cancel', hasCancel: true, needsReason: true,
+        // Was 'Reopen &amp; log'. This is a JS string rendered as text, not markup, so
+        // React escaped the ampersand and the button read "Reopen &amp; log" literally.
+        okLabel: 'Reopen & log', cancelLabel: 'Cancel', hasCancel: true, needsReason: true,
         confirm: () => {
           const r = (S.reasonText || '').trim();
           if (!r) return;
           this.patchTicket({ status: 'done' });
-          this.log('Reopened by Omar Al-Saleh — reason: ' + r);
+          // Was hardcoded to the seeded ops manager's name, so the trail credited him
+          // for a reopen whoever actually did it.
+          this.log('Reopened by ' + ((S.session && S.session.name) || 'Ops Manager') + ' — reason: ' + r);
           this.setState({ dialog: null, reasonText: '' });
         },
       },
@@ -2048,12 +2068,13 @@ class Component extends DCLogic {
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
-        onChange: ev => { const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
+        locked: locked,
+        onChange: ev => { if (locked) return; const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
         onTimeChange: ev => this.setDraft('evt:' + t.id + ':' + i, ev.target.value),
         onTimeCommit: ev => {
           const raw = ev.target.value;
           this.clearDraft('evt:' + t.id + ':' + i);
-          if (!raw) return;
+          if (locked || !raw) return;
           const newIso = F.fromInput(raw);
           if (!newIso || newIso === e.ts) return;
           this.mutate(d => {
@@ -2066,7 +2087,7 @@ class Component extends DCLogic {
             });
           });
         },
-        remove: () => this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); }),
+        remove: () => { if (locked) return; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); }); },
       })) : [],
       newEventText: S.newEventText,
       addEvent: () => {
@@ -2108,13 +2129,13 @@ class Component extends DCLogic {
         const stampField = (field, label) => {
           const val = t[field];
           return {
-            label: label, value: val ? F.stamp(val) : 'open', editable: true, notEditable: false, isTextField: false,
+            label: label, value: val ? F.stamp(val) : 'open', editable: true, notEditable: false, isTextField: false, locked: locked,
             tsInput: this.draftOf('hdr:' + field, F.input(val)),
             onChange: ev => this.setDraft('hdr:' + field, ev.target.value),
             onCommit: ev => {
               const raw = ev.target.value;
               this.clearDraft('hdr:' + field);
-              if (!raw) return;
+              if (locked || !raw) return;
               const newIso = F.fromInput(raw);
               // Nothing actually moved — say nothing.
               if (!newIso || newIso === t[field]) return;
@@ -2135,14 +2156,14 @@ class Component extends DCLogic {
         const textField = (field, label) => {
           const stored = t[field] || '';
           return {
-            label: label, value: stored, editable: false, notEditable: false, isTextField: true,
+            label: label, value: stored, editable: false, notEditable: false, isTextField: true, locked: locked,
             textInput: this.draftOf('hdr:' + field, stored),
             onTextChange: ev => this.setDraft('hdr:' + field, ev.target.value),
             onCommit: ev => {
               const v = ev.target.value;
               this.clearDraft('hdr:' + field);
               // Typed and then put back the way it was — nothing to record.
-              if (v === stored) return;
+              if (locked || v === stored) return;
               this.mutate(d => {
                 const x = d.tickets.find(y => y.id === t.id);
                 const oldVal = x[field] || '(default)';
@@ -2202,6 +2223,7 @@ class Component extends DCLogic {
       // reach for on nearly every job.
       suggestedItems: suggestedItems,
       showSuggested: suggestedItems.length > 0,
+      showSuggestedEditable: suggestedItems.length > 0 && !locked,
       curItems: t ? (t.items || []).map((it, i) => {
         const setField = (k, ovKey) => ev => {
           const v = ev.target.value;
@@ -2213,15 +2235,24 @@ class Component extends DCLogic {
         };
         const ov = it.ov || {};
         return {
+          locked: locked, showRemove: !locked,
           code: it.code, desc: it.desc, qty: it.qty, uom: it.uom, cost: it.cost,
           total: money(this.itemTotal(it, t)),
           descBg: ov.desc ? '#eef6ff' : '#e9e9ea',
           uomBg: ov.uom ? '#eef6ff' : '#e9e9ea',
           costBg: ov.cost ? '#eef6ff' : '#e9e9ea',
           onDesc: setField('desc', 'desc'), onQty: setField('qty'), onUom: setField('uom', 'uom'), onCost: setField('cost', 'cost'),
-          remove: () => this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.items.splice(i, 1); }),
+          remove: () => {
+            if (locked) return;
+            this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.items.splice(i, 1); });
+          },
         };
       }) : [],
+      ticketLocked: locked,
+      ticketEditable: !locked,
+      lockedNote: t && t.approvedAt
+        ? 'Approved ' + F.stamp(t.approvedAt) + ' by ' + (t.approvedBy || 'Ops Manager') + '. Prices and lines are frozen — reopen the ticket to change anything.'
+        : 'This ticket is approved and frozen. Reopen it to change anything.',
       grandTotal: t ? money(this.ticketTotal(t)) : money(0),
       checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? '#416180' : 'rgba(29,31,32,0.55)' })),
       approveDisabled: !canApprove || (t && t.status === 'approved'),
@@ -2229,8 +2260,29 @@ class Component extends DCLogic {
       approveLabel: t && t.status === 'approved' ? 'Approved' : 'Approve ticket',
       approve: () => {
         if (!canApprove || !t || t.status === 'approved') return;
-        this.patchTicket({ status: 'approved' });
-        this.log('Approved by Omar Al-Saleh · ticket total ' + money(this.ticketTotal(t)) + '.');
+        const who = (S.session && S.session.name) || 'Ops Manager';
+        const when = iso(new Date());
+        const total = money(this.ticketTotal(t));
+        this.mutate(d => {
+          const x = d.tickets.find(y => y.id === t.id);
+          x.status = 'approved';
+          x.approvedAt = when;
+          x.approvedBy = who;
+          // Lines already carry their own copy of the unit cost, taken when the line was
+          // added. What was missing is a record of what the client's price list said at
+          // the moment of approval: without it there is no way, months later, to show
+          // that a ticket matched the list rather than being quietly re-priced. frozen
+          // marks the line as sealed; listCost preserves the list's own figure so an
+          // override stays visible as an override.
+          const list = (this.client(x.customer) || {}).items || [];
+          (x.items || []).forEach(line => {
+            const src = list.find(i => i.code === line.code);
+            line.listCost = src ? src.cost : null;
+            line.frozenCost = Number(line.cost) || 0;
+            line.frozen = true;
+          });
+          (x.audit = x.audit || []).push({ ts: when, text: 'Approved by ' + who + ' · ticket total ' + total + '. Prices frozen against the ' + x.customer + ' price list.' });
+        });
         this.setState({ dialog: 'approved' });
       },
       askReopen: () => this.setState({ dialog: 'reopen', reasonText: '' }),
