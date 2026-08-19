@@ -283,7 +283,6 @@
       <span style="font-weight:600">{{ sessionName }}</span>
       <span class="mk-nav-role" style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
     </div>
-    <button onClick="{{ openSettings }}" title="Settings" style="width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:transparent;border:1px solid rgba(var(--on-navbar-rgb),0.28);color:var(--on-accent)">⚙</button>
   </div>
 
   <!-- ══ SETTINGS (overlay, any role) ══ -->
@@ -667,12 +666,12 @@
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
             <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
           </div>
-          <select value="{{ techFilterValue }}" onChange="{{ setTechFilter }}" style="margin-left:auto;min-height:36px;padding:7px 10px;font-size:13px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
+          <button onClick="{{ goNewTicket }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New ticket</button>
+          <select value="{{ techFilterValue }}" onChange="{{ setTechFilter }}" style="min-height:36px;padding:7px 10px;font-size:13px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
             <sc-for list="{{ techFilterOptions }}" as="o" hint-placeholder-count="3">
               <option value="{{ o.name }}">{{ o.label }}</option>
             </sc-for>
           </select>
-          <button onClick="{{ goTeam }}" style="padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Team</button>
         </div>
         <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
@@ -725,6 +724,53 @@
               </sc-for>
             </tbody>
           </table>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ mgrNew }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
+        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">New ticket</h2>
+        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">For work called in to the office. The technician picks it up on their device.</div>
+        <div style="max-width:520px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Customer</label>
+            <input value="{{ md.customer }}" onChange="{{ fm.customer }}" list="customers" placeholder="Start typing to find an existing customer…" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <datalist id="customers">
+              <sc-for list="{{ customerOptions }}" as="c" hint-placeholder-count="3">
+                <option value="{{ c.name }}"></option>
+              </sc-for>
+            </datalist>
+            <sc-if value="{{ mgrNewIsNewCustomer }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:8px;align-items:baseline;margin-top:7px;padding:9px 11px;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);font-size:12px;line-height:1.45;color:var(--ink)">
+                <span style="flex:none">New</span>
+                <span>Not on the customer list — it will be added. Set up a price list for it before this ticket can charge anything.</span>
+              </div>
+            </sc-if>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Field name</label>
+            <input value="{{ md.field }}" onChange="{{ fm.field }}" placeholder="e.g. Defa" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1">
+              <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Well No.</label>
+              <input value="{{ md.well }}" onChange="{{ fm.well }}" placeholder="e.g. DF-12" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            </div>
+            <div style="flex:1">
+              <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Rig name</label>
+              <input value="{{ md.rig }}" onChange="{{ fm.rig }}" placeholder="e.g. RIG-4" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            </div>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Assign to</label>
+            <select value="{{ md.tech }}" onChange="{{ fm.tech }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <option value="">Select a technician…</option>
+              <sc-for list="{{ techOptions }}" as="o" hint-placeholder-count="2">
+                <option value="{{ o.name }}">{{ o.name }}</option>
+              </sc-for>
+            </select>
+          </div>
+          <button onClick="{{ createMgrTicket }}" disabled="{{ mgrNewDisabled }}" style="width:100%;min-height:48px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ mgrNewOpacity }}">Raise ticket</button>
         </div>
       </sc-if>
 
@@ -1201,13 +1247,11 @@
   <!-- ══ ADMIN ══ -->
   <sc-if value="{{ showAdminPage }}" hint-placeholder-val="{{ false }}">
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
-      <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Admin</h2>
-      <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">Price lists, customers, numbering and job types — all editable without a release.</div>
-      <div class="mk-tabbar" style="display:flex;flex-wrap:wrap;border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:22px">
-        <sc-for list="{{ adminTabs }}" as="t" hint-placeholder-count="4">
-          <button onClick="{{ t.pick }}" class="mk-tabbar-btn" style="flex:1;min-width:120px;padding:9px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;border:0;border-right:1px solid rgba(var(--ink-rgb),0.16);background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
-        </sc-for>
-      </div>
+      <!-- The tools are chosen from the Account tab, which shows what is inside each
+           one. A strip of four equal words here said less and said it twice. -->
+      <button onClick="{{ backToAccount }}" class="back-btn">‹ Account</button>
+      <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">{{ adminToolTitle }}</h2>
+      <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">{{ adminToolHint }}</div>
 
       <sc-if value="{{ adminPrice }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-bottom:14px">
@@ -1942,6 +1986,7 @@ class Component extends DCLogic {
       roleTab: 'tickets',
       // '' means every technician. Office roles only.
       techFilter: '',
+      mgrDraft: null,
       // 'all' | 'lifecycle' | 'edit' — which slice of the Activity feed is showing.
       activityKind: 'all',
     }, this.load());
@@ -3112,6 +3157,63 @@ class Component extends DCLogic {
           .sort().map(n => ({ name: n, label: n }))),
       setTechFilter: e => this.setState({ techFilter: e.target.value }),
       backToInbox: () => this.setState({ mgrScreen: 'inbox' }),
+
+      // ── Office-raised tickets ──────────────────────────────────────────────
+      // Work does not always start with a technician tapping New Job Ticket. A
+      // first-time customer calls the office, and the job has to exist before
+      // anyone drives out. The Ops Manager raises it here and assigns it.
+      mgrNew: S.mgrScreen === 'new',
+      goNewTicket: () => this.setState({ mgrScreen: 'new', mgrDraft: { customer: '', field: '', well: '', rig: '', tech: '' } }),
+      md: S.mgrDraft || { customer: '', field: '', well: '', rig: '', tech: '' },
+      // A datalist rather than a dropdown: it suggests as you type, but still
+      // accepts a name that is not on the list — which is the whole point, since
+      // the customer may be new. The suggestions are what stop "Al-Dhafra Energy"
+      // being retyped as "Al Dhafra Energy" and quietly becoming a second customer
+      // with its own empty price list.
+      customerOptions: D.clients.map(c => ({ name: c.name })),
+      techOptions: (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active').map(u => ({ name: u.name })),
+      mgrNewIsNewCustomer: (() => {
+        const typed = ((S.mgrDraft || {}).customer || '').trim().toLowerCase();
+        return !!typed && !D.clients.some(c => c.name.trim().toLowerCase() === typed);
+      })(),
+      mgrNewDisabled: !(S.mgrDraft && (S.mgrDraft.customer || '').trim() && (S.mgrDraft.field || '').trim()
+        && (S.mgrDraft.well || '').trim() && (S.mgrDraft.rig || '').trim() && S.mgrDraft.tech),
+      mgrNewOpacity: (S.mgrDraft && (S.mgrDraft.customer || '').trim() && (S.mgrDraft.field || '').trim()
+        && (S.mgrDraft.well || '').trim() && (S.mgrDraft.rig || '').trim() && S.mgrDraft.tech) ? 1 : 0.45,
+      createMgrTicket: () => {
+        const dr = S.mgrDraft || {};
+        const name = (dr.customer || '').trim();
+        if (!name || !dr.tech) return;
+        const id = 'k' + Date.now();
+        const now = iso(new Date());
+        // Matched case- and space-insensitively so a difference of typing does not
+        // create a second customer that looks identical in the list.
+        const existing = D.clients.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+        const isNew = !existing;
+        this.mutate(d => {
+          if (isNew) d.clients.push({ name: name, fields: (dr.field || '').trim(), rigs: (dr.rig || '').trim(), items: [] });
+          d.tickets.push({
+            id: id, tech: dr.tech, customer: existing ? existing.name : name,
+            field: (dr.field || '').trim(), well: (dr.well || '').trim(), rig: (dr.rig || '').trim(),
+            jobType: '', arrival: now, start: '', end: '', status: 'logging',
+            // Raised in the office, so it is already where the office can see it —
+            // there is no device holding it that still has to upload.
+            synced: true, syncedAt: now,
+            ticketNo: '', mileage: '', events: [], items: [],
+            baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',
+            audit: [{ ts: now, kind: 'lifecycle', by: myName, text: 'Ticket raised in the office by ' + myName + ' and assigned to ' + dr.tech + '.' }],
+          });
+        });
+        if (isNew) this.logOn(id, 'New customer "' + name + '" added to the register. No price list yet — items cannot be charged until one is set up.', 'lifecycle');
+        this.setState({ mgrScreen: 'inbox', mgrDraft: null, activeId: id });
+      },
+      fm: {
+        customer: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { customer: e.target.value }) }),
+        field: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { field: e.target.value }) }),
+        well: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { well: e.target.value }) }),
+        rig: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { rig: e.target.value }) }),
+        tech: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { tech: e.target.value }) }),
+      },
       backToReview: () => this.setState({ mgrScreen: 'review' }),
       headerFields: t ? (() => {
         // Arrival/Start/End are editable by Ops Manager/Admin, same as individual
@@ -3402,14 +3504,17 @@ class Component extends DCLogic {
         this.setState({ dialog: 'exportGoogleDrive' });
       },
 
-      adminTabs: [
-        { key: 'price', label: 'Price lists' }, { key: 'numbers', label: 'Numbering & job types' },
-        { key: 'people', label: 'Users & customers' }, { key: 'system', label: 'System' },
-      ].map(x => ({
-        label: x.label, bg: S.adminTab === x.key ? 'var(--accent)' : 'transparent',
-        fg: S.adminTab === x.key ? 'var(--on-accent)' : 'var(--ink)',
-        pick: () => this.setState({ adminTab: x.key }),
-      })),
+      // One tool at a time, chosen from Account. The page names the tool it is
+      // showing rather than repeating the whole menu above it.
+      adminToolTitle: { price: 'Price Lists', numbers: 'Numbering & Job Types',
+        people: 'Users & Customers', system: 'System' }[S.adminTab] || 'Admin',
+      adminToolHint: {
+        price: 'Priced items per customer — changes apply to new ticket lines only.',
+        numbers: 'Ticket number series and the job types offered in the field.',
+        people: 'Accounts, roles and the customer register.',
+        system: 'Charging rules and the danger zone.',
+      }[S.adminTab] || '',
+      backToAccount: () => this.setState({ roleTab: 'account' }),
       adminPrice: S.adminTab === 'price', adminNumbers: S.adminTab === 'numbers',
       adminPeople: S.adminTab === 'people', adminSystem: S.adminTab === 'system',
       adminClient: S.adminClient,
