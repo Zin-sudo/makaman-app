@@ -1,0 +1,141 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Makaman Job Tickets — Role Capabilities</title>
+<style>
+@page { size: A4 portrait; margin: 9mm 10mm 8mm 10mm; }
+* { box-sizing: border-box; }
+html,body { margin:0; padding:0; }
+body { font-family:'Inter',sans-serif; color:#1d1f20; font-size:9px; line-height:1.3; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.ar { font-family:'Noto Naskh Arabic',serif; direction:rtl; text-align:right; font-size:9.5px; line-height:1.4; }
+.cond { font-family:'Barlow Condensed',sans-serif; }
+
+.doc-head { display:flex; align-items:flex-end; gap:12px; border-bottom:2px solid #1d1f20; padding-bottom:7px; margin-bottom:4px; }
+.doc-head .t1 { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:21px; letter-spacing:0.03em; text-transform:uppercase; line-height:1; }
+.doc-head .t2 { font-size:8.5px; color:rgba(29,31,32,0.62); margin-top:3px; letter-spacing:0.02em; }
+.doc-head .ar-t { margin-left:auto; text-align:right; }
+.doc-head .ar-t .a1 { font-family:'Noto Naskh Arabic',serif; font-weight:700; font-size:15px; direction:rtl; line-height:1.3; }
+.doc-head .ar-t .a2 { font-family:'Noto Naskh Arabic',serif; font-size:8.5px; color:rgba(29,31,32,0.62); direction:rtl; }
+.subline { font-size:8px; color:rgba(29,31,32,0.5); margin-bottom:8px; letter-spacing:0.02em; }
+
+.role { border:1px solid rgba(29,31,32,0.22); margin-bottom:6px; break-inside:avoid; }
+.role-head { display:flex; align-items:center; background:#5980a6; color:#f2f2f3; padding:3.5px 8px; }
+.role-head.k-all   { background:#416180; }
+.role-head.k-tech  { background:#5980a6; }
+.role-head.k-mgr   { background:#2c455d; }
+.role-head.k-admin { background:#1d1f20; }
+.role-head.k-obs   { background:#7a6a4f; }
+.role-head .en { font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:14px; letter-spacing:0.07em; text-transform:uppercase; }
+.role-head .ar { margin-left:auto; font-size:12px; font-weight:700; color:#f2f2f3; }
+
+table { width:100%; border-collapse:collapse; table-layout:fixed; }
+td { padding:1.6px 8px; vertical-align:top; border-bottom:1px solid rgba(29,31,32,0.09); }
+tr:last-child td { border-bottom:0; }
+td.en { width:50%; }
+td.ar { width:50%; border-left:1px solid rgba(29,31,32,0.13); background:rgba(238,246,255,0.35); }
+tr:nth-child(even) td.en { background:rgba(29,31,32,0.022); }
+tr:nth-child(even) td.ar { background:rgba(238,246,255,0.6); }
+td.en::before { content:"›"; color:#5980a6; font-weight:600; margin-right:5px; }
+.no::before, .no-a::after { color:#b0413a !important; }
+td.no { color:#8a2f2a; }
+td.no-a { color:#8a2f2a; }
+
+.foot { margin-top:9px; padding-top:6px; border-top:1px solid rgba(29,31,32,0.2); display:flex; font-size:7.5px; color:rgba(29,31,32,0.55); }
+.foot .r { margin-left:auto; font-family:'Noto Naskh Arabic',serif; direction:rtl; }
+.note { border:1px solid rgba(29,31,32,0.22); border-left:3px solid #b5790c; padding:6px 9px; margin-bottom:8px; break-inside:avoid; display:flex; gap:10px; }
+.note .en { width:50%; font-size:8.5px; }
+.note .ar { width:50%; font-size:9px; }
+.note b { font-family:'Barlow Condensed',sans-serif; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; }
+</style></head><body>
+
+<div class="doc-head">
+  <div>
+    <div class="t1">Makaman Libya Oil Services Inc.</div>
+    <div class="t2">Job Ticket System — what each role can do</div>
+  </div>
+  <div class="ar-t">
+    <div class="a1">مكامن ليبيا لخدمات النفط</div>
+    <div class="a2">نظام تذاكر العمل — صلاحيات كل دور</div>
+  </div>
+</div>
+<div class="subline">Four roles · Field Technician, Operations Manager, Admin, Observer &nbsp;|&nbsp; أربعة أدوار: فني حقل، مدير عمليات، مسؤول النظام، مراقب</div>
+
+<div class="role">
+  <div class="role-head k-all"><span class="en">All roles</span><span class="ar">جميع الأدوار</span></div>
+  <table>
+    <tr><td class="en">Install on phone, tablet or laptop (PWA)</td><td class="ar">تثبيت التطبيق على الهاتف أو اللوحي أو الحاسوب</td></tr>
+    <tr><td class="en">Sign up — account stays pending until approved</td><td class="ar">إنشاء حساب — يبقى معلّقاً حتى الموافقة عليه</td></tr>
+    <tr><td class="en">Log in and log out; role shown in the header</td><td class="ar">تسجيل الدخول والخروج؛ الدور ظاهر في الأعلى</td></tr>
+    <tr><td class="en">Works with no signal; data kept on the device</td><td class="ar">يعمل دون تغطية؛ البيانات محفوظة على الجهاز</td></tr>
+  </table>
+</div>
+
+<div class="role">
+  <div class="role-head k-tech"><span class="en">Field Technician</span><span class="ar">فني الحقل</span></div>
+  <table>
+    <tr><td class="en">See own tickets and their status</td><td class="ar">عرض تذاكره الخاصة وحالة كل منها</td></tr>
+    <tr><td class="en">Create a ticket: customer, field, well, rig, job type, dates</td><td class="ar">إنشاء تذكرة: العميل، الحقل، البئر، جهاز الحفر، نوع العمل، التواريخ</td></tr>
+    <tr><td class="en">Log job events — each line time-stamped automatically</td><td class="ar">تسجيل أحداث العمل — كل سطر يُختم بالوقت تلقائياً</td></tr>
+    <tr><td class="en">Edit or remove own log lines before syncing</td><td class="ar">تعديل أو حذف أسطره في السجل قبل المزامنة</td></tr>
+    <tr><td class="en">Sync manually, plus automatic background sync</td><td class="ar">مزامنة يدوية، إضافة إلى مزامنة تلقائية في الخلفية</td></tr>
+    <tr><td class="en no">Cannot see prices, rates or totals</td><td class="ar no-a">لا يمكنه الاطلاع على الأسعار أو التعرفة أو الإجماليات</td></tr>
+  </table>
+</div>
+
+<div class="role">
+  <div class="role-head k-mgr"><span class="en">Operations Manager</span><span class="ar">مدير العمليات</span></div>
+  <table>
+    <tr><td class="en">Inbox of all tickets: awaiting review, approved, in field</td><td class="ar">صندوق كل التذاكر: بانتظار المراجعة، معتمدة، في الحقل</td></tr>
+    <tr><td class="en">Assign the official ticket number from the series</td><td class="ar">تعيين رقم التذكرة الرسمي من التسلسل</td></tr>
+    <tr><td class="en">Enter mileage — one way, charged as a round trip (×2)</td><td class="ar">إدخال المسافة — باتجاه واحد، وتُحتسب ذهاباً وإياباً (×٢)</td></tr>
+    <tr><td class="en">Add charged lines from the customer's price list</td><td class="ar">إضافة البنود المحتسبة من قائمة أسعار العميل</td></tr>
+    <tr><td class="en">Accept the items suggested for that job type</td><td class="ar">قبول البنود المقترحة حسب نوع العمل</td></tr>
+    <tr><td class="en">Change quantities, remove lines, see the live total</td><td class="ar">تغيير الكميات وحذف الأسطر ومتابعة الإجمالي الحي</td></tr>
+    <tr><td class="en">Review and correct the field job log and its timestamps</td><td class="ar">مراجعة وتصحيح سجل العمل الميداني وأختامه الزمنية</td></tr>
+    <tr><td class="en">Edit the ticket header fields</td><td class="ar">تعديل حقول ترويسة التذكرة</td></tr>
+    <tr><td class="en">Approve a ticket — this locks it</td><td class="ar">اعتماد التذكرة — ويؤدي ذلك إلى قفلها</td></tr>
+    <tr><td class="en">Reopen an approved ticket, with a written reason</td><td class="ar">إعادة فتح تذكرة معتمدة مع تدوين السبب</td></tr>
+    <tr><td class="en">Preview the four printable A4 sheets</td><td class="ar">معاينة الأوراق الأربع القابلة للطباعة بمقاس A4</td></tr>
+    <tr><td class="en">Fill the Excel template and download it</td><td class="ar">تعبئة قالب الإكسل وتنزيله</td></tr>
+    <tr><td class="en">Upload the finished file to OneDrive or Google Drive</td><td class="ar">رفع الملف النهائي إلى OneDrive أو Google Drive</td></tr>
+    <tr><td class="en">Read the full audit trail of every change</td><td class="ar">الاطلاع على سجل التدقيق الكامل لكل تغيير</td></tr>
+    <tr><td class="en">Team view — approve accounts waiting for approval</td><td class="ar">شاشة الفريق — الموافقة على الحسابات المنتظرة</td></tr>
+    <tr><td class="en">Create a technician account</td><td class="ar">إنشاء حساب لفني</td></tr>
+  </table>
+</div>
+
+<div class="role">
+  <div class="role-head k-admin"><span class="en">Admin</span><span class="ar">مسؤول النظام</span></div>
+  <table>
+    <tr><td class="en">Everything the Operations Manager can do</td><td class="ar">كل ما يستطيع مدير العمليات القيام به</td></tr>
+    <tr><td class="en">Price lists per customer — add, edit and delete items</td><td class="ar">قوائم الأسعار لكل عميل — إضافة وتعديل وحذف البنود</td></tr>
+    <tr><td class="en">Ticket numbering series and its format</td><td class="ar">تسلسل أرقام التذاكر وصيغته</td></tr>
+    <tr><td class="en">Manage the list of job types</td><td class="ar">إدارة قائمة أنواع الأعمال</td></tr>
+    <tr><td class="en">Users &amp; roles — approve, promote, change a role</td><td class="ar">المستخدمون والأدوار — الموافقة والترقية وتغيير الدور</td></tr>
+    <tr><td class="en">Customers, fields and rigs</td><td class="ar">العملاء والحقول وأجهزة الحفر</td></tr>
+    <tr><td class="en">Charging &amp; export rules, and ticket defaults</td><td class="ar">قواعد الاحتساب والتصدير والإعدادات الافتراضية للتذكرة</td></tr>
+    <tr><td class="en">Danger zone — reset the system's data</td><td class="ar">منطقة الخطر — إعادة ضبط بيانات النظام</td></tr>
+  </table>
+</div>
+
+<div class="role">
+  <div class="role-head k-obs"><span class="en">Observer</span><span class="ar">المراقب</span></div>
+  <table>
+    <tr><td class="en">Read-only view of approved jobs only</td><td class="ar">عرض للقراءة فقط، وللأعمال المعتمدة فقط</td></tr>
+    <tr><td class="en">Headline figures: ticket count, value, activity</td><td class="ar">الأرقام الرئيسية: عدد التذاكر، القيمة، النشاط</td></tr>
+    <tr><td class="en">Live activity — what is running in the field right now</td><td class="ar">النشاط الحي — ما يجري في الحقل في هذه اللحظة</td></tr>
+    <tr><td class="en">Generate a report over the latest approved tickets</td><td class="ar">إنشاء تقرير لأحدث التذاكر المعتمدة</td></tr>
+    <tr><td class="en">Report shows: ticket no., customer, well, job type, dates, value</td><td class="ar">يعرض التقرير: رقم التذكرة، العميل، البئر، نوع العمل، التواريخ، القيمة</td></tr>
+    <tr><td class="en no">Cannot edit, approve or export anything</td><td class="ar no-a">لا يمكنه التعديل أو الاعتماد أو التصدير إطلاقاً</td></tr>
+  </table>
+</div>
+
+<div class="note">
+  <div class="en"><b>Who may assign which role</b><br>Admin assigns: Admin, Ops Manager, Technician, Observer. Ops Manager assigns: Ops Manager, Technician. The Observer role can only be granted by an Admin.</div>
+  <div class="ar"><b style="font-family:'Noto Naskh Arabic',serif">من يمنح أي دور</b><br>مسؤول النظام يمنح: مسؤول نظام، مدير عمليات، فني، مراقب. مدير العمليات يمنح: مدير عمليات، فني. أما دور المراقب فلا يمنحه إلا مسؤول النظام.</div>
+</div>
+
+<div class="foot">
+  <div>Makaman Job Ticket System · role capability sheet · generated 19 Aug 2026</div>
+  <div class="r">نظام تذاكر العمل · ورقة صلاحيات الأدوار</div>
+</div>
+
+</body></html>
