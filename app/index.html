@@ -163,6 +163,12 @@
        for genuinely long lists (data tables). Wrap into an even 2-column grid instead of
        squeezing 4 tabs into one unreadable scrollable row. */
     .mk-tabbar-btn { flex-basis:50% !important; font-size:11px !important; padding:8px 6px !important; }
+    /* Inside the desktop mockup the screen is a fixed-height flex column, so the nav
+       sits at its bottom edge on its own. A real phone viewport has no such bottom to
+       sit against — the screen grows with its content — so the bar has to be pinned to
+       the viewport instead, with the scrolling area given room to clear it. */
+    .mk-bottom-nav { position:fixed !important; left:0; right:0; bottom:0; z-index:40; padding-bottom:env(safe-area-inset-bottom); }
+    .mk-tab-body { padding-bottom:88px !important; }
   }
   /* Back-navigation as a visible, bounded button rather than a plain text link —
      some field/office staff being trained on this aren't habitual app/mobile users,
@@ -393,7 +399,9 @@
             </div>
           </sc-if>
 
-          <div style="flex:1;overflow-y:auto;padding:14px">
+          <div class="mk-tab-body" style="flex:1;overflow-y:auto;padding:14px">
+
+            <sc-if value="{{ navTickets }}" hint-placeholder-val="{{ true }}">
 
             <!-- technician: ticket list -->
             <sc-if value="{{ techList }}" hint-placeholder-val="{{ true }}">
@@ -529,6 +537,91 @@
                 <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
               </div>
             </sc-if>
+
+            </sc-if>
+            <!-- end Tickets tab -->
+
+            <sc-if value="{{ navActivity }}" hint-placeholder-val="{{ false }}">
+              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Activity</h2>
+              <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">{{ activityScope }} · newest first</div>
+              <sc-if value="{{ hasActivity }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="6">
+                    <div style="display:flex;gap:11px;padding:11px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;line-height:1.4;color:var(--ink)">{{ a.text }}</div>
+                        <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ noActivity }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:26px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">Nothing logged yet. Entries appear here as tickets are worked on.</div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
+              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Sync</h2>
+              <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">Last upload: {{ syncLastLabel }}</div>
+              <div style="display:flex;align-items:center;gap:9px;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:16px">
+                <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ netDot }}"></span>
+                <div style="flex:1;font-size:13px">{{ netLabel }}</div>
+                <button onClick="{{ toggleOnline }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Toggle</button>
+              </div>
+              <sc-if value="{{ syncNothingPending }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:26px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">Everything on this device has been uploaded.</div>
+              </sc-if>
+              <sc-if value="{{ syncHasPending }}" hint-placeholder-val="{{ true }}">
+                <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:8px">{{ syncPendingLabel }}</div>
+                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+                  <sc-for list="{{ syncRows }}" as="t" hint-placeholder-count="2">
+                    <div class="mk-ticket-card" style="padding:11px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }}">
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.customer }}</div>
+                          <div style="font-size:12px;color:rgba(var(--ink-rgb),0.65)">{{ t.locLine }}</div>
+                        </div>
+                        <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+                <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px;text-align:center">Uploads happen on their own once there is signal.</div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ false }}">
+              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Account</h2>
+              <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="2">
+                  <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:12px;padding:13px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                    <div class="mk-icon-chip" style="background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.glyph }}</div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px">{{ m.label }}</div>
+                      <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6)">{{ m.hint }}</div>
+                    </div>
+                    <span style="flex:none;color:rgba(var(--ink-rgb),0.35)">{{ m.chevron }}</span>
+                  </button>
+                </sc-for>
+              </div>
+              <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:18px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
+              <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.3);margin-top:14px">BUILD {{ buildStamp }}</div>
+            </sc-if>
+
+          </div>
+
+          <div class="mk-bottom-nav" style="display:flex;flex:none;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface)">
+            <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
+              <button onClick="{{ n.pick }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
+                {{ n.glyph }}
+                <span style="font-size:10px;letter-spacing:0.03em;font-weight:{{ n.weight }}">{{ n.label }}</span>
+              </button>
+            </sc-for>
           </div>
         </div>
       </div>
@@ -1390,9 +1483,9 @@ const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 // works; `{{ icon('check') }}` would not.
 const ICON_D = {
   // bottom navigation
-  tickets:  ['M4 7h16v10H4z', 'M4 11h16', 'M9 7v10'],
+  tickets:  ['M3 10.5L12 3l9 7.5', 'M5.5 9.5V20h13V9.5'],
   activity: ['M3 13h4l3 6 4-14 3 8h4'],
-  sync:     ['M12 5a7 7 0 016.9 5.8', 'M12 19a7 7 0 01-6.9-5.8', 'M19 4v4h-4', 'M5 20v-4h4'],
+  sync:     ['M12 14.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', 'M12 3v3.5', 'M12 17.5V21', 'M3 12h3.5', 'M17.5 12H21', 'M5.6 5.6l2.5 2.5', 'M15.9 15.9l2.5 2.5', 'M18.4 5.6l-2.5 2.5', 'M8.1 15.9l-2.5 2.5'],
   account:  ['M12 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7z', 'M5 20a7 7 0 0114 0'],
   // ticket status
   rig:      ['M4 20h16', 'M12 4L7 20', 'M12 4l5 16', 'M9 12h6'],
@@ -1648,6 +1741,9 @@ class Component extends DCLogic {
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
       editDraft: {}, dragStartIndex: undefined, dragOverIndex: undefined,
       deleteUserEmail: null, deleteUserName: null,
+      // Which of the four bottom-nav destinations is showing. One key rather than one
+      // per role: only ever one role is signed in, so they cannot both be in play.
+      roleTab: 'tickets',
     }, this.load());
   }
 
@@ -2212,6 +2308,92 @@ class Component extends DCLogic {
 
       isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
       currentRoleLabel: { tech: 'Technician', mgr: 'Ops Manager', admin: 'Admin', founder: 'Observer' }[S.role] || '',
+
+      // ── Bottom navigation ──────────────────────────────────────────────────
+      // Four destinations, the same for every role: the work itself, what has been
+      // happening, what is still waiting to reach the server, and the account.
+      navTickets: S.roleTab === 'tickets',
+      navActivity: S.roleTab === 'activity',
+      navSync: S.roleTab === 'sync',
+      navAccount: S.roleTab === 'account',
+      navTabs: [
+        { key: 'tickets', label: 'Tickets' },
+        { key: 'activity', label: 'Activity' },
+        { key: 'sync', label: 'Sync' },
+        { key: 'account', label: 'Account' },
+      ].map(x => {
+        const on = S.roleTab === x.key;
+        return {
+          label: x.label,
+          glyph: icon(x.key, 21),
+          color: on ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.45)',
+          weight: on ? '600' : '500',
+          pick: () => this.setState({ roleTab: x.key }),
+        };
+      }),
+
+      // ── Activity ───────────────────────────────────────────────────────────
+      // There is no organisation-wide log to read: this.log() appends to the audit
+      // trail of one ticket. The feed is therefore assembled by walking every
+      // ticket's own trail. A technician sees only their own tickets; everyone else
+      // sees the whole operation, which is the difference between "what did I do"
+      // and "what is my team doing".
+      activityFeed: (() => {
+        const mine = S.role === 'tech';
+        return D.tickets
+          .filter(x => !mine || x.tech === myName)
+          .reduce((acc, x) => acc.concat((x.audit || []).map(a => ({
+            ts: a.ts,
+            text: a.text,
+            stamp: F.stamp(a.ts),
+            where: (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
+            edge: this.cardTreatment(x).edge,
+          }))), [])
+          .sort((a, b) => new Date(b.ts) - new Date(a.ts))
+          .slice(0, 60);
+      })(),
+      hasActivity: D.tickets.some(x => (S.role !== 'tech' || x.tech === myName) && (x.audit || []).length),
+      noActivity: !D.tickets.some(x => (S.role !== 'tech' || x.tech === myName) && (x.audit || []).length),
+      activityScope: S.role === 'tech' ? 'Your tickets' : 'All tickets',
+
+      // ── Sync ───────────────────────────────────────────────────────────────
+      // Promotes what was a one-line banner into somewhere you can actually look:
+      // what has not reached the server, and when the last upload happened.
+      syncRows: unsynced.slice().reverse().map(x => this.ticketView(x)),
+      syncNothingPending: unsynced.length === 0,
+      syncHasPending: unsynced.length > 0,
+      syncPendingLabel: unsynced.length === 1 ? '1 ticket waiting to upload' : unsynced.length + ' tickets waiting to upload',
+      syncLastLabel: S.lastAutoSyncAt ? F.stamp(S.lastAutoSyncAt) : 'No upload yet on this device',
+
+      // ── Account ────────────────────────────────────────────────────────────
+      // The tools each role can reach from the account tab. Admin's four are the
+      // ones that used to sit behind a flat tab strip; the others lead to screens
+      // that already existed and just had no home on a phone.
+      accountTiles: (() => {
+        const tile = (label, hint, iconName, tileBg, tileFg, pick) => ({
+          label: label, hint: hint, glyph: icon(iconName), chevron: icon('chevron', 16),
+          tileBg: tileBg, tileFg: tileFg, pick: pick,
+        });
+        const settings = tile('Settings', 'Theme, time zone, storage', 'system',
+          'rgba(var(--ink-rgb),0.08)', 'var(--ink-dim)', () => this.setState({ showSettings: true }));
+        if (S.role === 'admin') {
+          const go = (t) => () => this.setState({ adminTab: t, roleTab: 'tickets' });
+          return [
+            tile('Price Lists', list.length + ' priced items · ' + D.clients.length + ' customers', 'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)', go('price')),
+            tile('Numbering & Job Types', D.series.length + ' series · ' + D.jobTypes.length + ' job types', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('numbers')),
+            tile('Users & Customers', (D.users || []).length + ' users · ' + D.clients.length + ' customers', 'people', 'var(--accent-wash)', 'var(--accent)', go('people')),
+            tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
+            settings,
+          ];
+        }
+        if (S.role === 'mgr') {
+          return [
+            tile('Team', (D.users || []).length + ' users · approve signups', 'people', 'var(--accent-wash)', 'var(--accent)', () => this.setState({ mgrScreen: 'team', roleTab: 'tickets' })),
+            settings,
+          ];
+        }
+        return [settings];
+      })(),
 
       showSettings: S.showSettings,
       openSettings: () => this.setState({ showSettings: true }),
