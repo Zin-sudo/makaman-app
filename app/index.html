@@ -185,6 +185,7 @@
           </sc-if>
           <button onClick="{{ doLogin }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand)">Log in</button>
           <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
+          <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin-top:16px">BUILD {{ buildStamp }}</div>
         </div>
       </sc-if>
 
@@ -333,6 +334,7 @@
           </div>
         </sc-if>
 
+        <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin:2px 0 10px">BUILD {{ buildStamp }}</div>
         <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
@@ -1297,6 +1299,7 @@
 
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;roundTripFactor&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:1,&quot;max&quot;:3,&quot;section&quot;:&quot;Charging&quot;},&quot;strictNumberFormat&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Rules&quot;}}">
+const BUILD = 'night-shift.1 · 19 Aug 2026';
 const K = 'makaman.jobtickets.v2';
 const SK = 'makaman.jobtickets.session.v1';
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2012,6 +2015,7 @@ class Component extends DCLogic {
       authIsLogin: S.authScreen === 'login' && !S.signupDone,
       authIsSignup: S.authScreen === 'signup' && !S.signupDone,
       signupDone: S.signupDone,
+      buildStamp: BUILD,
       authError: S.authError,
       // The four auth inputs bind value="{{ authEmail }}" etc. Without these the
       // view never receives the typed value, so React re-rendered them back to ''
