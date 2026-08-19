@@ -1239,12 +1239,43 @@ const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
 function dt(s) { return s ? new Date(s) : null; }
-// datetime-local inputs need 'YYYY-MM-DDTHH:mm' in the browser's local time, no
-// timezone suffix — used for the Ops Manager/Admin line-timestamp edit control.
-function toLocalInput(s) {
+// Wall-clock parts of an instant as seen in `tz`. Everything below is built on this so
+// there is exactly one place where a UTC instant becomes a local calendar reading.
+function zoneParts(d, tz) {
+  const opt = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+  if (tz && tz !== 'device') opt.timeZone = tz;
+  const out = {};
+  new Intl.DateTimeFormat('en-GB', opt).formatToParts(d).forEach(x => { if (x.type !== 'literal') out[x.type] = x.value; });
+  return out;
+}
+// datetime-local inputs need 'YYYY-MM-DDTHH:mm' with no timezone suffix. It must be the
+// wall clock of the operating timezone, not of the device — otherwise an ops manager
+// abroad, or on a phone with the wrong zone, would see one time in the ticket and a
+// different one the moment he clicked the field to correct it.
+function toLocalInput(s, tz) {
   const d = dt(s); if (!d) return '';
-  const pad = n => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const p = zoneParts(d, tz);
+  return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
+}
+// The inverse: read 'YYYY-MM-DDTHH:mm' as a wall clock in `tz` and return the UTC
+// instant. Reads the wall clock as if it were UTC, measures how far that lands from the
+// zone's own reading of the same moment, and subtracts the difference.
+function fromLocalInput(str, tz) {
+  if (!str) return null;
+  if (!tz || tz === 'device') return iso(new Date(str));
+  const guess = new Date(str.length === 16 ? str + ':00Z' : str + 'Z');
+  if (isNaN(guess.getTime())) return null;
+  const p = zoneParts(guess, tz);
+  const asZone = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return new Date(guess.getTime() - (asZone - guess.getTime())).toISOString();
+}
+// Calendar month an instant falls in, in the operating timezone, as 'YYYY-MM'. This is
+// what the payroll filter keys off: a job ending just after midnight on 1 March belongs
+// to March, and that must not depend on where the reader's device thinks it is.
+function monthKey(s, tz) {
+  const d = dt(s); if (!d) return '';
+  const p = zoneParts(d, tz);
+  return p.year + '-' + p.month;
 }
 
 // Background auto-sync cadence — field connectivity is intermittent, so the device
@@ -1321,7 +1352,10 @@ function priceList(mult) {
 function seed() {
   return {
     settings: {
-      theme: 'system', accent: 'steel', timezone: 'device', timeFormat: '24', shareLocation: true,
+      // Libya time by default, not the device's. Every operation is at the Ahmadi base,
+      // and the payroll month rule keys off the job end date — so a technician whose
+      // phone is on the wrong zone must not be able to move a ticket into another month.
+      theme: 'system', accent: 'steel', timezone: 'Africa/Tripoli', timeFormat: '24', shareLocation: true,
       // Ops Manager storage linking — local download always works with no account; the
       // Ops Manager can additionally connect OneDrive and/or Google Drive to upload
       // exported sheets straight there instead of only saving to the device. This is a
@@ -1548,10 +1582,14 @@ class Component extends DCLogic {
     const s = (this.state.data && this.state.data.settings) || {};
     const tz = s.timezone, hr12 = s.timeFormat === '12';
     return {
+      tz: tz,
       date: v => fdate(v, tz),
       short: v => fshort(v, tz),
       time: v => ftime(v, tz, hr12),
       stamp: v => fstamp(v, tz, hr12),
+      input: v => toLocalInput(v, tz),
+      fromInput: v => fromLocalInput(v, tz),
+      month: v => monthKey(v, tz),
     };
   }
   statusChip(t) {
@@ -2009,15 +2047,15 @@ class Component extends DCLogic {
       cur: view,
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
-        tsInput: this.draftOf('evt:' + t.id + ':' + i, toLocalInput(e.ts)),
+        tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
         onChange: ev => { const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
         onTimeChange: ev => this.setDraft('evt:' + t.id + ':' + i, ev.target.value),
         onTimeCommit: ev => {
           const raw = ev.target.value;
           this.clearDraft('evt:' + t.id + ':' + i);
           if (!raw) return;
-          const newIso = iso(new Date(raw));
-          if (newIso === e.ts) return;
+          const newIso = F.fromInput(raw);
+          if (!newIso || newIso === e.ts) return;
           this.mutate(d => {
             const x = d.tickets.find(y => y.id === t.id);
             const oldStamp = F.stamp(x.events[i].ts);
@@ -2071,15 +2109,15 @@ class Component extends DCLogic {
           const val = t[field];
           return {
             label: label, value: val ? F.stamp(val) : 'open', editable: true, notEditable: false, isTextField: false,
-            tsInput: this.draftOf('hdr:' + field, toLocalInput(val)),
+            tsInput: this.draftOf('hdr:' + field, F.input(val)),
             onChange: ev => this.setDraft('hdr:' + field, ev.target.value),
             onCommit: ev => {
               const raw = ev.target.value;
               this.clearDraft('hdr:' + field);
               if (!raw) return;
-              const newIso = iso(new Date(raw));
+              const newIso = F.fromInput(raw);
               // Nothing actually moved — say nothing.
-              if (newIso === t[field]) return;
+              if (!newIso || newIso === t[field]) return;
               this.mutate(d => {
                 const x = d.tickets.find(y => y.id === t.id);
                 const oldVal = x[field] ? F.stamp(x[field]) : 'open';
