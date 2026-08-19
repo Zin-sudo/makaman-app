@@ -142,8 +142,33 @@
     .mk-nav-role { display:none !important; }
   }
   @media (max-width: 640px) {
-    .mk-stats4 { grid-template-columns: 1fr !important; }
+    /* Two across rather than one. Four figures stacked single-file pushed the actual
+       tickets most of a screen down, so the summary crowded out the thing it summarises. */
+    .mk-stats4 { grid-template-columns: repeat(2,1fr) !important; }
     .mk-page { padding-left:14px !important; padding-right:14px !important; }
+    /* 34px page headings break mid-word at phone widths — "Ticket Inbox" became
+       "Ticket" over "Inbox". Smaller here so they stay on one line and leave room
+       for the controls beside them. */
+    .mk-page h2 { font-size:25px !important; }
+    /* Header rows carry a heading plus buttons plus a filter; let them wrap onto a
+       second line instead of squeezing every child. */
+    .mk-pagehead { flex-wrap:wrap !important; gap:10px !important; }
+    .mk-pagehead > * { margin-left:0 !important; }
+    /* The charged-items grid is kept as a grid rather than stacked — the columns are
+       what make a priced line readable against the ones above it. It only needs the
+       padding taken in to clear the narrowest phones. */
+    /* The fixed column widths (74 + 74 + 104 + 112 + 28) already exceed a narrow
+       phone before the code and description columns get a say, so they are released
+       here and the browser fits the columns to whatever width there is. */
+    .mk-items th, .mk-items td { width:auto !important; padding-left:3px !important; padding-right:3px !important; }
+    .mk-items { font-size:12px !important; }
+    /* Label beside field leaves a date input about 145px on a narrow phone, and a
+       datetime input will not shrink below the width of its own spinner controls —
+       so the row overflowed the page. Stacked, the field gets the full width. */
+    .mk-kv { flex-direction:column !important; align-items:stretch !important; gap:3px !important; }
+    .mk-kv > * { width:auto !important; }
+    .mk-kv input { min-width:0 !important; max-width:100% !important; }
+    .mk-items input { padding-left:5px !important; padding-right:5px !important; font-size:12px !important; }
     /* Collapse the decorative "phone mockup" frame into a plain full-width mobile page
        once the viewport actually is phone-sized — the frame/bezel/fixed 398px width only
        make sense as a design-review aid on a wide desktop screen; on a real phone they'd
@@ -192,6 +217,38 @@
     border-radius:var(--radius);
   }
   .mk-icon-chip-sm { width:30px; height:30px; }
+
+  /* The header stays put while the page moves under it, so who you are signed in as
+     is always answerable without scrolling back to the top. Sits below the dialog
+     and settings layers (z-index 50) and below the bottom bar. */
+  .mk-appbar { position:sticky; top:0; z-index:30; }
+
+  /* A wide table on a phone is a table you read by dragging it sideways, losing the
+     row you were on. Below 640px these become one card per row: the column headings
+     are hidden and each cell carries its own label instead. Nothing is dropped —
+     the same cells, stacked rather than strung out. */
+  @media (max-width: 640px) {
+    .mk-stack thead { display:none; }
+    .mk-stack, .mk-stack tbody, .mk-stack tr, .mk-stack td { display:block; width:100%; }
+    .mk-stack tr {
+      border:1px solid rgba(var(--ink-rgb),0.16);
+      border-left-width:3px;
+      margin-bottom:10px; padding:10px 12px;
+    }
+    .mk-stack td {
+      border:0 !important; padding:4px 0 !important;
+      text-align:left !important; white-space:normal !important; width:auto !important;
+    }
+    .mk-stack td[data-label]::before {
+      content:attr(data-label);
+      display:block;
+      font-size:9px; letter-spacing:0.08em; text-transform:uppercase;
+      color:rgba(var(--ink-rgb),0.5);
+      margin-bottom:1px;
+    }
+    /* A cell with nothing in it would otherwise show a label with no value under it. */
+    .mk-stack td:empty { display:none; }
+  }
   /* The office roles' pages scroll under a bar pinned to the viewport, so the last
      row of every dashboard needs room to clear it. */
   .mk-page { padding-bottom:96px; }
@@ -274,7 +331,7 @@
   <!-- ══ MAIN APP (logged in) ══ -->
   <sc-if value="{{ loggedIn }}" hint-placeholder-val="{{ true }}">
 
-  <div style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:var(--navbar);color:var(--on-accent)">
+  <div class="mk-appbar" style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:var(--navbar);color:var(--on-accent)">
     <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
       <div class="mk-nav-title" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
@@ -384,7 +441,10 @@
   <sc-if value="{{ isTech }}" hint-placeholder-val="{{ true }}">
     <div class="mk-phone-shell" style="display:flex;justify-content:center;gap:36px;padding:34px 22px 60px">
       <div class="mk-phone-frame" style="width:398px;flex:none;padding:9px;background:var(--bezel);border-radius:34px;box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.22)">
-        <div class="mk-phone-screen" style="background:var(--ground);border-radius:26px;overflow:hidden;height:806px;display:flex;flex-direction:column">
+        <!-- 806px is the mockup's natural height, but it shrinks to fit a shorter
+             window so the phone's own bottom bar is never pushed below the fold on a
+             laptop. The ≤640px rule replaces this with a full-height page anyway. -->
+        <div class="mk-phone-screen" style="background:var(--ground);border-radius:26px;overflow:hidden;height:min(806px, calc(100vh - 140px));display:flex;flex-direction:column">
 
           <div style="display:flex;align-items:center;gap:8px;padding:11px 18px 6px;font-size:11px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.6)">
             <span>{{ clock }}</span>
@@ -661,7 +721,7 @@
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
 
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
-        <div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
+        <div class="mk-pagehead" style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
           <div>
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
             <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
@@ -682,7 +742,7 @@
           </sc-for>
         </div>
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:14px">
             <thead>
               <tr>
                 <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
@@ -698,18 +758,18 @@
             <tbody>
               <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
                 <tr>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                  <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                  <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <div style="display:flex;align-items:center;gap:9px">
                       <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
                       <span>{{ t.customer }}</span>
                     </div>
                   </td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ t.locLine }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.tech }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.eventCount }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                  <td data-label="Field / Well / Rig" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ t.locLine }}</td>
+                  <td data-label="Technician" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.tech }}</td>
+                  <td data-label="Job dates" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
+                  <td data-label="Lines" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.eventCount }}</td>
+                  <td data-label="Status" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <div style="display:flex;align-items:center;gap:8px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
@@ -917,7 +977,7 @@
                   <span style="flex:none">🔒</span><span>{{ lockedNote }}</span>
                 </div>
               </sc-if>
-              <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <table class="mk-items" style="width:100%;border-collapse:collapse;font-size:13px">
                 <thead>
                   <tr>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Item No.</th>
@@ -986,7 +1046,7 @@
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket header</div>
               <sc-for list="{{ headerFields }}" as="h" hint-placeholder-count="7">
-                <div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;align-items:center">
+                <div class="mk-kv" style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;align-items:center">
                   <div style="width:104px;flex:none;color:rgba(var(--ink-rgb),0.55)">{{ h.label }}</div>
                   <sc-if value="{{ h.notEditable }}" hint-placeholder-val="{{ true }}">
                     <div style="flex:1;font-weight:500">{{ h.value }}</div>
@@ -1503,7 +1563,7 @@
       <!-- The report controls moved to Account: producing a report is something you
            do with your account, not part of reading the work. -->
       <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:14px">
           <thead>
             <tr>
               <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
@@ -1517,12 +1577,12 @@
           <tbody>
             <sc-for list="{{ founderRows }}" as="t" hint-placeholder-count="3">
               <tr>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.well }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75);font-size:13px">{{ t.jobType }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
-                <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ t.value }}</td>
+                <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
+                <td data-label="Well" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.well }}</td>
+                <td data-label="Job type" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75);font-size:13px">{{ t.jobType }}</td>
+                <td data-label="Dates" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
+                <td data-label="Value" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ t.value }}</td>
               </tr>
             </sc-for>
           </tbody>
