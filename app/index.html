@@ -93,6 +93,16 @@
 </style>
 <style>
   body { margin:0; background:var(--ground); color:var(--ink); font-family:"Barlow",system-ui,sans-serif; font-size:15px; line-height:1.55; }
+  /* Wordmark: makaman-logo-full.png has "Makaman" baked in as flat black — invisible on
+     the dark theme's near-black surfaces. The icon mark (red rings + black dot, ringed
+     in white) is colour-safe on both themes, so full-brand moments (login, pending
+     approval, Settings) pair it with a text wordmark on theme tokens instead, matching
+     the PNG's own black+red styling in light mode and inverting cleanly in dark mode. */
+  .mk-wordmark { display:flex; align-items:center; gap:10px; }
+  .mk-wordmark img { height:100%; width:auto; flex:none; }
+  .mk-wordmark span { font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:-0.01em; line-height:1; }
+  .mk-wordmark .mk-wm-1 { color:var(--ink-strong); }
+  .mk-wordmark .mk-wm-2 { color:var(--brand); }
   *,*::before,*::after { box-sizing:border-box; }
   input,select,textarea,button { font-family:inherit; }
   a { color:var(--accent-deep); text-underline-offset:3px; }
@@ -171,7 +181,10 @@
   <!-- ══ LOGIN / SIGNUP (logged out) ══ -->
   <sc-if value="{{ loggedOut }}" hint-placeholder-val="{{ false }}">
     <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
-      <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:56px;width:auto;margin-bottom:34px">
+      <div class="mk-wordmark" style="height:44px;margin-bottom:34px">
+        <img src="uploads/makaman-logo-mark.png" alt="">
+        <span style="font-size:30px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
+      </div>
 
       <sc-if value="{{ authIsLogin }}" hint-placeholder-val="{{ true }}">
         <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
@@ -221,7 +234,10 @@
   <!-- ══ PENDING APPROVAL (logged in, not yet approved) ══ -->
   <sc-if value="{{ isPendingUser }}" hint-placeholder-val="{{ false }}">
     <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
-      <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:56px;width:auto;margin-bottom:34px">
+      <div class="mk-wordmark" style="height:44px;margin-bottom:34px">
+        <img src="uploads/makaman-logo-mark.png" alt="">
+        <span style="font-size:30px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
+      </div>
       <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14);text-align:center">
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Waiting for approval</h2>
         <p style="font-size:14px;color:rgba(var(--ink-rgb),0.7);line-height:1.5;margin:0 0 20px">Signed in as {{ sessionName }}. An Ops Manager or Admin still needs to approve your account.</p>
@@ -251,8 +267,9 @@
     <div style="position:fixed;inset:0;background:var(--ground);z-index:50;overflow-y:auto">
       <div style="max-width:480px;margin:0 auto;padding:26px 22px 60px">
         <button onClick="{{ closeSettings }}" class="back-btn">‹ Close</button>
-        <div style="display:flex;justify-content:center;margin:8px 0 20px">
-          <img src="uploads/makaman-logo-full.png" alt="Makaman Libya" style="height:40px;width:auto">
+        <div class="mk-wordmark" style="height:32px;justify-content:center;margin:8px 0 20px">
+          <img src="uploads/makaman-logo-mark.png" alt="">
+          <span style="font-size:22px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
         </div>
         <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
 
@@ -572,7 +589,7 @@
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Name</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last sync</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Sync</th>
                   <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
@@ -582,17 +599,24 @@
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ u.name }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ u.base }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6)">{{ u.lastSync }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6);display:flex;align-items:center;gap:5px">
+                      <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
+                    </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
                         <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
-                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
-                          <option value="tech">Technician</option>
-                          <option value="mgr">Ops Manager</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <div style="display:flex;gap:6px;align-items:center">
+                          <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
+                            <option value="tech">Technician</option>
+                            <option value="mgr">Ops Manager</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.delete }}" title="Delete technician" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.3);cursor:pointer">Delete</button>
+                          </sc-if>
+                        </div>
                       </sc-if>
                     </td>
                   </tr>
@@ -666,24 +690,27 @@
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">2 · Charged items</div>
                 <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.6)">Price list: {{ cur.customer }}</div>
               </div>
-              <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" placeholder="Search item no. or description…" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:8px">
+              <sc-if value="{{ ticketEditable }}" hint-placeholder-val="{{ true }}">
+                <div style="position:relative;margin-bottom:12px">
+                  <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" onKeyDown="{{ onItemSearchKey }}" placeholder="Search item no. or description… (or press ENTER to add selected)" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <sc-if value="{{ showSearchResults }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.2);border-top:0;max-height:280px;overflow-y:auto;z-index:10;margin-top:0">
+                      <sc-for list="{{ searchResults }}" as="sr" hint-placeholder-count="8">
+                        <button onClick="{{ sr.add }}" style="width:100%;text-align:left;padding:8px 10px;border:0;background:transparent;color:var(--ink);cursor:pointer;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;display:block">
+                          <div style="font-weight:600;font-family:'Barlow Condensed',sans-serif">{{ sr.code }}</div>
+                          <div style="font-size:11px;color:rgba(var(--ink-rgb),0.6)">{{ sr.desc }} · {{ sr.detail }}</div>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
               <sc-if value="{{ showSuggestedEditable }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
                   <span style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Frequently added:</span>
                   <sc-for list="{{ suggestedItems }}" as="sug" hint-placeholder-count="3">
                     <button onClick="{{ sug.add }}" style="padding:5px 10px;font-size:12px;cursor:pointer;background:var(--accent-wash);border:1px solid var(--accent);color:var(--accent-ink)">+ {{ sug.label }}</button>
                   </sc-for>
-                </div>
-              </sc-if>
-              <sc-if value="{{ ticketEditable }}" hint-placeholder-val="{{ true }}">
-                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-                  <select value="{{ pickItem }}" onChange="{{ f.pickItem }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
-                    <option value="">Add item from price list…</option>
-                    <sc-for list="{{ priceOptions }}" as="p" hint-placeholder-count="5">
-                      <option value="{{ p.code }}">{{ p.label }}</option>
-                    </sc-for>
-                  </select>
-                  <button onClick="{{ addItem }}" style="padding:7px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Add line</button>
                 </div>
               </sc-if>
               <sc-if value="{{ ticketLocked }}" hint-placeholder-val="{{ false }}">
@@ -705,7 +732,7 @@
                 </thead>
                 <tbody>
                   <sc-for list="{{ curItems }}" as="it" hint-placeholder-count="3">
-                    <tr>
+                    <tr draggable="{{ it.draggable }}" onDragStart="{{ it.onDragStart }}" onDragOver="{{ it.onDragOver }}" onDrop="{{ it.onDrop }}" onDragEnd="{{ it.onDragEnd }}" style="cursor:{{ it.dragCursor }};opacity:{{ it.dragOpacity }}">
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                         <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
@@ -1091,7 +1118,7 @@
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Name</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last sync</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Sync</th>
                   <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
@@ -1101,17 +1128,24 @@
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ u.name }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ u.base }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6)">{{ u.lastSync }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6);display:flex;align-items:center;gap:5px">
+                      <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
+                    </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
                         <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
-                        <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
-                          <option value="tech">Technician</option>
-                          <option value="mgr">Ops Manager</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <div style="display:flex;gap:6px;align-items:center">
+                          <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
+                            <option value="tech">Technician</option>
+                            <option value="mgr">Ops Manager</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.delete }}" title="Delete technician" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.3);cursor:pointer">Delete</button>
+                          </sc-if>
+                        </div>
                       </sc-if>
                     </td>
                   </tr>
@@ -1302,6 +1336,10 @@
 const BUILD = 'night-shift.1 · 19 Aug 2026';
 const K = 'makaman.jobtickets.v2';
 const SK = 'makaman.jobtickets.session.v1';
+// The seeded initial Admin account — permanently undeletable, regardless of who is
+// logged in or how many other admins exist. Every other user, including other admins,
+// can be deleted by an Admin.
+const MASTER_ADMIN_EMAIL = 'lateri@makaman.ly';
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function iso(d) { return new Date(d).toISOString(); }
@@ -1531,7 +1569,8 @@ class Component extends DCLogic {
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
       authFullName: '', authConfirm: '', authError: '', signupDone: false,
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
-      editDraft: {},
+      editDraft: {}, dragStartIndex: undefined, dragOverIndex: undefined,
+      deleteUserEmail: null, deleteUserName: null,
     }, this.load());
   }
 
@@ -1762,8 +1801,23 @@ class Component extends DCLogic {
     // exactly the ticket most likely to have been printed, signed and invoiced already.
     const locked = !!(t && t.status === 'approved');
 
-    // Shared by the "Add item from price list" dropdown and the "Frequently added"
-    // quick-add chips — both just need to push a price-list line onto the current ticket.
+    // Sheet ordering rank for a charged line. Transportation is the standing first line
+    // on a ticket (MKN-1801 is the travel line — the same code addItemByCode already
+    // special-cases for round-trip mileage); percentage lines are always the tail, with
+    // the surcharge above the discount so the discount reads as the final adjustment.
+    // Anything else keeps its insertion order in the middle band.
+    const ITEM_RANK = { transportation: 0, regular: 1, surcharge: 2, discount: 3 };
+    const itemRank = (it) => {
+      if (it.kind === 'percent') return it.sign < 0 ? ITEM_RANK.discount : ITEM_RANK.surcharge;
+      if (it.code === 'MKN-1801') return ITEM_RANK.transportation;
+      return ITEM_RANK.regular;
+    };
+    // Array.prototype.sort is stable, so lines that share a rank stay in the order they
+    // were added — a newly added item lands at the bottom of its own band rather than
+    // jumping above lines already on the ticket.
+    const reorderItems = (items) => items.slice().sort((a, b) => itemRank(a) - itemRank(b));
+    // Shared by the search results, "Frequently added" chips, and price-list dropdown.
+    // Adds item and reorders according to business logic.
     const addItemByCode = (code) => {
       if (locked || !code || !t || !curClient) return;
       const src = curClient.items.find(i => i.code === code); if (!src) return;
@@ -1774,7 +1828,10 @@ class Component extends DCLogic {
         const line = { code: src.code, desc: src.desc, qty: qty, uom: src.uom, cost: src.cost, ov: {} };
         if (isPercent) { line.kind = 'percent'; line.sign = src.sign; }
         (x.items = x.items || []).push(line);
+        // Reorder items after adding
+        x.items = reorderItems(x.items);
       });
+      this.setState({ itemSearch: '' }); // Clear search after adding
       this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.');
     };
     // Behavioral suggestion: up to 3 items charged most often on this client's other
@@ -1953,6 +2010,22 @@ class Component extends DCLogic {
       dupNumber: {
         title: 'Number refused', body: 'That ticket number is already in use. Every ticket number must be unique.',
         okLabel: 'Change it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
+      },
+      deleteUser: {
+        title: 'Delete this user?',
+        body: 'This removes ' + (S.deleteUserName || 'this user') + ' permanently. They will no longer be able to log in, and their name stays on any tickets they already touched.',
+        okLabel: 'Delete', cancelLabel: 'Cancel', hasCancel: true,
+        confirm: () => {
+          const email = S.deleteUserEmail;
+          // Ticket audit trails (this.log) are scoped to a single ticket, not the
+          // organization — a user deletion isn't a ticket event, so there is nowhere to
+          // log it yet (see B6, tracked separately). The removal itself still applies.
+          this.mutate(d => {
+            const idx = (d.users || []).findIndex(x => x.email === email);
+            if (idx >= 0) d.users.splice(idx, 1);
+          });
+          this.setState({ dialog: null, deleteUserEmail: null, deleteUserName: null });
+        },
       },
       report: {
         title: 'Report generated', body: 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary. Observer view cannot modify ticket data.',
@@ -2286,35 +2359,69 @@ class Component extends DCLogic {
       })() : [],
       noMsg: issue.msg || '', noBorder: issue.bad ? 'var(--danger-deep)' : 'rgba(var(--ink-rgb),0.16)',
       noMsgColor: issue.bad ? 'var(--danger-deep)' : (issue.ok ? 'var(--accent-deep)' : 'rgba(var(--ink-rgb),0.6)'),
-      seriesBtns: D.series.map(s => ({
-        label: s.label, next: s.prefix + (s.last + 1),
-        take: () => {
-          const cand = s.prefix + (s.last + 1);
-          if (D.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === cand)) { this.setState({ dialog: 'dupNumber' }); return; }
+      seriesBtns: D.series.map(s => {
+        // A technician can type a ticket number by hand that happens to land inside a
+        // series' own range (e.g. "1885" typed manually before anyone took it from the
+        // series). Walking forward from s.last+1 past any number already in use — on
+        // ANY ticket, not just this one — means the button always shows a number that's
+        // actually free to take, not one it will immediately reject.
+        let n = s.last + 1;
+        while (D.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === (s.prefix + n))) n++;
+        const cand = s.prefix + n;
+        return { label: s.label, next: cand, take: () => {
+          if (D.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === cand)) {
+            // Rare race (another device took it between render and click): re-derive the
+            // next free number and jump the series counter to just before it, so every
+            // "Take next from series" button — this one and the other two — reflects the
+            // new next-available number the instant the alert is dismissed, with no
+            // second click needed.
+            this.mutate(d => {
+              const ser = d.series.find(y => y.id === s.id);
+              let m = ser.last + 1;
+              while (d.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === (s.prefix + m))) m++;
+              ser.last = m - 1;
+            });
+            this.setState({ dialog: 'dupNumber' });
+            return;
+          }
           this.mutate(d => {
             const x = d.tickets.find(y => y.id === t.id); x.ticketNo = cand;
-            const ser = d.series.find(y => y.id === s.id); ser.last = ser.last + 1;
+            const ser = d.series.find(y => y.id === s.id); ser.last = n;
           });
           this.log('Ticket No. ' + cand + ' taken from the ' + s.label + ' series.');
-        },
-      })),
+        } };
+      }),
       mileageNote: t && t.mileage ? 'Round trip charged: ' + (Number(t.mileage) * roundTrip) + ' km' : 'Charged as round trip (×' + roundTrip + ').',
 
-      // Shared by the dropdown's Add line button and the "Frequently added" quick-add
-      // chips below — both just need to push a price-list line onto the current ticket.
+      // Live search results for item addition — shows matching items that can be clicked to add
       itemSearch: S.itemSearch || '',
-      priceOptions: (curClient ? curClient.items : []).filter(i => {
+      searchResults: (() => {
         const q = (S.itemSearch || '').trim().toLowerCase();
-        if (!q) return true;
-        return i.code.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q);
-      }).map(i => ({
-        code: i.code,
-        label: i.kind === 'percent'
-          ? i.code + ' — ' + i.desc + ' (' + i.cost + '% of subtotal, ' + (i.sign < 0 ? 'discount' : 'surcharge') + ')'
-          : i.code + ' — ' + i.desc + ' (' + money(i.cost) + ' / ' + i.uom + ')',
-      })),
-      pickItem: S.pickItem,
-      addItem: () => { addItemByCode(S.pickItem); this.setState({ pickItem: '' }); },
+        if (!q || !curClient) return [];
+        return curClient.items
+          .filter(i => i.code.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q))
+          .map(i => ({
+            code: i.code,
+            desc: i.desc,
+            detail: i.kind === 'percent'
+              ? i.cost + '% ' + (i.sign < 0 ? 'discount' : 'surcharge')
+              : money(i.cost) + ' / ' + i.uom,
+            add: () => { addItemByCode(i.code); },
+          }))
+          .slice(0, 12); // Limit results to 12 for performance
+      })(),
+      showSearchResults: (S.itemSearch || '').trim().length > 0 && ((S.itemSearch || '').trim().toLowerCase() !== 'tmp-debug'),
+      onItemSearchKey: (ev) => {
+        if (ev.key === 'Enter' && !locked && curClient) {
+          ev.preventDefault();
+          const q = (S.itemSearch || '').trim().toLowerCase();
+          const matches = curClient.items.filter(i => i.code.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
+          if (matches.length > 0) addItemByCode(matches[0].code); // Add first match on ENTER
+        }
+      },
+      priceOptions: [], // Dropdown no longer used, but keeping for backward compatibility
+      pickItem: '',
+      addItem: () => {},
       // Behavioral suggestion: the up-to-3 items charged most often on this client's
       // other tickets, that aren't already on this one — a quick-add shortcut so the
       // Ops Manager doesn't have to search/scroll the full price list for the items they
@@ -2343,6 +2450,33 @@ class Component extends DCLogic {
           remove: () => {
             if (locked) return;
             this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.items.splice(i, 1); });
+          },
+          // Drag-and-drop support for reordering items
+          draggable: !locked,
+          dragCursor: !locked ? 'grab' : 'default',
+          dragOpacity: (S.dragOverIndex === i && S.dragStartIndex !== undefined && S.dragStartIndex !== i) ? 0.6 : 1,
+          onDragStart: (ev) => {
+            if (locked) return;
+            this.setState({ dragStartIndex: i });
+          },
+          onDragOver: (ev) => {
+            if (locked || S.dragStartIndex === undefined) return;
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = 'move';
+            this.setState({ dragOverIndex: i });
+          },
+          onDrop: (ev) => {
+            if (locked || S.dragStartIndex === undefined || S.dragStartIndex === i) return;
+            ev.preventDefault();
+            this.mutate(d => {
+              const x = d.tickets.find(y => y.id === t.id);
+              const [item] = x.items.splice(S.dragStartIndex, 1);
+              x.items.splice(i, 0, item);
+            });
+            this.setState({ dragStartIndex: undefined, dragOverIndex: undefined });
+          },
+          onDragEnd: () => {
+            this.setState({ dragStartIndex: undefined, dragOverIndex: undefined });
           },
         };
       }) : [],
@@ -2455,6 +2589,7 @@ class Component extends DCLogic {
       users: (D.users || []).map(u => ({
         name: u.name, role: u.status === 'pending' ? 'Pending approval' : u.role, base: u.base, lastSync: u.lastSync,
         isPending: u.status === 'pending',
+        syncDot: (u.status === 'active' && u.lastSync && !u.lastSync.includes('ago')) ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
         roleBg: u.status === 'pending' ? 'rgba(var(--warning-rgb),0.14)' : 'var(--accent-wash)',
         roleFg: u.status === 'pending' ? 'var(--warning-ink)' : 'var(--accent-ink)',
         approve: () => this.mutate(d => {
@@ -2472,6 +2607,11 @@ class Component extends DCLogic {
             if (target) { target.roleKey = val; target.role = labelMap[val] || target.role; }
           });
         },
+        // Admin can delete anyone — including other admins — except the one seeded
+        // "master" admin account (lateri@makaman.ly), which is permanently undeletable
+        // by design, not merely by convention.
+        canDelete: S.role === 'admin' && u.email !== MASTER_ADMIN_EMAIL,
+        delete: () => this.setState({ dialog: 'deleteUser', deleteUserEmail: u.email, deleteUserName: u.name }),
       })),
       clientCards: D.clients.map(c => ({ name: c.name, fields: c.fields, rigs: c.rigs, itemCount: c.items.length })),
       systemRows: [
