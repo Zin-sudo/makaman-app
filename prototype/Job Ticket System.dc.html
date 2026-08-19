@@ -1626,7 +1626,10 @@ class Component extends DCLogic {
       pairRow('Field Name:', t.field),
       pairRow('Well No:', t.well, 'MKN Supervisor:', t.tech),
       pairRow('Rig Name:', t.rig, 'Start Job:', F.date(t.start)),
-      pairRow('Mileage (Km):', t.mileage === 0 ? '0' : (t.mileage || ''), 'End Job:', t.end ? F.date(t.end) : ''),
+      // "(One Way)" is appended permanently next to the entered mileage so the client
+      // can see, right on the ticket, why the Qty on the mileage line item further down
+      // reads double this number (round trip = 2x one-way distance).
+      pairRow('Mileage (Km):', t.mileage === 0 ? '0 (One Way)' : (t.mileage ? t.mileage + ' (One Way)' : ''), 'End Job:', t.end ? F.date(t.end) : ''),
       pairRow('Base Location:', t.baseLocation),
     ] : [];
     const logRows = t ? [
