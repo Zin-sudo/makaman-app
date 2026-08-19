@@ -1642,21 +1642,21 @@ function auditKind(entry) {
   if (entry.kind) return entry.kind;
   return AUDIT_EDIT_HINTS.test(entry.text || '') ? 'edit' : 'lifecycle';
 }
-// A stored fix as a person reads it. Six decimals is roughly a tenth of a metre —
-// past the point GPS itself is honest to, so more would be false precision.
+// A stored fix as a person reads it: latitude and longitude, nothing else. Six
+// decimals is roughly a tenth of a metre — past the point GPS itself is honest to,
+// so more would be false precision.
+//
+// Altitude and accuracy used to be appended here. Altitude reads null on most
+// phones and nearly all desktops, so it was usually "alt n/a"; accuracy answered a
+// question nobody was asking. Both were noise around the only two numbers anyone
+// needed. Accuracy is still captured — it is the one signal available for spotting
+// a garbage fix later — it is simply not shown.
 function geoText(fix) {
   if (!fix) return '';
-  const n = (v, dp) => (v === null || v === undefined || isNaN(v)) ? null : Number(v).toFixed(dp);
-  const lat = n(fix.lat, 6), lon = n(fix.lon, 6);
+  const n = (v) => (v === null || v === undefined || isNaN(v)) ? null : Number(v).toFixed(6);
+  const lat = n(fix.lat), lon = n(fix.lon);
   if (lat === null || lon === null) return '';
-  let s = lat + ', ' + lon;
-  const alt = n(fix.alt, 0);
-  // Altitude is null on most phones indoors and on nearly all desktops — say so
-  // rather than printing a zero that reads like sea level.
-  s += alt === null ? ' · alt n/a' : ' · alt ' + alt + ' m';
-  const acc = n(fix.acc, 0);
-  if (acc !== null) s += ' · ±' + acc + ' m';
-  return s;
+  return lat + ', ' + lon;
 }
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
@@ -2055,8 +2055,11 @@ class Component extends DCLogic {
         (pos) => {
           const c = pos.coords || {};
           done({
+            // Latitude and longitude answer the question being asked — was someone
+            // at the well. Altitude does not, and is null on most devices anyway.
+            // Accuracy is kept but never displayed: it is what would let a wildly
+            // imprecise fix be spotted and discarded later.
             lat: c.latitude, lon: c.longitude,
-            alt: (c.altitude === undefined ? null : c.altitude),
             acc: (c.accuracy === undefined ? null : c.accuracy),
             ts: iso(new Date(pos.timestamp || Date.now())),
           });
