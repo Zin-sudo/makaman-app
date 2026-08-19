@@ -478,6 +478,9 @@
                   <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+                      <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:10px;padding:3px 8px;letter-spacing:0.05em;background:var(--hue-indigo-wash);color:var(--hue-indigo)">CO-OP</span>
+                      </sc-if>
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
                         <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(var(--ink-rgb),0.6)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
                       </sc-if>
@@ -509,8 +512,8 @@
               </div>
               <div style="display:flex;flex-direction:column;gap:13px">
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Technician Name</label>
-                  <input value="{{ d.tech }}" onChange="{{ f.tech }}" placeholder="Full name" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Technician</label>
+                  <div style="width:100%;min-height:46px;padding:12px 11px;font-size:15px;background:rgba(var(--ink-rgb),0.06);border:1px solid rgba(var(--ink-rgb),0.12);color:rgba(var(--ink-rgb),0.75)">{{ d.tech }}</div>
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
@@ -593,11 +596,19 @@
                   </div>
                 </sc-for>
               </div>
+              <sc-if value="{{ notHolder }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px;padding:10px 12px;background:var(--accent-wash);border-left:3px solid var(--accent);font-size:12px;line-height:1.45;color:var(--accent-ink)">{{ holderName }} has this job now. You can read it, but only they can add to the log.</div>
+              </sc-if>
+              <sc-if value="{{ isHolder }}" hint-placeholder-val="{{ true }}">
               <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
                 <textarea value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
                 <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
                 <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
+                <sc-if value="{{ canHandOver }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ askHandover }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Hand over job</button>
+                </sc-if>
               </div>
+              </sc-if>
             </sc-if>
 
             </sc-if>
@@ -766,7 +777,12 @@
                     </div>
                   </td>
                   <td data-label="Field / Well / Rig" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ t.locLine }}</td>
-                  <td data-label="Technician" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.tech }}</td>
+                  <td data-label="Technician" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    {{ t.crewLabel }}
+                    <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:10px;letter-spacing:0.05em;color:var(--hue-indigo);margin-top:2px">CO-OP</div>
+                    </sc-if>
+                  </td>
                   <td data-label="Job dates" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
                   <td data-label="Lines" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.eventCount }}</td>
                   <td data-label="Status" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
@@ -907,7 +923,7 @@
         <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:18px">
           <div>
             <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:rgba(var(--ink-rgb),0.45)">· {{ cur.well }}</span></h2>
-            <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ cur.locLine }} · {{ cur.tech }} · uploaded {{ cur.syncLabel }}</div>
+            <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ cur.locLine }} · {{ cur.crewLabel }} · uploaded {{ cur.syncLabel }}</div>
           </div>
           <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
             <sc-if value="{{ cur.presenceShow }}" hint-placeholder-val="{{ false }}">
@@ -1102,6 +1118,9 @@
                 </sc-for>
               </div>
               <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
+              <sc-if value="{{ mgrCanHandOver }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ askHandover }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Reassign to another technician</button>
+              </sc-if>
               <button onClick="{{ goPrint }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Preview 4 sheets</button>
               <sc-if value="{{ cur.isApproved }}" hint-placeholder-val="{{ false }}">
                 <button onClick="{{ askReopen }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent-deep);border:1px solid rgba(var(--ink-rgb),0.3)">Reopen ticket</button>
@@ -1706,6 +1725,14 @@
       <div style="width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--ground);border:1px solid rgba(var(--ink-rgb),0.3);box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.32)">
         <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px">{{ dialog.title }}</div>
         <div style="font-size:14px;color:rgba(var(--ink-rgb),0.8)">{{ dialog.body }}</div>
+        <sc-if value="{{ dialog.needsPerson }}" hint-placeholder-val="{{ false }}">
+          <select value="{{ handoverTo }}" onChange="{{ setHandoverTo }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.22);color:var(--ink)">
+            <option value="">Hand over to…</option>
+            <sc-for list="{{ handoverOptions }}" as="o" hint-placeholder-count="2">
+              <option value="{{ o.name }}">{{ o.name }}</option>
+            </sc-for>
+          </select>
+        </sc-if>
         <sc-if value="{{ dialog.needsReason }}" hint-placeholder-val="{{ false }}">
           <textarea value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="Reason for reopening — recorded in the audit trail" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
         </sc-if>
@@ -1775,6 +1802,29 @@ function icon(name, size) {
     style: { display: 'block', flex: 'none' },
   }, d.map((path, i) => React.createElement('path', { key: i, d: path })));
 }
+
+// ── Who a ticket belongs to ──────────────────────────────────────────────────
+// A job can span a rotation change: opened by one technician, finished by another.
+// Rather than one owner, a ticket carries a crew — everyone who has held it, opener
+// first — and a holder, the one person who may log to it right now. Passing the job
+// moves the holder and appends to the crew; it never removes anyone, because the
+// person who did the first half still did it and still appears on the sheet.
+//
+// Tickets saved before this have neither field, so both are derived from `tech`,
+// which stays as the opener. Crew entries carry an email because two people can
+// share a display name; the name is matched as a fallback for older tickets whose
+// crew was derived rather than recorded.
+function crewOf(t) {
+  if (t.crew && t.crew.length) return t.crew;
+  return [{ name: t.tech || '', email: t.techEmail || '' }];
+}
+function holderOf(t) { return t.holder || t.tech || ''; }
+function inCrew(t, name, email) {
+  return crewOf(t).some(c => (email && c.email) ? c.email === email : c.name === name);
+}
+function crewNames(t) { return crewOf(t).map(c => c.name).filter(Boolean); }
+// "Yousef Al-Harbi → Mahmoud Zaki" — the order the job passed through hands.
+function crewLabel(t) { return crewNames(t).join(' → '); }
 
 // Entries written before audit entries carried a kind — the seeded history, and
 // anything saved by an older build — have to be placed by their wording. Only the
@@ -2047,6 +2097,7 @@ class Component extends DCLogic {
       // '' means every technician. Office roles only.
       techFilter: '',
       mgrDraft: null,
+      handoverTo: '',
       // 'all' | 'lifecycle' | 'edit' — which slice of the Activity feed is showing.
       activityKind: 'all',
     }, this.load());
@@ -2178,13 +2229,14 @@ class Component extends DCLogic {
       && typeof navigator !== 'undefined' && !!navigator.geolocation
       && !this.geoDenied;
   }
-  // Tickets this device should be pinning: still being logged, and belonging to
-  // whoever is signed in. A manager reviewing a ticket never pings for it.
+  // Tickets this device should be pinning: still being logged, and held by whoever
+  // is signed in. A manager reviewing a ticket never pings for it — and neither does
+  // a technician who has handed the job on, since they are no longer the one on site.
   geoActiveTickets() {
     const S = this.state;
     if (!S.session || S.role !== 'tech') return [];
     const me = S.session.name;
-    return (S.data.tickets || []).filter(x => x.status === 'logging' && x.tech === me);
+    return (S.data.tickets || []).filter(x => x.status === 'logging' && holderOf(x) === me);
   }
   // One fix, shared by the opening pin and the periodic ones. The in-flight guard is
   // what stops a slow fix from stacking: a request already running means the tick that
@@ -2389,6 +2441,11 @@ class Component extends DCLogic {
     const online = !!this.state.online;
     return Object.assign({
       id: t.id, customer: t.customer, tech: t.tech, well: t.well, jobType: t.jobType || '—',
+      // A job passed between technicians names all of them; one held by a single
+      // person reads exactly as it did before.
+      coop: crewOf(t).length > 1,
+      crewLabel: crewLabel(t),
+      holder: holderOf(t),
       locLine: [t.field, t.well, t.rig].filter(Boolean).join(' · '),
       arrivalShort: F.stamp(t.arrival), startShort: F.short(t.start), endShort: t.end ? F.short(t.end) : 'open',
       dateRange: t.start ? F.date(t.start) + ' → ' + (t.end ? F.date(t.end) : 'open') : '—',
@@ -2446,7 +2503,11 @@ class Component extends DCLogic {
     const view = t ? this.ticketView(t) : {};
     const unsynced = D.tickets.filter(x => !x.synced);
     const myName = (S.session && S.session.name) || '';
-    const myTickets = D.tickets.filter(x => x.tech === myName);
+    const myEmail = (S.session && S.session.email) || '';
+    // Everyone who has held a ticket keeps it in their list — the person who opened
+    // it can still see how the job they started finished, they just cannot write to
+    // it once they have handed it on.
+    const myTickets = D.tickets.filter(x => inCrew(x, myName, myEmail));
     const issue = t ? this.numberIssue(t) : {};
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
@@ -2573,7 +2634,7 @@ class Component extends DCLogic {
     const svcRows = t ? [
       pairRow('Customer:', t.customer),
       pairRow('Field Name:', t.field),
-      pairRow('Well No:', t.well, 'MKN Supervisor:', t.tech),
+      pairRow('Well No:', t.well, 'MKN Supervisor:', crewLabel(t)),
       pairRow('Rig Name:', t.rig, 'Start Job:', F.date(t.start)),
       // "(One Way)" is appended permanently next to the entered mileage so the client
       // can see, right on the ticket, why the Qty on the mileage line item further down
@@ -2585,7 +2646,7 @@ class Component extends DCLogic {
       pairRow('Customer:', t.customer, 'Date:', t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '')),
       pairRow('Field:', t.field, 'Job Type:', t.jobType),
       pairRow('Well No:', t.well, 'Customer Rep.:', t.customerRep),
-      pairRow('Job Supervisor:', t.tech, 'Rig Name:', t.rig),
+      pairRow('Job Supervisor:', crewLabel(t), 'Rig Name:', t.rig),
     ] : [];
     const logTimes = t ? [
       { label: 'Start Job', value: F.date(t.start) },
@@ -2660,6 +2721,31 @@ class Component extends DCLogic {
     });
 
     const dialogs = {
+      handover: {
+        title: 'Hand over this job?',
+        body: 'The job moves to them: they continue the log from where it stands, and you keep the ticket in your list to read. Both names stay on the ticket and on the printed sheets.',
+        okLabel: 'Hand over', cancelLabel: 'Keep it', hasCancel: true, needsPerson: true,
+        confirm: () => {
+          const to = (S.handoverTo || '').trim();
+          if (!to || !t) return;
+          const from = holderOf(t);
+          if (to === from) { this.setState({ dialog: null, handoverTo: '' }); return; }
+          const toEmail = ((D.users || []).find(u => u.name === to) || {}).email || '';
+          this.mutate(d => {
+            const x = d.tickets.find(y => y.id === t.id);
+            if (!x) return;
+            // Keep the derived crew if this ticket predates the field, then append —
+            // nobody is ever removed, so the sheet still credits whoever did the first
+            // half of the work.
+            const crew = (x.crew && x.crew.length) ? x.crew.slice() : [{ name: x.tech || '', email: x.techEmail || '' }];
+            if (!crew.some(c => c.name === to)) crew.push({ name: to, email: toEmail });
+            x.crew = crew;
+            x.holder = to;
+          });
+          this.log('Job handed over by ' + (from || 'the previous technician') + ' to ' + to + '.', 'lifecycle');
+          this.setState({ dialog: null, handoverTo: '' });
+        },
+      },
       done: {
         title: 'Mark job as done?', body: 'End Job will be stamped ' + F.stamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
         okLabel: 'Yes, job done', cancelLabel: 'Keep logging', hasCancel: true,
@@ -3111,6 +3197,8 @@ class Component extends DCLogic {
           }));
           d.tickets.push({
             id: id, tech: dr.tech, customer: dr.customer, field: dr.field, well: dr.well, rig: dr.rig,
+            // The opener is the whole crew until the job is handed on.
+            crew: [{ name: dr.tech, email: myEmail }], holder: dr.tech,
             jobType: '', arrival: dr.arrival, start: '', end: '', status: 'logging', synced: false, syncedAt: '',
             ticketNo: '', mileage: '', events: [], items: defaultItems, audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.' }],
             // B13/F14 — permanent admin-configured defaults, pre-filled here, only the
@@ -3188,6 +3276,19 @@ class Component extends DCLogic {
         });
         this.setState({ newEventText: '' });
       },
+      handoverTo: S.handoverTo || '',
+      setHandoverTo: e => this.setState({ handoverTo: e.target.value }),
+      // Anyone active except whoever is holding it now.
+      handoverOptions: (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active'
+        && u.name !== (t ? holderOf(t) : '')).map(u => ({ name: u.name })),
+      askHandover: () => this.setState({ dialog: 'handover', handoverTo: '' }),
+      // Only the person actually holding the job can hand it on or log to it. A
+      // previous holder still sees the ticket; the buttons are simply not there.
+      canHandOver: !!t && t.status === 'logging' && holderOf(t) === myName,
+      mgrCanHandOver: !!t && t.status !== 'approved',
+      isHolder: !!t && holderOf(t) === myName,
+      notHolder: !!t && holderOf(t) !== myName,
+      holderName: t ? holderOf(t) : '',
       doneLabel: t && t.status !== 'logging' ? 'Reopen for corrections' : 'Job done',
       askJobDone: () => this.setState({ dialog: t && t.status !== 'logging' ? 'reopenTech' : 'done' }),
       jobTypes: D.jobTypes.map((n, i) => ({
@@ -3204,7 +3305,7 @@ class Component extends DCLogic {
         { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
         { label: 'Approved value', value: money(approved.reduce((s, x) => s + this.ticketTotal(x), 0)), color: 'var(--ink-strong)' },
       ],
-      inboxRows: bandedTickets(D.tickets.filter(x => x.synced && (!S.techFilter || x.tech === S.techFilter)))
+      inboxRows: bandedTickets(D.tickets.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, ''))))
         .map(x => Object.assign(this.ticketView(x), {
           actionLabel: x.status === 'approved' ? 'View' : 'Review',
           review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
@@ -3213,7 +3314,7 @@ class Component extends DCLogic {
       // user list, so the filter never offers a name that would return nothing.
       techFilterValue: S.techFilter || '',
       techFilterOptions: [{ name: '', label: 'All technicians' }].concat(
-        Array.from(new Set(D.tickets.filter(x => x.synced).map(x => x.tech).filter(Boolean)))
+        Array.from(new Set(D.tickets.filter(x => x.synced).reduce((a, x) => a.concat(crewNames(x)), []).filter(Boolean)))
           .sort().map(n => ({ name: n, label: n }))),
       setTechFilter: e => this.setState({ techFilter: e.target.value }),
       backToInbox: () => this.setState({ mgrScreen: 'inbox' }),
@@ -3255,6 +3356,7 @@ class Component extends DCLogic {
           d.tickets.push({
             id: id, tech: dr.tech, customer: existing ? existing.name : name,
             field: (dr.field || '').trim(), well: (dr.well || '').trim(), rig: (dr.rig || '').trim(),
+            crew: [{ name: dr.tech, email: ((D.users || []).find(u => u.name === dr.tech) || {}).email || '' }], holder: dr.tech,
             jobType: '', arrival: now, start: '', end: '', status: 'logging',
             // Raised in the office, so it is already where the office can see it —
             // there is no device holding it that still has to upload.
@@ -3685,7 +3787,7 @@ class Component extends DCLogic {
       noLiveTickets: !D.tickets.some(x => x.status === 'logging' && x.synced),
 
       hasDialog: !!S.dialog,
-      dialog: Object.assign({ title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true, needsReason: false, confirm: () => this.setState({ dialog: null }) }, dialogs[S.dialog] || {}),
+      dialog: Object.assign({ title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true, needsReason: false, needsPerson: false, confirm: () => this.setState({ dialog: null }) }, dialogs[S.dialog] || {}),
       closeDialog: () => this.setState({ dialog: null }),
       reasonText: S.reasonText,
 
