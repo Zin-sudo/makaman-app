@@ -798,7 +798,7 @@
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Ticket No. (unique)</label>
-                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" disabled="{{ ticketLocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
+                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ ticketLocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
                 </div>
                 <div style="flex:1">
@@ -811,7 +811,7 @@
                 </div>
                 <div style="width:230px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Mileage one way (KM)</label>
-                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" onFocus="{{ onMileageFocus }}" onBlur="{{ onMileageBlur }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.6)">{{ mileageNote }}</div>
                 </div>
               </div>
@@ -867,16 +867,16 @@
                     <tr draggable="{{ it.draggable }}" onDragStart="{{ it.onDragStart }}" onDragOver="{{ it.onDragOver }}" onDrop="{{ it.onDrop }}" onDragEnd="{{ it.onDragEnd }}" style="cursor:{{ it.dragCursor }};opacity:{{ it.dragOpacity }}">
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" onFocus="{{ it.onDescFocus }}" onBlur="{{ it.onDescBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" onFocus="{{ it.onQtyFocus }}" onBlur="{{ it.onQtyBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" onFocus="{{ it.onUomFocus }}" onBlur="{{ it.onUomBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" onFocus="{{ it.onCostFocus }}" onBlur="{{ it.onCostBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
@@ -902,13 +902,13 @@
               </div>
               <div style="margin-bottom:12px;max-width:420px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Job type (objective)</label>
-                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
                     <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);padding:6px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35)">
-                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" onFocus="{{ e.onTextFocus }}" onBlur="{{ e.onTextBlur }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                   </div>
                 </sc-for>
               </div>
@@ -1632,6 +1632,16 @@ function icon(name, size) {
   }, d.map((path, i) => React.createElement('path', { key: i, d: path })));
 }
 
+// Entries written before audit entries carried a kind — the seeded history, and
+// anything saved by an older build — have to be placed by their wording. Only the
+// phrases this app itself writes are matched, and the safe direction is 'edit':
+// misfiling an edit as lifecycle would show it to someone who should not see it,
+// whereas the reverse only hides something from a technician.
+const AUDIT_EDIT_HINTS = / changed by | added from the |overrid|removed|deleted/i;
+function auditKind(entry) {
+  if (entry.kind) return entry.kind;
+  return AUDIT_EDIT_HINTS.test(entry.text || '') ? 'edit' : 'lifecycle';
+}
 // A stored fix as a person reads it. Six decimals is roughly a tenth of a metre —
 // past the point GPS itself is honest to, so more would be false precision.
 function geoText(fix) {
@@ -2132,7 +2142,7 @@ class Component extends DCLogic {
     this.mutate(d => d.tickets.forEach(x => {
       if (!x.synced) {
         x.synced = true; x.syncedAt = now;
-        (x.audit = x.audit || []).push({ ts: now, text: 'Auto-synced from field device (' + x.tech + ').' });
+        (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: '', text: 'Auto-synced from field device (' + x.tech + ').' });
       }
     }));
     this.setState({ lastAutoSyncAt: now });
@@ -2146,9 +2156,23 @@ class Component extends DCLogic {
     this.mutate(d => { d.settings = Object.assign({}, d.settings, patch); });
     if (patch.theme !== undefined) setTimeout(() => this.applyTheme(), 0);
   }
-  log(text) {
-    const id = this.state.activeId;
-    this.mutate(d => { const t = d.tickets.find(x => x.id === id); if (t) (t.audit = t.audit || []).push({ ts: iso(new Date()), text: text }); });
+  // An audit entry is one of two things, and the difference decides who may read it:
+  //  · 'lifecycle' — the ticket moved through its official stages, or changed identity.
+  //    Any employee can see these; they are the public history of the job.
+  //  · 'edit' — someone altered what the ticket says. Restricted to the office, because
+  //    this is the record that answers "who changed the price after it was approved".
+  // Entries also carry who did it, which the text alone did not always say.
+  log(text, kind) {
+    this.logOn(this.state.activeId, text, kind);
+  }
+  // Same, for a ticket that is not the one currently open — the sync paths write to
+  // every pending ticket at once, not just the active one.
+  logOn(ticketId, text, kind) {
+    const by = (this.state.session && this.state.session.name) || '';
+    this.mutate(d => {
+      const t = d.tickets.find(x => x.id === ticketId);
+      if (t) (t.audit = t.audit || []).push({ ts: iso(new Date()), text: text, kind: kind || 'lifecycle', by: by });
+    });
   }
   client(name) { return this.state.data.clients.find(c => c.name === name); }
   // Flat (non-percent) items only — the base that surcharge/discount percentages are
@@ -2315,7 +2339,7 @@ class Component extends DCLogic {
         x.items = reorderItems(x.items);
       });
       this.setState({ itemSearch: '' }); // Clear search after adding
-      this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.');
+      this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.', 'edit');
     };
     // Behavioral suggestion: up to 3 items charged most often on this client's other
     // tickets that aren't already on this one — lets the Ops Manager one-click the items
@@ -2336,6 +2360,34 @@ class Component extends DCLogic {
       : [];
 
     const setDraft = k => e => this.setState({ draft: Object.assign({}, S.draft, { [k]: e.target.value }) });
+
+    // Commit-on-blur audit logging for the plain ticket fields on the review screen
+    // (ticket number typed by hand, mileage, job type). These write through
+    // patchTicket on every keystroke, so the entry is deferred to blur and written
+    // once, comparing against the value the field held when it was entered.
+    const fieldCommit = (key, label) => {
+      const slot = 'tf:' + (t ? t.id : '-') + ':' + key;
+      return {
+        focus: () => {
+          this.editBefore = this.editBefore || {};
+          if (this.editBefore[slot] === undefined) this.editBefore[slot] = t ? (t[key] === undefined ? '' : t[key]) : '';
+        },
+        blur: (ev) => {
+          this.editBefore = this.editBefore || {};
+          const before = this.editBefore[slot];
+          delete this.editBefore[slot];
+          if (before === undefined || locked || !t) return;
+          const after = ev.target.value;
+          if (String(before) === String(after)) return;
+          const show = (v) => (v === '' || v === null || v === undefined) ? '(blank)' : String(v);
+          this.log(label + ' changed by ' + (myName || 'Ops Manager')
+            + ': ' + show(before) + ' → ' + show(after) + '.', 'edit');
+        },
+      };
+    };
+    const commitTicketNo = fieldCommit('ticketNo', 'Ticket No.');
+    const commitMileage = fieldCommit('mileage', 'Mileage');
+    const commitJobType = fieldCommit('jobType', 'Job type');
 
     const checks = t ? [
       { key: 'no', label: 'Unique ticket number assigned', pass: !!(t.ticketNo || '').trim() && !issue.bad },
@@ -2447,12 +2499,12 @@ class Component extends DCLogic {
       done: {
         title: 'Mark job as done?', body: 'End Job will be stamped ' + F.stamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
         okLabel: 'Yes, job done', cancelLabel: 'Keep logging', hasCancel: true,
-        confirm: () => { this.patchTicket({ status: 'done', end: iso(new Date()) }); this.log('Marked Job Done on device.'); this.setState({ dialog: null }); },
+        confirm: () => { this.patchTicket({ status: 'done', end: iso(new Date()) }); this.log('Marked Job Done on device.', 'lifecycle'); this.setState({ dialog: null }); },
       },
       reopenTech: {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
-        confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.'); this.setState({ dialog: null }); },
+        confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
       },
       synced: {
         title: 'Sync complete', body: unsynced.length + ' ticket(s) uploaded. Job Done tickets are now visible to the operations manager.',
@@ -2474,7 +2526,7 @@ class Component extends DCLogic {
           this.patchTicket({ status: 'done' });
           // Was hardcoded to the seeded ops manager's name, so the trail credited him
           // for a reopen whoever actually did it.
-          this.log('Reopened by ' + ((S.session && S.session.name) || 'Ops Manager') + ' — reason: ' + r);
+          this.log('Reopened by ' + ((S.session && S.session.name) || 'Ops Manager') + ' — reason: ' + r, 'lifecycle');
           this.setState({ dialog: null, reasonText: '' });
         },
       },
@@ -2775,7 +2827,7 @@ class Component extends DCLogic {
       sync: () => {
         if (!S.online) return;
         const now = iso(new Date());
-        this.mutate(d => d.tickets.forEach(x => { if (!x.synced) { x.synced = true; x.syncedAt = now; (x.audit = x.audit || []).push({ ts: now, text: 'Uploaded from field device (' + x.tech + ').' }); } }));
+        this.mutate(d => d.tickets.forEach(x => { if (!x.synced) { x.synced = true; x.syncedAt = now; (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' }); } }));
         this.setState({ dialog: 'synced' });
       },
 
@@ -2825,11 +2877,32 @@ class Component extends DCLogic {
       },
 
       cur: view,
+      onTicketNoFocus: commitTicketNo.focus, onTicketNoBlur: commitTicketNo.blur,
+      onMileageFocus: commitMileage.focus, onMileageBlur: commitMileage.blur,
+      onJobTypeFocus: commitJobType.focus, onJobTypeBlur: commitJobType.blur,
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
         locked: locked,
         onChange: ev => { if (locked) return; const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
+        // Same commit-on-blur rule as the charged lines: the wording of a field log line
+        // is evidence, so a rewrite is recorded once, with both versions.
+        onTextFocus: () => {
+          this.editBefore = this.editBefore || {};
+          const key = 'evttext:' + t.id + ':' + i;
+          if (this.editBefore[key] === undefined) this.editBefore[key] = e.text;
+        },
+        onTextBlur: ev => {
+          this.editBefore = this.editBefore || {};
+          const key = 'evttext:' + t.id + ':' + i;
+          const before = this.editBefore[key];
+          delete this.editBefore[key];
+          if (before === undefined || locked) return;
+          const after = ev.target.value;
+          if (before === after) return;
+          this.log('Log line ' + (i + 1) + ' reworded by ' + (myName || 'Ops Manager')
+            + ': "' + before + '" → "' + after + '".', 'edit');
+        },
         onTimeChange: ev => this.setDraft('evt:' + t.id + ':' + i, ev.target.value),
         onTimeCommit: ev => {
           const raw = ev.target.value;
@@ -2847,7 +2920,12 @@ class Component extends DCLogic {
             });
           });
         },
-        remove: () => { if (locked) return; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); }); },
+        remove: () => {
+          if (locked) return;
+          this.log('Log line ' + (i + 1) + ' deleted by ' + (myName || 'Ops Manager')
+            + ': "' + e.text + '" (' + F.stamp(e.ts) + ').', 'edit');
+          this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); });
+        },
       })) : [],
       newEventText: S.newEventText,
       addEvent: () => {
@@ -2856,7 +2934,7 @@ class Component extends DCLogic {
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
           x.events.push({ ts: now, text: text });
-          if (!x.start) { x.start = now; (x.audit = x.audit || []).push({ ts: now, text: 'First log line — Start Job date recorded.' }); }
+          if (!x.start) { x.start = now; (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'First log line — Start Job date recorded.' }); }
           if (x.status === 'done') x.status = 'logging';
         });
         this.setState({ newEventText: '' });
@@ -2977,7 +3055,7 @@ class Component extends DCLogic {
             const x = d.tickets.find(y => y.id === t.id); x.ticketNo = cand;
             const ser = d.series.find(y => y.id === s.id); ser.last = n;
           });
-          this.log('Ticket No. ' + cand + ' taken from the ' + s.label + ' series.');
+          this.log('Ticket No. ' + cand + ' taken from the ' + s.label + ' series.', 'lifecycle');
         } };
       }),
       mileageNote: t && t.mileage ? 'Round trip charged: ' + (Number(t.mileage) * roundTrip) + ' km' : 'Charged as round trip (×' + roundTrip + ').',
@@ -3019,6 +3097,28 @@ class Component extends DCLogic {
       showSuggested: suggestedItems.length > 0,
       showSuggestedEditable: suggestedItems.length > 0 && !locked,
       curItems: t ? (t.items || []).map((it, i) => {
+        // Typing changes the value as you go, but the audit entry is written once, on
+        // leaving the field, comparing against what was there on arrival. Logging every
+        // keystroke would bury a real change under a trail of half-typed numbers.
+        const editKey = (k) => t.id + ':' + i + ':' + k;
+        const noteBefore = (k) => () => {
+          this.editBefore = this.editBefore || {};
+          const key = editKey(k);
+          if (this.editBefore[key] === undefined) this.editBefore[key] = it[k];
+        };
+        const commitField = (k, label) => ev => {
+          this.editBefore = this.editBefore || {};
+          const key = editKey(k);
+          const before = this.editBefore[key];
+          delete this.editBefore[key];
+          if (before === undefined) return;
+          const raw = ev.target.value;
+          const after = (k === 'qty' || k === 'cost') ? (raw === '' ? '' : Number(raw)) : raw;
+          if (String(before) === String(after)) return;
+          const show = (v) => (v === '' || v === null || v === undefined) ? '(blank)' : String(v);
+          this.log(it.code + ' — ' + label + ' changed by ' + (myName || 'Ops Manager')
+            + ': ' + show(before) + ' → ' + show(after) + '.', 'edit');
+        };
         const setField = (k, ovKey) => ev => {
           const v = ev.target.value;
           this.mutate(d => {
@@ -3036,8 +3136,14 @@ class Component extends DCLogic {
           uomBg: ov.uom ? 'var(--accent-wash)' : 'var(--field)',
           costBg: ov.cost ? 'var(--accent-wash)' : 'var(--field)',
           onDesc: setField('desc', 'desc'), onQty: setField('qty'), onUom: setField('uom', 'uom'), onCost: setField('cost', 'cost'),
+          onDescFocus: noteBefore('desc'), onQtyFocus: noteBefore('qty'), onUomFocus: noteBefore('uom'), onCostFocus: noteBefore('cost'),
+          onDescBlur: commitField('desc', 'description'), onQtyBlur: commitField('qty', 'quantity'),
+          onUomBlur: commitField('uom', 'unit'), onCostBlur: commitField('cost', 'unit cost'),
           remove: () => {
             if (locked) return;
+            // Logged before the splice, while the line still exists to be described.
+            this.log('Line removed by ' + (myName || 'Ops Manager') + ': ' + it.code
+              + ' — ' + it.desc + ' (' + (it.qty === '' ? '—' : it.qty) + ' × ' + money(it.cost) + ').', 'edit');
             this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.items.splice(i, 1); });
           },
           // Drag-and-drop support for reordering items
@@ -3102,7 +3208,7 @@ class Component extends DCLogic {
             line.frozenCost = Number(line.cost) || 0;
             line.frozen = true;
           });
-          (x.audit = x.audit || []).push({ ts: when, text: 'Approved by ' + who + ' · ticket total ' + total + '. Prices frozen against the ' + x.customer + ' price list.' });
+          (x.audit = x.audit || []).push({ ts: when, kind: 'lifecycle', by: who, text: 'Approved by ' + who + ' · ticket total ' + total + '. Prices frozen against the ' + x.customer + ' price list.' });
         });
         this.setState({ dialog: 'approved' });
       },
@@ -3122,7 +3228,7 @@ class Component extends DCLogic {
         if (logOverflow) bits.push((sheetEventsReal.length - LOG_ROW_CAP) + ' more job-log line(s) than the ' + LOG_ROW_CAP + '-row page limit');
         return 'This ticket has ' + bits.join(' and ') + ' — a second page was added automatically below. Prefer one page? Go back to review and remove some lines, then reopen this preview.';
       })(),
-      exportExcel: () => { this.log('4 sheets downloaded to this device.'); this.setState({ dialog: 'export' }); },
+      exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.setState({ dialog: 'export' }); },
       // Local download always works. OneDrive/Google Drive upload buttons only render
       // once connected (Settings > Storage & Export) — see the seed() comment on
       // cloudStorage for why the connect step itself is mocked.
@@ -3131,12 +3237,12 @@ class Component extends DCLogic {
         : 'Download always works, no account needed.',
       uploadOneDrive: () => {
         const acct = ((D.settings.cloudStorage || {}).oneDrive || {}).account || 'OneDrive';
-        this.log('4 sheets uploaded to OneDrive (' + acct + ').');
+        this.log('4 sheets uploaded to OneDrive (' + acct + ').', 'lifecycle');
         this.setState({ dialog: 'exportOneDrive' });
       },
       uploadGoogleDrive: () => {
         const acct = ((D.settings.cloudStorage || {}).googleDrive || {}).account || 'Google Drive';
-        this.log('4 sheets uploaded to Google Drive (' + acct + ').');
+        this.log('4 sheets uploaded to Google Drive (' + acct + ').', 'lifecycle');
         this.setState({ dialog: 'exportGoogleDrive' });
       },
 
