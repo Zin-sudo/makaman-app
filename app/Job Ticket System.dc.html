@@ -743,6 +743,7 @@
                             <option value="tech">Technician</option>
                             <option value="mgr">Ops Manager</option>
                             <option value="admin">Admin</option>
+                            <option value="founder">Observer</option>
                           </select>
                           <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
                             <button onClick="{{ u.delete }}" title="Delete technician" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.3);cursor:pointer">Delete</button>
@@ -1302,6 +1303,7 @@
                             <option value="tech">Technician</option>
                             <option value="mgr">Ops Manager</option>
                             <option value="admin">Admin</option>
+                            <option value="founder">Observer</option>
                           </select>
                           <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
                             <button onClick="{{ u.delete }}" title="Delete technician" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.3);cursor:pointer">Delete</button>
@@ -3176,7 +3178,10 @@ class Component extends DCLogic {
       users: (D.users || []).map(u => ({
         name: u.name, role: u.status === 'pending' ? 'Pending approval' : u.role, base: u.base, lastSync: u.lastSync,
         isPending: u.status === 'pending',
-        syncDot: (u.status === 'active' && u.lastSync && !u.lastSync.includes('ago')) ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
+        // Green means connected right now, and nothing else. Matching on the exact
+        // word is the point: an earlier version excluded anything containing "ago",
+        // which let "yesterday" through as though that user were online.
+        syncDot: (u.status === 'active' && u.lastSync === 'live') ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
         roleBg: u.status === 'pending' ? 'rgba(var(--warning-rgb),0.14)' : 'var(--accent-wash)',
         roleFg: u.status === 'pending' ? 'var(--warning-ink)' : 'var(--accent-ink)',
         approve: () => this.mutate(d => {
@@ -3185,10 +3190,14 @@ class Component extends DCLogic {
         }),
         showPromote: S.role === 'admin' && u.status !== 'pending',
         promoteDisabled: u.email === (S.session && S.session.email),
+        // Must be a value the dropdown actually offers. An Observer's 'founder' key
+        // had no matching option, so the browser fell back to displaying the first
+        // one and every Observer read as a Technician — one careless click away from
+        // being demoted into one.
         roleKeySafe: u.roleKey || 'tech',
         promote: e => {
           const val = e.target.value;
-          const labelMap = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin' };
+          const labelMap = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
           this.mutate(d => {
             const target = (d.users || []).find(x => x.email === u.email);
             if (target) { target.roleKey = val; target.role = labelMap[val] || target.role; }
