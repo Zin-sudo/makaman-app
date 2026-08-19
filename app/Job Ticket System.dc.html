@@ -664,7 +664,7 @@
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(29,31,32,0.1)">
-                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
+                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:#416180;padding:6px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35)">
                     <input value="{{ e.text }}" onChange="{{ e.onChange }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:#e9e9ea;border:1px solid rgba(29,31,32,0.12);color:#1d1f20">
                   </div>
                 </sc-for>
@@ -682,10 +682,10 @@
                     <div style="flex:1;font-weight:500">{{ h.value }}</div>
                   </sc-if>
                   <sc-if value="{{ h.editable }}" hint-placeholder-val="{{ false }}">
-                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                    <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" onBlur="{{ h.onCommit }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
                   </sc-if>
                   <sc-if value="{{ h.isTextField }}" hint-placeholder-val="{{ false }}">
-                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
+                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" style="flex:1;font-size:13px;padding:5px 7px;background:#eef3f8;border:1px solid rgba(65,97,128,0.35);color:#1d1f20">
                   </sc-if>
                 </div>
               </sc-for>
@@ -1412,6 +1412,7 @@ class Component extends DCLogic {
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
       authFullName: '', authConfirm: '', authError: '', signupDone: false,
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
+      editDraft: {},
     }, this.load());
   }
 
@@ -1455,6 +1456,29 @@ class Component extends DCLogic {
     fn(data);
     this.persist(data);
     this.setState({ data: data });
+  }
+  // Transient edit buffer for the inline fields that write to the audit trail (ticket
+  // header stamps, Base Location, Customer Rep., job-log line timestamps).
+  //
+  // Keystrokes land here and nowhere else — not in the ticket, not in the trail. The
+  // value is only committed on blur, and only after it is compared against what is
+  // already stored. Typing something and undoing it back to the original therefore
+  // leaves no audit entry at all. Without this, React's onChange fires once per
+  // keystroke, so editing "Ali" to "Ali Hassan" wrote ten entries and changing it back
+  // wrote ten more — the trail recorded typing instead of decisions.
+  draftOf(key, stored) {
+    const d = this.state.editDraft || {};
+    return d[key] !== undefined ? d[key] : stored;
+  }
+  setDraft(key, v) {
+    const d = Object.assign({}, this.state.editDraft || {});
+    d[key] = v;
+    this.setState({ editDraft: d });
+  }
+  clearDraft(key) {
+    const d = Object.assign({}, this.state.editDraft || {});
+    delete d[key];
+    this.setState({ editDraft: d });
   }
   // Background sync — runs on a timer instead of only when the technician remembers to
   // tap Sync. Same effect as the manual Sync button (uploads every not-yet-synced
@@ -1968,11 +1992,15 @@ class Component extends DCLogic {
       cur: view,
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
-        tsInput: toLocalInput(e.ts),
+        tsInput: this.draftOf('evt:' + t.id + ':' + i, toLocalInput(e.ts)),
         onChange: ev => { const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
-        onTimeChange: ev => {
-          const raw = ev.target.value; if (!raw) return;
+        onTimeChange: ev => this.setDraft('evt:' + t.id + ':' + i, ev.target.value),
+        onTimeCommit: ev => {
+          const raw = ev.target.value;
+          this.clearDraft('evt:' + t.id + ':' + i);
+          if (!raw) return;
           const newIso = iso(new Date(raw));
+          if (newIso === e.ts) return;
           this.mutate(d => {
             const x = d.tickets.find(y => y.id === t.id);
             const oldStamp = F.stamp(x.events[i].ts);
@@ -2026,10 +2054,15 @@ class Component extends DCLogic {
           const val = t[field];
           return {
             label: label, value: val ? F.stamp(val) : 'open', editable: true, notEditable: false, isTextField: false,
-            tsInput: toLocalInput(val),
-            onChange: ev => {
-              const raw = ev.target.value; if (!raw) return;
+            tsInput: this.draftOf('hdr:' + field, toLocalInput(val)),
+            onChange: ev => this.setDraft('hdr:' + field, ev.target.value),
+            onCommit: ev => {
+              const raw = ev.target.value;
+              this.clearDraft('hdr:' + field);
+              if (!raw) return;
               const newIso = iso(new Date(raw));
+              // Nothing actually moved — say nothing.
+              if (newIso === t[field]) return;
               this.mutate(d => {
                 const x = d.tickets.find(y => y.id === t.id);
                 const oldVal = x[field] ? F.stamp(x[field]) : 'open';
@@ -2044,22 +2077,29 @@ class Component extends DCLogic {
         };
         // B13 Base Location / F14 Customer Rep. — permanent admin-configured defaults
         // pre-filled at ticket creation; only the Ops Manager can override per ticket.
-        const textField = (field, label) => ({
-          label: label, value: t[field] || '', editable: false, notEditable: false, isTextField: true,
-          textInput: t[field] || '',
-          onTextChange: ev => {
-            const v = ev.target.value;
-            this.mutate(d => {
-              const x = d.tickets.find(y => y.id === t.id);
-              const oldVal = x[field] || '(default)';
-              x[field] = v;
-              (x.audit = x.audit || []).push({
-                ts: iso(new Date()),
-                text: label + ' changed by ' + ((S.session && S.session.name) || 'Ops Manager') + ': "' + oldVal + '" → "' + (v || '(blank)') + '".',
+        const textField = (field, label) => {
+          const stored = t[field] || '';
+          return {
+            label: label, value: stored, editable: false, notEditable: false, isTextField: true,
+            textInput: this.draftOf('hdr:' + field, stored),
+            onTextChange: ev => this.setDraft('hdr:' + field, ev.target.value),
+            onCommit: ev => {
+              const v = ev.target.value;
+              this.clearDraft('hdr:' + field);
+              // Typed and then put back the way it was — nothing to record.
+              if (v === stored) return;
+              this.mutate(d => {
+                const x = d.tickets.find(y => y.id === t.id);
+                const oldVal = x[field] || '(default)';
+                x[field] = v;
+                (x.audit = x.audit || []).push({
+                  ts: iso(new Date()),
+                  text: label + ' changed by ' + ((S.session && S.session.name) || 'Ops Manager') + ': "' + oldVal + '" → "' + (v || '(blank)') + '".',
+                });
               });
-            });
-          },
-        });
+            },
+          };
+        };
         return [
           { label: 'Technician', value: t.tech, editable: false, notEditable: true, isTextField: false },
           { label: 'Customer', value: t.customer, editable: false, notEditable: true, isTextField: false },
