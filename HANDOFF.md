@@ -82,43 +82,67 @@ HANDOFF.md                  this file
 - Admin seeded: `Lateri@makaman.ly` — **tell the user to rotate this password**, it was typed into a chat transcript.
 - **Email confirmation has NOT been turned off.** No MCP tool in this session exposed Auth config, and no documented Management API path was found either — this needs a human to flip "Confirm email" off under Authentication → Providers → Email in the Supabase dashboard. Required, not optional (see original A.1 rationale below).
 
-### 3a. Vercel — NOT live, blocked on a real account-permission issue (confirmed 2026-08-19)
+### 3a. Vercel — the MCP token is write-only; deploys work but cannot be verified from a session
 
-**This needs the account owner, not another coding session.** A fresh check this session
-(2026-08-19) confirms the earlier "maybe just a tool-scoping bug" theory was wrong — it's
-a real permission restriction:
+**Corrected 2026-08-19.** An earlier version of this section claimed the account "does not
+have deploy permission." **That was wrong** and is retracted — a probe deployment
+(a one-file throwaway project) came back `READY`, which disproves it. Deploys succeed.
+Reads do not. Do not re-derive this; the evidence is below.
 
-- `list_teams` → one team, `midolateri-2760's projects` (`team_A2oAoC4hOKAGYM8kULx2ylNv`).
-- `list_projects` on that team → **empty**, both before and immediately after creating a
-  project (see next line). Confirms the earlier `makaman-job-tickets` project referenced
-  below is really gone/inaccessible now, not just unlisted by a buggy read.
-- `create_git_project` (repo `Zin-sudo/makaman-app`, root `app`) → **succeeds**, returns a
-  real project id (`prj_SFT9XWc70QHCWAqHfivKM6xXGojM`), confirms it's linked to the GitHub
-  repo. But the automatic first deployment it tries to trigger fails:
-  `403 forbidden: "You don't have permission to create a Production Deployment for this
-  project."` (links to `vercel.com/docs/accounts/team-members-and-roles`).
-- Every subsequent read (`get_project`, `list_projects`, `list_deployments`) on that same
-  project also returns `403`/`404` immediately after — not eventual consistency, not a
-  transient blip.
+| Call | Result |
+|---|---|
+| `list_teams` | works — 1 team, `midolateri-2760s-projects` (`team_A2oAoC4hOKAGYM8kULx2ylNv`) |
+| `list_projects` | **empty array** — a 200 with no rows, *not* an error |
+| `get_project(<any id>)` | **404** |
+| `list_deployments` | **403** "You don't have permission to list the deployment" |
+| `get_deployment(<own deploy id>)` | **404** |
+| `create_git_project('makaman-app')` | **409 already exists** |
+| `deploy_to_vercel` | **succeeds** (probe returned `READY`) |
 
-**Conclusion: the Vercel account/token this MCP connector is using does not have deploy
-permission on this team** (most likely role is below "Member" for deployments, or the
-team's plan/token scope excludes production deploys). Project creation still works
-because that's a lower-privilege action. **A coding session cannot fix this — the account
-owner needs to check vercel.com dashboard directly**: confirm project
-`makaman-job-tickets` (id `prj_SFT9XWc70QHCWAqHfivKM6xXGojM`) exists under
-`midolateri-2760's projects`, check the connected token/integration's role has deploy
-permission (Project Settings → or Team Settings → Members), and either fix the role or
-manually trigger the first deploy from the dashboard. Once that's done, a session can
-pick up at A.5 (verify the live URL) — don't re-attempt `create_git_project`, it already
-worked and re-running just risks a 409 on the existing project.
+`list_projects` returning empty while `create_git_project` 409s on the same name is the
+tell: the project exists, the token simply cannot see it. This is an **OAuth scope
+problem on the Vercel connector — write granted, read not.** The 403 seen on
+`create_git_project`'s *auto-deploy* step is a narrower thing (that path creates a
+production deployment against a project the token can't read) and is not evidence of a
+missing deploy permission generally.
 
-Root directory `app`, framework Vite, build command `npm run build`, output directory
-`dist` — already correct on the created project (Vite auto-detected). Env vars —
-`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — are already committed in
-`app/.env.production` (Vite reads this automatically for production builds; safe because
-the anon key is meant to be public and RLS is what actually protects data), so no manual
-env var step should be needed once deploys are actually permitted.
+**Second, independent blocker: `*.vercel.app` is blocked by this session's network egress
+policy.** `curl` → `CONNECT tunnel failed, response 403`; `WebFetch` → `EGRESS_BLOCKED`.
+(MCP calls reach Vercel because they run server-side, not through this session's proxy.)
+
+**Net effect: a coding session has no way — MCP, curl, or browser — to observe whether a
+deployment succeeded.** Plan around this. Either the owner grants read scope, or the
+owner does the verifying. Do not burn a session retrying deploys hoping for a signal;
+there isn't one.
+
+#### The right way to deploy this repo
+
+**Use git-based deploy, never `deploy_to_vercel`.** `deploy_to_vercel` requires inlining
+every file's content into the tool call — including base64 for the 8 PNGs in
+`app/public/`. A previous session spent ~250k tokens doing exactly that and still shipped
+two incomplete deploys (missing `public/` both times, missing all screens the first time).
+**Everything is already committed to `Zin-sudo/makaman-app`** — verify with
+`git ls-files app/public`. Vercel builds from git natively; there is nothing to inline.
+
+Project `makaman-app` already exists (`prj_PWckjCuvytKTwBwoAH4deEBIxWOW`, id supplied by
+the owner — not readable via MCP). Settings it needs, which only the owner can confirm:
+
+- **Root Directory = `app`** (the repo is a monorepo; the app is not at the root)
+- **Production Branch = `claude/makaman-app`** (repo default, where all work lands)
+- Framework Vite, build `npm run build`, output `dist` — auto-detected, no `vercel.json`
+  exists or is needed.
+
+Env vars need no dashboard step: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are
+committed in `app/.env.production` (Vite reads it for production builds; safe because the
+anon key is public by design and RLS is what protects data).
+
+Once Root Directory + Production Branch are set, deploying is just a push to that branch.
+
+#### Junk to clean up in the Vercel account (owner only — there is no `delete_project` MCP tool)
+
+- `claude-permission-probe` — throwaway project from the write-scope probe.
+- `makaman-job-tickets` (`prj_SFT9XWc70QHCWAqHfivKM6xXGojM`) — duplicate created before
+  the correct project id was known.
 
 ### A.5 Verify on the live URL (do this whenever the URL is confirmed live)
 
