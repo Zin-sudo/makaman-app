@@ -59,10 +59,11 @@
     --navbar:#1d2d3d; --navbar-ink:#f2f2f3; --on-navbar-rgb:242,242,243;
     --ink-strong:#1d2d3d; --brand:#b0413a;
     --chip-ok-bg:#1d2d3d; --chip-ok-fg:#f2f2f3;
-    --danger:#b0413a; --danger-deep:#8c3b3b;
+    --danger:#b0413a; --danger-deep:#8c3b3b; --danger-rgb:176,65,58;
     --warning:#b5790c; --warning-ink:#8a5b09; --warning-deep:#7a5109; --warning-rgb:181,121,12;
     --success:#2f8f5b; --success-rgb:41,143,91;
     --hue-teal:#2c7a72; --hue-indigo:#4c5c9e; --hue-clay:#b0644a;
+    --hue-teal-wash:rgba(44,122,114,0.12); --hue-indigo-wash:rgba(76,92,158,0.12); --hue-clay-wash:rgba(176,100,74,0.12);
     --shadow-rgb:43,43,45; --scrim:rgba(43,43,45,0.55);
     --radius:0px; --radius-lg:0px;
   }
@@ -79,10 +80,11 @@
     --navbar:#0e0e10; --navbar-ink:#f5f5f7; --on-navbar-rgb:245,245,247;
     --ink-strong:#f5f5f7; --brand:#e05a4e;
     --chip-ok-bg:rgba(48,209,88,0.18); --chip-ok-fg:#30d158;
-    --danger:#ff453a; --danger-deep:#ff6961;
+    --danger:#ff453a; --danger-deep:#ff6961; --danger-rgb:255,69,58;
     --warning:#ff9f0a; --warning-ink:#ffcf70; --warning-deep:#ffbf4d; --warning-rgb:255,159,10;
     --success:#30d158; --success-rgb:48,209,88;
     --hue-teal:#40c8e0; --hue-indigo:#bf5af2; --hue-clay:#ff9f0a;
+    --hue-teal-wash:rgba(64,200,224,0.16); --hue-indigo-wash:rgba(191,90,242,0.16); --hue-clay-wash:rgba(255,159,10,0.16);
     --shadow-rgb:0,0,0; --scrim:rgba(0,0,0,0.72);
     --radius:12px; --radius-lg:16px;
   }
@@ -173,6 +175,19 @@
     cursor:pointer;
   }
   .back-btn:hover { background:var(--accent-wash-3); border-color:var(--accent-deep); }
+
+  /* Icon tile. Square, centred, colour supplied per instance so one class covers the
+     status tiles on ticket cards, the field markers on the new-ticket form and the
+     tool tiles in the admin menu. Follows the theme's own corner radius, which is
+     square on the light/paper theme and rounded on the dark one. */
+  .mk-icon-chip {
+    width:38px; height:38px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:var(--radius);
+  }
+  .mk-icon-chip-sm { width:30px; height:30px; }
+  /* A ticket card: coloured rule down the leading edge, per status. */
+  .mk-ticket-card { border-left-width:3px; border-left-style:solid; }
 </style>
 </helmet>
 
@@ -390,7 +405,7 @@
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:20px 0 8px">On this device</div>
               <div style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
-                  <div onClick="{{ t.open }}" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);cursor:pointer;background:transparent">
+                  <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
@@ -398,8 +413,13 @@
                       </sc-if>
                       <span style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ t.syncLabel }}</span>
                     </div>
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
-                    <div style="font-size:13px;color:rgba(var(--ink-rgb),0.7)">{{ t.locLine }}</div>
+                    <div style="display:flex;align-items:center;gap:11px">
+                      <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
+                        <div style="font-size:13px;color:rgba(var(--ink-rgb),0.7)">{{ t.locLine }}</div>
+                      </div>
+                    </div>
                     <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(var(--ink-rgb),0.08);font-size:11px;color:rgba(var(--ink-rgb),0.55)">
                       <span>Arrived {{ t.arrivalShort }}</span>
                       <span>{{ t.eventCount }} log lines</span>
@@ -423,7 +443,10 @@
                   <input value="{{ d.tech }}" onChange="{{ f.tech }}" placeholder="Full name" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Customer</label>
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+                    <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--accent-wash);color:var(--accent)">{{ icCustomer }}</div>
+                    <label style="font-size:13px;color:var(--ink)">Customer</label>
+                  </div>
                   <select value="{{ d.customer }}" onChange="{{ f.customer }}" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                     <option value="">Select customer…</option>
                     <sc-for list="{{ clientNames }}" as="c" hint-placeholder-count="3">
@@ -432,18 +455,25 @@
                   </select>
                 </div>
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Field Name</label>
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+                    <div class="mk-icon-chip mk-icon-chip-sm" style="background:rgba(var(--warning-rgb),0.16);color:var(--warning)">{{ icField }}</div>
+                    <label style="font-size:13px;color:var(--ink)">Field Name</label>
+                  </div>
                   <input value="{{ d.field }}" onChange="{{ f.field }}" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
-                <div style="display:flex;gap:12px">
-                  <div style="flex:1">
-                    <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Well No.</label>
-                    <input value="{{ d.well }}" onChange="{{ f.well }}" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                <div>
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+                    <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
+                    <label style="font-size:13px;color:var(--ink)">Well No.</label>
                   </div>
-                  <div style="flex:1">
-                    <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Rig Name</label>
-                    <input value="{{ d.rig }}" onChange="{{ f.rig }}" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input value="{{ d.well }}" onChange="{{ f.well }}" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                </div>
+                <div>
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+                    <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-indigo-wash);color:var(--hue-indigo)">{{ icRig }}</div>
+                    <label style="font-size:13px;color:var(--ink)">Rig Name</label>
                   </div>
+                  <input value="{{ d.rig }}" onChange="{{ f.rig }}" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
               </div>
               <button onClick="{{ createTicket }}" disabled="{{ createDisabled }}" style="width:100%;min-height:52px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ createOpacity }}">Start Logging</button>
@@ -552,8 +582,13 @@
             <tbody>
               <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
                 <tr>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <div style="display:flex;align-items:center;gap:9px">
+                      <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
+                      <span>{{ t.customer }}</span>
+                    </div>
+                  </td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ t.locLine }}</td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.tech }}</td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:rgba(var(--ink-rgb),0.75)">{{ t.dateRange }}</td>
@@ -1342,6 +1377,48 @@ const SK = 'makaman.jobtickets.session.v1';
 const MASTER_ADMIN_EMAIL = 'lateri@makaman.ly';
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// ── Icons ────────────────────────────────────────────────────────────────────
+// Line icons drawn on a 24-grid. `stroke:currentColor` means an icon takes the
+// colour of whatever it sits in, so one definition serves both themes and no icon
+// needs a light/dark variant.
+//
+// These are built as React elements rather than markup strings because the template
+// runtime renders a {{ }} binding that holds a React element as a real element (it
+// checks isValidElement before falling back to text). The same runtime resolves a
+// {{ }} expression as a property path only — it cannot call a function — so an icon
+// has to be built here in JS and handed to the template as a value. `{{ t.tileIcon }}`
+// works; `{{ icon('check') }}` would not.
+const ICON_D = {
+  // bottom navigation
+  tickets:  ['M4 7h16v10H4z', 'M4 11h16', 'M9 7v10'],
+  activity: ['M3 13h4l3 6 4-14 3 8h4'],
+  sync:     ['M12 5a7 7 0 016.9 5.8', 'M12 19a7 7 0 01-6.9-5.8', 'M19 4v4h-4', 'M5 20v-4h4'],
+  account:  ['M12 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7z', 'M5 20a7 7 0 0114 0'],
+  // ticket status
+  rig:      ['M4 20h16', 'M12 4L7 20', 'M12 4l5 16', 'M9 12h6'],
+  clock:    ['M12 21a9 9 0 100-18 9 9 0 000 18z', 'M12 7.5V12l3 2'],
+  check:    ['M5 13l4 4L19 7'],
+  // new-ticket form fields
+  customer: ['M4 20V5h9v15', 'M13 10h7v10', 'M7 8h3', 'M7 12h3', 'M7 16h3', 'M16 14h1', 'M3 20h18'],
+  field:    ['M4 4h7v7H4z', 'M13 4h7v7h-7z', 'M4 13h7v7H4z', 'M13 13h7v7h-7z'],
+  well:     ['M12 21s6-5.7 6-10.5A6 6 0 006 10.5C6 15.3 12 21 12 21z', 'M12 12.5a2 2 0 100-4 2 2 0 000 4z'],
+  // admin tools
+  priceList:['M4 7h11', 'M4 12h11', 'M4 17h11', 'M19 6.5v1', 'M19 11.5v1', 'M19 16.5v1'],
+  numbering:['M6 3h9l4 4v14H6z', 'M15 3v4h4', 'M9 12h6', 'M9 16h6'],
+  people:   ['M9 11a3 3 0 100-6 3 3 0 000 6z', 'M3 19a6 6 0 0112 0', 'M16 5.5a3 3 0 010 5.6', 'M18 19a6 6 0 00-3-5.2'],
+  system:   ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M12 2v3', 'M12 19v3', 'M2 12h3', 'M19 12h3', 'M4.9 4.9l2.2 2.2', 'M16.9 16.9l2.2 2.2', 'M19.1 4.9l-2.2 2.2', 'M7.1 16.9l-2.2 2.2'],
+  chevron:  ['M9 6l6 6-6 6'],
+};
+function icon(name, size) {
+  const d = ICON_D[name];
+  if (!d) return null;
+  return React.createElement('svg', {
+    width: size || 20, height: size || 20, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round',
+    style: { display: 'block', flex: 'none' },
+  }, d.map((path, i) => React.createElement('path', { key: i, d: path })));
+}
+
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
 function dt(s) { return s ? new Date(s) : null; }
@@ -1737,13 +1814,30 @@ class Component extends DCLogic {
       month: v => monthKey(v, tz),
     };
   }
+  // One colour per stage of a ticket's life, used everywhere a ticket appears: blue
+  // while it's still being logged in the field, amber once it's sitting in someone's
+  // queue waiting on them, green when it's approved and closed. Reading a list is then
+  // a colour scan — amber rows are the ones that need a person to act.
+  //
+  // These were previously assigned the other way round (blue for waiting, grey for
+  // in-progress), which left the one state nobody needs to act on wearing the loudest
+  // colour and the active work looking inert.
   statusChip(t) {
     if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
-    if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
-    return { statusLabel: 'IN PROGRESS', chipBg: 'var(--field)', chipFg: 'var(--ink-faint)' };
+    if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'rgba(var(--warning-rgb),0.16)', chipFg: 'var(--warning-ink)' };
+    return { statusLabel: 'IN PROGRESS', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
+  }
+  // The same three stages as a card treatment — a coloured rule down the leading edge
+  // and an icon tile — so a ticket is identifiable from its shape before any text is
+  // read. Merged into ticketView() so every list that renders a ticket picks it up.
+  cardTreatment(t) {
+    if (t.status === 'approved') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success)', tileIcon: icon('check') };
+    if (t.status === 'done') return { edge: 'var(--warning)', tileBg: 'rgba(var(--warning-rgb),0.16)', tileFg: 'var(--warning)', tileIcon: icon('clock') };
+    return { edge: 'var(--accent)', tileBg: 'var(--accent-wash)', tileFg: 'var(--accent)', tileIcon: icon('rig') };
   }
   ticketView(t) {
     const chip = this.statusChip(t);
+    const card = this.cardTreatment(t);
     const F = this.fmt();
     // In-progress presence badge — only meaningful while a ticket is still being logged
     // in the field (not yet marked Job Done). This prototype models one shared device
@@ -1767,7 +1861,7 @@ class Component extends DCLogic {
       presenceShow: showPresence,
       presenceDot: online ? 'var(--success)' : 'var(--ink-ghost)',
       presenceLabel: online ? 'Online' : 'Offline',
-    }, chip);
+    }, chip, card);
   }
 
   numberIssue(t) {
@@ -2209,6 +2303,10 @@ class Component extends DCLogic {
       backToList: () => this.setState({ techScreen: 'list', draft: null }),
       draftArrival: S.draft ? F.stamp(S.draft.arrival) : F.stamp(iso(new Date())),
       d: S.draft || { tech: '', customer: '', field: '', well: '', rig: '' },
+      // Field markers on the new-ticket form. A {{ }} binding can hold a React element
+      // but cannot call a function, so each icon is built here and referenced by name.
+      icCustomer: icon('customer', 17), icField: icon('field', 17),
+      icWell: icon('well', 17), icRig: icon('rig', 17),
       clientNames: D.clients.map(c => ({ name: c.name })),
       createDisabled: !(S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig),
       createOpacity: (S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig) ? 1 : 0.45,
