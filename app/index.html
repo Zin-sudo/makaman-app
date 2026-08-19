@@ -932,6 +932,36 @@
                 </div>
               </sc-for>
               <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px">Arrival, Start job, End job, Base Location and Customer Rep. are editable here and logged to the audit trail below.</div>
+
+              <!-- Device position. Rendered only for the office roles — geoView()
+                   returns nothing for a technician, so this section cannot appear
+                   on the device being pinned. -->
+              <sc-if value="{{ cur.geoShow }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.12)">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:8px">Device position</div>
+                  <div style="display:flex;gap:9px;margin-bottom:9px">
+                    <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">When opened</div>
+                      <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoOpenText }}</div>
+                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ cur.geoOpenStamp }}</div>
+                    </div>
+                  </div>
+                  <sc-if value="{{ cur.geoLastShow }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:9px">
+                      <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--accent-wash);color:var(--accent)">{{ icWell }}</div>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">{{ cur.geoLastLabel }}</div>
+                        <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoLastText }}</div>
+                        <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ cur.geoLastStamp }}</div>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+              <sc-if value="{{ cur.geoNone }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.12);font-size:11px;color:rgba(var(--ink-rgb),0.45)">No device position recorded — location sharing was off, refused, or unavailable on that device.</div>
+              </sc-if>
             </div>
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
@@ -1600,6 +1630,22 @@ function icon(name, size) {
   }, d.map((path, i) => React.createElement('path', { key: i, d: path })));
 }
 
+// A stored fix as a person reads it. Six decimals is roughly a tenth of a metre —
+// past the point GPS itself is honest to, so more would be false precision.
+function geoText(fix) {
+  if (!fix) return '';
+  const n = (v, dp) => (v === null || v === undefined || isNaN(v)) ? null : Number(v).toFixed(dp);
+  const lat = n(fix.lat, 6), lon = n(fix.lon, 6);
+  if (lat === null || lon === null) return '';
+  let s = lat + ', ' + lon;
+  const alt = n(fix.alt, 0);
+  // Altitude is null on most phones indoors and on nearly all desktops — say so
+  // rather than printing a zero that reads like sea level.
+  s += alt === null ? ' · alt n/a' : ' · alt ' + alt + ' m';
+  const acc = n(fix.acc, 0);
+  if (acc !== null) s += ' · ±' + acc + ' m';
+  return s;
+}
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
 function dt(s) { return s ? new Date(s) : null; }
@@ -1647,6 +1693,16 @@ function monthKey(s, tz) {
 // on the technician remembering to tap Sync. window.__AUTO_SYNC_TEST_MS overrides it for
 // fast automated verification; production uses a realistic once-a-minute cadence.
 const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 60000;
+// How often a ticket that is still being logged re-pins where the device is.
+const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 3600000;
+// How often the app *checks* whether a ping is due. Checking often and pinging rarely is
+// what keeps a device that was asleep or offline from owing a burst of catch-up fixes:
+// the check finds one ping due, not six.
+const GEO_TICK_MS = (typeof window !== 'undefined' && window.__GEO_TICK_TEST_MS) || 60000;
+// The opening pin may reuse a fix this recent: the technician has just arrived and
+// tapped a button, so a position from the last half-minute is where they are, and
+// reusing it answers instantly instead of waiting on a cold GPS lock.
+const GEO_MAX_AGE_MS = 30000;
 
 // Timezone + 24h/12h are read from Settings (S.data.settings) — 'device' timezone means
 // no explicit IANA zone is passed to Intl, so the browser's own local zone is used.
@@ -1891,6 +1947,8 @@ class Component extends DCLogic {
     }
     this.timer = setInterval(() => this.setState({ tick: Date.now() }), 30000);
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
+    // Checks every minute whether an hourly pin is due; see geoTick.
+    this.geoTimer = setInterval(() => this.geoTick(), GEO_TICK_MS);
     // Registers sw.js so the app is a real installable PWA on any device (see the
     // <link rel="manifest"> in <helmet>). Swallows failures silently — e.g. when run
     // from file:// or a sandboxed preview with no service-worker support — since this is
@@ -1900,7 +1958,7 @@ class Component extends DCLogic {
     }
   }
   componentWillUnmount() {
-    clearInterval(this.timer); clearInterval(this.autoSyncTimer);
+    clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
     if (this.mq && this.mqListener) {
       if (this.mq.removeEventListener) this.mq.removeEventListener('change', this.mqListener);
       else if (this.mq.removeListener) this.mq.removeListener(this.mqListener);
@@ -1935,6 +1993,128 @@ class Component extends DCLogic {
     const d = Object.assign({}, this.state.editDraft || {});
     delete d[key];
     this.setState({ editDraft: d });
+  }
+  // ── Where the work happened ────────────────────────────────────────────────
+  // A ticket records two positions: where the device was when the job was opened,
+  // and where it was most recently while the job was still open. Between them they
+  // answer "was someone at the well, and did they stay there" — which is what the
+  // mileage on the ticket is being charged against.
+  //
+  // Three things this deliberately does NOT do:
+  //  · It cannot be silent in the sense of unannounced. The browser demands its own
+  //    permission prompt before the first fix and there is no API that skips it, so
+  //    the technician always learns this is happening. It is silent afterwards: no
+  //    UI, no indicator, and the coordinates never appear in a technician's view.
+  //  · It does not run when the technician has turned the Settings toggle off.
+  //  · It does not follow anyone between jobs. Pings exist only while a ticket of
+  //    that technician's own is still being logged, and stop at Job Done.
+  //
+  // GPS needs no network, so a device out of signal still records; the fixes ride up
+  // with the ticket at the next sync.
+  geoEnabled() {
+    const s = (this.state.data || {}).settings || {};
+    return s.shareLocation !== false
+      && typeof navigator !== 'undefined' && !!navigator.geolocation
+      && !this.geoDenied;
+  }
+  // Tickets this device should be pinning: still being logged, and belonging to
+  // whoever is signed in. A manager reviewing a ticket never pings for it.
+  geoActiveTickets() {
+    const S = this.state;
+    if (!S.session || S.role !== 'tech') return [];
+    const me = S.session.name;
+    return (S.data.tickets || []).filter(x => x.status === 'logging' && x.tech === me);
+  }
+  // One fix, shared by the opening pin and the periodic ones. The in-flight guard is
+  // what stops a slow fix from stacking: a request already running means the tick that
+  // wanted another one simply does nothing.
+  geoFix(cb, maxAgeMs) {
+    if (this.geoBusy || !this.geoEnabled()) return;
+    this.geoBusy = true;
+    let settled = false;
+    const done = (fix) => {
+      if (settled) return;
+      settled = true;
+      this.geoBusy = false;
+      cb(fix);
+    };
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const c = pos.coords || {};
+          done({
+            lat: c.latitude, lon: c.longitude,
+            alt: (c.altitude === undefined ? null : c.altitude),
+            acc: (c.accuracy === undefined ? null : c.accuracy),
+            ts: iso(new Date(pos.timestamp || Date.now())),
+          });
+        },
+        (err) => {
+          // A refusal is permanent for the session — retrying a denied permission
+          // every minute would badger the technician with prompts on some browsers
+          // and burn battery on all of them.
+          if (err && err.code === 1) this.geoDenied = true;
+          done(null);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: maxAgeMs === undefined ? GEO_MAX_AGE_MS : maxAgeMs }
+      );
+    } catch (e) { done(null); }
+  }
+  // The opening pin. Written once and never overwritten — it is the record of where
+  // the job was started, so a later fix must not be able to rewrite history.
+  geoPinOpen(ticketId) {
+    if (!this.geoEnabled()) return;
+    this.geoFix((fix) => {
+      if (!fix) return;
+      const askedAt = iso(new Date());
+      this.mutate(d => {
+        const x = d.tickets.find(y => y.id === ticketId);
+        if (!x || (x.geo && x.geo.open)) return;
+        x.geo = Object.assign({}, x.geo, { open: fix, last: fix, pingedAt: askedAt });
+      });
+    });
+  }
+  // The periodic pin. Each fix replaces the previous one rather than appending, so a
+  // device that was offline for a day arrives with one current position, not a day of
+  // breadcrumbs — the last fix before Job Done is what remains.
+  geoTick() {
+    if (!this.geoEnabled()) return;
+    const due = this.geoActiveTickets().filter(x => {
+      const g = x.geo || {};
+      // Scheduled from when the device was last *asked*, not from the age of the fix
+      // it came back with. The browser is allowed to answer with a recent cached fix,
+      // which carries its own older timestamp; scheduling from that timestamp would
+      // leave the ticket permanently overdue and re-ask on every single tick — an
+      // hourly ping turning into a once-a-minute one.
+      const askedAt = g.pingedAt || (g.last && g.last.ts);
+      if (!askedAt) return true;
+      return Date.now() - new Date(askedAt).getTime() >= GEO_PING_INTERVAL_MS;
+    });
+    if (!due.length) return;
+    // One fix serves every ticket still open on this device, not only the ones that
+    // happened to come due — a technician holds one device in one place, so a second
+    // open ticket must not mean a second trip to the GPS. Stamping them all together
+    // also pulls their schedules back into step, so two tickets opened an hour apart
+    // settle onto one hourly fix rather than drifting into two.
+    const ids = this.geoActiveTickets().map(x => x.id);
+    const askedAt = iso(new Date());
+    this.geoFix((fix) => {
+      if (!fix) return;
+      this.mutate(d => {
+        ids.forEach(id => {
+          const x = d.tickets.find(y => y.id === id);
+          // Re-checked inside the mutation: the ticket may have been marked done while
+          // the fix was in flight, and a position recorded after Job Done would be
+          // following someone off the job.
+          if (!x || x.status !== 'logging') return;
+          x.geo = Object.assign({}, x.geo, { last: fix, pingedAt: askedAt });
+          if (!x.geo.open) x.geo.open = fix;
+        });
+      });
+    // A position meant to show whether someone is still on site has to be current, so
+    // the periodic fix refuses cached answers outright. (The opening pin is the one
+    // place a recent cached fix is welcome — see GEO_MAX_AGE_MS.)
+    }, 0);
   }
   // Background sync — runs on a timer instead of only when the technician remembers to
   // tap Sync. Same effect as the manual Sync button (uploads every not-yet-synced
@@ -2045,7 +2225,30 @@ class Component extends DCLogic {
       presenceShow: showPresence,
       presenceDot: online ? 'var(--success)' : 'var(--ink-ghost)',
       presenceLabel: online ? 'Online' : 'Offline',
-    }, chip, card);
+    }, chip, card, this.geoView(t));
+  }
+  // The two positions as the office reads them. Gated on role here rather than in the
+  // markup so a technician's own view cannot render them even by accident: for a
+  // technician every field below is empty and the section that shows them is hidden.
+  geoView(t) {
+    const office = this.state.role === 'mgr' || this.state.role === 'admin' || this.state.role === 'founder';
+    const g = (office && t.geo) || {};
+    const F = this.fmt();
+    const openTxt = geoText(g.open);
+    const lastTxt = geoText(g.last);
+    // Only worth showing the later fix separately once it has actually moved on from
+    // the opening one; otherwise it is the same line printed twice.
+    const moved = !!(g.open && g.last && g.last.ts !== g.open.ts);
+    return {
+      geoShow: !!openTxt,
+      geoNone: office && !openTxt,
+      geoOpenText: openTxt,
+      geoOpenStamp: g.open ? F.stamp(g.open.ts) : '',
+      geoLastShow: moved && !!lastTxt,
+      geoLastText: lastTxt,
+      geoLastStamp: g.last ? F.stamp(g.last.ts) : '',
+      geoLastLabel: t.status === 'logging' ? 'Latest position' : 'Last position before Job Done',
+    };
   }
 
   numberIssue(t) {
@@ -2584,10 +2787,11 @@ class Component extends DCLogic {
       backToList: () => this.setState({ techScreen: 'list', draft: null }),
       draftArrival: S.draft ? F.stamp(S.draft.arrival) : F.stamp(iso(new Date())),
       d: S.draft || { tech: '', customer: '', field: '', well: '', rig: '' },
-      // Field markers on the new-ticket form. A {{ }} binding can hold a React element
-      // but cannot call a function, so each icon is built here and referenced by name.
+      // Field markers on the new-ticket form, and the pin used by the position panel
+      // on the review screen. A {{ }} binding can hold a React element but cannot call
+      // a function, so each icon is built here and referenced by name.
       icCustomer: icon('customer', 17), icField: icon('field', 17),
-      icWell: icon('well', 17), icRig: icon('rig', 17),
+      icWell: icon('well', 16), icRig: icon('rig', 17),
       clientNames: D.clients.map(c => ({ name: c.name })),
       createDisabled: !(S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig),
       createOpacity: (S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig) ? 1 : 0.45,
@@ -2612,6 +2816,10 @@ class Component extends DCLogic {
           });
         });
         this.setState({ activeId: id, techScreen: 'log', draft: null });
+        // Pin where the job was opened. Fires after the ticket exists so the fix has
+        // somewhere to land, and never blocks the technician — a slow or refused fix
+        // leaves the ticket exactly as it is.
+        this.geoPinOpen(id);
       },
 
       cur: view,
