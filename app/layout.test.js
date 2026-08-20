@@ -46,17 +46,30 @@ const boxes = (p) => p.evaluate(() => {
     await p.close();
   }
 
-  // technician, inside the phone mockup at desktop width, and full-bleed on a phone
-  let p = await signIn(browser, 'yousef@makaman.ly', 390, 700);
-  let b = await boxes(p);
-  check('tech phone: bottom bar pinned to the viewport', b.navBottom !== null && Math.abs(b.navBottom - b.vh) < 3, `bottom ${b.navBottom} of ${b.vh}`);
-  await p.close();
-
-  p = await signIn(browser, 'yousef@makaman.ly', 1300, 900);
-  b = await boxes(p);
-  check('tech desktop: bottom bar sits inside the mockup, not pinned to the window',
-    b.navBottom !== null && b.navBottom < b.vh - 5, `bottom ${b.navBottom} of ${b.vh}`);
-  await p.close();
+  // The technician's app, at three real sizes. The phone mockup this used to assert is
+  // gone: a technician whose phone is dead and who picks up a laptop needs an
+  // application, not a picture of a phone he cannot reach. So the bar is pinned to the
+  // viewport at every width now, not sitting at the bottom edge of a drawn bezel.
+  for (const [label, w, h] of [['tech phone', 390, 700], ['tech tablet', 810, 1080], ['tech laptop', 1300, 900]]) {
+    const p = await signIn(browser, 'yousef@makaman.ly', w, h);
+    const b = await boxes(p);
+    check(`${label}: bottom bar pinned to the viewport`,
+      b.navBottom !== null && Math.abs(b.navBottom - b.vh) < 3, `bottom ${b.navBottom} of ${b.vh}`);
+    // Held to a readable column rather than stretched across the whole monitor, and
+    // never wider than the window on a small one.
+    const nav = await p.evaluate(() => {
+      const el = document.querySelector('.mk-bottom-nav');
+      const r = el.getBoundingClientRect();
+      return { w: Math.round(r.width), vw: document.documentElement.clientWidth };
+    });
+    check(`${label}: the bar is a column, not a strip the width of the screen`,
+      nav.w <= 762 && nav.w <= nav.vw + 1, `${nav.w} of ${nav.vw}`);
+    // The mockup and its reviewer copy are gone at every size.
+    const body = await p.innerText('body');
+    check(`${label}: no phone-mockup explainer`, !/Field device/i.test(body)
+      && !/simulate regaining signal/i.test(body));
+    await p.close();
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`);
   await browser.close();

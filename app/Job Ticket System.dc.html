@@ -227,32 +227,24 @@
     .mk-kv > * { width:auto !important; }
     .mk-kv input { min-width:0 !important; max-width:100% !important; }
     .mk-items input { padding-left:5px !important; padding-right:5px !important; font-size:12px !important; }
-    /* Collapse the decorative "phone mockup" frame into a plain full-width mobile page
-       once the viewport actually is phone-sized — the frame/bezel/fixed 398px width only
-       make sense as a design-review aid on a wide desktop screen; on a real phone they'd
-       just overflow and force horizontal scrolling. */
-    .mk-phone-shell { justify-content:flex-start !important; padding:0 !important; gap:0 !important; }
-    /* flex:none on the frame (flex-shrink:0) is what makes the desktop mockup hold its
-       exact 398px size against a squeezed container — that's the opposite of what a real
-       phone viewport needs, so it has to be overridden too, not just width. */
-    .mk-phone-frame { width:100% !important; max-width:100% !important; flex:1 1 auto !important; padding:0 !important; background:transparent !important; border-radius:0 !important; box-shadow:none !important; }
-    .mk-phone-screen { border-radius:0 !important; height:auto !important; min-height:100vh !important; }
-    /* The "Field Device" explainer sidebar exists to tell a desktop reviewer what the
-       phone mockup represents — meaningless (and just takes up space) on an actual
-       phone, which doesn't need to be told what a phone looks like. */
-    .mk-field-note { display:none !important; }
+    .mk-phone-frame { max-width:100% !important; }
     /* A small fixed set of options (tabs, segmented controls) should stay fully visible
        and tappable, never partially hidden behind a horizontal scroll — that's reserved
        for genuinely long lists (data tables). Wrap into an even 2-column grid instead of
        squeezing 4 tabs into one unreadable scrollable row. */
     .mk-tabbar-btn { flex-basis:50% !important; font-size:11px !important; padding:8px 6px !important; }
-    /* Inside the desktop mockup the screen is a fixed-height flex column, so the nav
-       sits at its bottom edge on its own. A real phone viewport has no such bottom to
-       sit against — the screen grows with its content — so the bar has to be pinned to
-       the viewport instead, with the scrolling area given room to clear it. */
-    .mk-bottom-nav { position:fixed !important; left:0; right:0; bottom:0; z-index:40; padding-bottom:env(safe-area-inset-bottom); }
-    .mk-tab-body { padding-bottom:88px !important; }
   }
+  /* The technician's navigation, at every size. It used to be pinned to the viewport
+     only on phones, because on anything wider it sat at the bottom edge of a phone
+     mockup that no longer exists. The bar is centred on the same column as the content
+     rather than stretched edge to edge, so on a laptop it reads as part of the app
+     instead of a strip of chrome the width of the monitor. */
+  .mk-bottom-nav {
+    position:fixed; left:50%; transform:translateX(-50%); bottom:0; z-index:40;
+    width:100%; max-width:760px;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .mk-tab-body { padding-bottom:88px !important; }
   /* Back-navigation as a visible, bounded button rather than a plain text link —
      some field/office staff being trained on this aren't habitual app/mobile users,
      so a same-color underline-less text link is too easy to miss or mistake for a label. */
@@ -572,12 +564,17 @@
 
   <!-- ══ TECHNICIAN ══ -->
   <sc-if value="{{ isTech }}" hint-placeholder-val="{{ true }}">
-    <div class="mk-phone-shell" style="display:flex;justify-content:center;gap:36px;padding:34px 22px 60px">
-      <div class="mk-phone-frame" style="width:398px;flex:none;padding:9px;background:var(--bezel);border-radius:34px;box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.22)">
-        <!-- 806px is the mockup's natural height, but it shrinks to fit a shorter
-             window so the phone's own bottom bar is never pushed below the fold on a
-             laptop. The ≤640px rule replaces this with a full-height page anyway. -->
-        <div class="mk-phone-screen" style="background:var(--ground);border-radius:26px;overflow:hidden;height:min(806px, calc(100vh - 140px));display:flex;flex-direction:column">
+    <!-- The technician's app, at whatever size the device is.
+         This was a 398px phone drawn inside a bezel with an explainer beside it — a
+         design-review prop, useful when the only question was "what will this look like
+         on a phone". It is a real tool now, and a technician whose phone is dead and who
+         picks up a laptop should get an application, not a picture of a phone he cannot
+         reach. The column is held to a readable width rather than stretched across a
+         1366px screen, because these are one-thing-at-a-time screens and a log line
+         spanning a metre of monitor is worse than one that doesn't. -->
+    <div class="mk-phone-shell" style="display:flex;justify-content:center;padding:0">
+      <div class="mk-phone-frame" style="width:100%;max-width:760px;flex:1 1 auto;padding:0;background:transparent">
+        <div class="mk-phone-screen" style="background:var(--ground);overflow:visible;min-height:calc(100vh - 58px);display:flex;flex-direction:column">
 
           <div style="display:flex;align-items:center;gap:8px;padding:11px 18px 6px;font-size:11px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.6)">
             <span>{{ clock }}</span>
@@ -932,15 +929,6 @@
         </div>
       </div>
 
-      <div class="mk-field-note" style="width:290px;flex:none;padding-top:14px;font-size:13px;color:rgba(var(--ink-rgb),0.7)">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Field device</div>
-        <p style="margin:0 0 10px">Everything here works with no connection. Arrival, every log line, Start Job and End Job are stamped from the device clock and stored locally.</p>
-        <p style="margin:0 0 10px">Tap the status pill at the top of the phone to simulate regaining signal. Pending tickets upload automatically in the background once signal returns — tap <strong>Sync</strong> to upload immediately instead of waiting. Only uploaded <em>Job Done</em> tickets reach the operations manager.</p>
-        <p style="margin:0 0 10px">A Job Done ticket stays editable — reopening it for corrections keeps the original stamps.</p>
-        <sc-if value="{{ lastAutoSyncLabel }}" hint-placeholder-val="{{ false }}">
-          <p style="margin:0;color:rgba(var(--ink-rgb),0.5)">{{ lastAutoSyncLabel }}</p>
-        </sc-if>
-      </div>
     </div>
   </sc-if>
 
@@ -1169,10 +1157,12 @@
               <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:12px">
                 <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">1 · Ticket number &amp; mileage</div>
                 <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
+                  <!-- Who holds the claim stays here, because it is the reason the
+                       controls below are live or inert. Handing it over does not: it is
+                       a shift-level decision about every future ticket, not something to
+                       do from inside whichever one happens to be open. It lives in
+                       Account now. -->
                   <span style="font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ numberingHolderLabel }}</span>
-                  <sc-if value="{{ numberingCanTransfer }}" hint-placeholder-val="{{ false }}">
-                    <button onClick="{{ claimTransfer }}" style="padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Hand over</button>
-                  </sc-if>
                 </div>
               </div>
               <sc-if value="{{ numberingBlocked }}" hint-placeholder-val="{{ false }}">
@@ -1302,6 +1292,29 @@
           </div>
 
           <div style="display:flex;flex-direction:column;gap:18px;position:sticky;top:18px">
+            <!-- Its own container, between the job log and the ticket header. It was a
+                 footnote under the approval checklist, which put what a technician is
+                 sent out carrying below the decision to approve — read in the wrong
+                 order and easy to miss entirely. What leaves the base with someone is
+                 its own subject. -->
+            <sc-if value="{{ assetsEditable }}" hint-placeholder-val="{{ false }}">
+              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+                <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Tools &amp; crossovers allocated</div>
+                  <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ assetHolderLabel }}</div>
+                </div>
+                <sc-for list="{{ assetRows }}" as="a" hint-placeholder-count="2">
+                  <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+                    <input value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                    <input value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                    <input value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                    <button onClick="{{ a.remove }}" title="Remove" style="width:24px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
+                  </div>
+                </sc-for>
+                <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.4">The technician is asked to account for these when they close the job.</div>
+              </div>
+            </sc-if>
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
               <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket header</div>
               <sc-for list="{{ headerFields }}" as="h" hint-placeholder-count="7">
@@ -1364,25 +1377,6 @@
                 <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Approving on the technician's behalf.</strong> {{ approvalForcedText }}</div>
               </sc-if>
               <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
-              <sc-if value="{{ assetsEditable }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.12)">
-                  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
-                    <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Tools &amp; crossovers allocated</div>
-                    <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ assetHolderLabel }}</div>
-                  </div>
-                  <sc-for list="{{ assetRows }}" as="a" hint-placeholder-count="2">
-                    <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
-                      <input value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                      <input value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                      <input value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                      <button onClick="{{ a.remove }}" title="Remove" style="width:24px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
-                    </div>
-                  </sc-for>
-                  <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
-                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.4">The technician is asked to account for these when they close the job.</div>
-                </div>
-              </sc-if>
-
               <sc-if value="{{ showAssetAnswers }}" hint-placeholder-val="{{ false }}">
                 <div style="margin-top:14px;padding:11px 13px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.08)">
                   <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--warning-ink);margin-bottom:8px">Allocated assets — accounted for on closing</div>
@@ -2062,6 +2056,24 @@
 
             <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
             <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.45">The bundle is one overview table of everything listed above. ZIP on a row gives that ticket alone: originals in one PDF, copies in the other.</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showClaimPanel }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket numbering claim</div>
+            <div style="font-size:14px;font-weight:600;margin-bottom:2px">{{ claimHolderName }}</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-bottom:4px">{{ claimSinceLabel }}</div>
+            <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45);margin-bottom:10px">{{ claimLastMove }}</div>
+            <div style="font-size:12px;line-height:1.5;color:rgba(var(--ink-rgb),0.7);margin-bottom:12px">One person allocates ticket numbers at a time. Whoever holds the claim numbers every job from the moment they receive it until they hand it on — that is what stops two managers issuing the same number onto two clients' sheets.</div>
+            <sc-if value="{{ claimAdminOverride }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ claimAdminOverrideText }}</div>
+            </sc-if>
+            <sc-if value="{{ claimCanTransfer }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ claimTransfer }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">{{ claimTransferLabel }}</button>
+            </sc-if>
+            <sc-if value="{{ claimCannotTransfer }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:12px;line-height:1.45;color:rgba(var(--ink-rgb),0.55)">{{ claimCannotText }}</div>
+            </sc-if>
           </div>
         </sc-if>
         <div style="display:flex;flex-direction:column;gap:10px">
@@ -4471,6 +4483,10 @@ class Component extends DCLogic {
         + (myName || 'the office') + '. ' + (tk.holder || tk.tech || 'The technician')
         + ' had not closed it.', 'lifecycle');
     };
+    // An Admin moving a claim they do not hold is an override, and reads differently to
+    // the holder passing it on deliberately.
+    const adminOverridingClaim = S.role === 'admin' && !this.holdsNumbering()
+      && !!(D.numbering || {}).holderName;
     const commitTicketNo = fieldCommit('ticketNo', 'Ticket No.');
     const commitMileage = fieldCommit('mileage', 'Mileage');
     const commitJobType = fieldCommit('jobType', 'Job type');
@@ -4554,19 +4570,32 @@ class Component extends DCLogic {
       // Cover for a shift change or a holiday. One holder at a time is the whole point,
       // so this moves the claim rather than sharing it.
       claimNumbering: {
-        title: 'Hand over ticket numbering?',
-        body: 'They become the only person who can assign ticket numbers. You keep every other manager permission — you simply stop allocating numbers until it comes back.',
-        okLabel: 'Hand over', cancelLabel: 'Keep it', hasCancel: true, needsPerson: true,
+        title: adminOverridingClaim ? 'Move ticket numbering to someone else?' : 'Hand over ticket numbering?',
+        body: adminOverridingClaim
+          ? 'An Admin can move the claim when the person holding it is not available. They stop allocating numbers from this moment; the person you choose starts. It is recorded as an Admin override.'
+          : 'They become the only person who can assign ticket numbers. You keep every other manager permission — you simply stop allocating numbers until it comes back.',
+        okLabel: adminOverridingClaim ? 'Move the claim' : 'Hand over',
+        cancelLabel: adminOverridingClaim ? 'Cancel' : 'Keep it', hasCancel: true, needsPerson: true,
         confirm: () => {
           const to = (S.handoverTo || '').trim();
           if (!to) return;
           const target = (D.users || []).find(u => u.name === to) || {};
           const from = (D.numbering || {}).holderName || myName;
+          const when = iso(new Date());
+          const how = adminOverridingClaim ? 'moved by Admin ' + myName : 'handed over by ' + from;
           this.mutate(d => {
-            d.numbering = { holderEmail: target.email || '', holderName: to, since: iso(new Date()) };
+            const prev = ((d.numbering || {}).history) || [];
+            d.numbering = {
+              holderEmail: target.email || '', holderName: to, since: when,
+              // Kept on the claim itself. This used to be written onto whichever ticket
+              // happened to be open, which meant a handover done from anywhere else left
+              // no trace at all — and now that it is done from Account, that would be
+              // every handover.
+              history: prev.concat([{ ts: when, from: from, to: to, by: myName, admin: !!adminOverridingClaim }]).slice(-20),
+            };
           });
-          this.toast('claim-moved', 'Ticket numbering handed to ' + to + '.', 'ok');
-          if (t) this.log('Numbering claim handed over by ' + from + ' to ' + to + '.', 'lifecycle');
+          this.toast('claim-moved', 'Ticket numbering ' + how + ' to ' + to + '.', 'ok');
+          if (t) this.log('Numbering claim ' + how + ' to ' + to + '.', 'lifecycle');
           this.setState({ dialog: null, handoverTo: '' });
         },
       },
@@ -4936,7 +4965,7 @@ class Component extends DCLogic {
           label: label, hint: hint, glyph: icon(iconName), chevron: icon('chevron', 16),
           tileBg: tileBg, tileFg: tileFg, pick: pick,
         });
-        const settings = tile('Settings', 'Theme, time zone, storage', 'system',
+        const settings = tile('Settings', 'Appearance, clock, storage', 'system',
           'rgba(var(--ink-rgb),0.08)', 'var(--ink-dim)', () => this.setState({ showSettings: true }));
         if (S.role === 'admin') {
           const go = (t) => () => this.setState({ adminTab: t, roleTab: 'tickets' });
@@ -5225,8 +5254,16 @@ class Component extends DCLogic {
       handoverTo: S.handoverTo || '',
       setHandoverTo: e => this.setState({ handoverTo: e.target.value }),
       // Anyone active except whoever is holding it now.
-      handoverOptions: (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active'
-        && u.name !== (t ? holderOf(t) : '')).map(u => ({ name: u.name })),
+      // Two different handovers share this dialog, and they hand to different people. A
+      // job goes to another technician; the numbering claim can only go to someone
+      // allowed to hold it. Offering the claim to a technician would let the office
+      // hand numbering to somebody the app then refuses to let number anything.
+      handoverOptions: (S.dialog === 'claimNumbering'
+        ? (D.users || []).filter(u => (u.roleKey === 'mgr' || u.roleKey === 'admin')
+            && u.status === 'active' && u.name !== (D.numbering || {}).holderName)
+        : (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active'
+            && u.name !== (t ? holderOf(t) : ''))
+      ).map(u => ({ name: u.name })),
       askHandover: () => this.setState({ dialog: 'handover', handoverTo: '' }),
       // Only the person actually holding the job can hand it on or log to it. A
       // previous holder still sees the ticket; the buttons are simply not there.
@@ -5596,11 +5633,39 @@ class Component extends DCLogic {
       approvalForcedText: t ? ('Closed in the office by ' + (t.closedBy || 'the operations manager')
         + ', not by ' + (t.holder || t.tech || 'the technician')
         + '. Approving now approves on their behalf; they are notified and can see who did it.') : '',
+      // The claim, as its own subject in Account. Two people may move it: whoever holds
+      // it, and an Admin — because the reason it usually needs moving is that the holder
+      // is not there to move it himself, and a claim that can only be released by the
+      // person who is unreachable is a claim that strands the whole office.
+      showClaimPanel: (S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'account',
+      claimHolderName: (D.numbering || {}).holderName
+        ? ((D.numbering || {}).holderName + (this.holdsNumbering() ? ' — you' : ''))
+        : 'Nobody holds the claim',
+      claimSinceLabel: (D.numbering || {}).since
+        ? ('Numbering every job raised since ' + F.stamp((D.numbering || {}).since))
+        : 'Numbering every job raised from now',
+      claimLastMove: (() => {
+        const h = ((D.numbering || {}).history || []);
+        const last = h[h.length - 1];
+        if (!last) return 'No handover recorded on this device.';
+        return (last.admin ? 'Moved by Admin ' + last.by : 'Handed over by ' + last.from)
+          + ' → ' + last.to + ' · ' + F.stamp(last.ts);
+      })(),
+      claimCanTransfer: S.role === 'admin' || (S.role === 'mgr' && this.holdsNumbering()),
+      claimCannotTransfer: !(S.role === 'admin' || (S.role === 'mgr' && this.holdsNumbering())),
+      claimCannotText: ((D.numbering || {}).holderName || 'Another manager')
+        + ' holds it. Ask them to hand it over, or ask an Admin to move it if they are not available.',
+      claimTransferLabel: this.holdsNumbering() ? 'Hand over the claim' : 'Move the claim',
+      // An Admin taking it off someone is a different act from a holder passing it on,
+      // and the trail should be able to tell them apart afterwards.
+      claimAdminOverride: S.role === 'admin' && !this.holdsNumbering() && !!(D.numbering || {}).holderName,
+      claimAdminOverrideText: 'You are moving this on behalf of '
+        + ((D.numbering || {}).holderName || 'the holder')
+        + ', who is not the one asking. It is recorded as an Admin override.',
       numberingHolderLabel: (D.numbering || {}).holderName
         ? ((D.numbering || {}).holderName + ' holds the numbering claim')
         : 'No one holds the numbering claim',
       numberingIsMine: this.holdsNumbering(),
-      numberingCanTransfer: this.holdsNumbering() && (S.role === 'mgr' || S.role === 'admin'),
       claimTransfer: () => this.setState({ dialog: 'claimNumbering', handoverTo: '' }),
 
       seriesBtns: !t ? [] : D.series.map(s => {
