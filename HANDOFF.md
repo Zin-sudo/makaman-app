@@ -14,8 +14,27 @@ or `execute_sql`.
 
 **Price-list import.** Item codes arrive from the source Excel with stray spacing —
 `MKN- 1801`, `MKN-100 -01`. Normalise whitespace around hyphens on the **item-number
-column only**; every other column is stored exactly as exported. The normaliser lives in
-the import path, not in a one-off cleanup, because each re-import brings the problem back.
+column only**; every other column is stored exactly as exported.
+
+This is now enforced in the database, not in the import script: `public.normalise_item_number(text)`
+plus the `trg_price_list_items_normalise` trigger (migration `0004`). Any re-import — by any
+route — lands clean without the importer having to remember. Canonical form is hyphenated
+throughout: `MKN-100-001`. Values containing no digit are left untouched, because they are
+not codes; `price_list_items.has_valid_code` is false for those so the app can flag them.
+
+**Loaded price lists** (2,274 items, 5 customers, verified 2026-08-20):
+AGOCO 227 · Harouge (HOO) 314 · Sirte (SOC) 292 · Waha Oil Company 608 · Zueitina 833.
+Waha arrived as two workbook sheets with zero overlapping codes and was merged into one
+customer; `price_list_items.source_sheet` records which sheet each row came from.
+Two rows have no usable code and are flagged rather than guessed: HOO `GUIDES - WALL HOOK`
+and Waha `Thru 42" OD` (5,500 per cut). Both need their code read off the signed price list.
+
+Pre-change snapshots live in the `backup` schema (`price_list_items_20260820`,
+`clients_20260820`).
+
+**Migration files.** `0002_price_list_two_tier_and_currency` is applied in the database but
+has no file in `supabase/migrations/` — it was applied directly in an earlier session. Worth
+reconstructing before anyone rebuilds this database from the files alone.
 
 ---
 
