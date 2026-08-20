@@ -37,6 +37,15 @@ and Waha `Thru 42" OD` (5,500 per cut). Both need their code read off the signed
 Pre-change snapshots live in the `backup` schema (`price_list_items_20260820`,
 `clients_20260820`).
 
+**Database state (2026-08-20).** Schema, RLS and seeds are level with the app model:
+15 tables, 44 policies, every table covered. `supabase/migrations/` holds 0001 and
+0003–0011; **0002 is still applied-but-missing** and needs reconstructing before anyone
+rebuilds this database from files alone.
+
+**One setting only you can change:** Supabase Auth → leaked-password protection is
+**off**. Turn it on before real accounts exist —
+https://supabase.com/docs/guides/auth/password-security
+
 **Migration files.** `0002_price_list_two_tier_and_currency` is applied in the database but
 has no file in `supabase/migrations/` — it was applied directly in an earlier session. Worth
 reconstructing before anyone rebuilds this database from the files alone.

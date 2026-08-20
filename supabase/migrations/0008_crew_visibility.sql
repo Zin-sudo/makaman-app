@@ -1,4 +1,4 @@
--- 20260820 · ticket_visibility_follows_the_crew   [PENDING — not yet applied]
+-- 20260820 · ticket_visibility_follows_the_crew   [APPLIED]
 --
 -- Visibility was keyed to technician_id, which predates co-op. A job handed on would
 -- vanish from the opener's list even though their name still prints on the sheet, and

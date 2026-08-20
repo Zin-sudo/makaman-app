@@ -1,4 +1,4 @@
--- 20260820 · seed_reference_rows   [PENDING — not yet applied]
+-- 20260820 · seed_reference_rows   [APPLIED]
 --
 -- The rows the app expects to find on a cold start. Written so re-running is harmless:
 -- a re-import or a second deploy must not duplicate a numbering series or reset a
@@ -15,12 +15,8 @@ insert into public.asset_questions (key, label, tone, multi, presets, sort_order
    array['None'], 2)
 on conflict (key) do nothing;
 
--- The numbering series, with the floor each started from.
-insert into public.ticket_numbering (prefix, label, next_number, floor, note) values
-  ('',  'Special Tools', 1884, 1883, 'Plain four-digit numbers'),
-  ('F', 'Fishing',        703,  702, 'F-prefixed'),
-  ('D', 'Drilling',      5024, 5023, 'D-prefixed')
-on conflict do nothing;
+-- (The numbering series seed moved to 0010: the live counters were found to be ahead
+-- of the defaults, so they could not be seeded blind.)
 
 -- One row, by construction. Left unclaimed: an Admin assigns it to whoever is on shift
 -- rather than the migration guessing at a name.
