@@ -58,7 +58,9 @@ const tab = async (p, name) => {
   check('observer Tickets no longer carries report controls', !/Report size/.test(body));
   body = await tab(p, 'Account');
   // Case-insensitive: innerText applies text-transform, so these render uppercase.
-  check('observer Account has Reports', /Reports/i.test(body) && /Report size/i.test(body) && /Generate report/i.test(body));
+  // "Generate report" became "Generate bundle — N tickets" when the report grew a
+  // month filter and a per-ticket download.
+  check('observer Account has Reports', /Reports/i.test(body) && /Report size/i.test(body) && /Generate bundle/i.test(body));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);

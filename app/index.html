@@ -1801,9 +1801,51 @@
         <sc-if value="{{ showReports }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
             <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Reports</div>
-            <label style="display:block;font-size:13px;margin-bottom:8px;color:rgba(var(--ink-rgb),0.75)">Report size — last {{ founderCount }} approved jobs</label>
-            <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:12px">
-            <button onClick="{{ generateReport }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate report</button>
+            <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Month — counted by End Job date</label>
+            <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+              <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
+                <option value="{{ m.key }}">{{ m.label }}</option>
+              </sc-for>
+            </select>
+            <label style="display:block;font-size:13px;margin-bottom:8px;color:rgba(var(--ink-rgb),0.75)">Report size — up to {{ founderCount }} approved jobs · showing {{ reportCountLabel }}</label>
+            <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:14px">
+
+            <sc-if value="{{ hasReportRows }}" hint-placeholder-val="{{ true }}">
+              <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto;margin-bottom:12px">
+                <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:13px">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
+                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Technician</th>
+                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
+                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Field / Well / Rig</th>
+                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Date</th>
+                      <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="3">
+                      <tr>
+                        <td data-label="Ticket No." style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }}</td>
+                        <td data-label="Technician" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.crewLabel }}</td>
+                        <td data-label="Customer" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.customer }}</td>
+                        <td data-label="Field / Well / Rig" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:rgba(var(--ink-rgb),0.75)">{{ r.locLine }}</td>
+                        <td data-label="Date" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:rgba(var(--ink-rgb),0.75)">{{ r.dateRange }}</td>
+                        <td style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
+                          <button onClick="{{ r.download }}" title="Download this ticket only" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                        </td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noReportRows }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:18px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">No approved jobs finished in that month.</div>
+            </sc-if>
+
+            <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
+            <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.45">The bundle is one overview table of everything listed above. ZIP on a row gives that ticket alone: originals in one PDF, copies in the other.</div>
           </div>
         </sc-if>
         <div style="display:flex;flex-direction:column;gap:10px">
@@ -2745,6 +2787,317 @@ class Component extends DCLogic {
     return { msg: 'Available.', bad: false, ok: true };
   }
 
+  // The four printed sheets for any ticket, not just the one on screen. Extracted so a
+  // report row can produce a ticket's PDFs without opening it, and so the preview and
+  // the export render the same model rather than two that drift apart.
+  // jsPDF and JSZip are precached by the service worker but not loaded at boot: half a
+  // megabyte of parse time on every launch, for something most sessions never touch, is
+  // a bad trade on a field phone. Loaded once on the first export; offline the service
+  // worker serves them from cache, which is the whole reason they are precached.
+  loadExporters() {
+    if (this._exporters) return this._exporters;
+    const need = [];
+    if (!(window.jspdf && window.jspdf.jsPDF)) need.push('./vendor/jspdf.umd.min.js');
+    if (!window.JSZip) need.push('./vendor/jszip.min.js');
+    this._exporters = Promise.all(need.map(src => new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src; el.onload = resolve; el.onerror = () => reject(new Error(src));
+      document.head.appendChild(el);
+    })));
+    return this._exporters;
+  }
+
+  // Hands the browser a file. Revoking on the next tick rather than immediately: Safari
+  // aborts the download if the URL dies before it has read it.
+  saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // One printed sheet, drawn in millimetres on A4. Vector text rather than a screenshot
+  // of the preview: it stays crisp at any zoom, the file is a fraction of the size, and
+  // the numbers stay selectable and searchable in the client's PDF reader.
+  drawSheet(doc, page) {
+    const L = 12, R = 198, W = R - L;
+    let y = 14;
+    const line = (y1) => { doc.setDrawColor(70); doc.line(L, y1, R, y1); };
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(20);
+    doc.text('MAKAMAN LIBYA COMPANY', L, y);
+    doc.text('OIL SERVICES INCORPORATED', L, y + 4);
+    doc.text('TOOLS & TESTING · TRIPOLI - LIBYA', L, y + 8);
+    doc.setFontSize(13);
+    doc.text(page.title.toUpperCase() + ' (' + page.mark + ')' + (page.pageLabel || ''), R, y + 2, { align: 'right' });
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    doc.text('Ticket No: ' + page.no, R, y + 8, { align: 'right' });
+    y += 13; line(y); y += 6;
+
+    // header field rows, two columns where the sheet has two
+    doc.setFontSize(8);
+    const rows = page.isService ? page.svcRows : page.logRows;
+    (rows || []).forEach(r => {
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(105);
+      doc.text(String(r.labelA || ''), L, y);
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
+      doc.text(String(r.valueA || ''), L + 32, y);
+      if (r.hasB) {
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(105);
+        doc.text(String(r.labelB || ''), L + 100, y);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
+        doc.text(String(r.valueB || ''), L + 132, y);
+      }
+      y += 5.4;
+    });
+    y += 1; line(y); y += 6;
+
+    if (page.isService) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(20);
+      doc.text(String(page.jobType || ''), L + W / 2, y, { align: 'center' });
+      y += 6;
+      const cols = [L, L + 24, L + 108, L + 122, L + 140, L + 166];
+      const heads = ['Item no.', 'Item Description', 'Qty', 'Unit', 'Unit Cost', 'Total Cost'];
+      doc.setFontSize(7.5);
+      heads.forEach((h, i) => doc.text(h, i >= 2 ? cols[i] : cols[i], y));
+      y += 2; line(y); y += 4;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+      (page.items || []).forEach(it => {
+        if (it.code || it.desc) {
+          doc.setTextColor(20);
+          doc.text(String(it.code || ''), cols[0], y);
+          doc.text(doc.splitTextToSize(String(it.desc || ''), 80)[0] || '', cols[1], y);
+          doc.text(String(it.qty || ''), cols[2], y);
+          doc.text(String(it.uom || ''), cols[3], y);
+          doc.text(String(it.unit || ''), cols[5] - 2, y, { align: 'right' });
+          doc.text(String(it.total || ''), R, y, { align: 'right' });
+        }
+        doc.setDrawColor(215); doc.line(L, y + 1.4, R, y + 1.4);
+        y += 5;
+      });
+      if (page.showTotal) {
+        y += 2; doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(20);
+        doc.text('Total =', cols[4], y);
+        doc.text(String(page.total || ''), R, y, { align: 'right' });
+        y += 4;
+      }
+    } else {
+      (page.logTimes || []).forEach(lt => {
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(105); doc.setFontSize(8);
+        doc.text(lt.label + ':', L, y);
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
+        doc.text(String(lt.value || ''), L + 40, y);
+        y += 5;
+      });
+      y += 2;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(20);
+      doc.text('Date', L, y); doc.text('Time', L + 22, y); doc.text('Description of Operations', L + 42, y);
+      y += 2; line(y); y += 4;
+      doc.setFont('helvetica', 'normal');
+      (page.events || []).forEach(e => {
+        if (e.text) {
+          doc.setTextColor(20);
+          doc.text(String(e.date || ''), L, y);
+          doc.text(String(e.time || ''), L + 22, y);
+          doc.text(doc.splitTextToSize(String(e.text || ''), 140)[0] || '', L + 42, y);
+        }
+        doc.setDrawColor(215); doc.line(L, y + 1.4, R, y + 1.4);
+        y += 5;
+      });
+    }
+
+    if (page.showSignature) {
+      const sy = 268;
+      doc.setDrawColor(70);
+      doc.line(L, sy, L + 70, sy);
+      doc.line(R - 70, sy, R, sy);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(105);
+      doc.text('CUSTOMER REPRESENTATIVE', L, sy + 4);
+      doc.text(String(page.signee2 || ''), R, sy + 4, { align: 'right' });
+    } else if (page.isContinued) {
+      doc.setFontSize(7.5); doc.setTextColor(120);
+      doc.text('continued overleaf', R, 272, { align: 'right' });
+    }
+  }
+
+  // Pages of one kind into a single PDF.
+  pdfFromPages(pages) {
+    const JsPDF = window.jspdf.jsPDF;
+    const doc = new JsPDF({ unit: 'mm', format: 'a4' });
+    pages.forEach((pg, i) => { if (i) doc.addPage(); this.drawSheet(doc, pg); });
+    return doc;
+  }
+
+  // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF and
+  // the two COPY sheets in another, zipped together. Two files rather than four because
+  // that is how they are signed — an original set and a copy set.
+  exportTicketZip(ticket) {
+    return this.loadExporters().then(() => {
+      const SH = this.buildSheets(ticket);
+      const no = (ticket.ticketNo || 'unnumbered').replace(/[^\w.-]+/g, '-');
+      const zip = new window.JSZip();
+      zip.file(no + '-ORIGINAL.pdf', this.pdfFromPages(SH.svcOriginal.concat(SH.logOriginal)).output('blob'));
+      zip.file(no + '-COPY.pdf', this.pdfFromPages(SH.svcCopy.concat(SH.logCopy)).output('blob'));
+      return zip.generateAsync({ type: 'blob' }).then(blob => {
+        this.saveBlob(blob, 'Makaman-' + no + '.zip');
+        return no;
+      });
+    });
+  }
+
+  // The overview: one row per ticket, for reading across a month rather than one job in
+  // detail. Highest ticket number first, so the most recent work is at the top.
+  exportBundle(tickets, label) {
+    return this.loadExporters().then(() => {
+      const F = this.fmt();
+      const JsPDF = window.jspdf.jsPDF;
+      const doc = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+      const L = 10, R = 287;
+      let y = 16;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(20);
+      doc.text('MAKAMAN LIBYA — JOB TICKETS', L, y);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(105);
+      doc.text(label + ' · ' + tickets.length + ' ticket(s) · generated ' + F.stamp(iso(new Date())), L, y + 5);
+      y += 13;
+      const cols = [L, L + 22, L + 62, L + 118, L + 158, L + 190, L + 218, L + 250];
+      const heads = ['Ticket No.', 'Technician', 'Customer', 'Field', 'Well', 'Rig', 'Date', 'Value'];
+      const drawHead = () => {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(20);
+        heads.forEach((h, i) => doc.text(h, cols[i], y));
+        doc.setDrawColor(70); doc.line(L, y + 1.6, R, y + 1.6);
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+      };
+      drawHead();
+      doc.setFontSize(8);
+      tickets.forEach(t => {
+        if (y > 195) { doc.addPage(); y = 16; drawHead(); }
+        const cell = (v, w) => doc.splitTextToSize(String(v == null ? '' : v), w)[0] || '';
+        doc.setTextColor(20);
+        doc.text(cell(t.ticketNo || '—', 20), cols[0], y);
+        doc.text(cell(crewLabel(t) || t.tech, 38), cols[1], y);
+        doc.text(cell(t.customer, 54), cols[2], y);
+        doc.text(cell(t.field, 38), cols[3], y);
+        doc.text(cell(t.well, 30), cols[4], y);
+        doc.text(cell(t.rig, 26), cols[5], y);
+        doc.text(cell(t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '—'), 30), cols[6], y);
+        doc.text(money(this.ticketTotal(t), this.ticketCurrency(t)), R, y, { align: 'right' });
+        doc.setDrawColor(215); doc.line(L, y + 1.4, R, y + 1.4);
+        y += 5.4;
+      });
+      doc.save('Makaman-overview-' + label.replace(/[^\w.-]+/g, '-') + '.pdf');
+      return tickets.length;
+    });
+  }
+
+  buildSheets(ticket) {
+    const t = ticket;
+    const F = this.fmt();
+    const pairRow = (labelA, valueA, labelB, valueB) => ({
+      labelA: labelA, valueA: valueA === undefined || valueA === null ? '' : String(valueA),
+      hasB: labelB !== undefined, labelB: labelB || '',
+      valueB: valueB === undefined || valueB === null ? '' : String(valueB),
+    });
+    const svcRows = t ? [
+      pairRow('Customer:', t.customer),
+      pairRow('Field Name:', t.field),
+      pairRow('Well No:', t.well, 'MKN Supervisor:', crewLabel(t)),
+      pairRow('Rig Name:', t.rig, 'Start Job:', F.date(t.start)),
+      // "(One Way)" is appended permanently next to the entered mileage so the client
+      // can see, right on the ticket, why the Qty on the mileage line item further down
+      // reads double this number (round trip = 2x one-way distance).
+      pairRow('Mileage (Km):', t.mileage === 0 ? '0 (One Way)' : (t.mileage ? t.mileage + ' (One Way)' : ''), 'End Job:', t.end ? F.date(t.end) : ''),
+      pairRow('Base Location:', t.baseLocation),
+    ] : [];
+    const logRows = t ? [
+      pairRow('Customer:', t.customer, 'Date:', t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '')),
+      pairRow('Field:', t.field, 'Job Type:', t.jobType),
+      pairRow('Well No:', t.well, 'Customer Rep.:', t.customerRep),
+      pairRow('Job Supervisor:', crewLabel(t), 'Rig Name:', t.rig),
+    ] : [];
+    const logTimes = t ? [
+      { label: 'Start Job', value: F.date(t.start) },
+      { label: 'End Job', value: t.end ? F.date(t.end) : '—' },
+      { label: 'Arrived To Location', value: F.stamp(t.arrival) },
+    ] : [];
+    // The real template's item table runs rows 16-39 (24 rows) before the Total row, and
+    // its Job Log table runs rows 20-44 (25 rows) before the signature block — both
+    // ranges hold that shape whether or not every row is filled in, so the printed page
+    // always shows the same number of ruled lines. Padding sheetItems/sheetEvents out to
+    // a fixed count (below) reproduces that.
+    // These caps match the real template exactly (24/25). An earlier pass had these
+    // trimmed to 20/22 because the on-screen preview card was capped at max-width:640px
+    // for on-screen readability, and 24/25 real rows at 19px each didn't fit that smaller
+    // box without shoving the signature block off the bottom. Measured against the true
+    // full-size A4 print page (the actual PDF export target, ~297mm/1122px tall) instead,
+    // the real 24/25 counts fit with ~195-210px (10+ rows) to spare before the signature
+    // block, so the on-screen cap was the artificial constraint, not the page itself.
+    const ITEM_ROW_CAP = 24;
+    const LOG_ROW_CAP = 25;
+    const sheetItemsReal = t ? (t.items || []).map(i => ({
+      code: i.code, desc: i.desc,
+      qty: i.kind === 'percent' ? '—' : String(i.qty),
+      uom: i.uom,
+      unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost, this.ticketCurrency(t)),
+      total: money(this.itemTotal(i, t), this.ticketCurrency(t)),
+    })) : [];
+    const sheetEventsReal = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), pressure: '—', durTotal: '—', text: e.text })) : [];
+    // Overflow handling: a ticket can genuinely have more charged items or job-log lines
+    // than fit the one-page cap above. Rather than silently truncating (losing real
+    // data) or silently growing past a real page's proportions, split into multiple
+    // page-shaped cards — same approach a real print run takes when a ticket runs long.
+    // Every page pads to the same row cap so each looks like a full ruled page; only the
+    // last page of a given sheet type carries the Total row / signature block.
+    const paginate = (arr, cap) => {
+      if (arr.length === 0) return [[]];
+      const pages = [];
+      for (let i = 0; i < arr.length; i += cap) pages.push(arr.slice(i, i + cap));
+      return pages;
+    };
+    const padTo = (arr, cap, emptyRow) => arr.concat(Array.from({ length: Math.max(0, cap - arr.length) }, () => Object.assign({}, emptyRow)));
+    const itemPages = paginate(sheetItemsReal, ITEM_ROW_CAP);
+    const eventPages = paginate(sheetEventsReal, LOG_ROW_CAP);
+    const svcOverflow = itemPages.length > 1;
+    const logOverflow = eventPages.length > 1;
+    const EMPTY_ITEM_ROW = { code: '', desc: '', qty: '', uom: '', unit: '', total: '' };
+    const EMPTY_LOG_ROW = { date: '', time: '', pressure: '', durTotal: '', text: '' };
+    const grandTotalStr = t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0);
+    const mkSvcPages = (mark) => itemPages.map((pageItems, idx) => {
+      const isLast = idx === itemPages.length - 1;
+      return {
+        title: 'Service Ticket', mark: mark, no: t ? (t.ticketNo || '—') : '—',
+        pageLabel: itemPages.length > 1 ? (' · Page ' + (idx + 1) + ' of ' + itemPages.length) : '',
+        isService: true, isLog: false,
+        svcRows: svcRows, jobType: t ? (t.jobType || '—') : '—',
+        items: padTo(pageItems, ITEM_ROW_CAP, EMPTY_ITEM_ROW),
+        showTotal: isLast, total: grandTotalStr,
+        showSignature: isLast, isContinued: !isLast, signee2: 'MAKAMAN LIBYA',
+      };
+    });
+    const mkLogPages = (mark) => eventPages.map((pageEvents, idx) => {
+      const isLast = idx === eventPages.length - 1;
+      return {
+        title: 'Job Log', mark: mark, no: t ? (t.ticketNo || '—') : '—',
+        pageLabel: eventPages.length > 1 ? (' · Page ' + (idx + 1) + ' of ' + eventPages.length) : '',
+        isService: false, isLog: true,
+        logRows: logRows, logTimes: logTimes,
+        events: padTo(pageEvents, LOG_ROW_CAP, EMPTY_LOG_ROW),
+        showTotal: false, total: grandTotalStr,
+        showSignature: isLast, isContinued: !isLast, signee2: 'MAKAMAN Libya',
+      };
+    });
+    return {
+      pages: [].concat(mkSvcPages('ORIGINAL'), mkSvcPages('COPY'), mkLogPages('ORIGINAL'), mkLogPages('COPY')),
+      svcOriginal: mkSvcPages('ORIGINAL'), svcCopy: mkSvcPages('COPY'),
+      logOriginal: mkLogPages('ORIGINAL'), logCopy: mkLogPages('COPY'),
+      svcOverflow: svcOverflow, logOverflow: logOverflow,
+      itemsReal: sheetItemsReal, eventsReal: sheetEventsReal,
+      itemCap: ITEM_ROW_CAP, logCap: LOG_ROW_CAP,
+      total: grandTotalStr,
+    };
+  }
+
   renderVals() {
     const S = this.state, D = S.data, self = this;
     const F = this.fmt();
@@ -2786,6 +3139,27 @@ class Component extends DCLogic {
     })();
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
+
+    // One list feeds the preview table and the bundle button, so what is on screen is
+    // exactly what downloads — the slider cannot mean one thing in the table and another
+    // in the file.
+    const reportRows = (() => {
+      const inMonth = approved.filter(x => {
+        if (!S.reportMonth) return true;
+        const d = dt(x.end || x.start);
+        if (!d) return false;
+        return (d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')) === S.reportMonth;
+      });
+      // Highest ticket number first. Numbers are strings and can carry a letter prefix,
+      // so compare the numeric tail within a prefix and fall back to plain text order.
+      const key = (x) => (x.ticketNo || '').trim();
+      return inMonth.slice().sort((a, b) => {
+        const ka = key(a), kb = key(b);
+        const na = parseInt(ka.replace(/^\D+/, ''), 10), nb = parseInt(kb.replace(/^\D+/, ''), 10);
+        if (!isNaN(na) && !isNaN(nb) && na !== nb) return nb - na;
+        return kb.localeCompare(ka);
+      }).slice(0, S.founderCount);
+    })();
 
     // Every ticket list reads top to bottom in the order the work needs attention:
     // still out in the field, then waiting on someone in the office, then finished.
@@ -2911,94 +3285,7 @@ class Component extends DCLogic {
     const pairRow = (labelA, valueA, labelB, valueB) => ({
       labelA: labelA, valueA: valueA || '—', labelB: labelB || '', valueB: valueB || '—', hasB: !!labelB,
     });
-    const svcRows = t ? [
-      pairRow('Customer:', t.customer),
-      pairRow('Field Name:', t.field),
-      pairRow('Well No:', t.well, 'MKN Supervisor:', crewLabel(t)),
-      pairRow('Rig Name:', t.rig, 'Start Job:', F.date(t.start)),
-      // "(One Way)" is appended permanently next to the entered mileage so the client
-      // can see, right on the ticket, why the Qty on the mileage line item further down
-      // reads double this number (round trip = 2x one-way distance).
-      pairRow('Mileage (Km):', t.mileage === 0 ? '0 (One Way)' : (t.mileage ? t.mileage + ' (One Way)' : ''), 'End Job:', t.end ? F.date(t.end) : ''),
-      pairRow('Base Location:', t.baseLocation),
-    ] : [];
-    const logRows = t ? [
-      pairRow('Customer:', t.customer, 'Date:', t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '')),
-      pairRow('Field:', t.field, 'Job Type:', t.jobType),
-      pairRow('Well No:', t.well, 'Customer Rep.:', t.customerRep),
-      pairRow('Job Supervisor:', crewLabel(t), 'Rig Name:', t.rig),
-    ] : [];
-    const logTimes = t ? [
-      { label: 'Start Job', value: F.date(t.start) },
-      { label: 'End Job', value: t.end ? F.date(t.end) : '—' },
-      { label: 'Arrived To Location', value: F.stamp(t.arrival) },
-    ] : [];
-    // The real template's item table runs rows 16-39 (24 rows) before the Total row, and
-    // its Job Log table runs rows 20-44 (25 rows) before the signature block — both
-    // ranges hold that shape whether or not every row is filled in, so the printed page
-    // always shows the same number of ruled lines. Padding sheetItems/sheetEvents out to
-    // a fixed count (below) reproduces that.
-    // These caps match the real template exactly (24/25). An earlier pass had these
-    // trimmed to 20/22 because the on-screen preview card was capped at max-width:640px
-    // for on-screen readability, and 24/25 real rows at 19px each didn't fit that smaller
-    // box without shoving the signature block off the bottom. Measured against the true
-    // full-size A4 print page (the actual PDF export target, ~297mm/1122px tall) instead,
-    // the real 24/25 counts fit with ~195-210px (10+ rows) to spare before the signature
-    // block, so the on-screen cap was the artificial constraint, not the page itself.
-    const ITEM_ROW_CAP = 24;
-    const LOG_ROW_CAP = 25;
-    const sheetItemsReal = t ? (t.items || []).map(i => ({
-      code: i.code, desc: i.desc,
-      qty: i.kind === 'percent' ? '—' : String(i.qty),
-      uom: i.uom,
-      unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost, this.ticketCurrency(t)),
-      total: money(this.itemTotal(i, t), this.ticketCurrency(t)),
-    })) : [];
-    const sheetEventsReal = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), pressure: '—', durTotal: '—', text: e.text })) : [];
-    // Overflow handling: a ticket can genuinely have more charged items or job-log lines
-    // than fit the one-page cap above. Rather than silently truncating (losing real
-    // data) or silently growing past a real page's proportions, split into multiple
-    // page-shaped cards — same approach a real print run takes when a ticket runs long.
-    // Every page pads to the same row cap so each looks like a full ruled page; only the
-    // last page of a given sheet type carries the Total row / signature block.
-    const paginate = (arr, cap) => {
-      if (arr.length === 0) return [[]];
-      const pages = [];
-      for (let i = 0; i < arr.length; i += cap) pages.push(arr.slice(i, i + cap));
-      return pages;
-    };
-    const padTo = (arr, cap, emptyRow) => arr.concat(Array.from({ length: Math.max(0, cap - arr.length) }, () => Object.assign({}, emptyRow)));
-    const itemPages = paginate(sheetItemsReal, ITEM_ROW_CAP);
-    const eventPages = paginate(sheetEventsReal, LOG_ROW_CAP);
-    const svcOverflow = itemPages.length > 1;
-    const logOverflow = eventPages.length > 1;
-    const EMPTY_ITEM_ROW = { code: '', desc: '', qty: '', uom: '', unit: '', total: '' };
-    const EMPTY_LOG_ROW = { date: '', time: '', pressure: '', durTotal: '', text: '' };
-    const grandTotalStr = t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0);
-    const mkSvcPages = (mark) => itemPages.map((pageItems, idx) => {
-      const isLast = idx === itemPages.length - 1;
-      return {
-        title: 'Service Ticket', mark: mark, no: t ? (t.ticketNo || '—') : '—',
-        pageLabel: itemPages.length > 1 ? (' · Page ' + (idx + 1) + ' of ' + itemPages.length) : '',
-        isService: true, isLog: false,
-        svcRows: svcRows, jobType: t ? (t.jobType || '—') : '—',
-        items: padTo(pageItems, ITEM_ROW_CAP, EMPTY_ITEM_ROW),
-        showTotal: isLast, total: grandTotalStr,
-        showSignature: isLast, isContinued: !isLast, signee2: 'MAKAMAN LIBYA',
-      };
-    });
-    const mkLogPages = (mark) => eventPages.map((pageEvents, idx) => {
-      const isLast = idx === eventPages.length - 1;
-      return {
-        title: 'Job Log', mark: mark, no: t ? (t.ticketNo || '—') : '—',
-        pageLabel: eventPages.length > 1 ? (' · Page ' + (idx + 1) + ' of ' + eventPages.length) : '',
-        isService: false, isLog: true,
-        logRows: logRows, logTimes: logTimes,
-        events: padTo(pageEvents, LOG_ROW_CAP, EMPTY_LOG_ROW),
-        showTotal: false, total: grandTotalStr,
-        showSignature: isLast, isContinued: !isLast, signee2: 'MAKAMAN Libya',
-      };
-    });
+    const SH = this.buildSheets(t);
 
     const dialogs = {
       handover: {
@@ -4073,17 +4360,17 @@ class Component extends DCLogic {
       askReopen: () => this.setState({ dialog: 'reopen', reasonText: '' }),
       goPrint: () => this.setState({ mgrScreen: 'print' }),
       curAudit: t ? (t.audit || []).slice().reverse().map(a => ({ stamp: F.stamp(a.ts), text: a.text })) : [],
-      sheets: [].concat(mkSvcPages('ORIGINAL'), mkSvcPages('COPY'), mkLogPages('ORIGINAL'), mkLogPages('COPY')),
+      sheets: SH.pages,
       // Surfaced on the print/preview screen when a ticket has more charged items or
       // job-log lines than fit the one-page cap (ITEM_ROW_CAP=24 / LOG_ROW_CAP=25,
       // matching the real template's row counts) — extra pages are already added
       // automatically above, this just tells the Ops Manager that happened and offers
       // the alternative of trimming lines instead.
-      printOverflow: svcOverflow || logOverflow,
+      printOverflow: SH.svcOverflow || SH.logOverflow,
       printOverflowText: (() => {
         const bits = [];
-        if (svcOverflow) bits.push((sheetItemsReal.length - ITEM_ROW_CAP) + ' more charged item(s) than the ' + ITEM_ROW_CAP + '-row page limit');
-        if (logOverflow) bits.push((sheetEventsReal.length - LOG_ROW_CAP) + ' more job-log line(s) than the ' + LOG_ROW_CAP + '-row page limit');
+        if (SH.svcOverflow) bits.push((SH.itemsReal.length - SH.itemCap) + ' more charged item(s) than the ' + SH.itemCap + '-row page limit');
+        if (SH.logOverflow) bits.push((SH.eventsReal.length - SH.logCap) + ' more job-log line(s) than the ' + SH.logCap + '-row page limit');
         return 'This ticket has ' + bits.join(' and ') + ' — a second page was added automatically below. Prefer one page? Go back to review and remove some lines, then reopen this preview.';
       })(),
       exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.toast('export', 'Four sheets generated from the template and downloading to this device.', 'ok'); },
@@ -4208,10 +4495,44 @@ class Component extends DCLogic {
         { label: 'Awaiting manager', value: String(awaiting.length) },
       ],
       founderCount: S.founderCount,
+      // ── Reports ──────────────────────────────────────────────────────────
+      // A job is counted in the month it finished, not the month it started: a run that
+      // begins in February and ends in March belongs to March, because that is when the
+      // work was delivered and when it gets invoiced. Falls back to the start date only
+      // for a job with no end recorded at all.
+      reportMonths: (() => {
+        const seen = {};
+        approved.forEach(x => {
+          const d = dt(x.end || x.start);
+          if (!d) return;
+          const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          seen[key] = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(d);
+        });
+        return [{ key: '', label: 'All months' }].concat(
+          Object.keys(seen).sort().reverse().map(k => ({ key: k, label: seen[k] })));
+      })(),
+      reportMonth: S.reportMonth || '',
+      pickReportMonth: e => this.setState({ reportMonth: e.target.value }),
+      reportRows: reportRows.map(x => Object.assign(this.ticketView(x), {
+        // Each row can be taken on its own — the slider governs the bundle, not this.
+        download: () => this.exportTicketZip(x)
+          .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in the other.', 'ok'))
+          .catch(() => this.toast('zip-fail', 'Could not build that download on this device.', 'warn')),
+      })),
+      reportCountLabel: reportRows.length === 1
+        ? '1 ticket' : reportRows.length + ' tickets',
+      hasReportRows: reportRows.length > 0,
+      noReportRows: reportRows.length === 0,
+      generateBundle: () => {
+        if (!reportRows.length) { this.toast('bundle-empty', 'Nothing to bundle for that month.', 'warn'); return; }
+        const label = S.reportMonth || 'all months';
+        this.exportBundle(reportRows, label)
+          .then(n => this.toast('bundle', 'Overview of ' + n + ' ticket(s) downloaded.', 'ok'))
+          .catch(() => this.toast('bundle-fail', 'Could not build the overview on this device.', 'warn'));
+      },
       founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
         open: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
       })),
-      generateReport: () => this.toast('report', 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary.', 'ok'),
 
       // Live activity — the only view in the app that shows tickets still being logged
       // in the field to the Observer, who otherwise only ever sees already-approved
