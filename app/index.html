@@ -142,6 +142,13 @@
        two purely decorative text pieces so the bar stays one line and nothing clips. */
     .mk-nav-title { display:none !important; }
     .mk-nav-role { display:none !important; }
+    /* The position readout is the reason the bar is crowded, and it is also the piece
+       that must survive: a screenshot is worth nothing to a search party without it.
+       So the name gives up its width instead of wrapping to two lines, and the label
+       above the coordinates goes — the numbers are self-evidently coordinates. */
+    .mk-nav-name { white-space:nowrap !important; }
+    .mk-nav-fix-label { display:none !important; }
+    .mk-nav-fix { padding-left:9px !important; padding-right:9px !important; }
   }
   @media (max-width: 640px) {
     /* Two across rather than one. Four figures stacked single-file pushed the actual
@@ -414,8 +421,14 @@
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
       <div class="mk-nav-title" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
+    <sc-if value="{{ showBarFix }}" hint-placeholder-val="{{ true }}">
+      <div class="mk-nav-fix" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">
+        <span class="mk-nav-fix-label" style="opacity:0.55;text-transform:uppercase;font-size:10px;letter-spacing:0.06em">Position</span>
+        <span style="font-weight:600">{{ barFixText }}</span>
+      </div>
+    </sc-if>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:13px">
-      <span style="font-weight:600">{{ sessionName }}</span>
+      <span class="mk-nav-name" style="font-weight:600">{{ sessionName }}</span>
       <span class="mk-nav-role" style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
     </div>
   </div>
@@ -438,21 +451,14 @@
               <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
           </div>
-          <div style="display:flex;gap:12px;align-items:center">
-            <sc-for list="{{ accentSwatches }}" as="a" hint-placeholder-count="5">
-              <span onClick="{{ a.pick }}" style="width:26px;height:26px;border-radius:50%;background:{{ a.color }};box-shadow:0 0 0 2px var(--ground), 0 0 0 4px {{ a.color }};cursor:pointer;display:inline-block"></span>
-            </sc-for>
-          </div>
-          <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:10px">Dark mode applies across every screen. Accent colour is saved but not applied yet.</div>
+          <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:10px">Applies across every screen.</div>
         </div>
 
         <div style="margin-bottom:28px">
           <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Date &amp; time</div>
-          <select value="{{ timezoneValue }}" onChange="{{ setTimezone }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:14px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.22);color:var(--ink);margin-bottom:12px">
-            <sc-for list="{{ timezoneOptions }}" as="z" hint-placeholder-count="7">
-              <option value="{{ z.value }}">{{ z.label }}</option>
-            </sc-for>
-          </select>
+          <div style="padding:10px 12px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:12px;font-size:13px">
+            All times are <strong>Libya time (UTC+2)</strong> on every device.
+          </div>
           <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22)">
             <sc-for list="{{ timeFormatOptions }}" as="o" hint-placeholder-count="2">
               <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
@@ -468,7 +474,7 @@
                 <span style="position:absolute;top:1px;left:{{ shareLocationKnob }};width:18px;height:18px;background:var(--surface)"></span>
               </button>
             </div>
-            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px;line-height:1.4">Captured silently on arrival when a connection is available. Visible only to the Ops Manager — never shown on your screen.</div>
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px;line-height:1.4">Controls what the office is told. Your own position stays in the top bar either way, so a screenshot of any screen can be used to find you.</div>
           </div>
         </sc-if>
 
@@ -2119,6 +2125,445 @@ const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin:
 // logged in or how many other admins exist. Every other user, including other admins,
 // can be deleted by an Admin.
 const MASTER_ADMIN_EMAIL = 'lateri@makaman.ly';
+
+// ── The cloud store ──────────────────────────────────────────────────────────
+// The screens read `state.data` synchronously and always have. Supabase is async, so
+// rather than rewrite every screen around promises, the database is treated as the
+// authority and `state.data` as a local replica of it:
+//
+//   sign in    → hydrate() pulls everything this person may see and shapes it exactly
+//                like seed() does, so no screen can tell the difference.
+//   a change   → mutate() writes the replica first and enqueues the change. The UI never
+//                waits for the network; a technician at a wellhead has no network.
+//   reconnect  → the outbox drains in order. Anything already superseded is dropped
+//                rather than replayed, so a day offline does not become a burst of
+//                writes when the truck reaches signal.
+//
+// The replica is cached under its own key. Losing signal is normal here; a cold start
+// with no signal must still open the app on real data rather than on demo tickets.
+// Ids the app shape has no room for. A ticket names its job type; the database points
+// at a row. Rather than widen the app's model to carry a uuid nobody reads, the lookup
+// is kept here and filled at hydrate.
+const CLOUD_IDS = { job: {}, me: null };
+const CACHE_K = 'makaman.cloud.v1';
+const OUTBOX_K = 'makaman.outbox.v1';
+
+// Ids are minted on the device, not by the database. An offline technician opening a
+// ticket needs its id immediately — for the ticket's own children, for the audit trail,
+// for the URL — and cannot wait for a round trip that may be hours away.
+function uuid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+// Timestamps travel as ISO strings in the app and as timestamptz in the database. An
+// empty string is the app's "not yet"; null is the database's. Neither may reach the
+// other — Postgres rejects '' for a timestamp, and the app's date formatting turns null
+// into "Invalid Date".
+const tsOut = (v) => (v ? new Date(v).toISOString() : null);
+const tsIn = (v) => (v ? new Date(v).toISOString() : '');
+const numOut = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
+const numIn = (v) => (v === null || v === undefined ? '' : Number(v));
+
+// ── DB row → app shape ───────────────────────────────────────────────────────
+// Names, not ids, are what the app has always keyed on: a ticket says its technician is
+// 'Yousef Al-Harbi' and its customer 'Kuwait Oil Group'. The database keys on uuids, as
+// it should. Resolution happens here, once, at the edge — the alternative is every
+// screen learning to join.
+function shapeUser(p) {
+  const key = ROLE_FROM_DB[p.role] || 'tech';
+  return {
+    id: p.id, name: p.full_name || p.email, email: p.email, roleKey: key,
+    role: ROLE_LABEL[key], base: 'Ahmadi Base', lastSync: '', status: p.status,
+  };
+}
+function shapeClient(c, items) {
+  return {
+    id: c.id, name: c.name, currency: c.currency || DEFAULT_CURRENCY,
+    // Fields and rigs are free text on the ticket, gathered from what has actually been
+    // worked rather than from a list somebody has to maintain.
+    fields: '', rigs: '',
+    items: (items || []).map((i) => ({
+      id: i.id, code: i.item_number, desc: i.description, uom: i.uom,
+      cost: Number(i.unit_cost) || 0,
+      costAdd: i.unit_cost_additional === null ? '' : Number(i.unit_cost_additional),
+      currency: i.currency || c.currency || DEFAULT_CURRENCY,
+      // Flagged rather than hidden: the item is real and priced, but its code cell held
+      // something that is not a code, so it must be confirmed before it reaches a client.
+      badCode: i.has_valid_code === false,
+    })),
+  };
+}
+function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
+  const k = kids || {};
+  return {
+    id: t.id,
+    tech: nameById[t.technician_id] || '',
+    holder: nameById[t.holder_id] || nameById[t.technician_id] || '',
+    customer: t.customer || (clientById[t.client_id] || {}).name || '',
+    field: t.field_name || '', well: t.well_no || '', rig: t.rig_name || '',
+    jobType: jobById[t.job_type_id] || '',
+    arrival: tsIn(t.arrival_at), start: tsIn(t.start_job_at), end: tsIn(t.end_job_at),
+    status: t.status, synced: !!t.synced, syncedAt: tsIn(t.synced_at),
+    ticketNo: t.ticket_number || '', mileage: numIn(t.mileage_one_way),
+    currency: t.currency || DEFAULT_CURRENCY,
+    baseLocation: t.base_location || '', customerRep: t.customer_rep || '',
+    officeClosed: !!t.office_closed,
+    closedBy: nameById[t.closed_by] || '', closedAt: tsIn(t.closed_at),
+    approvedBy: nameById[t.approved_by] || '', approvedAt: tsIn(t.approved_at),
+    geo: (t.geo_open || t.geo_last)
+      ? { open: t.geo_open || null, last: t.geo_last || null, pingedAt: tsIn(t.geo_pinged_at) }
+      : null,
+    assetCheck: t.asset_check || null,
+    crew: (k.crew || []).map((c) => ({ name: nameById[c.profile_id] || '', email: emailById[c.profile_id] || '' })),
+    events: (k.lines || []).map((l) => ({
+      ts: tsIn(l.logged_at), text: l.text,
+      editedBy: nameById[l.edited_by] || '', editedAt: tsIn(l.edited_at),
+    })),
+    items: (k.items || []).map((i) => ({
+      code: i.item_number, desc: i.description, qty: numIn(i.qty), uom: i.uom,
+      cost: Number(i.unit_cost) || 0, ov: i.overrides || {},
+      kind: i.kind, sign: i.sign,
+    })),
+    assets: (k.assets || []).map((a) => ({ item: a.item, qty: a.qty, note: a.note })),
+    audit: (k.audit || []).map((a) => ({
+      ts: tsIn(a.changed_at), text: a.text || '', kind: a.kind,
+      by: nameById[a.changed_by] || '', field: a.field || '',
+      from: a.old_value || '', to: a.new_value || '',
+    })),
+  };
+}
+
+// ── app shape → DB row ───────────────────────────────────────────────────────
+function rowTicket(t, idByName, idByClient, idByJob) {
+  return {
+    id: t.id,
+    technician_id: idByName[t.tech] || null,
+    holder_id: idByName[t.holder] || idByName[t.tech] || null,
+    customer: t.customer || '',
+    client_id: idByClient[t.customer] || null,
+    field_name: t.field || '', well_no: t.well || '', rig_name: t.rig || '',
+    job_type_id: idByJob[t.jobType] || null,
+    arrival_at: tsOut(t.arrival), start_job_at: tsOut(t.start), end_job_at: tsOut(t.end),
+    status: t.status, synced: !!t.synced, synced_at: tsOut(t.syncedAt),
+    ticket_number: t.ticketNo || null, mileage_one_way: numOut(t.mileage),
+    currency: t.currency || DEFAULT_CURRENCY,
+    base_location: t.baseLocation || '', customer_rep: t.customerRep || '',
+    office_closed: !!t.officeClosed,
+    closed_by: idByName[t.closedBy] || null, closed_at: tsOut(t.closedAt),
+    approved_by: idByName[t.approvedBy] || null, approved_at: tsOut(t.approvedAt),
+    geo_open: (t.geo || {}).open || null, geo_last: (t.geo || {}).last || null,
+    geo_pinged_at: tsOut((t.geo || {}).pingedAt),
+    asset_check: t.assetCheck || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+// Children are replaced wholesale rather than diffed row by row. They have no stable
+// identity in the app — an event is its position in a list — so a diff would have to
+// invent one, and inventing one makes inserting a line in the middle look like every
+// line after it changing. Replacement is small (a ticket holds tens of rows, not
+// thousands), obviously correct, and idempotent, which matters more here than clever:
+// a replay after a failed drain must not double anything.
+function rowsChildren(t, idByName) {
+  return {
+    ticket_lines: (t.events || []).map((e) => ({
+      id: uuid(), ticket_id: t.id, logged_at: tsOut(e.ts) || new Date().toISOString(),
+      text: e.text || '', edited_by: idByName[e.editedBy] || null, edited_at: tsOut(e.editedAt),
+    })),
+    ticket_items: (t.items || []).map((i, n) => ({
+      id: uuid(), ticket_id: t.id, item_number: i.code || '', description: i.desc || '',
+      qty: Number(i.qty) || 0, uom: i.uom || '', unit_cost: Number(i.cost) || 0,
+      total_cost: (Number(i.qty) || 0) * (Number(i.cost) || 0),
+      sort_order: n, kind: i.kind || 'flat', sign: i.sign === -1 ? -1 : 1,
+      overrides: i.ov && Object.keys(i.ov).length ? i.ov : null,
+    })),
+    ticket_assets: (t.assets || []).map((a, n) => ({
+      id: uuid(), ticket_id: t.id, item: a.item || '', qty: a.qty || '',
+      note: a.note || '', sort_order: n,
+    })),
+    ticket_crew: (t.crew || []).map((c, n) => ({
+      ticket_id: t.id, profile_id: idByName[c.name] || null, position: n,
+    })).filter((r) => r.profile_id),
+    audit_log: (t.audit || []).map((a) => ({
+      id: uuid(), ticket_id: t.id, changed_at: tsOut(a.ts) || new Date().toISOString(),
+      changed_by: idByName[a.by] || idByName[t.tech] || null,
+      text: a.text || '', kind: a.kind || 'lifecycle',
+      field: a.field || null, old_value: a.from || null, new_value: a.to || null,
+    })).filter((r) => r.changed_by),
+  };
+}
+
+// ── Hydration ────────────────────────────────────────────────────────────────
+// One pull, in parallel, of everything this person is allowed to see. What that is
+// belongs to the database's row-level security, not to this function: a technician's
+// select on tickets simply returns fewer rows than an Ops Manager's. Filtering here as
+// well would be a second, weaker copy of a rule that already exists.
+function hydrate() {
+  const c = sb();
+  if (!c) return Promise.reject(new Error('No server configured.'));
+  const all = (table, cols) => c.from(table).select(cols || '*');
+  return Promise.all([
+    all('profiles'), all('clients'), all('price_list_items'), all('job_types'),
+    all('ticket_numbering'), all('org_defaults'), all('asset_questions'),
+    all('numbering_claim'), all('user_settings'),
+    all('tickets'), all('ticket_lines'), all('ticket_items'), all('ticket_assets'),
+    all('ticket_crew'), all('audit_log'),
+  ]).then((res) => {
+    const bad = res.find((r) => r.error);
+    if (bad) throw new Error(bad.error.message || 'Could not load data.');
+    const [profiles, clients, priceItems, jobTypes, numbering, orgDefaults, assetQs,
+      claim, settings, tickets, lines, items, assets, crew, audit] = res.map((r) => r.data || []);
+
+    const nameById = {}, emailById = {}, jobById = {};
+    profiles.forEach((p) => { nameById[p.id] = p.full_name || p.email; emailById[p.id] = p.email; });
+    jobTypes.forEach((j) => { jobById[j.id] = j.name; CLOUD_IDS.job[j.name] = j.id; });
+    const clientById = {};
+    clients.forEach((cl) => { clientById[cl.id] = cl; });
+
+    const by = (rows, key) => {
+      const out = {};
+      rows.forEach((r) => { (out[r[key]] = out[r[key]] || []).push(r); });
+      return out;
+    };
+    const byTs = (a, b) => new Date(a.logged_at || a.changed_at || 0) - new Date(b.logged_at || b.changed_at || 0);
+    const L = by(lines, 'ticket_id'), I = by(items, 'ticket_id'), A = by(assets, 'ticket_id'),
+      C = by(crew, 'ticket_id'), U = by(audit, 'ticket_id'), P = by(priceItems, 'client_id');
+
+    const mySettings = settings[0] || {};
+    return {
+      // The app's own vocabulary, not the column names. It has always said timezone and
+      // timeFormat '24' | '12'; the database says timezone and a boolean. Translating
+      // here rather than teaching the settings screen a second spelling is the same rule
+      // the roles follow — and getting it wrong is silent, because an unrecognised key
+      // simply falls back to the default instead of failing.
+      // Only what someone can actually change. The zone is pinned company-wide and the
+      // accent is gone, so reading either back would be carrying a preference that has
+      // no control behind it — a setting nobody can set is a bug waiting to be found.
+      settings: {
+        theme: mySettings.theme || 'system',
+        timeFormat: mySettings.hour12 ? '12' : '24',
+        shareLocation: !!mySettings.share_location,
+      },
+      orgDefaults: {
+        baseLocation: (orgDefaults[0] || {}).base_location || '',
+        customerRep: (orgDefaults[0] || {}).customer_rep || '',
+      },
+      clients: clients.map((cl) => shapeClient(cl, P[cl.id])),
+      jobTypes: jobTypes.map((j) => j.name),
+      users: profiles.map(shapeUser),
+      series: numbering.map((n) => ({
+        id: n.id, label: n.label || '', prefix: n.prefix || '',
+        last: n.next_number, floor: n.floor,
+      })),
+      numbering: {
+        holderEmail: emailById[(claim[0] || {}).holder_id] || '',
+        holderName: nameById[(claim[0] || {}).holder_id] || '',
+        since: tsIn((claim[0] || {}).since),
+      },
+      assetQuestions: assetQs
+        .slice().sort((a, b) => a.sort_order - b.sort_order)
+        .map((q) => ({ key: q.key, label: q.label, tone: q.tone, multi: !!q.multi, presets: q.presets || [] })),
+      tickets: tickets.map((t) => shapeTicket(t, {
+        lines: (L[t.id] || []).slice().sort(byTs),
+        items: (I[t.id] || []).slice().sort((a, b) => a.sort_order - b.sort_order),
+        assets: (A[t.id] || []).slice().sort((a, b) => a.sort_order - b.sort_order),
+        crew: (C[t.id] || []).slice().sort((a, b) => a.position - b.position),
+        audit: (U[t.id] || []).slice().sort(byTs),
+      }, nameById, clientById, jobById, emailById)),
+    };
+  });
+}
+
+// ── The outbox ───────────────────────────────────────────────────────────────
+// Every write is recorded here first and sent later. Two rules keep a long spell
+// offline from turning into a flood on reconnect:
+//
+//   coalesce — an op is keyed by what it touches. Ten edits to one ticket collapse to
+//              the tenth, because the tenth already contains the other nine. The queue
+//              records intent about a row, not a history of keystrokes.
+//   in order — tickets before their children, so a child never arrives at a parent that
+//              does not exist yet.
+//
+// A failed op stays queued and is retried on the next drain. It does not block the ops
+// behind it from being tried, but it does keep its place, so nothing overtakes it.
+function outboxRead() {
+  try { return JSON.parse(localStorage.getItem(OUTBOX_K) || '[]'); } catch (e) { return []; }
+}
+function outboxWrite(q) {
+  try { localStorage.setItem(OUTBOX_K, JSON.stringify(q)); } catch (e) { /* quota */ }
+}
+function outboxPush(ops) {
+  if (!ops.length) return;
+  const q = outboxRead();
+  ops.forEach((op) => {
+    const at = q.findIndex((x) => x.key === op.key);
+    if (at >= 0) q[at] = op; else q.push(op);
+  });
+  outboxWrite(q);
+}
+
+// Sending one op. Three shapes cover everything the app does: upsert a row, replace a
+// ticket's children, delete a row.
+function outboxSend(c, op) {
+  if (op.action === 'upsert') return c.from(op.table).upsert(op.row).then((r) => { if (r.error) throw r.error; });
+  if (op.action === 'delete') {
+    return c.from(op.table).delete().eq(op.by || 'id', op.id).then((r) => { if (r.error) throw r.error; });
+  }
+  // Conflicts on a natural key, not on the primary key: the app knows a question by its
+  // key and has no idea what uuid the row was given.
+  if (op.action === 'upsert_key') {
+    return c.from(op.table).upsert(op.row, { onConflict: 'key' }).then((r) => { if (r.error) throw r.error; });
+  }
+  // Settings belong to whoever is signed in. The id is not the app's to know, so it is
+  // stamped at send time from the session rather than carried through the queue.
+  if (op.action === 'upsert_settings') {
+    if (!CLOUD_IDS.me) return Promise.resolve();
+    return c.from(op.table).upsert(Object.assign({ user_id: CLOUD_IDS.me }, op.row)).then((r) => { if (r.error) throw r.error; });
+  }
+  if (op.action === 'replace_client') {
+    return c.from(op.table).delete().eq('client_id', op.clientId)
+      .then((r) => { if (r.error) throw r.error; if (!op.rows.length) return { error: null }; return c.from(op.table).insert(op.rows); })
+      .then((r) => { if (r && r.error) throw r.error; });
+  }
+  // replace: clear then insert, in that order, or the insert collides with what it is
+  // meant to be replacing.
+  return c.from(op.table).delete().eq('ticket_id', op.ticketId)
+    .then((r) => { if (r.error) throw r.error; if (!op.rows.length) return { error: null }; return c.from(op.table).insert(op.rows); })
+    .then((r) => { if (r && r.error) throw r.error; });
+}
+// Drains oldest-first and stops at the first failure rather than pressing on. If the
+// network dropped mid-drain, everything after the failure is about to fail too, and
+// hammering a dead connection is exactly the pile-up this is here to prevent. What
+// succeeded is removed; what did not stays for the next attempt.
+function outboxDrain() {
+  const c = sb();
+  if (!c) return Promise.resolve(0);
+  const q = outboxRead();
+  if (!q.length) return Promise.resolve(0);
+  let sent = 0;
+  const step = (n) => {
+    if (n >= q.length) return Promise.resolve();
+    return outboxSend(c, q[n]).then(() => { sent = n + 1; return step(n + 1); }, () => undefined);
+  };
+  return step(0).then(() => {
+    outboxWrite(outboxRead().slice(sent));
+    return sent;
+  });
+}
+
+// ── Turning a change in the replica into ops ─────────────────────────────────
+// mutate() hands over the store before and after. Comparing the two is what makes this
+// work without every caller having to describe its own change: a screen edits the
+// replica the way it always has, and the difference is read off afterwards. The
+// alternative — every mutation site declaring which rows it touched — is the same
+// information written by hand in ninety places, and wrong in a few of them.
+const CHILD_TABLES = ['ticket_lines', 'ticket_items', 'ticket_assets', 'ticket_crew', 'audit_log'];
+function diffOps(before, after) {
+  const ops = [];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const idByName = {}, idByClient = {}, idByJob = {};
+  (after.users || []).forEach((u) => { if (u.id) idByName[u.name] = u.id; });
+  (after.clients || []).forEach((c) => { if (c.id) idByClient[c.name] = c.id; });
+  Object.assign(idByJob, CLOUD_IDS.job);
+
+  const oldT = {}; (before.tickets || []).forEach((t) => { oldT[t.id] = t; });
+  const newT = {}; (after.tickets || []).forEach((t) => { newT[t.id] = t; });
+
+  (after.tickets || []).forEach((t) => {
+    const was = oldT[t.id];
+    // The header and the children move independently: retyping a well number must not
+    // rewrite the job log, and adding a log line must not rewrite the header.
+    const head = (x) => rowTicket(x, idByName, idByClient, idByJob);
+    if (!was || !same(head(was), head(t))) {
+      ops.push({ key: 'tickets:' + t.id, table: 'tickets', action: 'upsert', row: head(t) });
+    }
+    const kidsNow = rowsChildren(t, idByName);
+    const kidsWas = was ? rowsChildren(was, idByName) : null;
+    // Ids are regenerated on every call, so they cannot take part in the comparison —
+    // strip them, or every ticket looks changed every time.
+    const bare = (rows) => rows.map((r) => { const o = Object.assign({}, r); delete o.id; return o; });
+    CHILD_TABLES.forEach((tbl) => {
+      if (kidsWas && same(bare(kidsWas[tbl]), bare(kidsNow[tbl]))) return;
+      ops.push({ key: tbl + ':' + t.id, table: tbl, action: 'replace', ticketId: t.id, rows: kidsNow[tbl] });
+    });
+  });
+  (before.tickets || []).forEach((t) => {
+    if (!newT[t.id]) ops.push({ key: 'tickets:del:' + t.id, table: 'tickets', action: 'delete', id: t.id });
+  });
+
+  // Users, clients and their price lists. Rows the app created offline have no id yet;
+  // one is minted here so the row can be sent and referred to.
+  const pairs = [
+    ['profiles', 'users', (u) => ({ id: u.id, email: u.email, full_name: u.name, role: ROLE_TO_DB[u.roleKey] || 'technician', status: u.status || 'pending' })],
+    ['clients', 'clients', (c) => ({ id: c.id, name: c.name, currency: c.currency || DEFAULT_CURRENCY })],
+  ];
+  pairs.forEach(([table, key, row]) => {
+    const was = {}; (before[key] || []).forEach((r) => { was[r.id || r.email || r.name] = r; });
+    (after[key] || []).forEach((r) => {
+      const k = r.id || r.email || r.name;
+      if (!was[k] || !same(row(was[k]), row(r))) ops.push({ key: table + ':' + k, table: table, action: 'upsert', row: row(r) });
+    });
+    const now = {}; (after[key] || []).forEach((r) => { now[r.id || r.email || r.name] = 1; });
+    Object.keys(was).forEach((k) => {
+      if (!now[k] && was[k].id) ops.push({ key: table + ':del:' + k, table: table, action: 'delete', id: was[k].id });
+    });
+  });
+
+  // Price list items, per customer. Compared as a whole because that is how they are
+  // edited — a batch import replaces a customer's list, it does not amend it row by row.
+  (after.clients || []).forEach((c) => {
+    const was = (before.clients || []).find((x) => x.name === c.name);
+    if (was && same(was.items, c.items)) return;
+    if (!c.id) return;
+    ops.push({
+      key: 'price_list_items:' + c.id, table: 'price_list_items', action: 'replace_client', clientId: c.id,
+      rows: (c.items || []).map((i) => ({
+        id: i.id || uuid(), client_id: c.id, item_number: i.code || '', description: i.desc || '',
+        uom: i.uom || '', unit_cost: Number(i.cost) || 0,
+        unit_cost_additional: i.costAdd === '' || i.costAdd === undefined ? null : Number(i.costAdd),
+        currency: i.currency || c.currency || DEFAULT_CURRENCY,
+      })),
+    });
+  });
+
+  // Singletons: one row each, so an upsert is the whole story.
+  if (!same(before.orgDefaults, after.orgDefaults)) {
+    ops.push({ key: 'org_defaults', table: 'org_defaults', action: 'upsert', row: {
+      id: true, base_location: (after.orgDefaults || {}).baseLocation || '',
+      customer_rep: (after.orgDefaults || {}).customerRep || '' } });
+  }
+  if (!same(before.numbering, after.numbering)) {
+    ops.push({ key: 'numbering_claim', table: 'numbering_claim', action: 'upsert', row: {
+      id: true, holder_id: idByName[(after.numbering || {}).holderName] || null,
+      since: tsOut((after.numbering || {}).since) || new Date().toISOString() } });
+  }
+  if (!same(before.series, after.series)) {
+    (after.series || []).forEach((s) => {
+      const was = (before.series || []).find((x) => x.id === s.id);
+      if (was && same(was, s)) return;
+      ops.push({ key: 'ticket_numbering:' + s.id, table: 'ticket_numbering', action: 'upsert', row: {
+        id: s.id, prefix: s.prefix || '', label: s.label || '', next_number: s.last, floor: s.floor } });
+    });
+  }
+  if (!same(before.assetQuestions, after.assetQuestions)) {
+    (after.assetQuestions || []).forEach((q, n) => {
+      ops.push({ key: 'asset_questions:' + q.key, table: 'asset_questions', action: 'upsert_key', row: {
+        key: q.key, label: q.label, tone: q.tone, multi: !!q.multi, presets: q.presets || [], sort_order: n } });
+    });
+  }
+  if (!same(before.settings, after.settings)) {
+    ops.push({ key: 'user_settings', table: 'user_settings', action: 'upsert_settings', row: {
+      theme: (after.settings || {}).theme || 'system',
+      // Written explicitly rather than left to the column default, so the stored zone
+      // cannot drift away from the one the app actually formats with.
+      timezone: OPERATING_TZ,
+      hour12: (after.settings || {}).timeFormat === '12',
+      share_location: !!(after.settings || {}).shareLocation, updated_at: new Date().toISOString() } });
+  }
+  return ops;
+}
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -2295,6 +2740,10 @@ const ASSET_TONES = {
 const assetTone = (q) => ASSET_TONES[q.tone] || ASSET_TONES.accent;
 
 const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 60000;
+// How long a burst of edits is allowed to settle before the queue is sent. Long enough
+// that typing a field is one write rather than twenty; short enough that the office sees
+// a change while the technician is still looking at it.
+const DRAIN_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__DRAIN_TEST_MS) || 1200;
 // How often a ticket that is still being logged re-pins where the device is.
 const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 3600000;
 // How often the app *checks* whether a ping is due. Checking often and pinging rarely is
@@ -2305,18 +2754,17 @@ const GEO_TICK_MS = (typeof window !== 'undefined' && window.__GEO_TICK_TEST_MS)
 // tapped a button, so a position from the last half-minute is where they are, and
 // reusing it answers instantly instead of waiting on a cold GPS lock.
 const GEO_MAX_AGE_MS = 30000;
+// How stale the technician's own readout may get before it is taken again. Shorter than
+// the hourly office ping because this one is read off the screen in the moment, but not
+// so short that it keeps the GPS awake.
+const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO_TEST_MS) || 120000;
 
-// Timezone + 24h/12h are read from Settings (S.data.settings) — 'device' timezone means
-// no explicit IANA zone is passed to Intl, so the browser's own local zone is used.
-const TIMEZONES = [
-  { id: 'device', label: 'Device timezone' },
-  { id: 'Africa/Tripoli', label: 'Tripoli (Libya)' },
-  { id: 'Africa/Cairo', label: 'Cairo' },
-  { id: 'Asia/Riyadh', label: 'Riyadh' },
-  { id: 'Asia/Dubai', label: 'Dubai' },
-  { id: 'Europe/London', label: 'London' },
-  { id: 'UTC', label: 'UTC' },
-];
+// Every job on this system happens in Libya, and every timestamp on a ticket is evidence
+// of when someone was on a wellhead. That makes the operating zone a fact about the
+// company rather than a preference of the device: a technician whose phone is set to
+// Dubai must not stamp arrival an hour out, and a payroll month must not depend on where
+// the person reading it happens to be. Pinned, not offered.
+const OPERATING_TZ = 'Africa/Tripoli';
 function fdate(s, tz) {
   const d = dt(s); if (!d) return '—';
   const opt = { day: 'numeric', month: 'short', year: 'numeric' };
@@ -2391,7 +2839,7 @@ function seed() {
       // Libya time by default, not the device's. Every operation is at the Ahmadi base,
       // and the payroll month rule keys off the job end date — so a technician whose
       // phone is on the wrong zone must not be able to move a ticket into another month.
-      theme: 'dark', accent: 'steel', timezone: 'Africa/Tripoli', timeFormat: '24', shareLocation: true,
+      theme: 'dark', timeFormat: '24', shareLocation: true,
       // Ops Manager storage linking — local download always works with no account; the
       // Ops Manager can additionally connect OneDrive and/or Google Drive to upload
       // exported sheets straight there instead of only saving to the device. This is a
@@ -2509,6 +2957,8 @@ class Component extends DCLogic {
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
+      // Device-local position, never persisted and never synced. See selfGeoTick.
+      selfFix: null, selfFixFailed: false,
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
       authFullName: '', authConfirm: '', authError: '', signupDone: false,
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
@@ -2527,7 +2977,22 @@ class Component extends DCLogic {
   }
 
   load() {
+    // Demo tickets are the right thing to open on when there is no server. They are the
+    // wrong thing to open on when there is one and the device simply has no signal —
+    // a technician would be looking at invented jobs with real customers' names on
+    // them. In cloud mode the replica's own cache is the only acceptable source, and
+    // an empty list is the honest answer when there isn't one yet.
     let data = seed();
+    if (USE_CLOUD) {
+      data.tickets = []; data.clients = []; data.users = [];
+      try {
+        const cached = localStorage.getItem(CACHE_K);
+        if (cached) data = Object.assign(data, JSON.parse(cached));
+      } catch (e) { /* first run on this device */ }
+      let sess = null;
+      try { const r = localStorage.getItem(SK); if (r) sess = JSON.parse(r); } catch (e) { /* none */ }
+      return sess ? { data: data, session: sess, role: sess.roleKey } : { data: data };
+    }
     try {
       const raw = localStorage.getItem(K);
       if (raw) {
@@ -2642,7 +3107,10 @@ class Component extends DCLogic {
     } catch (e) { /* quota */ }
   }
   persist(data) {
-    try { localStorage.setItem(K, JSON.stringify(data)); } catch (e) { /* quota */ }
+    // Kept apart from the demo store deliberately. They hold different things under the
+    // same shape, and a device that has been used for both must not serve one as the
+    // other after a mode change.
+    try { localStorage.setItem(USE_CLOUD ? CACHE_K : K, JSON.stringify(data)); } catch (e) { /* quota */ }
   }
   // Settings stores 'system' | 'light' | 'dark'; the token blocks key off a
   // data-mkn-theme attribute on <html>. 'system' resolves through the OS preference and
@@ -2668,7 +3136,10 @@ class Component extends DCLogic {
     this.timer = setInterval(() => this.setState({ tick: Date.now() }), 30000);
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
     // Checks every minute whether an hourly pin is due; see geoTick.
-    this.geoTimer = setInterval(() => this.geoTick(), GEO_TICK_MS);
+    this.geoTimer = setInterval(() => { this.geoTick(); this.selfGeoTick(); }, GEO_TICK_MS);
+    // Once at boot as well as on the timer, so the bar carries a coordinate from the
+    // first screen rather than a minute in.
+    this.selfGeoTick();
     // Registers sw.js so the app is a real installable PWA on any device (see the
     // <link rel="manifest"> in <helmet>). Swallows failures silently — e.g. when run
     // from file:// or a sandboxed preview with no service-worker support — since this is
@@ -2679,11 +3150,22 @@ class Component extends DCLogic {
     // A handle on the running component, so the request coalescer can be exercised
     // directly by tests rather than only inferred from what the UI happens to show.
     if (typeof window !== 'undefined') window.__mkApp = this;
+    // Opening the app on a session that was already signed in. Same reasoning as after a
+    // login: the cached replica is on screen immediately, and the pull that replaces it
+    // is allowed to fail without disturbing anything.
+    if (USE_CLOUD && this.state.session) this.refresh();
 
     // Connectivity is a fact about the device, not a preference. It used to be a
     // button the technician could hold in "no signal" while actually connected —
     // which is a demo control, not a status. The browser tells us instead.
-    this.netListener = () => this.setState({ online: navigator.onLine !== false });
+    this.netListener = () => {
+      const up = navigator.onLine !== false;
+      this.setState({ online: up });
+      // Coming back is the moment everything queued while away goes out — and the moment
+      // to find out what the office did in the meantime. Both go through the coalescer,
+      // so a flapping connection cannot start a second round while the first is running.
+      if (up) this.refresh();
+    };
     if (typeof window !== 'undefined') {
       window.addEventListener('online', this.netListener);
       window.addEventListener('offline', this.netListener);
@@ -2692,6 +3174,7 @@ class Component extends DCLogic {
   componentWillUnmount() {
     clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
     if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (this.drainTimer) clearTimeout(this.drainTimer);
     if (this.netListener && typeof window !== 'undefined') {
       window.removeEventListener('online', this.netListener);
       window.removeEventListener('offline', this.netListener);
@@ -2723,10 +3206,56 @@ class Component extends DCLogic {
   }
 
   mutate(fn) {
-    const data = JSON.parse(JSON.stringify(this.state.data));
+    const before = this.state.data;
+    const data = JSON.parse(JSON.stringify(before));
     fn(data);
     this.persist(data);
     this.setState({ data: data });
+    // The replica is already updated and on screen; the database finds out afterwards.
+    // This ordering is the whole point — the app has to stay usable down a hole with no
+    // signal, and a screen that waits for a round trip before showing what you typed is
+    // not usable there.
+    if (USE_CLOUD) {
+      try { outboxPush(diffOps(before, data)); } catch (e) { /* never block the edit */ }
+      this.scheduleDrain();
+    }
+  }
+  // Pull the database's version of everything and adopt it. Deliberately not merged with
+  // what is on the device: the database is the authority, and anything of ours it does
+  // not know about is still in the outbox waiting to be sent — it is not lost by being
+  // overwritten here, it is queued.
+  refresh() {
+    if (!USE_CLOUD) return Promise.resolve();
+    return this.runLatest('refresh', () => outboxDrain()
+      .then(() => hydrate())
+      .then((data) => {
+        CLOUD_IDS.me = (((this.state.session || {}).email && (data.users || [])
+          .find((u) => u.email === this.state.session.email)) || {}).id || null;
+        // Settings key-by-key over the defaults, for the same reason load() does it:
+        // a key added since this device last saw the schema must not come back
+        // undefined.
+        const merged = Object.assign(seed(), data);
+        merged.settings = Object.assign({}, seed().settings, data.settings || {});
+        this.persist(merged);
+        this.setState({ data: merged });
+      })
+      .catch(() => undefined));
+  }
+  // Sending is debounced, not immediate. Typing a well number fires mutate once per
+  // keystroke; without this, so would the network. The queue coalesces by row, so a
+  // pause of a second turns a burst of edits into one write.
+  scheduleDrain() {
+    if (!USE_CLOUD) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (this.drainTimer) clearTimeout(this.drainTimer);
+    this.drainTimer = setTimeout(() => {
+      this.drainTimer = null;
+      // Through the coalescer, so a reconnect and a timer firing together still make
+      // one drain rather than two racing over the same queue.
+      this.runLatest('drain', () => outboxDrain().then((n) => {
+        if (n) this.setState({ tick: Date.now() });
+      }, () => undefined));
+    }, DRAIN_DEBOUNCE_MS);
   }
   // Transient edit buffer for the inline fields that write to the audit trail (ticket
   // header stamps, Base Location, Customer Rep., job-log line timestamps).
@@ -2820,6 +3349,60 @@ class Component extends DCLogic {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: maxAgeMs === undefined ? GEO_MAX_AGE_MS : maxAgeMs }
       );
     } catch (e) { done(null); }
+  }
+  // Where this device is, for the person holding it.
+  //
+  // Separate from every other fix in this file, and separate on purpose. The sharing
+  // toggle governs what the office is told, not what the technician may know about his
+  // own position — someone who has turned sharing off and is then lost in the desert
+  // still needs to be able to read a coordinate off his own screen and send it to
+  // whoever can come and get him. So this runs whatever the toggle says.
+  //
+  // What keeps that honest is where the value is kept: component state, never
+  // `this.state.data`. The store is the thing that persists and syncs; a fix that is
+  // not in it cannot reach the office by any path, cannot ride up with a ticket, and
+  // cannot be queued in the outbox. Turning sharing off still means the office learns
+  // nothing. It no longer means the technician learns nothing either.
+  selfGeoTick() {
+    const S = this.state;
+    // Technicians only. They are the ones who go out; an office desktop would just be
+    // answering a permission prompt for a readout nobody there needs.
+    if (!S.session || S.role !== 'tech') return;
+    if (this.selfGeoBusy || this.selfGeoDenied) return;
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      if (!S.selfFix) this.setState({ selfFixFailed: true });
+      return;
+    }
+    const fix = S.selfFix;
+    // Nothing to do while the last reading is still current. A safety readout does not
+    // need to be fresher than the minute, and re-asking every tick would cost battery
+    // for a number that has not moved.
+    if (fix && Date.now() - new Date(fix.ts).getTime() < SELF_GEO_INTERVAL_MS) return;
+    this.selfGeoBusy = true;
+    let settled = false;
+    const done = (f, failed) => {
+      if (settled) return;
+      settled = true;
+      this.selfGeoBusy = false;
+      if (f) this.setState({ selfFix: f, selfFixFailed: false });
+      else if (failed) this.setState({ selfFixFailed: true });
+    };
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const c = pos.coords || {};
+          done({ lat: c.latitude, lon: c.longitude, ts: iso(new Date(pos.timestamp || Date.now())) });
+        },
+        (err) => {
+          // A refusal is permanent for the session, for the same reason the office ping
+          // treats it that way: re-asking every minute badgers the technician with
+          // prompts and burns battery, and the answer will not have changed.
+          if (err && err.code === 1) this.selfGeoDenied = true;
+          done(null, true);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: SELF_GEO_INTERVAL_MS }
+      );
+    } catch (e) { done(null, true); }
   }
   // The opening pin. Written once and never overwritten — it is the record of where
   // the job was started, so a later fix must not be able to rewrite history.
@@ -3005,9 +3588,13 @@ class Component extends DCLogic {
   }
   ticketTotal(t) { return (t.items || []).reduce((s, i) => s + this.itemTotal(i, t), 0); }
 
-  fmt() {
+  // 12-hour clock is a reading preference and nothing more — it changes what is on the
+  // screen, never what is in the record. Anything that leaves the app as a file is a
+  // document a client signs and finance files, so it is always stamped 24-hour, whatever
+  // the person who pressed the button prefers to read. Pass true for those.
+  fmt(forPrint) {
     const s = (this.state.data && this.state.data.settings) || {};
-    const tz = s.timezone, hr12 = s.timeFormat === '12';
+    const tz = OPERATING_TZ, hr12 = !forPrint && s.timeFormat === '12';
     return {
       tz: tz,
       date: v => fdate(v, tz),
@@ -3306,7 +3893,7 @@ class Component extends DCLogic {
   // detail. Highest ticket number first, so the most recent work is at the top.
   exportBundle(tickets, label) {
     return this.loadExporters().then(() => {
-      const F = this.fmt();
+      const F = this.fmt(true);
       const JsPDF = window.jspdf.jsPDF;
       const doc = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
       const L = 10, R = 287;
@@ -3349,7 +3936,10 @@ class Component extends DCLogic {
 
   buildSheets(ticket) {
     const t = ticket;
-    const F = this.fmt();
+    // Print mode. The A4 preview and the PDF it produces are the same document, so they
+    // must show the same clock — a preview that disagrees with the file it generates
+    // reads as a bug even when both are individually correct.
+    const F = this.fmt(true);
     const pairRow = (labelA, valueA, labelB, valueB) => ({
       labelA: labelA, valueA: valueA === undefined || valueA === null ? '' : String(valueA),
       hasB: labelB !== undefined, labelB: labelB || '',
@@ -3859,6 +4449,16 @@ class Component extends DCLogic {
             session: session, role: session.roleKey || S.role,
             authEmail: '', authPassword: '', authError: '', authBusy: false,
           });
+          // The screens are already up on whatever the last visit cached. Pulling fresh
+          // data is a separate, failable step on purpose: a bad connection should leave
+          // someone signed in and looking at yesterday's tickets, not bounced back to
+          // the login screen with a network error.
+          this.refresh();
+          // Ask for the position now rather than waiting on the minute timer. At mount
+          // there was no session, so the call there did nothing — without this the bar
+          // sits empty for the first minute of every shift, which is exactly the minute
+          // someone would be checking it.
+          this.selfGeoTick();
         })
         .catch(err => this.setState({ authError: err.message || 'Could not sign you in.', authBusy: false })));
     };
@@ -3881,7 +4481,16 @@ class Component extends DCLogic {
       // leave you out, never in.
       this.persistSession(null);
       this.setState({ session: null, showSettings: false, dialog: null });
-      if (USE_CLOUD && sb()) sb().auth.signOut().catch(() => {});
+      if (USE_CLOUD) {
+        // The replica goes with the session. Devices are shared here — one phone in a
+        // truck, whoever is on shift — and the next person signing in must not find the
+        // last one's tickets sitting in the list before their own pull lands. The outbox
+        // is left alone: it holds work that has not reached the office yet, and it is
+        // the previous user's work whether or not they are still signed in.
+        try { localStorage.removeItem(CACHE_K); } catch (e) { /* quota */ }
+        this.setState({ data: Object.assign(seed(), { tickets: [], clients: [], users: [] }) });
+        if (sb()) sb().auth.signOut().catch(() => {});
+      }
     };
     const createTechnician = () => {
       const name = (S.newTechName || '').trim();
@@ -3918,6 +4527,13 @@ class Component extends DCLogic {
       authFullName: S.authFullName || '',
       authConfirm: S.authConfirm || '',
       sessionName: S.session ? S.session.name : '',
+      // The technician's own coordinates, on every screen he can reach. The point is
+      // that a screenshot of any tab carries them: someone lost with no idea where he
+      // is can send whatever is already on screen and be found from it, without having
+      // to navigate anywhere first. Shown regardless of the sharing toggle — see
+      // selfGeoTick for why that is not a leak.
+      showBarFix: S.role === 'tech' && !!S.session && !!(S.selfFix || S.selfFixFailed),
+      barFixText: S.selfFix ? geoText(S.selfFix) : 'NO GPS FIX',
       goToLogin: () => this.setState({ authScreen: 'login', authError: '', signupDone: false }),
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
       doLogin: doLogin,
@@ -4161,18 +4777,6 @@ class Component extends DCLogic {
         fg: (D.settings || {}).theme === k ? 'var(--on-accent)' : 'var(--ink)',
         pick: () => this.updateSettings({ theme: k }),
       })),
-      accentSwatches: [
-        { key: 'steel', color: '#5980a6' }, { key: 'graphite', color: '#4a4a4d' },
-        { key: 'teal', color: '#2c7a72' }, { key: 'indigo', color: '#4c5c9e' },
-        { key: 'terracotta', color: '#b0644a' },
-      ].map(a => ({
-        key: a.key, color: a.color,
-        ring: (D.settings || {}).accent === a.key ? '2px solid var(--ink)' : '2px solid transparent',
-        pick: () => this.updateSettings({ accent: a.key }),
-      })),
-      timezoneOptions: TIMEZONES.map(z => ({ value: z.id, label: z.label })),
-      timezoneValue: (D.settings || {}).timezone || 'device',
-      setTimezone: e => this.updateSettings({ timezone: e.target.value }),
       timeFormatOptions: [{ k: '24', l: '24-hour' }, { k: '12', l: '12-hour' }].map(o => ({
         key: o.k, label: o.l,
         bg: (D.settings || {}).timeFormat === o.k ? 'var(--accent)' : 'transparent',

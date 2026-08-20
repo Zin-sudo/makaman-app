@@ -106,8 +106,20 @@ const geoOf = (page) => page.evaluate(() => {
   check('done ticket stops recording', JSON.stringify(g.geo.last) === frozen,
     g.geo.last.lat.toFixed(4) === C.latitude.toFixed(4) ? 'followed device after done!' : 'unchanged');
 
-  const techBody = await page.textContent('body');
-  check('nothing visible to the technician', !/Device position|32\.8\d{4}|32\.9\d{4}/.test(techBody));
+  // The office's record of where the ticket was worked is still the office's. What the
+  // technician gained is a readout of where *this device* is now, in the app bar — a
+  // different thing, kept in component state and never in the ticket.
+  // innerText, not textContent: the x-dc template lives inside <body>, so textContent
+  // hands back the markup for every screen including the office panel this is asserting
+  // is absent — it would pass or fail on source code rather than on what is rendered.
+  const techBody = await page.innerText('body');
+  check('the office position panel stays out of the technician\'s ticket view',
+    !/Device position|Opening fix|Last fix/i.test(techBody));
+  const barFix = await page.evaluate(() => {
+    const el = document.querySelector('.mk-nav-fix');
+    return el ? el.innerText.replace(/\s+/g, ' ').trim() : '';
+  });
+  check('but his own position is in the app bar', /\d+\.\d{4}/.test(barFix), barFix);
   await page.screenshot({ path: OUT + '/60-tech.png' });
   await page.close();
 
@@ -159,7 +171,21 @@ const geoOf = (page) => page.evaluate(() => {
   await page.waitForTimeout(PING * 2);
   const offCalls = await page.evaluate(() => window.__geoCalls);
   const offGeo = await geoOf(page);
-  check('sharing off: GPS never touched', offCalls === 0 && !offGeo, `calls=${offCalls}`);
+  // The rule the toggle enforces changed, deliberately. It used to mean "never ask the
+  // GPS"; it now means "never tell the office". A technician who has turned sharing off
+  // and is then lost still needs to read his own coordinates off his own screen, so the
+  // device keeps a fix locally — what it must not do is put one on a ticket, where it
+  // would sync. That is the line these three assertions hold.
+  check('sharing off: nothing lands on the ticket', !offGeo, JSON.stringify(offGeo));
+  const stored = await page.evaluate(() => localStorage.getItem('makaman.jobtickets.v2') || '');
+  check('sharing off: no coordinate is written to the store at all',
+    !/"lat"\s*:/.test(stored));
+  const offBar = await page.evaluate(() => {
+    const el = document.querySelector('.mk-nav-fix');
+    return el ? el.innerText.replace(/\s+/g, ' ').trim() : '';
+  });
+  check('sharing off: the technician can still read his own position',
+    /\d+\.\d{4}/.test(offBar), offBar + ' (gps calls=' + offCalls + ')');
   await page.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);
