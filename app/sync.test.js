@@ -26,11 +26,9 @@ async function signIn(ctx, email) {
   await p.waitForTimeout(900);
   return p;
 }
-// The status pill is a <span onClick>, not a button — getByRole finds nothing.
-const goOnline = async (p) => {
-  const pill = p.getByText('NO SIGNAL', { exact: true }).first();
-  if (await pill.count()) { await pill.click(); await p.waitForTimeout(400); }
-};
+// Connectivity is read from the device now — there is no in-app switch to flip, and
+// a headless browser reports itself online, so nothing needs doing to get there.
+const goOnline = async () => {};
 const tickets = (p) => p.evaluate(() => {
   const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2') || '{}');
   return (d.tickets || []).map(t => ({ id: t.id, cust: t.customer, status: t.status, synced: !!t.synced, tech: t.tech }));
@@ -62,7 +60,7 @@ const tab = async (p, name) => {
   let p = await signIn(ctx, 'yousef@makaman.ly');
   await p.getByText('Northern Gulf Petroleum').first().click();
   await p.waitForTimeout(700);
-  await goOnline(p);
+  await goOnline();
   // Seeded state: Yousef's only unsynced ticket is the one he is logging, so with
   // in-progress excluded there is nothing pending and the banner must be gone.
   check('no banner for a job that is merely in progress',
@@ -105,7 +103,7 @@ const tab = async (p, name) => {
   });
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
-  await goOnline(p);
+  await goOnline();
   await tab(p, 'Sync');
   await p.getByRole('button', { name: /Sync now/i }).click();
   await p.waitForTimeout(600);
@@ -133,7 +131,7 @@ const tab = async (p, name) => {
   });
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
-  await goOnline(p);
+  await goOnline();
   await tab(p, 'Sync');
   await p.getByRole('button', { name: /Sync now/i }).click();
   await p.waitForTimeout(700);
@@ -165,11 +163,11 @@ const tab = async (p, name) => {
   body = await p.innerText('body');
   check('the Sync tab lists the closed ticket instead', /1 ticket waiting to upload/i.test(body));
 
-  await goOnline(p);
+  await goOnline();
   await p.getByRole('button', { name: /Sync now/i }).click();
   await p.waitForTimeout(700);
   body = await p.innerText('body');
-  check('uploading reports the closed count', /1 closed ticket\(s\) uploaded/i.test(body));
+  check('uploading reports the closed count', /1 closed ticket uploaded/i.test(body));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);

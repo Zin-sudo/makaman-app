@@ -4,6 +4,21 @@
 
 ---
 
+## 0a. Standing decisions — do not re-derive these
+
+**Supabase project.** This app is `Makaman-app` — ref `igutjfezxkdncrcpvnqx`.
+There is a second project in the same org, `makaman-libya` (`vaawlkmbhdbevkylclkf`).
+That one belongs to the official **company website** and is **never** to be read from,
+written to, or migrated by this project. Confirm the ref before any `apply_migration`
+or `execute_sql`.
+
+**Price-list import.** Item codes arrive from the source Excel with stray spacing —
+`MKN- 1801`, `MKN-100 -01`. Normalise whitespace around hyphens on the **item-number
+column only**; every other column is stored exactly as exported. The normaliser lives in
+the import path, not in a one-off cleanup, because each re-import brings the problem back.
+
+---
+
 ## 0. What to do first, in order
 
 1. Confirm the **Supabase** and **Vercel** MCP connectors are loaded in this session.

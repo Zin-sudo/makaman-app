@@ -253,6 +253,22 @@
   .mk-dev-pos { margin-top:9px; padding-top:9px; border-top:1px solid rgba(var(--ink-rgb),0.1); }
   .mk-dev-jobs { margin-top:9px; padding-top:9px; border-top:1px solid rgba(var(--ink-rgb),0.1); }
 
+  /* Drops in over whatever is on screen and sits clear of the app bar. Above the page
+     but below the dialog layer, so a question still takes precedence over a notice. */
+  .mk-toast {
+    /* Clears the 58px app bar rather than covering the logo and the signed-in name. */
+    position:fixed; top:68px; left:50%; transform:translateX(-50%);
+    z-index:45; width:min(520px, calc(100vw - 24px));
+    display:flex; align-items:flex-start; gap:10px;
+    padding:11px 12px; border:1px solid; box-shadow:0 6px 20px rgba(0,0,0,0.28);
+    animation:mk-drop 220ms ease-out;
+  }
+  @keyframes mk-drop {
+    from { opacity:0; transform:translateX(-50%) translateY(-14px); }
+    to   { opacity:1; transform:translateX(-50%) translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) { .mk-toast { animation:none; } }
+
   /* A wide table on a phone is a table you read by dragging it sideways, losing the
      row you were on. Below 640px these become one card per row: the column headings
      are hidden and each cell carries its own label instead. Nothing is dropped —
@@ -486,7 +502,7 @@
 
           <div style="display:flex;align-items:center;gap:8px;padding:11px 18px 6px;font-size:11px;letter-spacing:0.04em;color:rgba(var(--ink-rgb),0.6)">
             <span>{{ clock }}</span>
-            <span style="margin-left:auto;display:flex;align-items:center;gap:6px;cursor:pointer" onClick="{{ toggleOnline }}">
+            <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
               <span style="width:7px;height:7px;background:{{ netDot }}"></span>{{ netLabel }}
             </span>
           </div>
@@ -679,14 +695,11 @@
               <div style="display:flex;align-items:center;gap:9px;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:16px">
                 <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ netDot }}"></span>
                 <div style="flex:1;font-size:13px">{{ netLabel }}</div>
-                <button onClick="{{ toggleOnline }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Toggle</button>
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45);text-align:right">{{ netHint }}</div>
               </div>
               <sc-if value="{{ syncNothingPending }}" hint-placeholder-val="{{ false }}">
                 <div style="padding:22px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">{{ syncEmptyLabel }}</div>
                 <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
-              </sc-if>
-              <sc-if value="{{ syncNoteShow }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-top:12px;padding:11px 13px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;background:{{ syncNoteBg }};color:{{ syncNoteFg }};border:1px solid {{ syncNoteBorder }}">{{ syncNoteText }}</div>
               </sc-if>
               <sc-if value="{{ syncHasPending }}" hint-placeholder-val="{{ true }}">
                 <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:8px">{{ syncPendingLabel }}</div>
@@ -1776,6 +1789,13 @@
   </sc-if>
 
   <!-- ══ DIALOG ══ -->
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div class="mk-toast" style="background:{{ toastBg }};border-color:{{ toastBorder }};color:{{ toastFg }}">
+      <div style="flex:1;min-width:0;font-size:13px;line-height:1.4">{{ toastText }}</div>
+      <button onClick="{{ dismissToast }}" title="Dismiss" style="flex:none;width:24px;height:24px;font-size:16px;line-height:1;background:none;border:0;cursor:pointer;color:inherit;opacity:0.7">×</button>
+    </div>
+  </sc-if>
+
   <sc-if value="{{ hasDialog }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:var(--scrim);z-index:50">
       <div style="width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--ground);border:1px solid rgba(var(--ink-rgb),0.3);box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.32)">
@@ -1958,6 +1978,9 @@ function monthKey(s, tz) {
 // auto-uploads any pending tickets on this timer once signal is back, rather than relying
 // on the technician remembering to tap Sync. window.__AUTO_SYNC_TEST_MS overrides it for
 // fast automated verification; production uses a realistic once-a-minute cadence.
+// How long a drop banner holds before it retires itself. Overridable for tests, which
+// cannot afford to wait six seconds per assertion.
+const TOAST_MS = (typeof window !== 'undefined' && window.__TOAST_TEST_MS) || 6000;
 const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 60000;
 // How often a ticket that is still being logged re-pins where the device is.
 const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 3600000;
@@ -2143,7 +2166,7 @@ class Component extends DCLogic {
     super(props);
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null,
-      activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
+      activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
       session: null, authScreen: 'login', authEmail: '', authPassword: '',
@@ -2228,13 +2251,46 @@ class Component extends DCLogic {
     if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+    // Connectivity is a fact about the device, not a preference. It used to be a
+    // button the technician could hold in "no signal" while actually connected —
+    // which is a demo control, not a status. The browser tells us instead.
+    this.netListener = () => this.setState({ online: navigator.onLine !== false });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.netListener);
+      window.addEventListener('offline', this.netListener);
+    }
   }
   componentWillUnmount() {
     clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (this.netListener && typeof window !== 'undefined') {
+      window.removeEventListener('online', this.netListener);
+      window.removeEventListener('offline', this.netListener);
+    }
     if (this.mq && this.mqListener) {
       if (this.mq.removeEventListener) this.mq.removeEventListener('change', this.mqListener);
       else if (this.mq.removeListener) this.mq.removeListener(this.mqListener);
     }
+  }
+
+  // Every brief message in the app arrives the same way: a banner that drops from the
+  // top, holds for six seconds, and can be dismissed sooner. Anything that must stay
+  // until it is resolved — a refused ticket number, "No Location Shared" — is not this;
+  // it stays where the problem is.
+  //
+  // Pressing the same button twice does not stack a second banner or restart the
+  // animation. It keeps the one already on screen and pushes its countdown out, so the
+  // banner disappears six seconds after the last press rather than flickering once per
+  // press. That is what stops a held button turning into a spam loop.
+  toast(key, text, tone) {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    const cur = this.state.toast;
+    if (!cur || cur.key !== key) this.setState({ toast: { key: key, text: text, tone: tone || 'info' } });
+    this.toastTimer = setTimeout(() => this.setState({ toast: null }), TOAST_MS);
+  }
+  dismissToast() {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.setState({ toast: null });
   }
 
   mutate(fn) {
@@ -2829,10 +2885,6 @@ class Component extends DCLogic {
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
       },
-      synced: {
-        title: 'Sync complete', body: (S.syncedCount || 0) + ' closed ticket(s) uploaded and now visible to the operations manager. Jobs still being logged stay on this device list.',
-        okLabel: 'Done', hasCancel: false, confirm: () => this.setState({ dialog: null }),
-      },
       approved: {
         title: 'Ticket approved', body: 'Ticket ' + (t ? t.ticketNo : '') + ' is approved and locked for the technician. The four sheets are ready to fill.',
         okLabel: 'Preview sheets', hasCancel: true, cancelLabel: 'Back to inbox',
@@ -2853,18 +2905,6 @@ class Component extends DCLogic {
           this.setState({ dialog: null, reasonText: '' });
         },
       },
-      export: {
-        title: 'Files ready', body: 'Service Ticket (Original), Service Ticket (Copy), Job Log (Original) and Job Log (Copy) generated from the real template — cell map applied. Downloading to this device, no cloud account needed.',
-        okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
-      },
-      exportOneDrive: {
-        title: 'Uploaded to OneDrive', body: 'All 4 sheets uploaded to ' + (((D.settings.cloudStorage || {}).oneDrive || {}).account || 'OneDrive') + '. A copy was not also saved to this device — use Fill Excel & download for that.',
-        okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
-      },
-      exportGoogleDrive: {
-        title: 'Uploaded to Google Drive', body: 'All 4 sheets uploaded to ' + (((D.settings.cloudStorage || {}).googleDrive || {}).account || 'Google Drive') + '. A copy was not also saved to this device — use Fill Excel & download for that.',
-        okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
-      },
       dupNumber: {
         title: 'Number refused', body: 'That ticket number is already in use. Every ticket number must be unique.',
         okLabel: 'Change it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
@@ -2884,10 +2924,6 @@ class Component extends DCLogic {
           });
           this.setState({ dialog: null, deleteUserEmail: null, deleteUserName: null });
         },
-      },
-      report: {
-        title: 'Report generated', body: 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary. Observer view cannot modify ticket data.',
-        okLabel: 'Close', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
       reset: {
         title: 'Reset demo data?', body: 'Local tickets, price lists and numbering go back to the seeded values.',
@@ -3013,7 +3049,7 @@ class Component extends DCLogic {
           // open when the tab was left. roleTab and mgrScreen/techScreen are separate,
           // so without this a manager who wandered off the print preview came back to
           // the print preview rather than the inbox.
-          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null, syncNote: null }),
+          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null }),
         };
       }),
 
@@ -3081,14 +3117,6 @@ class Component extends DCLogic {
       syncHasPending: myPending.length > 0,
       syncPendingLabel: myPending.length === 1 ? '1 ticket waiting to upload' : myPending.length + ' tickets waiting to upload',
       syncLastLabel: S.lastAutoSyncAt ? F.stamp(S.lastAutoSyncAt) : 'No upload yet on this device',
-      // The answer to pressing Sync when there is nothing to upload. Green when the
-      // closed work is already up there, amber when the only thing on the device is a
-      // job still running — which is not a failure, just a job that is not finished.
-      syncNoteShow: !!S.syncNote,
-      syncNoteText: S.syncNote === 'inprogress' ? 'Close Ticket To Sync' : 'Tickets Already Synchronized',
-      syncNoteBg: S.syncNote === 'inprogress' ? 'rgba(var(--warning-rgb),0.16)' : 'rgba(var(--success-rgb),0.16)',
-      syncNoteFg: S.syncNote === 'inprogress' ? 'var(--warning-ink)' : 'var(--success)',
-      syncNoteBorder: S.syncNote === 'inprogress' ? 'var(--warning)' : 'var(--success)',
 
       // ── Field devices (office roles) ───────────────────────────────────────
       // A technician's Sync answers "what is still on my device". The office end of
@@ -3218,7 +3246,13 @@ class Component extends DCLogic {
       shareLocation: !!(D.settings || {}).shareLocation,
       shareLocationBg: (D.settings || {}).shareLocation ? 'var(--accent)' : 'var(--field)',
       shareLocationKnob: (D.settings || {}).shareLocation ? '20px' : '2px',
-      toggleShareLocation: () => this.updateSettings({ shareLocation: !(D.settings || {}).shareLocation }),
+      toggleShareLocation: () => {
+        const next = !(D.settings || {}).shareLocation;
+        this.updateSettings({ shareLocation: next });
+        // Only the switching-off direction says anything. Confirming a choice someone
+        // just made, in the direction they wanted, is noise.
+        if (!next) this.toast('geo-off', 'Location sharing is off. Your position will read "No Location Shared" — the office cannot reach you by coordinates if something goes wrong on site.', 'warn');
+      },
 
       // Storage & Export — Ops Manager only. See the seed() comment on cloudStorage for
       // why "Connect" is mocked rather than a real OAuth flow.
@@ -3247,7 +3281,7 @@ class Component extends DCLogic {
       clock: F.time(iso(new Date())),
       netDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       netLabel: S.online ? 'ONLINE' : 'NO SIGNAL',
-      toggleOnline: () => this.setState({ online: !S.online }),
+      netHint: S.online ? 'Detected automatically' : 'Work is stored on this device until signal returns',
       // One signal at a time. The Sync tab already says everything the banner would,
       // and louder — showing both meant the technician saw the same warning twice with
       // the tab's own controls right beneath it.
@@ -3268,7 +3302,8 @@ class Component extends DCLogic {
         // Pressed with nothing closed to upload, answer rather than doing nothing. The
         // in-progress tickets are deliberately left exactly where they are.
         if (!myPending.length) {
-          this.setState({ syncNote: myInProgress.length && !myClosed.length ? 'inprogress' : 'done' });
+          if (myInProgress.length && !myClosed.length) this.toast('sync-open', 'Close Ticket To Sync', 'warn');
+          else this.toast('sync-done', 'Tickets Already Synchronized', 'ok');
           return;
         }
         const now = iso(new Date());
@@ -3278,7 +3313,7 @@ class Component extends DCLogic {
           x.synced = true; x.syncedAt = now;
           (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' });
         }));
-        this.setState({ dialog: 'synced', syncedCount: ids.length, syncNote: null });
+        this.toast('sync-up', ids.length === 1 ? '1 closed ticket uploaded — the operations manager can see it now.' : ids.length + ' closed tickets uploaded — the operations manager can see them now.', 'ok');
       },
 
       techName: myName,
@@ -3763,7 +3798,7 @@ class Component extends DCLogic {
         if (logOverflow) bits.push((sheetEventsReal.length - LOG_ROW_CAP) + ' more job-log line(s) than the ' + LOG_ROW_CAP + '-row page limit');
         return 'This ticket has ' + bits.join(' and ') + ' — a second page was added automatically below. Prefer one page? Go back to review and remove some lines, then reopen this preview.';
       })(),
-      exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.setState({ dialog: 'export' }); },
+      exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.toast('export', 'Four sheets generated from the template and downloading to this device.', 'ok'); },
       // Local download always works. OneDrive/Google Drive upload buttons only render
       // once connected (Settings > Storage & Export) — see the seed() comment on
       // cloudStorage for why the connect step itself is mocked.
@@ -3773,12 +3808,12 @@ class Component extends DCLogic {
       uploadOneDrive: () => {
         const acct = ((D.settings.cloudStorage || {}).oneDrive || {}).account || 'OneDrive';
         this.log('4 sheets uploaded to OneDrive (' + acct + ').', 'lifecycle');
-        this.setState({ dialog: 'exportOneDrive' });
+        this.toast('export-od', 'All 4 sheets uploaded to OneDrive (' + acct + '). No copy was saved to this device — use Fill Excel & download for that.', 'ok');
       },
       uploadGoogleDrive: () => {
         const acct = ((D.settings.cloudStorage || {}).googleDrive || {}).account || 'Google Drive';
         this.log('4 sheets uploaded to Google Drive (' + acct + ').', 'lifecycle');
-        this.setState({ dialog: 'exportGoogleDrive' });
+        this.toast('export-gd', 'All 4 sheets uploaded to Google Drive (' + acct + '). No copy was saved to this device — use Fill Excel & download for that.', 'ok');
       },
 
       // One tool at a time, chosen from Account. The page names the tool it is
@@ -3880,7 +3915,7 @@ class Component extends DCLogic {
       ],
       founderCount: S.founderCount,
       founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => this.ticketView(x)),
-      generateReport: () => this.setState({ dialog: 'report' }),
+      generateReport: () => this.toast('report', 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary.', 'ok'),
 
       // Live activity — the only view in the app that shows tickets still being logged
       // in the field to the Observer, who otherwise only ever sees already-approved
@@ -3900,6 +3935,13 @@ class Component extends DCLogic {
       }),
       hasLiveTickets: D.tickets.some(x => x.status === 'logging' && x.synced),
       noLiveTickets: !D.tickets.some(x => x.status === 'logging' && x.synced),
+
+      hasToast: !!S.toast,
+      toastText: (S.toast || {}).text || '',
+      toastBg: 'linear-gradient(' + ({ warn: 'rgba(var(--warning-rgb),0.18)', ok: 'rgba(var(--success-rgb),0.18)' }[(S.toast || {}).tone] || 'var(--accent-wash)') + ',' + ({ warn: 'rgba(var(--warning-rgb),0.18)', ok: 'rgba(var(--success-rgb),0.18)' }[(S.toast || {}).tone] || 'var(--accent-wash)') + '), var(--surface)',
+      toastFg: { warn: 'var(--warning-ink)', ok: 'var(--success)' }[(S.toast || {}).tone] || 'var(--accent-ink)',
+      toastBorder: { warn: 'var(--warning)', ok: 'var(--success)' }[(S.toast || {}).tone] || 'var(--accent)',
+      dismissToast: () => this.dismissToast(),
 
       hasDialog: !!S.dialog,
       dialog: Object.assign({ title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true, needsReason: false, needsPerson: false, confirm: () => this.setState({ dialog: null }) }, dialogs[S.dialog] || {}),
