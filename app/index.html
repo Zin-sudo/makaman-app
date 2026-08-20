@@ -689,28 +689,38 @@
                     <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);line-height:1.45;margin-bottom:12px">{{ assetPromptNote }}</div>
                     <sc-for list="{{ assetPromptRows }}" as="q" hint-placeholder-count="3">
                       <div style="margin-bottom:13px">
-                        <div style="font-size:12px;font-weight:600;margin-bottom:7px;color:var(--ink)">{{ q.label }}</div>
+                        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:7px">
+                          <div style="font-size:12px;font-weight:600;color:{{ q.labelFg }}">{{ q.label }}</div>
+                          <sc-if value="{{ q.showHint }}" hint-placeholder-val="{{ false }}">
+                            <div style="font-size:10px;letter-spacing:0.05em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.45)">{{ q.hint }}</div>
+                          </sc-if>
+                        </div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                           <sc-for list="{{ q.options }}" as="o" hint-placeholder-count="3">
-                            <button onClick="{{ o.pick }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }}">{{ o.text }}</button>
+                            <button onClick="{{ o.pick }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:{{ o.weight }};font-size:12px;letter-spacing:0.03em;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }}">{{ o.text }}</button>
                           </sc-for>
                         </div>
+                        <sc-if value="{{ q.showMissed }}" hint-placeholder-val="{{ false }}">
+                          <div style="font-size:11px;color:var(--danger);margin-top:5px">{{ q.missedNote }}</div>
+                        </sc-if>
                       </div>
                     </sc-for>
 
                     <!-- The fourth row. Grey and optional while every question is
                          answered; red and mandatory the moment one is not. -->
-                    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.14)">
-                      <button onClick="{{ openAssetJustify }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:transparent;color:{{ assetJustifyFg }};border:1px solid {{ assetJustifyBorder }}">{{ assetJustifyLabel }}</button>
-                      <sc-if value="{{ assetJustifyOpen }}" hint-placeholder-val="{{ false }}">
-                        <textarea value="{{ assetJustifyText }}" onChange="{{ onAssetJustify }}" rows="2" placeholder="Type the answer…" style="width:100%;margin-top:8px;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid {{ assetJustifyBorder }};color:var(--ink);resize:vertical"></textarea>
-                        <sc-if value="{{ showAssetJustifyNote }}" hint-placeholder-val="{{ false }}">
-                          <div style="font-size:11px;color:var(--danger);margin-top:5px">{{ assetJustifyNote }}</div>
+                    <sc-if value="{{ assetJustifyShow }}" hint-placeholder-val="{{ true }}">
+                      <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.14)">
+                        <button onClick="{{ openAssetJustify }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:transparent;color:{{ assetJustifyFg }};border:1px solid {{ assetJustifyBorder }}">{{ assetJustifyLabel }}</button>
+                        <sc-if value="{{ assetJustifyOpen }}" hint-placeholder-val="{{ false }}">
+                          <textarea value="{{ assetJustifyText }}" onChange="{{ onAssetJustify }}" rows="2" placeholder="Type the answer…" style="width:100%;margin-top:8px;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid {{ assetJustifyBorder }};color:var(--ink);resize:vertical"></textarea>
+                          <sc-if value="{{ showAssetJustifyNote }}" hint-placeholder-val="{{ false }}">
+                            <div style="font-size:11px;color:var(--danger);margin-top:5px">{{ assetJustifyNote }}</div>
+                          </sc-if>
                         </sc-if>
-                      </sc-if>
-                    </div>
+                      </div>
+                    </sc-if>
 
-                    <button onClick="{{ confirmAssetPrompt }}" disabled="{{ assetPromptBlocked }}" style="width:100%;min-height:46px;margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:#fff;border:1px solid var(--danger);opacity:{{ assetPromptOpacity }}">Confirm and close the job</button>
+                    <button onClick="{{ confirmAssetPrompt }}" style="width:100%;min-height:46px;margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:#fff;border:1px solid var(--danger)">Confirm and close the job</button>
                     <button onClick="{{ cancelAssetPrompt }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to the log</button>
                   </div>
                 </sc-if>
@@ -1724,7 +1734,10 @@
                 <input value="{{ q.label }}" onChange="{{ q.onLabel }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;font-weight:600;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 <button onClick="{{ q.removeQuestion }}" title="Remove question" style="width:28px;flex:none;font-size:16px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
               </div>
-              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:7px">Options offered</div>
+              <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
+                <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Options offered</div>
+                <button onClick="{{ q.toggleMulti }}" style="margin-left:auto;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:{{ q.multiBg }};color:{{ q.multiFg }};border:1px solid {{ q.multiBorder }}">{{ q.multiLabel }}</button>
+              </div>
               <sc-for list="{{ q.options }}" as="o" hint-placeholder-count="3">
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
                   <input value="{{ o.text }}" onChange="{{ o.onText }}" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:{{ o.bg }};border:1px solid {{ o.border }};color:{{ o.fg }}">
@@ -2226,12 +2239,14 @@ const TOAST_MS = (typeof window !== 'undefined' && window.__TOAST_TEST_MS) || 60
 // company's vocabulary, not the app's, and a preset nobody uses just pushes people into
 // free text.
 const ASSET_QUESTIONS_DEFAULT = [
-  { key: 'reclaimed', label: 'Tools allocated reclaimed?', tone: 'warning',
-    presets: ['Yes', 'Not yet', 'Handed over'] },
+  { key: 'reclaimed', label: 'Tools allocated reclaimed and back to base?', tone: 'warning',
+    multi: false, presets: ['Yes', 'Not yet', 'Handed over to replacement'] },
+  // Kit rarely ends up in one place. Where a job used two strings and a vehicle, forcing
+  // a single answer would push a true answer into free text.
   { key: 'location', label: 'Tools allocated location?', tone: 'accent',
-    presets: ['In vehicle', 'At String-30', 'At rig'] },
+    multi: true, presets: ['In vehicle', 'At String-30', 'At rig'] },
   { key: 'leftBehind', label: 'Tools allocated left behind or damaged?', tone: 'success',
-    presets: ['None'] },
+    multi: false, presets: ['None'] },
 ];
 const ASSET_TONES = {
   warning: { bg: 'rgba(var(--warning-rgb),0.16)', fg: 'var(--warning-ink)', border: 'var(--warning)' },
@@ -3352,8 +3367,21 @@ class Component extends DCLogic {
     // Every question needs an answer, or a written justification standing in for the
     // ones that have none. Nothing closes on silence.
     const assetQs = this.assetQuestions();
-    const assetAllAnswered = assetQs.every(q => String(((S.assetDraft || {})[q.key]) || '').trim() !== '');
-    const assetJustifyRequired = !assetAllAnswered;
+    // A multi-answer question holds a list; a single one holds a string. answeredText
+    // flattens both so everything downstream — validation, storage, the printed note —
+    // reads one shape.
+    const answeredText = (q) => {
+      const v = (S.assetDraft || {})[q.key];
+      if (Array.isArray(v)) return v.filter(Boolean).join(', ');
+      return String(v || '').trim();
+    };
+    const assetUnanswered = assetQs
+      .map((q, qi) => (answeredText(q) ? null : qi + 1))
+      .filter(n => n !== null);
+    const assetAllAnswered = assetUnanswered.length === 0;
+    // Nothing is red or demanded until Confirm is pressed. Opening with a warning about
+    // work nobody has failed to do yet trains people to ignore the warning.
+    const assetJustifyRequired = !!S.assetAttempted && !assetAllAnswered;
     const assetPromptReady = assetAllAnswered || String(S.assetJustify || '').trim() !== '';
     const numberingBlock = (() => {
       if (S.role !== 'mgr' && S.role !== 'admin') return 'Only the operations manager assigns ticket numbers.';
@@ -4312,50 +4340,97 @@ class Component extends DCLogic {
       // Asked once, at the moment of closing, and only of a technician who was actually
       // given something. A job with no allocated kit closes exactly as it did before.
       assetPromptOpen: !!S.assetPrompt && !!t && (t.assets || []).length > 0,
-      assetPromptRows: assetQs.map(q => {
+      assetPromptRows: assetQs.map((q, qi) => {
         const tone = assetTone(q);
-        const picked = (S.assetDraft || {})[q.key] || '';
+        const raw = (S.assetDraft || {})[q.key];
+        const chosen = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+        const missed = !!S.assetAttempted && chosen.length === 0;
         return {
           label: q.label,
-          options: (q.presets || []).map(text => ({
-            text: text,
-            // The chosen one fills solid; the rest stay washed. On a phone in daylight a
-            // border alone is not enough to tell picked from not-picked.
-            bg: picked === text ? tone.border : tone.bg,
-            fg: picked === text ? 'var(--on-accent)' : tone.fg,
-            border: tone.border,
-            pick: () => this.setState({ assetDraft: Object.assign({}, S.assetDraft, { [q.key]: text }) }),
-          })),
+          hint: q.multi ? 'Pick all that apply' : '',
+          showHint: !!q.multi,
+          // Named only once Confirm has been pressed, so the technician is told what is
+          // missing at the moment it matters rather than warned about it up front.
+          missedNote: missed ? ('Question ' + (qi + 1) + " wasn't answered") : '',
+          showMissed: missed,
+          labelFg: missed ? 'var(--danger)' : 'var(--ink)',
+          options: (q.presets || []).map(text => {
+            const on = chosen.indexOf(text) !== -1;
+            return {
+              text: text,
+              // Chosen fills solid and goes bold; unchosen keeps only a tinted edge on a
+              // neutral ground. A wash against a wash is not a difference you can read on
+              // a phone screen in daylight.
+              bg: on ? tone.border : 'transparent',
+              fg: on ? 'var(--on-accent)' : 'rgba(var(--ink-rgb),0.6)',
+              border: on ? tone.border : 'rgba(var(--ink-rgb),0.28)',
+              weight: on ? '700' : '600',
+              pick: () => {
+                const cur = Array.isArray(raw) ? raw.slice() : (raw ? [raw] : []);
+                let next;
+                if (q.multi) {
+                  const at = cur.indexOf(text);
+                  if (at === -1) cur.push(text); else cur.splice(at, 1);
+                  next = cur;
+                } else {
+                  // Tapping the chosen one again clears it, so a mis-tap is undoable
+                  // without a separate control.
+                  next = (cur.length === 1 && cur[0] === text) ? '' : text;
+                }
+                const draft = Object.assign({}, S.assetDraft, { [q.key]: next });
+                this.setState({ assetDraft: draft });
+                // A warning must not outlive the problem. Once every question has an
+                // answer, retire the banner that named the missing ones rather than
+                // leaving it to time out over a form that is now complete.
+                const done = assetQs.every(x => {
+                  const v = draft[x.key];
+                  return (Array.isArray(v) ? v.filter(Boolean).join('') : String(v || '')).trim() !== '';
+                });
+                if (done) {
+                  if (this.state.toast && this.state.toast.key === 'assets-missing') this.dismissToast();
+                  // The row is about to disappear; do not keep text nobody can see or edit.
+                  if (this.state.assetJustify || this.state.assetJustifyOpen) {
+                    this.setState({ assetJustify: '', assetJustifyOpen: false, assetAttempted: false });
+                  }
+                }
+              },
+            };
+          }),
         };
       }),
-      // One justification row under the three, rather than a manual escape hatch on each.
-      // It is optional while every question has an answer, and becomes mandatory the
-      // moment one does not — which is the only case where free text is actually needed.
-      assetJustifyRequired: assetJustifyRequired,
+      // The row exists only while there is something to justify. Once every question has
+      // an answer it goes entirely — button, box and text — because a justification for
+      // nothing is just a field people wonder about.
+      assetJustifyShow: !assetAllAnswered,
       assetJustifyOpen: assetJustifyRequired || !!S.assetJustifyOpen,
       assetJustifyLabel: 'Type manually instead',
       assetJustifyText: S.assetJustify || '',
       assetJustifyBorder: assetJustifyRequired ? 'var(--danger)' : 'rgba(var(--ink-rgb),0.35)',
       assetJustifyFg: assetJustifyRequired ? 'var(--danger)' : 'rgba(var(--ink-rgb),0.75)',
-      assetJustifyNote: assetJustifyRequired ? 'If questions not answered, you must justify' : '',
+      assetJustifyNote: 'If questions not answered, you must justify',
       showAssetJustifyNote: assetJustifyRequired,
       openAssetJustify: () => this.setState({ assetJustifyOpen: !S.assetJustifyOpen }),
       onAssetJustify: e => this.setState({ assetJustify: e.target.value }),
-      assetPromptBlocked: !assetPromptReady,
-      assetPromptOpacity: assetPromptReady ? 1 : 0.5,
-      assetPromptNote: assetPromptReady
+      assetPromptNote: assetAllAnswered
         ? 'Ready to close — these stay on the ticket for the office.'
         : (assetJustifyRequired
-          ? 'One or more questions have no answer. Justify below to close.'
+          ? ('Unanswered: question ' + assetUnanswered.join(', ') + '. Justify below to close.')
           : 'Pick an answer for each question.'),
-      cancelAssetPrompt: () => this.setState({ assetPrompt: false, assetJustifyOpen: false }),
+      cancelAssetPrompt: () => this.setState({ assetPrompt: false, assetJustifyOpen: false, assetAttempted: false }),
       confirmAssetPrompt: () => {
-        if (!t || !assetPromptReady) return;
-        const draft = S.assetDraft || {};
+        if (!t) return;
+        // Validated on press rather than by disabling the button: a dead button explains
+        // nothing, and the technician needs to be told which question they missed.
+        if (!assetPromptReady) {
+          this.setState({ assetAttempted: true, assetJustifyOpen: true });
+          this.toast('assets-missing',
+            'Question ' + assetUnanswered.join(' and ') + " wasn't answered. Pick an answer, or type a justification.", 'warn');
+          return;
+        }
         const justify = (S.assetJustify || '').trim();
         const when = iso(new Date());
         const answers = {};
-        assetQs.forEach(q => { answers[q.key] = { label: q.label, text: draft[q.key] || '' }; });
+        assetQs.forEach(q => { answers[q.key] = { label: q.label, text: answeredText(q) }; });
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
           x.assetCheck = { answers: answers, justification: justify, at: when, by: myName };
@@ -4364,9 +4439,9 @@ class Component extends DCLogic {
         // three places: the office sees everything, the field and the Observer see job
         // stages only, and tool custody is neither of those.
         this.logOn(t.id, 'Allocated assets accounted for on closing — '
-          + assetQs.map(q => q.label.replace(/\?$/, '') + ': ' + (draft[q.key] || '(not answered)')).join(' · ')
+          + assetQs.map(q => q.label.replace(/\?$/, '') + ': ' + (answeredText(q) || '(not answered)')).join(' · ')
           + (justify ? ' · Justification: ' + justify : '') + '.', 'assets');
-        this.setState({ assetPrompt: false, assetDraft: null, assetJustify: '', assetJustifyOpen: false, dialog: 'done' });
+        this.setState({ assetPrompt: false, assetDraft: null, assetJustify: '', assetJustifyOpen: false, assetAttempted: false, dialog: 'done' });
       },
 
       askJobDone: () => {
@@ -4378,7 +4453,7 @@ class Component extends DCLogic {
         }
         // Kit was handed out and the job is being closed: account for it first.
         if (t && t.status === 'logging' && (t.assets || []).length && !t.assetCheck) {
-          this.setState({ assetPrompt: true, assetDraft: null });
+          this.setState({ assetPrompt: true, assetDraft: null, assetJustify: '', assetJustifyOpen: false, assetAttempted: false });
           return;
         }
         this.setState({ dialog: t && t.status !== 'logging' ? 'reopenTech' : 'done' });
@@ -4812,12 +4887,17 @@ class Component extends DCLogic {
             remove: () => this.mutate(d => { d.assetQuestions[qi].presets.splice(oi, 1); }),
           })),
           addOption: () => this.mutate(d => { (d.assetQuestions[qi].presets = d.assetQuestions[qi].presets || []).push('New option'); }),
+          multiLabel: q.multi ? 'Several answers' : 'One answer',
+          multiBg: q.multi ? 'var(--accent-wash)' : 'transparent',
+          multiFg: q.multi ? 'var(--accent-ink)' : 'rgba(var(--ink-rgb),0.6)',
+          multiBorder: q.multi ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.28)',
+          toggleMulti: () => this.mutate(d => { d.assetQuestions[qi].multi = !d.assetQuestions[qi].multi; }),
           removeQuestion: () => this.mutate(d => { d.assetQuestions.splice(qi, 1); }),
         };
       }),
       addAssetQuestion: () => this.mutate(d => {
         (d.assetQuestions = d.assetQuestions || []).push({
-          key: 'q' + Date.now(), label: 'New question?', tone: 'accent', presets: ['Yes'],
+          key: 'q' + Date.now(), label: 'New question?', tone: 'accent', multi: false, presets: ['Yes'],
         });
       }),
       resetAssetQuestions: () => {

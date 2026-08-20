@@ -90,38 +90,73 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   check('closing asks about the tools first', /Account for the tools before closing/i.test(body));
   check('all three questions are asked',
     /Tools allocated reclaimed/i.test(body) && /Tools allocated location/i.test(body) && /Tools allocated left behind or damaged/i.test(body));
-  check('and it will not close until they are answered',
-    await p.getByRole('button', { name: /Confirm and close the job/i }).isDisabled());
+
+  // Nothing is red until Confirm is pressed — the prompt does not open scolding.
+  check('no demand before anything is attempted',
+    !/wasn't answered/i.test(await p.innerText('body')));
+
+  // press Confirm with nothing answered: it must name every missing question
+  await p.getByRole('button', { name: /Confirm and close the job/i }).click();
+  await p.waitForTimeout(600);
+  body = await p.innerText('body');
+  check('pressing Confirm blank names each unanswered question',
+    /Question 1 wasn't answered/i.test(body) && /Question 2 wasn't answered/i.test(body) && /Question 3 wasn't answered/i.test(body));
+  check('and opens the justification with its reason',
+    /If questions not answered, you must justify/i.test(body));
+  check('and the job is still open', await p.getByRole('button', { name: /Confirm and close the job/i }).count() === 1);
 
   await p.getByRole('button', { name: /^Yes$/ }).click();
   await p.waitForTimeout(300);
-  await p.getByRole('button', { name: /^In vehicle$/i }).click();
-  await p.waitForTimeout(300);
-  check('two of three is still not enough',
-    await p.getByRole('button', { name: /Confirm and close the job/i }).isDisabled());
-  check('and the justification row demands a reason while one is unanswered',
-    /If questions not answered, you must justify/i.test(await p.innerText('body')));
+  check('answering one clears only that question',
+    !/Question 1 wasn't answered/i.test(await p.innerText('body'))
+    && /Question 2 wasn't answered/i.test(await p.innerText('body')));
 
-  // answering the third clears the demand and closes the box requirement
+  // question two takes several answers
+  await p.getByRole('button', { name: /^In vehicle$/i }).click();
+  await p.waitForTimeout(250);
+  await p.getByRole('button', { name: /^At rig$/i }).click();
+  await p.waitForTimeout(350);
+  const bothOn = await p.evaluate(() => {
+    const on = Array.from(document.querySelectorAll('button')).filter(b =>
+      ['In vehicle', 'At rig'].indexOf(b.innerText.trim()) !== -1);
+    return on.map(b => getComputedStyle(b).backgroundColor);
+  });
+  check('question two keeps more than one answer at once',
+    bothOn.length === 2 && bothOn.every(c => c !== 'rgba(0, 0, 0, 0)'), JSON.stringify(bothOn));
+
+  // a chosen option must look clearly different from an unchosen one
+  const contrast = await p.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('button'));
+    const on = btns.find(b => b.innerText.trim() === 'In vehicle');
+    const off = btns.find(b => b.innerText.trim() === 'At String-30');
+    const g = (el) => ({ bg: getComputedStyle(el).backgroundColor, fg: getComputedStyle(el).color, w: getComputedStyle(el).fontWeight });
+    return { on: g(on), off: g(off) };
+  });
+  check('a chosen option is visibly different from an unchosen one',
+    contrast.on.bg !== contrast.off.bg && contrast.on.fg !== contrast.off.fg,
+    JSON.stringify(contrast));
+
+  // question one takes only one
+  await p.getByRole('button', { name: /^Not yet$/i }).click();
+  await p.waitForTimeout(350);
+  const singles = await p.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('button'));
+    return ['Yes', 'Not yet'].map(txt => {
+      const b = btns.find(x => x.innerText.trim() === txt);
+      return getComputedStyle(b).backgroundColor;
+    });
+  });
+  check('question one replaces its answer rather than adding one',
+    singles[0] !== singles[1], JSON.stringify(singles));
+
   await p.getByRole('button', { name: /^None$/i }).click();
   await p.waitForTimeout(400);
-  check('answering all three lifts the demand',
-    !/If questions not answered, you must justify/i.test(await p.innerText('body')));
-  check('and closing is allowed',
-    !(await p.getByRole('button', { name: /Confirm and close the job/i }).isDisabled()));
-
-  // Q1 now offers three distinct choices
-  const q1 = await p.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('button')).map(b => b.innerText.trim());
-    return ['Yes', 'Not yet', 'Handed over'].every(x => btns.some(b => b.toLowerCase() === x.toLowerCase()));
-  });
-  check('the first question offers three distinct answers', q1);
-
-  // the justification is optional here, but still usable
-  await p.getByRole('button', { name: /Type manually instead/i }).click();
-  await p.waitForTimeout(300);
-  await p.locator('textarea[placeholder="Type the answer…"]').first().fill('One crossover left with the rig');
-  await p.waitForTimeout(400);
+  check('with all three answered nothing is demanded',
+    !/wasn't answered/i.test(await p.innerText('body')));
+  check('and the manual row disappears entirely',
+    await p.getByRole('button', { name: /Type manually instead/i }).count() === 0);
+  check('taking its text box with it',
+    await p.locator('textarea[placeholder="Type the answer…"]').count() === 0);
 
   await p.getByRole('button', { name: /Confirm and close the job/i }).click();
   await p.waitForTimeout(700);
@@ -132,12 +167,14 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   d = await store(p);
   tk = d.tickets.find(x => x.customer.indexOf('Northern Gulf') === 0);
   check('the answers are stored on the ticket', !!tk.assetCheck, JSON.stringify(tk.assetCheck || {}));
-  check('with all three answers recorded',
-    (tk.assetCheck.answers || {}).reclaimed.text === 'Yes'
-    && (tk.assetCheck.answers || {}).location.text === 'In vehicle'
-    && (tk.assetCheck.answers || {}).leftBehind.text === 'None');
-  check('and the justification alongside them',
-    /crossover left with the rig/i.test(tk.assetCheck.justification || ''));
+  check('the single-answer questions hold one value each',
+    (tk.assetCheck.answers || {}).reclaimed.text === 'Not yet'
+    && (tk.assetCheck.answers || {}).leftBehind.text === 'None',
+    JSON.stringify(tk.assetCheck.answers));
+  check('and the multi-answer question holds both',
+    /In vehicle/.test((tk.assetCheck.answers || {}).location.text)
+    && /At rig/.test((tk.assetCheck.answers || {}).location.text),
+    (tk.assetCheck.answers || {}).location.text);
   check('and it is on the audit trail',
     (tk.audit || []).some(a => /Allocated assets accounted for on closing/i.test(a.text)));
   check('filed under its own kind, not as a job stage',
@@ -160,7 +197,7 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   await p.waitForTimeout(900);
   body = await p.innerText('body');
   check('the office sees the answers on the ticket', /Allocated assets — accounted for on closing/i.test(body));
-  check('with the actual answers', /Yes/.test(body) && /In vehicle/i.test(body) && /crossover left with the rig/i.test(body));
+  check('with the actual answers', /Not yet/i.test(body) && /In vehicle/i.test(body) && /At rig/i.test(body));
   check('and who answered them', /Answered by Yousef Al-Harbi/i.test(body));
   await p.close();
 
@@ -178,6 +215,41 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
         !/Account for the tools before closing/i.test(await p.innerText('body')));
     }
   }
+  await p.close();
+
+  // ── a written justification alone is enough ─────────────────────────────
+  p = await signIn(ctx, 'omar@makaman.ly');
+  await p.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));
+    const t = d.tickets.find(x => x.customer.indexOf('Northern Gulf') === 0);
+    t.status = 'logging'; t.assetCheck = null; t.end = '';
+    t.assets = [{ item: 'Wash pipe', qty: '1', note: '' }];
+    localStorage.setItem('makaman.jobtickets.v2', JSON.stringify(d));
+  });
+  await p.close();
+  p = await signIn(ctx, 'yousef@makaman.ly', false, 430, 1300);
+  await p.getByText('Northern Gulf Petroleum').first().click();
+  await p.waitForTimeout(800);
+  await p.getByRole('button', { name: /^Job done$/i }).click();
+  await p.waitForTimeout(700);
+  await p.getByRole('button', { name: /Type manually instead/i }).click();
+  await p.waitForTimeout(300);
+  await p.locator('textarea[placeholder="Type the answer…"]').first().fill('Rig closed the site early, kit still on the pad');
+  await p.waitForTimeout(400);
+  await p.getByRole('button', { name: /Confirm and close the job/i }).click();
+  await p.waitForTimeout(700);
+  check('typing a justification alone closes the job, with nothing ticked',
+    /Yes, job done/i.test(await p.innerText('body')));
+  await p.getByRole('button', { name: /Yes, job done/i }).click();
+  await p.waitForTimeout(800);
+  const d2 = await store(p);
+  const tk2 = d2.tickets.find(x => x.customer.indexOf('Northern Gulf') === 0);
+  check('and the justification is what got recorded',
+    /kit still on the pad/i.test((tk2.assetCheck || {}).justification || ''),
+    JSON.stringify((tk2.assetCheck || {}).justification || ''));
+  check('with the unanswered questions left blank rather than invented',
+    ((tk2.assetCheck || {}).answers || {}).reclaimed.text === '',
+    JSON.stringify(((tk2.assetCheck || {}).answers || {}).reclaimed));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);
