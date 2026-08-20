@@ -274,6 +274,28 @@ window.supabase = {
   check('a 12-hour preference reaches the database as a boolean', saved.hour12 === true,
     JSON.stringify({ hour12: saved.hour12, timezone: saved.timezone }));
 
+  // ── the length cap holds at the last gate ────────────────────────────────
+  // The inputs cap what can be typed and pasted, but a value can reach the store any
+  // number of other ways. This is the one that matters for the database: whatever is on
+  // the device, the row that goes over the wire is within the cap — and the customer,
+  // which is deliberately exempt, still goes in full.
+  await p.evaluate(() => window.__mkApp.mutate(d => {
+    const t = d.tickets[0];
+    t.field = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    t.well = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    t.rig = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    t.customer = 'Sirte Oil Company for Petroleum Operations';
+  }));
+  await p.waitForTimeout(1300);
+  const sent = await p.evaluate(([id]) => window.__db.tickets.find(r => r.id === id), [TICKET]);
+  check('an over-long oilfield reaches the database capped at ten',
+    sent.field_name.length === 10, JSON.stringify(sent.field_name));
+  check('and so do the well and the rig',
+    sent.well_no.length === 10 && sent.rig_name.length === 10,
+    sent.well_no + ' | ' + sent.rig_name);
+  check('while the customer goes over in full', sent.customer.length === 42,
+    sent.customer.length + ' chars');
+
   // ── logout clears the replica ────────────────────────────────────────────
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(500);

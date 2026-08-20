@@ -620,21 +620,21 @@
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:rgba(var(--warning-rgb),0.16);color:var(--warning)">{{ icField }}</div>
                     <label style="font-size:13px;color:var(--ink)">Field Name</label>
                   </div>
-                  <input value="{{ d.field }}" onChange="{{ f.field }}" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input value="{{ d.field }}" onChange="{{ f.field }}" maxLength="10" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
                     <label style="font-size:13px;color:var(--ink)">Well No.</label>
                   </div>
-                  <input value="{{ d.well }}" onChange="{{ f.well }}" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input value="{{ d.well }}" onChange="{{ f.well }}" maxLength="10" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-indigo-wash);color:var(--hue-indigo)">{{ icRig }}</div>
                     <label style="font-size:13px;color:var(--ink)">Rig Name</label>
                   </div>
-                  <input value="{{ d.rig }}" onChange="{{ f.rig }}" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input value="{{ d.rig }}" onChange="{{ f.rig }}" maxLength="10" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
               </div>
               <button onClick="{{ createTicket }}" disabled="{{ createDisabled }}" style="width:100%;min-height:52px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ createOpacity }}">Start Logging</button>
@@ -1000,16 +1000,16 @@
           </div>
           <div>
             <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Field name</label>
-            <input value="{{ md.field }}" onChange="{{ fm.field }}" placeholder="e.g. Defa" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <input value="{{ md.field }}" onChange="{{ fm.field }}" maxLength="10" placeholder="e.g. Defa" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
           </div>
           <div style="display:flex;gap:12px">
             <div style="flex:1">
               <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Well No.</label>
-              <input value="{{ md.well }}" onChange="{{ fm.well }}" placeholder="e.g. DF-12" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <input value="{{ md.well }}" onChange="{{ fm.well }}" maxLength="10" placeholder="e.g. DF-12" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
             </div>
             <div style="flex:1">
               <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Rig name</label>
-              <input value="{{ md.rig }}" onChange="{{ fm.rig }}" placeholder="e.g. RIG-4" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <input value="{{ md.rig }}" onChange="{{ fm.rig }}" maxLength="10" placeholder="e.g. RIG-4" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
             </div>
           </div>
           <div>
@@ -2125,6 +2125,18 @@ const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin:
 // logged in or how many other admins exist. Every other user, including other admins,
 // can be deleted by an Admin.
 const MASTER_ADMIN_EMAIL = 'lateri@makaman.ly';
+// Oilfield, well and rig are short codes off a rig floor — 'Burgan North', 'BG-214',
+// 'WS-11'. Ten characters is well past anything real; the cap is a guard rail, not a
+// format, so that nothing downstream has to wonder how wide these can get — not the
+// sheet columns they print into, not the PDF cells, not the database.
+//
+// The customer is deliberately not subject to it. Company names are made of parts and
+// legitimately run long, and truncating one would put a wrong name on a client's ticket.
+const LOCATION_MAX = 10;
+const LOCATION_CAPPED = { field: true, well: true, rig: true };
+function clampLoc(key, v) {
+  return (LOCATION_CAPPED[key] && typeof v === 'string') ? v.slice(0, LOCATION_MAX) : v;
+}
 
 // ── The cloud store ──────────────────────────────────────────────────────────
 // The screens read `state.data` synchronously and always have. Supabase is async, so
@@ -2244,7 +2256,12 @@ function rowTicket(t, idByName, idByClient, idByJob) {
     holder_id: idByName[t.holder] || idByName[t.tech] || null,
     customer: t.customer || '',
     client_id: idByClient[t.customer] || null,
-    field_name: t.field || '', well_no: t.well || '', rig_name: t.rig || '',
+    // Clamped once more on the way out. The inputs cap what can be typed, but a row can
+    // reach here from a store written by an older build or edited by hand, and this is
+    // the last point before it becomes a database row.
+    field_name: clampLoc('field', t.field || ''),
+    well_no: clampLoc('well', t.well || ''),
+    rig_name: clampLoc('rig', t.rig || ''),
     job_type_id: idByJob[t.jobType] || null,
     arrival_at: tsOut(t.arrival), start_job_at: tsOut(t.start), end_job_at: tsOut(t.end),
     status: t.status, synced: !!t.synced, synced_at: tsOut(t.syncedAt),
@@ -4351,7 +4368,11 @@ class Component extends DCLogic {
       .map(i => ({ code: i.code, label: i.code + ' — ' + i.desc, add: () => addItemByCode(i.code) }))
       : [];
 
-    const setDraft = k => e => this.setState({ draft: Object.assign({}, S.draft, { [k]: e.target.value }) });
+    // Clamped here as well as by maxLength on the input. The attribute stops typing;
+    // it does not stop a paste on every browser, and it does nothing at all for a value
+    // that arrives any other way.
+    const setDraft = k => e => this.setState({ draft: Object.assign({}, S.draft, { [k]: clampLoc(k, e.target.value) }) });
+    const setMgrDraft = k => e => this.setState({ mgrDraft: Object.assign({}, this.state.mgrDraft, { [k]: clampLoc(k, e.target.value) }) });
 
     // Commit-on-blur audit logging for the plain ticket fields on the review screen
     // (ticket number typed by hand, mileage, job type). These write through
@@ -5404,11 +5425,10 @@ class Component extends DCLogic {
         this.setState({ mgrScreen: 'inbox', mgrDraft: null, activeId: id });
       },
       fm: {
-        customer: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { customer: e.target.value }) }),
-        field: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { field: e.target.value }) }),
-        well: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { well: e.target.value }) }),
-        rig: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { rig: e.target.value }) }),
-        tech: e => this.setState({ mgrDraft: Object.assign({}, S.mgrDraft, { tech: e.target.value }) }),
+        // Same cap as the field form. An office-raised ticket prints on the same sheet
+        // and lands in the same columns, so it cannot be allowed a wider value.
+        customer: setMgrDraft('customer'), field: setMgrDraft('field'),
+        well: setMgrDraft('well'), rig: setMgrDraft('rig'), tech: setMgrDraft('tech'),
       },
       backToReview: () => this.setState({ mgrScreen: 'review' }),
       headerFields: t ? (() => {
