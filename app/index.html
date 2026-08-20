@@ -679,6 +679,9 @@
               <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
                 <textarea value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
                 <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
+                <sc-if value="{{ techSealed }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ techSealedNote }}</div>
+                </sc-if>
                 <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
                 <sc-if value="{{ canHandOver }}" hint-placeholder-val="{{ true }}">
                   <button onClick="{{ askHandover }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Hand over job</button>
@@ -1019,18 +1022,29 @@
           <div style="display:flex;flex-direction:column;gap:22px">
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">1 · Ticket number &amp; mileage</div>
+              <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:12px">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">1 · Ticket number &amp; mileage</div>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
+                  <span style="font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ numberingHolderLabel }}</span>
+                  <sc-if value="{{ numberingCanTransfer }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ claimTransfer }}" style="padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Hand over</button>
+                  </sc-if>
+                </div>
+              </div>
+              <sc-if value="{{ numberingBlocked }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ numberingBlockText }}</div>
+              </sc-if>
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Ticket No. (unique)</label>
-                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ ticketLocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
+                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ numberingBlocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
                 </div>
                 <div style="flex:1">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Take next from series</label>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <sc-for list="{{ seriesBtns }}" as="s" hint-placeholder-count="3">
-                      <button onClick="{{ s.take }}" disabled="{{ ticketLocked }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ s.label }} → {{ s.next }}</button>
+                      <button onClick="{{ s.take }}" disabled="{{ s.disabled }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ s.label }} → {{ s.next }}</button>
                     </sc-for>
                   </div>
                 </div>
@@ -1200,6 +1214,10 @@
                 </sc-for>
               </div>
               <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
+              <sc-if value="{{ mgrCanClose }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ askOfficeClose }}" disabled="{{ mgrCloseDisabled }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--warning-ink);border:1px solid var(--warning);opacity:{{ mgrCloseOpacity }}">Close the job for the technician</button>
+                <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.55);line-height:1.4">{{ mgrCloseNote }}</div>
+              </sc-if>
               <sc-if value="{{ mgrCanHandOver }}" hint-placeholder-val="{{ true }}">
                 <button onClick="{{ askHandover }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Reassign to another technician</button>
               </sc-if>
@@ -1846,9 +1864,9 @@
         </sc-if>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
           <sc-if value="{{ dialog.hasCancel }}" hint-placeholder-val="{{ true }}">
-            <button onClick="{{ closeDialog }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">{{ dialog.cancelLabel }}</button>
+            <button onClick="{{ dialog.cancel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:{{ dialog.cancelFg }};border:1px solid {{ dialog.cancelBorder }}">{{ dialog.cancelLabel }}</button>
           </sc-if>
-          <button onClick="{{ dialog.confirm }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">{{ dialog.okLabel }}</button>
+          <button onClick="{{ dialog.confirm }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:{{ dialog.okBg }};color:{{ dialog.okFg }};border:1px solid {{ dialog.okBg }}">{{ dialog.okLabel }}</button>
         </div>
       </div>
     </div>
@@ -2141,10 +2159,19 @@ function seed() {
       { name: 'Sirte Oil Company (SOC)', currency: 'LYD', fields: 'Zelten, Raguba', rigs: 'SOC-4, SOC-9', items: priceList(4.85) },
     ],
     series: [
-      { id: 'st', label: 'Special Tools', prefix: '', last: 1883 },
-      { id: 'fish', label: 'Fishing', prefix: 'F', last: 702 },
-      { id: 'drill', label: 'Drilling', prefix: 'D', last: 5023 },
+      // floor is where the series started. last walks forward as numbers are taken and
+      // back when they are released, but never below floor — otherwise releasing the
+      // only ticket in a series would offer a number the company used years ago.
+      { id: 'st', label: 'Special Tools', prefix: '', last: 1883, floor: 1883 },
+      { id: 'fish', label: 'Fishing', prefix: 'F', last: 702, floor: 702 },
+      { id: 'drill', label: 'Drilling', prefix: 'D', last: 5023, floor: 5023 },
     ],
+    // Exactly one person may allocate ticket numbers at a time. Two Ops Managers
+    // assigning from the same series on two devices is how duplicate numbers happen, and
+    // no amount of checking after the fact undoes a number already printed on a client's
+    // sheet. The claim moves the way a job does: the holder hands it to a named
+    // colleague, so cover for a shift change or a holiday is a deliberate act.
+    numbering: { holderEmail: 'omar@makaman.ly', holderName: 'Omar Al-Saleh', since: '' },
     jobTypes: [
       'PKR FOR CSG TEST', 'PKR FOR ACID JOB', 'PKR FOR PRESSURE TEST', 'PKR FOR FRAC JOB',
       'PKR FOR COMMUNICATION TEST', 'PKR FOR LOCATE LEAK', 'RBP FOR CST TEST', 'RBP FOR CEMENT JOB',
@@ -2570,6 +2597,33 @@ class Component extends DCLogic {
       .sort((a, b) => new Date(b.ts) - new Date(a.ts));
     return fixes[0] || null;
   }
+  // Who may allocate ticket numbers right now. With no claim recorded — a store from
+  // before this existed — any Ops Manager may act, so an upgrade cannot lock everyone out.
+  numberingClaim() { return (this.state.data.numbering || {}); }
+  holdsNumbering() {
+    const claim = this.numberingClaim();
+    const me = (this.state.session || {}).email;
+    if (!claim.holderEmail) return this.state.role === 'mgr' || this.state.role === 'admin';
+    return me === claim.holderEmail;
+  }
+  // The lowest number a series can offer: never below where it started, and never one
+  // that some ticket is already carrying. Called after a number is released so the
+  // button rolls back to it instead of stranding the gap.
+  reseatSeries(d, seriesId) {
+    const ser = (d.series || []).find(x => x.id === seriesId);
+    if (!ser) return;
+    const floor = ser.floor === undefined ? ser.last : ser.floor;
+    let highest = floor;
+    (d.tickets || []).forEach(x => {
+      const no = (x.ticketNo || '').trim();
+      if (!no) return;
+      if (ser.prefix && no.indexOf(ser.prefix) !== 0) return;
+      if (!ser.prefix && !/^\d+$/.test(no)) return;
+      const n = Number(no.slice(ser.prefix.length));
+      if (!isNaN(n) && n > highest) highest = n;
+    });
+    ser.last = highest;
+  }
   ticketCurrency(t) {
     if (!t) return DEFAULT_CURRENCY;
     return t.currency || (this.client(t.customer) || {}).currency || DEFAULT_CURRENCY;
@@ -2715,6 +2769,21 @@ class Component extends DCLogic {
     const myPending = myClosed.filter(x => !x.synced);
     const myInProgress = myTickets.filter(x => x.status === 'logging');
     const issue = t ? this.numberIssue(t) : {};
+    const claim = D.numbering || {};
+    // What a job must have before anyone can call it finished. The ticket number is not
+    // here on purpose — that is an approval requirement, and it is assigned after closing.
+    const closeMissing = !t ? [] : [
+      [t.customer, 'customer'], [t.field, 'field'], [t.well, 'well'], [t.rig, 'rig'],
+      [(t.events || []).length, 'at least one job-log line'], [t.jobType, 'job type'],
+    ].filter(pair => !pair[0]).map(pair => pair[1]);
+    const closeReady = closeMissing.length === 0;
+    const numberingBlock = (() => {
+      if (S.role !== 'mgr' && S.role !== 'admin') return 'Only the operations manager assigns ticket numbers.';
+      if (t && t.status === 'logging') return 'This job is still running. A number is assigned once it is closed.';
+      if (!this.holdsNumbering()) return (claim.holderName || 'Another manager') + ' holds the numbering claim. Ask them to hand it over before assigning.';
+      if (!S.online) return 'Connect to the internet first — offline this device cannot see numbers taken on tickets it has not received yet.';
+      return '';
+    })();
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
 
@@ -2969,6 +3038,65 @@ class Component extends DCLogic {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
+      },
+      // An invented number reaches a client's invoice, so it takes a deliberate press.
+      // Discard is red because it throws the typing away; Confirm is the accent because
+      // it is a legitimate choice, just an unusual one.
+      unfamiliarNumber: {
+        title: 'Unfamiliar ticket number',
+        body: '"' + (S.pendingNumber || '') + '" belongs to none of the numbering series. It will be accepted as typed and printed on the client sheets exactly like this. Assign it anyway?',
+        okLabel: 'Confirm', cancelLabel: 'Discard', hasCancel: true,
+        cancelFg: 'var(--danger)', cancelBorder: 'var(--danger)',
+        confirm: () => {
+          this.log('Ticket No. ' + (S.pendingNumber || '') + ' assigned by hand — belongs to no series.', 'lifecycle');
+          this.setState({ dialog: null, pendingNumber: null });
+        },
+        cancel: () => {
+          this.patchTicket({ ticketNo: '' });
+          this.mutate(d => (d.series || []).forEach(x => this.reseatSeries(d, x.id)));
+          this.setState({ dialog: null, pendingNumber: null });
+        },
+      },
+      // Cover for a shift change or a holiday. One holder at a time is the whole point,
+      // so this moves the claim rather than sharing it.
+      claimNumbering: {
+        title: 'Hand over ticket numbering?',
+        body: 'They become the only person who can assign ticket numbers. You keep every other manager permission — you simply stop allocating numbers until it comes back.',
+        okLabel: 'Hand over', cancelLabel: 'Keep it', hasCancel: true, needsPerson: true,
+        confirm: () => {
+          const to = (S.handoverTo || '').trim();
+          if (!to) return;
+          const target = (D.users || []).find(u => u.name === to) || {};
+          const from = (D.numbering || {}).holderName || myName;
+          this.mutate(d => {
+            d.numbering = { holderEmail: target.email || '', holderName: to, since: iso(new Date()) };
+          });
+          this.toast('claim-moved', 'Ticket numbering handed to ' + to + '.', 'ok');
+          if (t) this.log('Numbering claim handed over by ' + from + ' to ' + to + '.', 'lifecycle');
+          this.setState({ dialog: null, handoverTo: '' });
+        },
+      },
+      // The office closing a job the technician left running. Everything the technician
+      // would have filled in has to be there first, because closing is what makes the
+      // sheet real — it is not a way to tidy the inbox.
+      officeClose: {
+        title: 'Close this job for the technician?',
+        body: 'It moves to Awaiting review and stops being theirs to change. They are told you closed it, and anything still unsent on their device will not overwrite what is here.',
+        okLabel: 'Close the job', cancelLabel: 'Cancel', hasCancel: true,
+        confirm: () => {
+          if (!t) return;
+          const when = iso(new Date());
+          this.mutate(d => {
+            const x = d.tickets.find(y => y.id === t.id);
+            if (!x) return;
+            x.status = 'done'; x.end = x.end || when;
+            x.synced = true; x.syncedAt = when;
+            x.officeClosed = true; x.closedBy = myName; x.closedAt = when;
+          });
+          this.log('Closed in the office by ' + myName + ' — the technician had not closed it.', 'lifecycle');
+          this.toast('office-closed', 'Job closed. ' + (t.holder || t.tech || 'The technician') + ' has been told.', 'ok');
+          this.setState({ dialog: null });
+        },
       },
       approved: {
         title: 'Ticket approved', body: 'Ticket ' + (t ? t.ticketNo : '') + ' is approved and locked for the technician. The four sheets are ready to fill.',
@@ -3393,12 +3521,32 @@ class Component extends DCLogic {
           return;
         }
         const now = iso(new Date());
-        const ids = myPending.map(x => x.id);
+        // A job the office already closed is settled. Uploading this device's copy would
+        // overwrite a sheet someone has already reviewed, so the field copy is dropped
+        // and the technician is told plainly rather than left wondering why his edits
+        // vanished. Losing the local version is the decision on record; what is on the
+        // office copy stands.
+        const clashed = myPending.filter(x => x.officeClosed && x.closedBy && x.closedBy !== myName);
+        const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
         this.mutate(d => d.tickets.forEach(x => {
+          if (clashed.some(c => c.id === x.id)) {
+            x.synced = true; x.syncedAt = x.closedAt || now;
+            (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
+              text: 'Field copy discarded on sync — already closed in the office by ' + x.closedBy + '.' });
+            return;
+          }
           if (ids.indexOf(x.id) === -1) return;
           x.synced = true; x.syncedAt = now;
           (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' });
         }));
+        if (clashed.length) {
+          const one = clashed[0];
+          this.toast('sync-clash', (clashed.length === 1
+            ? one.customer + ' was already closed in the office by ' + one.closedBy + '.'
+            : clashed.length + ' tickets were already closed in the office.')
+            + ' Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.', 'warn');
+          if (!ids.length) { this.setState({ syncedCount: 0 }); return; }
+        }
         this.toast('sync-up', ids.length === 1 ? '1 closed ticket uploaded — the operations manager can see it now.' : ids.length + ' closed tickets uploaded — the operations manager can see them now.', 'ok');
       },
 
@@ -3451,7 +3599,19 @@ class Component extends DCLogic {
       },
 
       cur: view,
-      onTicketNoFocus: commitTicketNo.focus, onTicketNoBlur: commitTicketNo.blur,
+      onTicketNoFocus: commitTicketNo.focus,
+      onTicketNoBlur: (ev) => {
+        commitTicketNo.blur(ev);
+        // A number belonging to no series is allowed — but it is worth one deliberate
+        // confirmation, because an invented number reaches a client's invoice and there
+        // is no series counter that would ever have produced it.
+        const v = (ev.target.value || '').trim();
+        if (!v || !t) return;
+        const known = (D.series || []).some(x => x.prefix
+          ? (v.toUpperCase().indexOf(x.prefix.toUpperCase()) === 0 && /^\d+$/.test(v.slice(x.prefix.length)))
+          : /^\d+$/.test(v));
+        if (!known) this.setState({ dialog: 'unfamiliarNumber', pendingNumber: v });
+      },
       onMileageFocus: commitMileage.focus, onMileageBlur: commitMileage.blur,
       onJobTypeFocus: commitJobType.focus, onJobTypeBlur: commitJobType.blur,
       curEvents: t ? (t.events || []).map((e, i) => ({
@@ -3523,11 +3683,35 @@ class Component extends DCLogic {
       // previous holder still sees the ticket; the buttons are simply not there.
       canHandOver: !!t && t.status === 'logging' && holderOf(t) === myName,
       mgrCanHandOver: !readOnly && !!t && t.status !== 'approved',
+      // Closing on the technician's behalf needs everything closing normally would
+      // produce. It is not a way to tidy the inbox — the closed sheet is the document.
+      mgrCanClose: !readOnly && !!t && t.status === 'logging',
+      mgrCloseDisabled: !closeReady,
+      mgrCloseOpacity: closeReady ? 1 : 0.45,
+      mgrCloseNote: closeReady
+        ? 'They will be told you closed it, and their device cannot overwrite it afterwards.'
+        : 'Missing before this job can be closed: ' + closeMissing.join(', ') + '.',
+      askOfficeClose: () => { if (closeReady) this.setState({ dialog: 'officeClose' }); },
       isHolder: !!t && holderOf(t) === myName,
       notHolder: !!t && holderOf(t) !== myName,
       holderName: t ? holderOf(t) : '',
+      // While a job is merely awaiting review it is still the technician's to correct,
+      // even though he closed it himself. Once the office has closed it or approved it,
+      // it is not — corrections go through the Ops Manager from there.
+      techSealed: !!t && (t.status === 'approved' || !!t.officeClosed),
+      techSealedNote: t && t.status === 'approved'
+        ? 'Approved and sealed. Ask the operations manager to make any correction.'
+        : (t && t.officeClosed ? 'Closed in the office by ' + (t.closedBy || 'the operations manager') + '. Ask them to make any correction.' : ''),
       doneLabel: t && t.status !== 'logging' ? 'Reopen for corrections' : 'Job done',
-      askJobDone: () => this.setState({ dialog: t && t.status !== 'logging' ? 'reopenTech' : 'done' }),
+      askJobDone: () => {
+        if (t && (t.status === 'approved' || t.officeClosed)) {
+          this.toast('tech-sealed', t.status === 'approved'
+            ? 'This ticket is approved and sealed. Ask the operations manager to make any correction.'
+            : 'The operations manager closed this job. Ask them to make any correction.', 'warn');
+          return;
+        }
+        this.setState({ dialog: t && t.status !== 'logging' ? 'reopenTech' : 'done' });
+      },
       jobTypes: D.jobTypes.map((n, i) => ({
         name: n, remove: () => this.mutate(d => d.jobTypes.splice(i, 1)),
       })),
@@ -3684,6 +3868,21 @@ class Component extends DCLogic {
       // against `t.id`, and renderVals() runs for every screen, not only the review
       // one — so if the remembered ticket is not in the data (restored from another
       // device, or removed), the whole app rendered an error page instead of a screen.
+      // Reasons are ordered by what the Ops Manager should fix first. Offline matters
+      // because the used-number list only reflects what has reached this device — a
+      // number that looks free here may already be on a technician's synced ticket.
+      // It is not verification against a server; there is no server yet. It is refusing
+      // to allocate from a view we know may be stale.
+      numberingAllowed: numberingBlock === '',
+      numberingBlocked: numberingBlock !== '',
+      numberingBlockText: numberingBlock,
+      numberingHolderLabel: (D.numbering || {}).holderName
+        ? ((D.numbering || {}).holderName + ' holds the numbering claim')
+        : 'No one holds the numbering claim',
+      numberingIsMine: this.holdsNumbering(),
+      numberingCanTransfer: this.holdsNumbering() && (S.role === 'mgr' || S.role === 'admin'),
+      claimTransfer: () => this.setState({ dialog: 'claimNumbering', handoverTo: '' }),
+
       seriesBtns: !t ? [] : D.series.map(s => {
         // A technician can type a ticket number by hand that happens to land inside a
         // series' own range (e.g. "1885" typed manually before anyone took it from the
@@ -3693,7 +3892,8 @@ class Component extends DCLogic {
         let n = s.last + 1;
         while (D.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === (s.prefix + n))) n++;
         const cand = s.prefix + n;
-        return { label: s.label, next: cand, take: () => {
+        return { label: s.label, next: cand, disabled: numberingBlock !== '', take: () => {
+          if (numberingBlock) { this.toast('numbering-blocked', numberingBlock, 'warn'); return; }
           if (D.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === cand)) {
             // Rare race (another device took it between render and click): re-derive the
             // next free number and jump the series counter to just before it, so every
@@ -4040,7 +4240,14 @@ class Component extends DCLogic {
       dismissToast: () => this.dismissToast(),
 
       hasDialog: !!S.dialog,
-      dialog: Object.assign({ title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true, needsReason: false, needsPerson: false, confirm: () => this.setState({ dialog: null }) }, dialogs[S.dialog] || {}),
+      dialog: Object.assign({
+        title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true,
+        needsReason: false, needsPerson: false,
+        okBg: 'var(--accent)', okFg: 'var(--on-accent)',
+        cancelFg: 'var(--ink)', cancelBorder: 'rgba(var(--ink-rgb),0.3)',
+        confirm: () => this.setState({ dialog: null }),
+        cancel: () => this.setState({ dialog: null }),
+      }, dialogs[S.dialog] || {}),
       closeDialog: () => this.setState({ dialog: null }),
       reasonText: S.reasonText,
 
@@ -4049,7 +4256,15 @@ class Component extends DCLogic {
         well: setDraft('well'), rig: setDraft('rig'),
         newEvent: e => this.setState({ newEventText: e.target.value }),
         jobType: e => { const v = e.target.value.toUpperCase(); this.patchTicket({ jobType: v }); },
-        ticketNo: e => { const v = e.target.value; this.patchTicket({ ticketNo: v }); },
+        ticketNo: e => {
+          const v = e.target.value;
+          if (numberingBlock) { this.toast('numbering-blocked', numberingBlock, 'warn'); return; }
+          this.patchTicket({ ticketNo: v });
+          // Clearing a number hands it back. Every series is reseated, not just the one
+          // it looked like it came from, so a hand-typed number that happened to sit in
+          // a series' range is released too.
+          if (!v.trim()) this.mutate(d => (d.series || []).forEach(x => this.reseatSeries(d, x.id)));
+        },
         mileage: e => { const v = e.target.value; this.patchTicket({ mileage: v === '' ? '' : Number(v) }); },
         pickItem: e => this.setState({ pickItem: e.target.value }),
         itemSearch: e => this.setState({ itemSearch: e.target.value }),
