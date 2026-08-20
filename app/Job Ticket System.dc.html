@@ -644,7 +644,11 @@
                 <button onClick="{{ toggleOnline }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Toggle</button>
               </div>
               <sc-if value="{{ syncNothingPending }}" hint-placeholder-val="{{ false }}">
-                <div style="padding:26px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">Everything on this device has been uploaded.</div>
+                <div style="padding:22px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">{{ syncEmptyLabel }}</div>
+                <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
+              </sc-if>
+              <sc-if value="{{ syncNoteShow }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px;padding:11px 13px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;background:{{ syncNoteBg }};color:{{ syncNoteFg }};border:1px solid {{ syncNoteBorder }}">{{ syncNoteText }}</div>
               </sc-if>
               <sc-if value="{{ syncHasPending }}" hint-placeholder-val="{{ true }}">
                 <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:8px">{{ syncPendingLabel }}</div>
@@ -2508,6 +2512,16 @@ class Component extends DCLogic {
     // it can still see how the job they started finished, they just cannot write to
     // it once they have handed it on.
     const myTickets = D.tickets.filter(x => inCrew(x, myName, myEmail));
+    // "Sync" means one thing to a technician: getting finished work off this device and
+    // in front of the office. A job still being logged is not finished work — it may
+    // still travel to the office in the background so the live panel and the emergency
+    // coordinates keep working, but it is never something the technician is waiting to
+    // upload, so it must never be listed as pending, counted in the banner, or consumed
+    // by the Sync button. Scoped to the signed-in person as well: the previous global
+    // filter meant one technician's Sync uploaded another technician's tickets.
+    const myClosed = myTickets.filter(x => x.status !== 'logging');
+    const myPending = myClosed.filter(x => !x.synced);
+    const myInProgress = myTickets.filter(x => x.status === 'logging');
     const issue = t ? this.numberIssue(t) : {};
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
@@ -2749,7 +2763,10 @@ class Component extends DCLogic {
       done: {
         title: 'Mark job as done?', body: 'End Job will be stamped ' + F.stamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
         okLabel: 'Yes, job done', cancelLabel: 'Keep logging', hasCancel: true,
-        confirm: () => { this.patchTicket({ status: 'done', end: iso(new Date()) }); this.log('Marked Job Done on device.', 'lifecycle'); this.setState({ dialog: null }); },
+        // Closing the job makes the ticket pending again even if the still-logging
+        // version had already gone up in the background. What the office received was a
+        // job in progress; the finished sheet is new content and has to be uploaded.
+        confirm: () => { this.patchTicket({ status: 'done', end: iso(new Date()), synced: false }); this.log('Marked Job Done on device.', 'lifecycle'); this.setState({ dialog: null }); },
       },
       reopenTech: {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
@@ -2757,7 +2774,7 @@ class Component extends DCLogic {
         confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
       },
       synced: {
-        title: 'Sync complete', body: unsynced.length + ' ticket(s) uploaded. Job Done tickets are now visible to the operations manager.',
+        title: 'Sync complete', body: (S.syncedCount || 0) + ' closed ticket(s) uploaded and now visible to the operations manager. Jobs still being logged stay on this device list.',
         okLabel: 'Done', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
       approved: {
@@ -2938,7 +2955,7 @@ class Component extends DCLogic {
           // open when the tab was left. roleTab and mgrScreen/techScreen are separate,
           // so without this a manager who wandered off the print preview came back to
           // the print preview rather than the inbox.
-          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list' }),
+          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', syncNote: null }),
         };
       }),
 
@@ -2994,11 +3011,26 @@ class Component extends DCLogic {
       // ── Sync ───────────────────────────────────────────────────────────────
       // Promotes what was a one-line banner into somewhere you can actually look:
       // what has not reached the server, and when the last upload happened.
-      syncRows: unsynced.slice().reverse().map(x => this.ticketView(x)),
-      syncNothingPending: unsynced.length === 0,
-      syncHasPending: unsynced.length > 0,
-      syncPendingLabel: unsynced.length === 1 ? '1 ticket waiting to upload' : unsynced.length + ' tickets waiting to upload',
+      syncRows: myPending.slice().reverse().map(x => this.ticketView(x)),
+      syncNothingPending: myPending.length === 0,
+      // "Everything has been uploaded" is a lie when there was never anything closed to
+      // upload — say what is actually on the device instead.
+      syncEmptyLabel: myClosed.length === 0
+        ? (myInProgress.length
+          ? (myInProgress.length === 1 ? '1 job still being logged — nothing to upload until it is closed.' : myInProgress.length + ' jobs still being logged — nothing to upload until they are closed.')
+          : 'No tickets on this device yet.')
+        : 'Every closed ticket on this device has been uploaded.',
+      syncHasPending: myPending.length > 0,
+      syncPendingLabel: myPending.length === 1 ? '1 ticket waiting to upload' : myPending.length + ' tickets waiting to upload',
       syncLastLabel: S.lastAutoSyncAt ? F.stamp(S.lastAutoSyncAt) : 'No upload yet on this device',
+      // The answer to pressing Sync when there is nothing to upload. Green when the
+      // closed work is already up there, amber when the only thing on the device is a
+      // job still running — which is not a failure, just a job that is not finished.
+      syncNoteShow: !!S.syncNote,
+      syncNoteText: S.syncNote === 'inprogress' ? 'Close Ticket To Sync' : 'Tickets Already Synchronized',
+      syncNoteBg: S.syncNote === 'inprogress' ? 'rgba(var(--warning-rgb),0.16)' : 'rgba(var(--success-rgb),0.16)',
+      syncNoteFg: S.syncNote === 'inprogress' ? 'var(--warning-ink)' : 'var(--success)',
+      syncNoteBorder: S.syncNote === 'inprogress' ? 'var(--warning)' : 'var(--success)',
 
       // ── Field devices (office roles) ───────────────────────────────────────
       // A technician's Sync answers "what is still on my device". The office end of
@@ -3147,13 +3179,16 @@ class Component extends DCLogic {
       netDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       netLabel: S.online ? 'ONLINE' : 'NO SIGNAL',
       toggleOnline: () => this.setState({ online: !S.online }),
-      showBanner: unsynced.length > 0,
+      // One signal at a time. The Sync tab already says everything the banner would,
+      // and louder — showing both meant the technician saw the same warning twice with
+      // the tab's own controls right beneath it.
+      showBanner: myPending.length > 0 && S.roleTab !== 'sync',
       bannerBg: S.online ? 'var(--accent-wash)' : 'var(--field)',
       bannerBorder: S.online ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.16)',
       bannerDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       bannerText: S.online
-        ? unsynced.length + ' ticket(s) auto-syncing in the background — connection available.'
-        : 'Offline · ' + unsynced.length + ' ticket(s) stored on this device, waiting for signal.',
+        ? myPending.length + ' closed ticket(s) auto-syncing in the background — connection available.'
+        : 'Offline · ' + myPending.length + ' closed ticket(s) stored on this device, waiting for signal.',
       lastAutoSyncLabel: S.lastAutoSyncAt ? 'Last auto-synced ' + F.stamp(S.lastAutoSyncAt) : '',
       syncDisabled: !S.online,
       syncBg: S.online ? 'var(--accent)' : 'transparent',
@@ -3161,9 +3196,20 @@ class Component extends DCLogic {
       syncOpacity: S.online ? 1 : 0.45,
       sync: () => {
         if (!S.online) return;
+        // Pressed with nothing closed to upload, answer rather than doing nothing. The
+        // in-progress tickets are deliberately left exactly where they are.
+        if (!myPending.length) {
+          this.setState({ syncNote: myInProgress.length && !myClosed.length ? 'inprogress' : 'done' });
+          return;
+        }
         const now = iso(new Date());
-        this.mutate(d => d.tickets.forEach(x => { if (!x.synced) { x.synced = true; x.syncedAt = now; (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' }); } }));
-        this.setState({ dialog: 'synced' });
+        const ids = myPending.map(x => x.id);
+        this.mutate(d => d.tickets.forEach(x => {
+          if (ids.indexOf(x.id) === -1) return;
+          x.synced = true; x.syncedAt = now;
+          (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' });
+        }));
+        this.setState({ dialog: 'synced', syncedCount: ids.length, syncNote: null });
       },
 
       techName: myName,
