@@ -223,6 +223,36 @@
      and settings layers (z-index 50) and below the bottom bar. */
   .mk-appbar { position:sticky; top:0; z-index:30; }
 
+  /* One live job. The presence badge used to sit in its own flex:none column beside a
+     hard 230px who-column, which on a phone added up to more than the card was wide and
+     pushed the badge outside it. It now rides with the who block, and min-width:0 lets
+     both blocks actually shrink — without it a flex child refuses to go below its
+     content width, which is what makes long field names blow a row open. */
+  .mk-live-row {
+    display:flex; gap:12px; align-items:flex-start;
+    padding:10px 12px; border:1px solid rgba(var(--ink-rgb),0.1);
+    background:rgba(var(--success-rgb),0.03);
+  }
+  .mk-live-head {
+    width:240px; flex:none; min-width:0;
+    display:flex; gap:10px; align-items:flex-start; justify-content:space-between;
+  }
+  .mk-live-presence {
+    display:flex; align-items:center; gap:4px; flex:none;
+    font-size:11px; color:rgba(var(--ink-rgb),0.6); white-space:nowrap;
+  }
+  .mk-live-log { flex:1; min-width:0; overflow-wrap:anywhere; }
+
+  /* One technician's device. Everything the office needs to act on a position without
+     opening the ticket: who, where they are based, how much work they are carrying,
+     one set of coordinates for the person (not repeated per job), and what each open
+     job actually is. */
+  .mk-dev-card { padding:14px; border:1px solid rgba(var(--ink-rgb),0.16); }
+  .mk-dev-top { display:flex; align-items:flex-start; gap:12px; }
+  .mk-dev-contact { flex:none; text-align:right; }
+  .mk-dev-pos { margin-top:9px; padding-top:9px; border-top:1px solid rgba(var(--ink-rgb),0.1); }
+  .mk-dev-jobs { margin-top:9px; padding-top:9px; border-top:1px solid rgba(var(--ink-rgb),0.1); }
+
   /* A wide table on a phone is a table you read by dragging it sideways, losing the
      row you were on. Below 640px these become one card per row: the column headings
      are hidden and each cell carries its own label instead. Nothing is dropped —
@@ -248,6 +278,14 @@
     }
     /* A cell with nothing in it would otherwise show a label with no value under it. */
     .mk-stack td:empty { display:none; }
+
+    /* On a phone the log line is the thing being read, so it takes the full width of
+       the card and the who/where block sits above it rather than beside it. */
+    .mk-live-row { flex-direction:column; gap:8px; }
+    .mk-live-head { width:auto; }
+    /* Last contact drops under the name rather than competing with it for width. */
+    .mk-dev-top { flex-wrap:wrap; }
+    .mk-dev-contact { text-align:left; width:100%; padding-left:21px; margin-top:4px; }
   }
   /* The office roles' pages scroll under a bar pinned to the viewport, so the last
      row of every dashboard needs room to clear it. */
@@ -1562,17 +1600,17 @@
         <sc-if value="{{ hasLiveTickets }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column;gap:10px">
             <sc-for list="{{ liveTickets }}" as="lt" hint-placeholder-count="2">
-              <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid rgba(var(--ink-rgb),0.1);background:rgba(var(--success-rgb),0.03)">
-                <div style="width:230px;flex:none">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
-                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6)">{{ lt.tech }} · {{ lt.locLine }}</div>
+              <div class="mk-live-row">
+                <div class="mk-live-head">
+                  <div style="min-width:0">
+                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
+                    <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);line-height:1.35">{{ lt.tech }} · {{ lt.locLine }}</div>
+                  </div>
+                  <div class="mk-live-presence"><span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}</div>
                 </div>
-                <div style="flex:1">
+                <div class="mk-live-log">
                   <div style="font-size:13px;color:var(--ink)">{{ lt.lastLogText }}</div>
                   <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:3px">{{ lt.lastLogTime }} · {{ lt.eventCount }} log lines</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:4px;flex:none;font-size:11px;color:rgba(var(--ink-rgb),0.6)">
-                  <span style="width:7px;height:7px;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}
                 </div>
               </div>
             </sc-for>
@@ -1657,23 +1695,37 @@
         <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column;gap:10px">
             <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
-              <div style="display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid rgba(var(--ink-rgb),0.16)">
-                <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:6px"></span>
-                <div style="flex:1;min-width:0">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px">{{ d.name }}</div>
-                  <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ d.base }} · {{ d.openLabel }}</div>
-                  <sc-if value="{{ d.showPos }}" hint-placeholder-val="{{ true }}">
-                    <div style="font-size:12px;font-variant-numeric:tabular-nums;color:rgba(var(--ink-rgb),0.75);margin-top:6px">{{ d.posText }}</div>
-                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45)">{{ d.posStamp }}</div>
-                  </sc-if>
+              <div class="mk-dev-card">
+                <div class="mk-dev-top">
+                  <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:7px"></span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
+                    <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ d.base }} · {{ d.tollLabel }}</div>
+                  </div>
+                  <div class="mk-dev-contact">
+                    <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Last contact</div>
+                    <div style="font-size:13px">{{ d.lastLabel }}</div>
+                    <sc-if value="{{ d.showPending }}" hint-placeholder-val="{{ false }}">
+                      <div style="font-size:11px;color:var(--warning);margin-top:3px">{{ d.pendingLabel }}</div>
+                    </sc-if>
+                  </div>
                 </div>
-                <div style="flex:none;text-align:right">
-                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Last contact</div>
-                  <div style="font-size:13px">{{ d.lastLabel }}</div>
-                  <sc-if value="{{ d.showPending }}" hint-placeholder-val="{{ false }}">
-                    <div style="font-size:11px;color:var(--warning);margin-top:4px">{{ d.pendingLabel }}</div>
-                  </sc-if>
+                <div class="mk-dev-pos">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Latest position</div>
+                  <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.posDim }};overflow-wrap:anywhere">{{ d.posText }}</div>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45)">{{ d.posStamp }}</div>
                 </div>
+                <sc-if value="{{ d.hasOpenJobs }}" hint-placeholder-val="{{ true }}">
+                  <div class="mk-dev-jobs">
+                    <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:6px">Open jobs</div>
+                    <sc-for list="{{ d.openJobs }}" as="j" hint-placeholder-count="2">
+                      <div style="margin-bottom:7px;min-width:0">
+                        <div style="font-size:13px;font-weight:600;overflow-wrap:anywhere">{{ j.customer }}</div>
+                        <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);overflow-wrap:anywhere">{{ j.locLine }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
               </div>
             </sc-for>
           </div>
@@ -1849,6 +1901,10 @@ function auditKind(entry) {
 // question nobody was asking. Both were noise around the only two numbers anyone
 // needed. Accuracy is still captured — it is the one signal available for spotting
 // a garbage fix later — it is simply not shown.
+// What every position field says when there is no fix to show — the technician turned
+// location sharing off, refused the browser prompt, or the device could not get one.
+// A blank space reads as a bug; this reads as a choice.
+const NO_LOCATION = 'No Location Shared';
 function geoText(fix) {
   if (!fix) return '';
   const n = (v) => (v === null || v === undefined || isNaN(v)) ? null : Number(v).toFixed(6);
@@ -2086,7 +2142,7 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = Object.assign({
-      role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: 'price',
+      role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null,
       activeId: 't3', online: false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
@@ -2924,8 +2980,10 @@ class Component extends DCLogic {
       // other three destinations replace the page rather than nesting inside it.
       // (The technician's tabs live inside the phone frame instead, so isTech is
       // unconditional and the switching happens one level further in.)
-      showMgrPage: S.role === 'mgr' && S.roleTab === 'tickets',
-      showAdminPage: S.role === 'admin' && S.roleTab === 'tickets',
+      // Tickets means the work, for every office role. The Admin's toolbox is a
+      // thing you open from Account, not the meaning of a tab on the bottom bar.
+      showMgrPage: (S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab,
+      showAdminPage: S.role === 'admin' && S.roleTab === 'tickets' && !!S.adminTab,
       showFounderPage: S.role === 'founder' && S.roleTab === 'tickets',
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
@@ -2955,7 +3013,7 @@ class Component extends DCLogic {
           // open when the tab was left. roleTab and mgrScreen/techScreen are separate,
           // so without this a manager who wandered off the print preview came back to
           // the print preview rather than the inbox.
-          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', syncNote: null }),
+          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null, syncNote: null }),
         };
       }),
 
@@ -3045,14 +3103,18 @@ class Component extends DCLogic {
         const techs = (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active');
         const now = Date.now();
         return techs.map(u => {
-          const mine = D.tickets.filter(x => x.tech === u.name);
+          // Crew membership, not the opener's name — a handed-over job is still that
+          // technician's open job and still their device reporting a position.
+          const mine = D.tickets.filter(x => inCrew(x, u.name, u.email));
           const stamps = mine.map(x => x.syncedAt).filter(Boolean).map(s => new Date(s).getTime());
           const lastAt = stamps.length ? Math.max.apply(null, stamps) : null;
-          const openCount = mine.filter(x => x.status === 'logging').length;
-          const pending = mine.filter(x => !x.synced).length;
+          const open = mine.filter(x => x.status === 'logging');
+          const closed = mine.filter(x => x.status !== 'logging');
+          const pending = mine.filter(x => x.status !== 'logging' && !x.synced).length;
           // Newest position across their tickets. Only refreshes while they have a
           // job open, so it is where they last were on a job — not live tracking.
-          const fixes = mine.map(x => (x.geo || {}).last).filter(Boolean)
+          // Shown once for the person rather than repeated under every open job.
+          const fixes = mine.map(x => (x.geo || {}).last || (x.geo || {}).open).filter(Boolean)
             .sort((a, b) => new Date(b.ts) - new Date(a.ts));
           const fix = fixes[0];
           const hours = lastAt === null ? Infinity : (now - lastAt) / 3600000;
@@ -3062,12 +3124,19 @@ class Component extends DCLogic {
             lastLabel: lastAt === null ? 'Never synced' : F.stamp(iso(new Date(lastAt))),
             // Amber past a shift, red past a day: how overdue a check-in is.
             dot: hours > 24 ? 'var(--danger)' : (hours > 12 ? 'var(--warning)' : 'var(--success)'),
-            openLabel: openCount === 1 ? '1 job open' : openCount + ' jobs open',
+            tollLabel: open.length + ' open · ' + closed.length + ' closed',
             pendingLabel: pending ? (pending === 1 ? '1 not uploaded' : pending + ' not uploaded') : '',
             showPending: pending > 0,
-            posText: fix ? geoText(fix) : '',
+            posText: fix ? geoText(fix) : NO_LOCATION,
             posStamp: fix ? F.stamp(fix.ts) : '',
-            showPos: !!fix,
+            posDim: fix ? 'rgba(var(--ink-rgb),0.75)' : 'rgba(var(--ink-rgb),0.45)',
+            // What each open job actually is, so the office can act on a position
+            // without opening the ticket first.
+            openJobs: open.slice().reverse().map(x => ({
+              customer: x.customer,
+              locLine: [x.field, x.well, x.rig].filter(Boolean).join(' · ') || '—',
+            })),
+            hasOpenJobs: open.length > 0,
           };
         }).sort((a, b) => a.sortKey - b.sortKey); // longest out of contact first
       })(),
@@ -3722,7 +3791,7 @@ class Component extends DCLogic {
         people: 'Accounts, roles and the customer register.',
         system: 'Charging rules and the danger zone.',
       }[S.adminTab] || '',
-      backToAccount: () => this.setState({ roleTab: 'account' }),
+      backToAccount: () => this.setState({ roleTab: 'account', adminTab: null }),
       adminPrice: S.adminTab === 'price', adminNumbers: S.adminTab === 'numbers',
       adminPeople: S.adminTab === 'people', adminSystem: S.adminTab === 'system',
       adminClient: S.adminClient,
