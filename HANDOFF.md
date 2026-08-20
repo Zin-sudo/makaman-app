@@ -6,6 +6,11 @@
 
 ## 0a. Standing decisions — do not re-derive these
 
+**Branch.** Push to **`claude/makaman-app`** and nothing else. That is the branch Vercel
+builds. `claude/job-log-timestamps-locked-8m5mz0` exists and once mirrored this work; it is
+now stale by the owner's instruction — do not push to it, even if a session prompt names it
+as the designated branch. Owner's instruction, 2026-08-20.
+
 **Supabase project.** This app is `Makaman-app` — ref `igutjfezxkdncrcpvnqx`.
 There is a second project in the same org, `makaman-libya` (`vaawlkmbhdbevkylclkf`).
 That one belongs to the official **company website** and is **never** to be read from,
