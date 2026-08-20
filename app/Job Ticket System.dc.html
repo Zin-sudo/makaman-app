@@ -2023,11 +2023,22 @@ function ftime(s, tz, hour12) {
   return new Intl.DateTimeFormat('en-GB', opt).format(d);
 }
 function fstamp(s, tz, hour12) { return s ? fdate(s, tz) + ' · ' + ftime(s, tz, hour12) : '—'; }
-function money(n) {
+// Not every client is billed in dollars. Sirte Oil Company's agreement is written in
+// Libyan dinar, and printing "$800.00" on a sheet that goes to Sirte states a price the
+// contract does not contain. Currency travels with the client, and every figure derived
+// from that client's price list is stamped with it.
+const CURRENCIES = {
+  USD: { before: '$', after: '' },
+  LYD: { before: '', after: ' LYD' },
+};
+const DEFAULT_CURRENCY = 'USD';
+function money(n, cur) {
   const v = Number(n) || 0;
-  // Discount lines produce negative item/ticket totals — show the minus sign before the
-  // $ (-$150.00), not after it ($-150.00).
-  return (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const c = CURRENCIES[cur] || CURRENCIES[DEFAULT_CURRENCY];
+  const amount = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Discount lines produce negative item/ticket totals — the minus belongs in front of
+  // the whole figure (-$150.00), never between the symbol and the digits ($-150.00).
+  return (v < 0 ? '-' : '') + c.before + amount + c.after;
 }
 
 const BASE_ITEMS = [
@@ -2087,9 +2098,12 @@ function seed() {
       baseLocation: 'Ahmadi Base', customerRep: 'Workover Office',
     },
     clients: [
-      { name: 'Kuwait Oil Group', fields: 'Burgan North, Raudhatain', rigs: 'WS-11, WS-14, RIG-208', items: priceList(1) },
-      { name: 'Al-Dhafra Energy', fields: 'Ruwais West, Bab', rigs: 'AD-3, AD-7', items: priceList(1.08) },
-      { name: 'Northern Gulf Petroleum', fields: 'Sabriyah', rigs: 'NG-2', items: priceList(0.94) },
+      { name: 'Kuwait Oil Group', currency: 'USD', fields: 'Burgan North, Raudhatain', rigs: 'WS-11, WS-14, RIG-208', items: priceList(1) },
+      { name: 'Al-Dhafra Energy', currency: 'USD', fields: 'Ruwais West, Bab', rigs: 'AD-3, AD-7', items: priceList(1.08) },
+      { name: 'Northern Gulf Petroleum', currency: 'USD', fields: 'Sabriyah', rigs: 'NG-2', items: priceList(0.94) },
+      // Billed in dinar, unlike the rest. Here so the LYD path is exercised by the
+      // running app and not only by the database.
+      { name: 'Sirte Oil Company (SOC)', currency: 'LYD', fields: 'Zelten, Raguba', rigs: 'SOC-4, SOC-9', items: priceList(4.85) },
     ],
     series: [
       { id: 'st', label: 'Special Tools', prefix: '', last: 1883 },
@@ -2495,6 +2509,26 @@ class Component extends DCLogic {
     });
   }
   client(name) { return this.state.data.clients.find(c => c.name === name); }
+  // The currency a ticket is priced in. Read off the ticket first: like the unit prices
+  // themselves, it is frozen onto the ticket when the job is raised, so re-negotiating a
+  // client's contract later cannot silently restate an approved ticket in another
+  // currency. Falls back to the client record for tickets raised before this existed.
+  // Approved value across many tickets. Summing 800 LYD into 800 USD produces a figure
+  // that is wrong in both currencies, so each is totalled separately and shown together.
+  totalByCurrency(list) {
+    const buckets = {};
+    list.forEach(x => {
+      const c = this.ticketCurrency(x);
+      buckets[c] = (buckets[c] || 0) + this.ticketTotal(x);
+    });
+    const keys = Object.keys(buckets);
+    if (!keys.length) return money(0);
+    return keys.sort().map(c => money(buckets[c], c)).join('  ·  ');
+  }
+  ticketCurrency(t) {
+    if (!t) return DEFAULT_CURRENCY;
+    return t.currency || (this.client(t.customer) || {}).currency || DEFAULT_CURRENCY;
+  }
   // Flat (non-percent) items only — the base that surcharge/discount percentages are
   // computed against, so a surcharge and a discount on the same ticket don't compound
   // on top of each other.
@@ -2568,7 +2602,8 @@ class Component extends DCLogic {
       eventCount: (t.events || []).length,
       syncLabel: t.synced ? F.stamp(t.syncedAt) : 'not synced',
       noLabel: t.ticketNo || '— unassigned —',
-      value: money(this.ticketTotal(t)),
+      value: money(this.ticketTotal(t), this.ticketCurrency(t)),
+      currency: this.ticketCurrency(t),
       isApproved: t.status === 'approved',
       yearFolder: String(new Date(t.arrival).getFullYear()),
       mileage: t.mileage === 0 ? '0' : (t.mileage || ''),
@@ -2797,8 +2832,8 @@ class Component extends DCLogic {
       code: i.code, desc: i.desc,
       qty: i.kind === 'percent' ? '—' : String(i.qty),
       uom: i.uom,
-      unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost),
-      total: money(this.itemTotal(i, t)),
+      unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost, this.ticketCurrency(t)),
+      total: money(this.itemTotal(i, t), this.ticketCurrency(t)),
     })) : [];
     const sheetEventsReal = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), pressure: '—', durTotal: '—', text: e.text })) : [];
     // Overflow handling: a ticket can genuinely have more charged items or job-log lines
@@ -2820,7 +2855,7 @@ class Component extends DCLogic {
     const logOverflow = eventPages.length > 1;
     const EMPTY_ITEM_ROW = { code: '', desc: '', qty: '', uom: '', unit: '', total: '' };
     const EMPTY_LOG_ROW = { date: '', time: '', pressure: '', durTotal: '', text: '' };
-    const grandTotalStr = t ? money(this.ticketTotal(t)) : money(0);
+    const grandTotalStr = t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0);
     const mkSvcPages = (mark) => itemPages.map((pageItems, idx) => {
       const isLast = idx === itemPages.length - 1;
       return {
@@ -3350,6 +3385,7 @@ class Component extends DCLogic {
             // The opener is the whole crew until the job is handed on.
             crew: [{ name: dr.tech, email: myEmail }], holder: dr.tech,
             jobType: '', arrival: dr.arrival, start: '', end: '', status: 'logging', synced: false, syncedAt: '',
+            currency: ((d.clients || []).find(c => c.name === dr.customer) || {}).currency || DEFAULT_CURRENCY,
             ticketNo: '', mileage: '', events: [], items: defaultItems, audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.' }],
             // B13/F14 — permanent admin-configured defaults, pre-filled here, only the
             // Ops Manager can change them afterwards (see the review screen).
@@ -3453,7 +3489,7 @@ class Component extends DCLogic {
         { label: 'Awaiting review', value: String(awaiting.length), color: 'var(--accent)' },
         { label: 'Approved', value: String(approved.length), color: 'var(--ink-strong)' },
         { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
-        { label: 'Approved value', value: money(approved.reduce((s, x) => s + this.ticketTotal(x), 0)), color: 'var(--ink-strong)' },
+        { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)' },
       ],
       inboxRows: bandedTickets(D.tickets.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, ''))))
         .map(x => Object.assign(this.ticketView(x), {
@@ -3511,6 +3547,7 @@ class Component extends DCLogic {
             // Raised in the office, so it is already where the office can see it —
             // there is no device holding it that still has to upload.
             synced: true, syncedAt: now,
+            currency: ((d.clients || []).find(c => c.name === (dr.customer || '').trim()) || {}).currency || DEFAULT_CURRENCY,
             ticketNo: '', mileage: '', events: [], items: [],
             baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',
             audit: [{ ts: now, kind: 'lifecycle', by: myName, text: 'Ticket raised in the office by ' + myName + ' and assigned to ' + dr.tech + '.' }],
@@ -3642,7 +3679,7 @@ class Component extends DCLogic {
             desc: i.desc,
             detail: i.kind === 'percent'
               ? i.cost + '% ' + (i.sign < 0 ? 'discount' : 'surcharge')
-              : money(i.cost) + ' / ' + i.uom,
+              : money(i.cost, (curClient || {}).currency) + ' / ' + i.uom,
             add: () => { addItemByCode(i.code); },
           }))
           .slice(0, 12); // Limit results to 12 for performance
@@ -3701,7 +3738,7 @@ class Component extends DCLogic {
         return {
           locked: locked, showRemove: !locked,
           code: it.code, desc: it.desc, qty: it.qty, uom: it.uom, cost: it.cost,
-          total: money(this.itemTotal(it, t)),
+          total: money(this.itemTotal(it, t), this.ticketCurrency(t)),
           descBg: ov.desc ? 'var(--accent-wash)' : 'var(--field)',
           uomBg: ov.uom ? 'var(--accent-wash)' : 'var(--field)',
           costBg: ov.cost ? 'var(--accent-wash)' : 'var(--field)',
@@ -3713,7 +3750,7 @@ class Component extends DCLogic {
             if (locked) return;
             // Logged before the splice, while the line still exists to be described.
             this.log('Line removed by ' + (myName || 'Ops Manager') + ': ' + it.code
-              + ' — ' + it.desc + ' (' + (it.qty === '' ? '—' : it.qty) + ' × ' + money(it.cost) + ').', 'edit');
+              + ' — ' + it.desc + ' (' + (it.qty === '' ? '—' : it.qty) + ' × ' + money(it.cost, this.ticketCurrency(t)) + ').', 'edit');
             this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.items.splice(i, 1); });
           },
           // Drag-and-drop support for reordering items
@@ -3750,7 +3787,7 @@ class Component extends DCLogic {
       lockedNote: t && t.approvedAt
         ? 'Approved ' + F.stamp(t.approvedAt) + ' by ' + (t.approvedBy || 'Ops Manager') + '. Prices and lines are frozen — reopen the ticket to change anything.'
         : 'This ticket is approved and frozen. Reopen it to change anything.',
-      grandTotal: t ? money(this.ticketTotal(t)) : money(0),
+      grandTotal: t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0),
       checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? 'var(--accent-deep)' : 'rgba(var(--ink-rgb),0.55)' })),
       approveDisabled: !canApprove || (t && t.status === 'approved'),
       approveOpacity: (!canApprove || (t && t.status === 'approved')) ? 0.45 : 1,
@@ -3759,7 +3796,7 @@ class Component extends DCLogic {
         if (!canApprove || !t || t.status === 'approved') return;
         const who = (S.session && S.session.name) || 'Ops Manager';
         const when = iso(new Date());
-        const total = money(this.ticketTotal(t));
+        const total = money(this.ticketTotal(t), this.ticketCurrency(t));
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
           x.status = 'approved';
@@ -3909,7 +3946,7 @@ class Component extends DCLogic {
 
       founderStats: [
         { label: 'Approved jobs', value: String(approved.length) },
-        { label: 'Approved value', value: money(approved.reduce((s, x) => s + this.ticketTotal(x), 0)) },
+        { label: 'Approved value', value: this.totalByCurrency(approved) },
         { label: 'Active in field', value: String(D.tickets.filter(x => x.status === 'logging').length) },
         { label: 'Awaiting manager', value: String(awaiting.length) },
       ],
