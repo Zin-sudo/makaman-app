@@ -548,7 +548,8 @@
               </div>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:14px">{{ techName }} · {{ myCount }}</div>
               <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
-              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:20px 0 8px">On this device</div>
+              <input value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="width:100%;min-height:40px;margin-top:16px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
+              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:16px 0 8px">On this device</div>
               <div style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
                   <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
@@ -576,6 +577,9 @@
                   </div>
                 </sc-for>
               </div>
+              <sc-if value="{{ myHasMore }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ loadMoreTickets }}" style="width:100%;min-height:42px;margin-top:12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ myMoreLabel }}</button>
+              </sc-if>
             </sc-if>
 
             <!-- technician: new ticket -->
@@ -818,6 +822,7 @@
             <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
           </div>
           <button onClick="{{ goNewTicket }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New ticket</button>
+          <input value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="min-height:36px;width:230px;max-width:100%;padding:7px 10px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
           <select value="{{ techFilterValue }}" onChange="{{ setTechFilter }}" style="min-height:36px;padding:7px 10px;font-size:13px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
             <sc-for list="{{ techFilterOptions }}" as="o" hint-placeholder-count="3">
               <option value="{{ o.name }}">{{ o.label }}</option>
@@ -880,6 +885,12 @@
               </sc-for>
             </tbody>
           </table>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+          <div style="font-size:12px;color:rgba(var(--ink-rgb),0.5)">{{ inboxCountLabel }}</div>
+          <sc-if value="{{ inboxHasMore }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ loadMoreTickets }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ inboxMoreLabel }}</button>
+          </sc-if>
         </div>
       </sc-if>
 
@@ -3188,6 +3199,30 @@ class Component extends DCLogic {
     // One list feeds the preview table and the bundle button, so what is on screen is
     // exactly what downloads — the slider cannot mean one thing in the table and another
     // in the file.
+    // A ticket list grows without bound, and a year of jobs is a long scroll on a phone.
+    // Ten at a time, with the rest a press away — the search is there so nobody has to
+    // scroll at all when they already know the number. Matching goes wider than the
+    // ticket number because someone hunting a job often remembers the well before the
+    // number, and a wider match costs nothing.
+    const TICKET_PAGE = 10;
+    const ticketQuery = (S.ticketQuery || '').trim().toLowerCase();
+    const matchesQuery = (x) => {
+      if (!ticketQuery) return true;
+      return [x.ticketNo, x.customer, x.field, x.well, x.rig, x.jobType]
+        .concat(crewNames(x))
+        .some(v => String(v || '').toLowerCase().indexOf(ticketQuery) !== -1);
+    };
+    const pageOf = (rows) => {
+      const shown = Math.min(rows.length, S.ticketLimit || TICKET_PAGE);
+      return {
+        rows: rows.slice(0, shown),
+        hasMore: rows.length > shown,
+        moreLabel: 'Load ' + Math.min(TICKET_PAGE, rows.length - shown) + ' more · ' + (rows.length - shown) + ' left',
+        countLabel: rows.length + (rows.length === 1 ? ' ticket' : ' tickets'),
+      };
+    };
+
+
     const reportRows = (() => {
       const inMonth = approved.filter(x => {
         if (!S.reportMonth) return true;
@@ -3217,6 +3252,10 @@ class Component extends DCLogic {
     const TICKET_BAND = { logging: 0, done: 1, approved: 2 };
     const bandOf = (x) => (TICKET_BAND[x.status] === undefined ? 3 : TICKET_BAND[x.status]);
     const bandedTickets = (list) => list.slice().reverse().sort((a, b) => bandOf(a) - bandOf(b));
+
+    const inboxPage = pageOf(bandedTickets(
+      D.tickets.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))));
+    const myPage = pageOf(bandedTickets(myTickets.filter(matchesQuery)));
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
 
@@ -3891,7 +3930,9 @@ class Component extends DCLogic {
       techName: myName,
       myCount: myTickets.length + ' on device',
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
-      myTickets: bandedTickets(myTickets).map(x => Object.assign(this.ticketView(x), {
+      myHasMore: myPage.hasMore,
+      myMoreLabel: myPage.moreLabel,
+      myTickets: myPage.rows.map(x => Object.assign(this.ticketView(x), {
         open: () => this.setState({ activeId: x.id, techScreen: 'log' }),
       })),
       startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: myName, customer: '', field: '', well: '', rig: '' } }),
@@ -4064,11 +4105,18 @@ class Component extends DCLogic {
         { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
         { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)' },
       ],
-      inboxRows: bandedTickets(D.tickets.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, ''))))
-        .map(x => Object.assign(this.ticketView(x), {
-          actionLabel: x.status === 'approved' ? 'View' : 'Review',
-          review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
-        })),
+      inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
+        actionLabel: x.status === 'approved' ? 'View' : 'Review',
+        review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+      })),
+      inboxHasMore: inboxPage.hasMore,
+      inboxMoreLabel: inboxPage.moreLabel,
+      inboxCountLabel: inboxPage.countLabel,
+      loadMoreTickets: () => this.setState({ ticketLimit: (S.ticketLimit || 10) + 10 }),
+      ticketQuery: S.ticketQuery || '',
+      // Any new search starts from the top of the list again, otherwise a narrowed
+      // result would still be capped by however far the previous one had been expanded.
+      setTicketQuery: e => this.setState({ ticketQuery: e.target.value, ticketLimit: 10 }),
       // Built from the technicians who actually have tickets rather than from the
       // user list, so the filter never offers a name that would return nothing.
       techFilterValue: S.techFilter || '',
