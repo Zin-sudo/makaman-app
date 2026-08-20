@@ -754,6 +754,40 @@
             <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ false }}">
               <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Account</h2>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
+
+              <!-- Approved work, printable here. The office no longer posts a hardcopy
+                   out to the field for signing and waits for it to come back. -->
+              <sc-if value="{{ showReports }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-bottom:14px">
+                  <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">{{ reportsTitle }}</div>
+                  <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Month — counted by End Job date</label>
+                  <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+                    <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
+                      <option value="{{ m.key }}">{{ m.label }}</option>
+                    </sc-for>
+                  </select>
+                  <label style="display:block;font-size:12px;margin-bottom:6px;color:rgba(var(--ink-rgb),0.75)">Up to {{ founderCount }} jobs · showing {{ reportCountLabel }}</label>
+                  <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:12px">
+                  <sc-if value="{{ hasReportRows }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+                      <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="2">
+                        <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(var(--ink-rgb),0.12)">
+                          <div style="flex:1;min-width:0">
+                            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }} · {{ r.customer }}</div>
+                            <div style="font-size:11px;color:rgba(var(--ink-rgb),0.6);overflow-wrap:anywhere">{{ r.locLine }} · {{ r.dateRange }}</div>
+                          </div>
+                          <button onClick="{{ r.download }}" style="flex:none;padding:6px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ noReportRows }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:14px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.5)">Nothing approved yet for that month. Sheets can be printed once the operations manager approves the job.</div>
+                  </sc-if>
+                  <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.45">ZIP gives that job's four sheets to print and sign — originals in one PDF, copies in the other.</div>
+                </div>
+              </sc-if>
               <sc-if value="{{ showProfile }}" hint-placeholder-val="{{ true }}">
                 <div style="border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:14px">
                   <sc-for list="{{ profileRows }}" as="r" hint-placeholder-count="4">
@@ -1811,7 +1845,7 @@
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
         <sc-if value="{{ showReports }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
-            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Reports</div>
+            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">{{ reportsTitle }}</div>
             <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Month — counted by End Job date</label>
             <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
               <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
@@ -3223,8 +3257,15 @@ class Component extends DCLogic {
     };
 
 
+    // A technician sees only jobs they were on the crew of — the same rule their ticket
+    // list uses, so a job they opened and handed over is still theirs to print, and both
+    // names are already on the sheet. Everyone else sees every approved job.
+    const reportBase = S.role === 'tech'
+      ? approved.filter(x => inCrew(x, myName, myEmail))
+      : approved;
+
     const reportRows = (() => {
-      const inMonth = approved.filter(x => {
+      const inMonth = reportBase.filter(x => {
         if (!S.reportMonth) return true;
         const d = dt(x.end || x.start);
         if (!d) return false;
@@ -3798,7 +3839,12 @@ class Component extends DCLogic {
       showProfile: S.role === 'tech',
       // Report controls, moved off the Observer's ticket list — generating a report is
       // an account action, not part of reading the work.
-      showReports: S.role === 'founder' || S.role === 'mgr' || S.role === 'admin',
+      // A technician printing and signing their own approved sheets on site replaces a
+      // hardcopy going out to the field and coming back. Same panel, same controls; what
+      // differs is only which tickets it can see, and that is enforced in reportBase
+      // rather than by hiding buttons.
+      showReports: true,
+      reportsTitle: S.role === 'tech' ? 'My approved jobs' : 'Reports',
 
       showSettings: S.showSettings,
       openSettings: () => this.setState({ showSettings: true }),
@@ -4601,7 +4647,7 @@ class Component extends DCLogic {
       // for a job with no end recorded at all.
       reportMonths: (() => {
         const seen = {};
-        approved.forEach(x => {
+        reportBase.forEach(x => {
           const d = dt(x.end || x.start);
           if (!d) return;
           const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
