@@ -422,7 +422,7 @@
       <div class="mk-nav-title" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
     <sc-if value="{{ showBarFix }}" hint-placeholder-val="{{ true }}">
-      <div class="mk-nav-fix" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">
+      <div class="mk-nav-fix" onPointerDown="{{ holdCopyStart }}" onPointerUp="{{ holdCopyCancel }}" onPointerLeave="{{ holdCopyCancel }}" onPointerCancel="{{ holdCopyCancel }}" onContextMenu="{{ swallowMenu }}" title="{{ barFixHint }}" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
         <span class="mk-nav-fix-label" style="opacity:0.55;text-transform:uppercase;font-size:10px;letter-spacing:0.06em">Position</span>
         <span style="font-weight:600">{{ barFixText }}</span>
       </div>
@@ -1437,7 +1437,7 @@
                   <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0">
                     <div style="flex:1;display:flex;align-items:center">
                       <div style="width:110px;flex:none;padding:3px 7px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-right:1px solid rgba(29,31,32,0.3)">{{ r.labelA }}</div>
-                      <div style="flex:1;padding:3px 7px;font-weight:600">{{ r.valueA }}</div>
+                      <div style="flex:1;min-width:0;padding:3px 7px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.valueA }} <span style="font-size:8px;font-weight:500;color:rgba(29,31,32,0.55);letter-spacing:0.01em">{{ r.noteA }}</span></div>
                     </div>
                     <sc-if value="{{ r.hasB }}" hint-placeholder-val="{{ true }}">
                       <div style="flex:1;display:flex;align-items:center;border-left:1px solid rgba(29,31,32,0.3)">
@@ -1485,7 +1485,7 @@
                   <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0">
                     <div style="flex:1;display:flex;align-items:center">
                       <div style="width:108px;flex:none;padding:3px 7px;background:#e9e9ea;font-size:9.5px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(29,31,32,0.65);border-right:1px solid rgba(29,31,32,0.3)">{{ r.labelA }}</div>
-                      <div style="flex:1;padding:3px 7px;font-weight:600">{{ r.valueA }}</div>
+                      <div style="flex:1;min-width:0;padding:3px 7px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.valueA }} <span style="font-size:8px;font-weight:500;color:rgba(29,31,32,0.55);letter-spacing:0.01em">{{ r.noteA }}</span></div>
                     </div>
                     <sc-if value="{{ r.hasB }}" hint-placeholder-val="{{ true }}">
                       <div style="flex:1;display:flex;align-items:center;border-left:1px solid rgba(29,31,32,0.3)">
@@ -2661,6 +2661,15 @@ function geoText(fix) {
   if (lat === null || lon === null) return '';
   return lat + ', ' + lon;
 }
+// Where the job was opened, in square brackets, for printing beside the well number.
+// The opening fix and not the last one: the well does not move, so what a reader of a
+// finished ticket wants is the coordinate of the location, not of wherever the truck
+// happened to be when the last ping went out.
+function geoNote(t) {
+  const fix = ((t || {}).geo || {}).open;
+  const txt = geoText(fix);
+  return txt ? '[' + txt + ']' : '';
+}
 function iso(d) { return new Date(d).toISOString(); }
 function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(h, m, 0, 0); return iso(d); }
 function dt(s) { return s ? new Date(s) : null; }
@@ -2758,6 +2767,10 @@ const GEO_MAX_AGE_MS = 30000;
 // the hourly office ping because this one is read off the screen in the moment, but not
 // so short that it keeps the GPS awake.
 const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO_TEST_MS) || 120000;
+// How long a press has to last before it counts as a hold rather than a tap.
+const HOLD_COPY_MS = (typeof window !== 'undefined' && window.__HOLD_TEST_MS) || 450;
+// A confirmation of something the user just did, so it goes as soon as it is read.
+const COPY_TOAST_MS = 2000;
 
 // Every job on this system happens in Libya, and every timestamp on a ticket is evidence
 // of when someone was on a wellhead. That makes the operating zone a fact about the
@@ -3194,11 +3207,14 @@ class Component extends DCLogic {
   // animation. It keeps the one already on screen and pushes its countdown out, so the
   // banner disappears six seconds after the last press rather than flickering once per
   // press. That is what stops a held button turning into a spam loop.
-  toast(key, text, tone) {
+  // ms overrides the six-second default for the few banners that confirm something the
+  // user just did with their own hand and already knows the result of — a copy, say.
+  // Six seconds of "Coordinates Copied!" is the app talking long after the point.
+  toast(key, text, tone, ms) {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     const cur = this.state.toast;
     if (!cur || cur.key !== key) this.setState({ toast: { key: key, text: text, tone: tone || 'info' } });
-    this.toastTimer = setTimeout(() => this.setState({ toast: null }), TOAST_MS);
+    this.toastTimer = setTimeout(() => this.setState({ toast: null }), ms || TOAST_MS);
   }
   dismissToast() {
     if (this.toastTimer) clearTimeout(this.toastTimer);
@@ -3403,6 +3419,53 @@ class Component extends DCLogic {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: SELF_GEO_INTERVAL_MS }
       );
     } catch (e) { done(null, true); }
+  }
+  // Press and hold the coordinates to copy them. The case this exists for is someone
+  // lost who needs to send a position to whoever can come and get them: reading twelve
+  // digits off a screen into a message is exactly the moment a digit gets dropped, and
+  // it is the worst possible moment for that.
+  //
+  // Bound to pointer events rather than touch, so a thumb and a mouse both work without
+  // two code paths. Any movement or release before the hold completes cancels it, so
+  // scrolling the page past the bar does not fire a copy.
+  holdCopyStart() {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    const fix = this.state.selfFix;
+    if (!fix) return;
+    this.holdTimer = setTimeout(() => {
+      this.holdTimer = null;
+      this.copyText(geoText(fix), 'coords', 'Coordinates Copied!');
+    }, HOLD_COPY_MS);
+  }
+  holdCopyCancel() {
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer = null;
+  }
+  // The async clipboard API is the right one and needs a secure context, which the PWA
+  // always has. The execCommand fallback is for the browsers that still refuse it — an
+  // off-screen textarea is ugly but it is the only thing that works there, and a copy
+  // that silently does nothing would be worse than ugly.
+  copyText(text, key, okMsg) {
+    if (!text) return;
+    const done = () => this.toast(key, okMsg, 'ok', COPY_TOAST_MS);
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand && document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) done(); else this.toast(key, 'Could not copy — select the text instead.', 'warn');
+      } catch (e) { this.toast(key, 'Could not copy — select the text instead.', 'warn'); }
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } else fallback();
+    } catch (e) { fallback(); }
   }
   // The opening pin. Written once and never overwritten — it is the record of where
   // the job was started, so a later fix must not be able to rewrite history.
@@ -3785,7 +3848,30 @@ class Component extends DCLogic {
       doc.setFont('helvetica', 'normal'); doc.setTextColor(105);
       doc.text(String(r.labelA || ''), L, y);
       doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
-      doc.text(String(r.valueA || ''), L + 32, y);
+      const va = String(r.valueA || '');
+      doc.text(va, L + 32, y);
+      // The footnote sits immediately after the value, at two-thirds the size and in
+      // grey. Where it starts is measured from the value rather than fixed, so a long
+      // well number pushes it along instead of being overwritten. The measurement has
+      // to happen while the value's own font is still selected — getTextWidth reports
+      // against whatever is current, so measuring after the switch would size the gap
+      // by the footnote's font and run the two together.
+      const vaWidth = doc.getTextWidth(va);
+      if (r.noteA) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.6); doc.setTextColor(120);
+        const at = L + 32 + vaWidth + 2;
+        // The right-hand label of the pair starts at L+100, and an unusually long well
+        // number would otherwise walk the footnote straight into it. Same ladder as the
+        // overview table: full precision, then four decimals (about ten metres, which
+        // still finds a wellhead), then nothing rather than an overlap.
+        const room = (L + 97) - at;
+        const note = String(r.noteA);
+        const short = note.replace(/(-?\d+\.\d{4})\d*/g, '$1');
+        const pick = doc.getTextWidth(note) <= room ? note
+          : (doc.getTextWidth(short) <= room ? short : '');
+        if (pick) doc.text(pick, at, y);
+        doc.setFontSize(8);
+      }
       if (r.hasB) {
         doc.setFont('helvetica', 'normal'); doc.setTextColor(105);
         doc.text(String(r.labelB || ''), L + 100, y);
@@ -3903,7 +3989,11 @@ class Component extends DCLogic {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(105);
       doc.text(label + ' · ' + tickets.length + ' ticket(s) · generated ' + F.stamp(iso(new Date())), L, y + 5);
       y += 13;
-      const cols = [L, L + 22, L + 62, L + 118, L + 158, L + 190, L + 218, L + 250];
+      // The Well column carries its coordinates now, so it needs roughly twice the room
+      // the bare number needed. The width comes off Technician, Customer and Field,
+      // each of which was sized for a worst case that truncation already handles.
+      const cols = [L, L + 20, L + 54, L + 100, L + 132, L + 186, L + 212, L + 244];
+      const WELL_W = 52;
       const heads = ['Ticket No.', 'Technician', 'Customer', 'Field', 'Well', 'Rig', 'Date', 'Value'];
       const drawHead = () => {
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(20);
@@ -3918,12 +4008,28 @@ class Component extends DCLogic {
         if (y > 195) { doc.addPage(); y = 16; drawHead(); }
         const cell = (v, w) => doc.splitTextToSize(String(v == null ? '' : v), w)[0] || '';
         doc.setTextColor(20);
-        doc.text(cell(t.ticketNo || '—', 20), cols[0], y);
-        doc.text(cell(crewLabel(t) || t.tech, 38), cols[1], y);
-        doc.text(cell(t.customer, 54), cols[2], y);
-        doc.text(cell(t.field, 38), cols[3], y);
-        doc.text(cell(t.well, 30), cols[4], y);
-        doc.text(cell(t.rig, 26), cols[5], y);
+        doc.text(cell(t.ticketNo || '—', 18), cols[0], y);
+        doc.text(cell(crewLabel(t) || t.tech, 32), cols[1], y);
+        doc.text(cell(t.customer, 44), cols[2], y);
+        doc.text(cell(t.field, 30), cols[3], y);
+        // Well number at full size, its coordinates beside it as a footnote. Both are
+        // measured against the column rather than trusted to fit: if the pair would run
+        // into the Rig column the coordinates drop to four decimals, which is still
+        // about ten metres — closer than anyone needs to find a wellhead — and if even
+        // that will not fit they are left off rather than allowed to overlap.
+        const wellTxt = cell(t.well, 24);
+        doc.text(wellTxt, cols[4], y);
+        const note = geoNote(t);
+        if (note) {
+          const used = doc.getTextWidth(wellTxt) + 2;
+          doc.setFontSize(5.6); doc.setTextColor(120);
+          const short = note.replace(/(-?\d+\.\d{4})\d*/g, '$1');
+          const pick = doc.getTextWidth(note) <= WELL_W - used ? note
+            : (doc.getTextWidth(short) <= WELL_W - used ? short : '');
+          if (pick) doc.text(pick, cols[4] + used, y);
+          doc.setFontSize(8); doc.setTextColor(20);
+        }
+        doc.text(cell(t.rig, 24), cols[5], y);
         doc.text(cell(t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '—'), 30), cols[6], y);
         doc.text(money(this.ticketTotal(t), this.ticketCurrency(t)), R, y, { align: 'right' });
         doc.setDrawColor(215); doc.line(L, y + 1.4, R, y + 1.4);
@@ -3940,15 +4046,20 @@ class Component extends DCLogic {
     // must show the same clock — a preview that disagrees with the file it generates
     // reads as a bug even when both are individually correct.
     const F = this.fmt(true);
-    const pairRow = (labelA, valueA, labelB, valueB) => ({
+    // noteA is a footnote hung off the left-hand value — smaller and lighter than the
+    // value it follows, on the same line. It exists for the well coordinates: they
+    // belong next to the well number, but they are a reference, not the field itself,
+    // and printing them at full weight would read as a second well number.
+    const pairRow = (labelA, valueA, labelB, valueB, noteA) => ({
       labelA: labelA, valueA: valueA === undefined || valueA === null ? '' : String(valueA),
       hasB: labelB !== undefined, labelB: labelB || '',
       valueB: valueB === undefined || valueB === null ? '' : String(valueB),
+      noteA: noteA || '',
     });
     const svcRows = t ? [
       pairRow('Customer:', t.customer),
       pairRow('Field Name:', t.field),
-      pairRow('Well No:', t.well, 'MKN Supervisor:', crewLabel(t)),
+      pairRow('Well No:', t.well, 'MKN Supervisor:', crewLabel(t), geoNote(t)),
       pairRow('Rig Name:', t.rig, 'Start Job:', F.date(t.start)),
       // "(One Way)" is appended permanently next to the entered mileage so the client
       // can see, right on the ticket, why the Qty on the mileage line item further down
@@ -3959,7 +4070,7 @@ class Component extends DCLogic {
     const logRows = t ? [
       pairRow('Customer:', t.customer, 'Date:', t.end ? F.date(t.end) : (t.start ? F.date(t.start) : '')),
       pairRow('Field:', t.field, 'Job Type:', t.jobType),
-      pairRow('Well No:', t.well, 'Customer Rep.:', t.customerRep),
+      pairRow('Well No:', t.well, 'Customer Rep.:', t.customerRep, geoNote(t)),
       pairRow('Job Supervisor:', crewLabel(t), 'Rig Name:', t.rig),
     ] : [];
     const logTimes = t ? [
@@ -4534,6 +4645,12 @@ class Component extends DCLogic {
       // selfGeoTick for why that is not a leak.
       showBarFix: S.role === 'tech' && !!S.session && !!(S.selfFix || S.selfFixFailed),
       barFixText: S.selfFix ? geoText(S.selfFix) : 'NO GPS FIX',
+      barFixHint: S.selfFix ? 'Press and hold to copy' : '',
+      holdCopyStart: () => this.holdCopyStart(),
+      holdCopyCancel: () => this.holdCopyCancel(),
+      // A long press on a phone otherwise raises the browser's own text-selection menu
+      // over the banner confirming the copy. Suppressed only on this one element.
+      swallowMenu: e => { e.preventDefault(); },
       goToLogin: () => this.setState({ authScreen: 'login', authError: '', signupDone: false }),
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
       doLogin: doLogin,
