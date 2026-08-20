@@ -89,7 +89,7 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   body = await p.innerText('body');
   check('closing asks about the tools first', /Account for the tools before closing/i.test(body));
   check('all three questions are asked',
-    /Tools allocated reclaimed/i.test(body) && /Tools allocated location/i.test(body) && /Tools allocated left behind/i.test(body));
+    /Tools allocated reclaimed/i.test(body) && /Tools allocated location/i.test(body) && /Tools allocated left behind or damaged/i.test(body));
   check('and it will not close until they are answered',
     await p.getByRole('button', { name: /Confirm and close the job/i }).isDisabled());
 
@@ -99,14 +99,29 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   await p.waitForTimeout(300);
   check('two of three is still not enough',
     await p.getByRole('button', { name: /Confirm and close the job/i }).isDisabled());
+  check('and the justification row demands a reason while one is unanswered',
+    /If questions not answered, you must justify/i.test(await p.innerText('body')));
 
-  // the manual path on the last one
-  await p.getByRole('button', { name: /Type manually instead/i }).last().click();
-  await p.waitForTimeout(300);
-  await p.getByPlaceholder(/Type the answer/i).first().fill('One crossover left with the rig');
+  // answering the third clears the demand and closes the box requirement
+  await p.getByRole('button', { name: /^None$/i }).click();
   await p.waitForTimeout(400);
-  check('a typed answer counts too',
+  check('answering all three lifts the demand',
+    !/If questions not answered, you must justify/i.test(await p.innerText('body')));
+  check('and closing is allowed',
     !(await p.getByRole('button', { name: /Confirm and close the job/i }).isDisabled()));
+
+  // Q1 now offers three distinct choices
+  const q1 = await p.evaluate(() => {
+    const btns = Array.from(document.querySelectorAll('button')).map(b => b.innerText.trim());
+    return ['Yes', 'Not yet', 'Handed over'].every(x => btns.some(b => b.toLowerCase() === x.toLowerCase()));
+  });
+  check('the first question offers three distinct answers', q1);
+
+  // the justification is optional here, but still usable
+  await p.getByRole('button', { name: /Type manually instead/i }).click();
+  await p.waitForTimeout(300);
+  await p.locator('textarea[placeholder="Type the answer…"]').first().fill('One crossover left with the rig');
+  await p.waitForTimeout(400);
 
   await p.getByRole('button', { name: /Confirm and close the job/i }).click();
   await p.waitForTimeout(700);
@@ -117,9 +132,16 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   d = await store(p);
   tk = d.tickets.find(x => x.customer.indexOf('Northern Gulf') === 0);
   check('the answers are stored on the ticket', !!tk.assetCheck, JSON.stringify(tk.assetCheck || {}));
-  check('including the typed one', /crossover left with the rig/i.test((tk.assetCheck.leftBehind || {}).text || ''));
+  check('with all three answers recorded',
+    (tk.assetCheck.answers || {}).reclaimed.text === 'Yes'
+    && (tk.assetCheck.answers || {}).location.text === 'In vehicle'
+    && (tk.assetCheck.answers || {}).leftBehind.text === 'None');
+  check('and the justification alongside them',
+    /crossover left with the rig/i.test(tk.assetCheck.justification || ''));
   check('and it is on the audit trail',
     (tk.audit || []).some(a => /Allocated assets accounted for on closing/i.test(a.text)));
+  check('filed under its own kind, not as a job stage',
+    (tk.audit || []).some(a => /Allocated assets/i.test(a.text) && a.kind === 'assets'));
   check('the job did actually close', tk.status === 'done', tk.status);
   await p.close();
 
