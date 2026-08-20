@@ -70,11 +70,21 @@ async function signIn(ctx, email, fresh) {
     check('line costs and totals read LYD, not dollars',
       /LYD/.test(body) && !/\$/.test(body.split('Charged items')[1] || body),
       (body.match(/[\d.,]+ LYD/) || ['none'])[0]);
+    // The dinar divides into 1,000 dirham, so its figures carry three decimal places.
+    // Two would silently drop a digit the contract prices to.
+    const lydFigures = body.match(/[\d,]+\.\d+ LYD/g) || [];
+    check('every dinar figure carries three decimals',
+      lydFigures.length > 0 && lydFigures.every(f => /\.\d{3} LYD$/.test(f)),
+      lydFigures.slice(0, 3).join(' , ') || 'none found');
 
     await p.getByRole('button', { name: /Preview 4 sheets/i }).click();
     await p.waitForTimeout(900);
     const sheets = await p.innerText('body');
     check('the printed sheets say LYD too', /LYD/.test(sheets));
+    const sheetFigures = sheets.match(/[\d,]+\.\d+ LYD/g) || [];
+    check('and carry three decimals on the sheets as well',
+      sheetFigures.length > 0 && sheetFigures.every(f => /\.\d{3} LYD$/.test(f)),
+      sheetFigures.slice(0, 3).join(' , ') || 'none found');
     check('no dollar sign reaches a Sirte sheet', !/\$/.test(sheets),
       (sheets.match(/\$[\d.,]+/) || ['clean'])[0]);
   } else {
@@ -101,6 +111,10 @@ async function signIn(ctx, email, fresh) {
   const line = (obs.split('\n').find(l => /LYD|\$/.test(l) && /[\d,]+\.\d\d/.test(l)) || '');
   check('approved value reports each currency rather than adding them up',
     /LYD/.test(obs) && /\$/.test(obs), line.trim());
+  // Both conventions side by side in the same figure is the clearest proof they differ.
+  check('dollars keep two decimals while dinar keeps three',
+    /\$[\d,]+\.\d{2}(?!\d)/.test(obs) && /[\d,]+\.\d{3} LYD/.test(obs),
+    ((obs.match(/\$[\d,]+\.\d+/) || [''])[0] + '  /  ' + (obs.match(/[\d,]+\.\d+ LYD/) || [''])[0]));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);

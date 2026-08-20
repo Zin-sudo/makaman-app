@@ -2027,15 +2027,18 @@ function fstamp(s, tz, hour12) { return s ? fdate(s, tz) + ' · ' + ftime(s, tz,
 // Libyan dinar, and printing "$800.00" on a sheet that goes to Sirte states a price the
 // contract does not contain. Currency travels with the client, and every figure derived
 // from that client's price list is stamped with it.
+// Decimal places are the currency's, not a house style: the dollar divides into 100
+// cents and the Libyan dinar into 1,000 dirham, so a dinar figure that stops at two
+// places has dropped a digit the contract prices to.
 const CURRENCIES = {
-  USD: { before: '$', after: '' },
-  LYD: { before: '', after: ' LYD' },
+  USD: { before: '$', after: '', decimals: 2 },
+  LYD: { before: '', after: ' LYD', decimals: 3 },
 };
 const DEFAULT_CURRENCY = 'USD';
 function money(n, cur) {
   const v = Number(n) || 0;
   const c = CURRENCIES[cur] || CURRENCIES[DEFAULT_CURRENCY];
-  const amount = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const amount = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: c.decimals, maximumFractionDigits: c.decimals });
   // Discount lines produce negative item/ticket totals — the minus belongs in front of
   // the whole figure (-$150.00), never between the symbol and the digits ($-150.00).
   return (v < 0 ? '-' : '') + c.before + amount + c.after;
