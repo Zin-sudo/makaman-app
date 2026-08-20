@@ -683,6 +683,29 @@
               <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
                 <textarea value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
                 <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
+                <sc-if value="{{ assetPromptOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:13px;border:2px solid var(--danger);background:rgba(var(--danger-rgb),0.07)">
+                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;color:var(--danger);margin-bottom:4px">Account for the tools before closing</div>
+                    <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);line-height:1.45;margin-bottom:12px">{{ assetPromptNote }}</div>
+                    <sc-for list="{{ assetPromptRows }}" as="q" hint-placeholder-count="3">
+                      <div style="margin-bottom:14px">
+                        <div style="font-size:12px;font-weight:600;margin-bottom:7px;color:var(--ink)">{{ q.label }}</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px">
+                          <sc-for list="{{ q.options }}" as="o" hint-placeholder-count="3">
+                            <button onClick="{{ o.pick }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }}">{{ o.text }}</button>
+                          </sc-for>
+                          <button onClick="{{ q.openManual }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:transparent;color:var(--danger);border:1px solid var(--danger)">{{ q.manualLabel }}</button>
+                        </div>
+                        <sc-if value="{{ q.manualActive }}" hint-placeholder-val="{{ false }}">
+                          <input value="{{ q.manualText }}" onChange="{{ q.onManual }}" placeholder="Type the answer…" style="width:100%;margin-top:7px;min-height:38px;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid var(--danger);color:var(--ink)">
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                    <button onClick="{{ confirmAssetPrompt }}" disabled="{{ assetPromptBlocked }}" style="width:100%;min-height:46px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:#fff;border:1px solid var(--danger);opacity:{{ assetPromptOpacity }}">Confirm and close the job</button>
+                    <button onClick="{{ cancelAssetPrompt }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to the log</button>
+                  </div>
+                </sc-if>
+
                 <sc-if value="{{ techSealed }}" hint-placeholder-val="{{ false }}">
                   <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ techSealedNote }}</div>
                 </sc-if>
@@ -1259,6 +1282,38 @@
                 </sc-for>
               </div>
               <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
+              <sc-if value="{{ assetsEditable }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.12)">
+                  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+                    <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Tools &amp; crossovers allocated</div>
+                    <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ assetHolderLabel }}</div>
+                  </div>
+                  <sc-for list="{{ assetRows }}" as="a" hint-placeholder-count="2">
+                    <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+                      <input value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                      <input value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                      <input value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                      <button onClick="{{ a.remove }}" title="Remove" style="width:24px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
+                    </div>
+                  </sc-for>
+                  <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.4">The technician is asked to account for these when they close the job.</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ hasAssetAnswers }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:14px;padding:11px 13px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.08)">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--warning-ink);margin-bottom:8px">Allocated assets — accounted for on closing</div>
+                  <sc-for list="{{ assetAnswers }}" as="q" hint-placeholder-count="3">
+                    <div style="display:flex;gap:10px;padding:4px 0;font-size:12px;line-height:1.4">
+                      <div style="width:150px;flex:none;color:rgba(var(--ink-rgb),0.6)">{{ q.label }}</div>
+                      <div style="flex:1;min-width:0;font-weight:600;color:{{ q.fg }};overflow-wrap:anywhere">{{ q.value }}</div>
+                    </div>
+                  </sc-for>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px">{{ assetAnsweredBy }}</div>
+                </div>
+              </sc-if>
+
               <sc-if value="{{ mgrCanClose }}" hint-placeholder-val="{{ false }}">
                 <button onClick="{{ askOfficeClose }}" disabled="{{ mgrCloseDisabled }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--warning-ink);border:1px solid var(--warning);opacity:{{ mgrCloseOpacity }}">Close the job for the technician</button>
                 <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.55);line-height:1.4">{{ mgrCloseNote }}</div>
@@ -2118,6 +2173,26 @@ function monthKey(s, tz) {
 // How long a drop banner holds before it retires itself. Overridable for tests, which
 // cannot afford to wait six seconds per assertion.
 const TOAST_MS = (typeof window !== 'undefined' && window.__TOAST_TEST_MS) || 6000;
+// What the office hands a technician for a job, written straight onto the ticket. No
+// catalogue, no register, no lifecycle — a line of text, a count and a note is what
+// actually gets written on a whiteboard at base, and anything heavier goes unused.
+//
+// The three questions below are asked once, when the technician closes the job. They are
+// the questions someone rings the office to ask a week later: did the kit come back,
+// where is it, and is anything still out there. Answering them at the moment of closing
+// costs seconds; reconstructing them afterwards costs a phone call and a guess.
+const ASSET_QUESTIONS = [
+  { key: 'reclaimed', label: 'Tools allocated reclaimed?',
+    presets: ['Yes', 'Not yet — handed over'],
+    bg: 'rgba(var(--warning-rgb),0.16)', fg: 'var(--warning-ink)', border: 'var(--warning)' },
+  { key: 'location', label: 'Tools allocated location?',
+    presets: ['In vehicle', 'At String-30', 'At rig'],
+    bg: 'var(--accent-wash)', fg: 'var(--accent-ink)', border: 'var(--accent)' },
+  { key: 'leftBehind', label: 'Tools allocated left behind?',
+    presets: ['None'],
+    bg: 'rgba(var(--success-rgb),0.16)', fg: 'var(--success)', border: 'var(--success)' },
+];
+
 const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 60000;
 // How often a ticket that is still being logged re-pins where the device is.
 const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 3600000;
@@ -4107,6 +4182,42 @@ class Component extends DCLogic {
       // Only the person actually holding the job can hand it on or log to it. A
       // previous holder still sees the ticket; the buttons are simply not there.
       canHandOver: !!t && t.status === 'logging' && holderOf(t) === myName,
+      // ── Allocated assets (office writes, technician answers for) ─────────
+      // Only while the job is running: kit is handed out before the work, and a closed
+      // ticket's answers would be about a list that changed after they were given.
+      assetsEditable: !readOnly && !!t && t.status === 'logging',
+      assetRows: !t ? [] : (t.assets || []).map((a, ai) => ({
+        item: a.item || '', qty: a.qty === undefined ? '' : a.qty, note: a.note || '',
+        onItem: e => { const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].item = v; }); },
+        onQty: e => { const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].qty = v; }); },
+        onNote: e => { const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].note = v; }); },
+        remove: () => {
+          this.log('Allocated asset removed: ' + (a.item || '(blank)') + '.', 'edit');
+          this.mutate(d => { d.tickets.find(x => x.id === t.id).assets.splice(ai, 1); });
+        },
+      })),
+      addAssetRow: () => {
+        if (!t) return;
+        this.mutate(d => {
+          const x = d.tickets.find(y => y.id === t.id);
+          (x.assets = x.assets || []).push({ item: '', qty: '', note: '' });
+        });
+      },
+      assetHolderLabel: t ? ('Allocated to ' + (holderOf(t) || 'the technician')) : '',
+      hasAssets: !!t && (t.assets || []).length > 0,
+      // The answers, pinned on the ticket for the office. Not a banner — this is a fact
+      // about the job that has to still be there next week.
+      assetAnswers: !t || !t.assetCheck ? [] : ASSET_QUESTIONS.map(q => ({
+        label: q.label,
+        value: (t.assetCheck[q.key] || {}).text || '—',
+        manual: !!(t.assetCheck[q.key] || {}).manual,
+        fg: (t.assetCheck[q.key] || {}).manual ? 'var(--danger)' : q.fg,
+      })),
+      hasAssetAnswers: !!t && !!t.assetCheck,
+      assetAnsweredBy: t && t.assetCheck
+        ? ('Answered by ' + (t.assetCheck.by || 'the technician') + ' · ' + F.stamp(t.assetCheck.at))
+        : '',
+
       mgrCanHandOver: !readOnly && !!t && t.status !== 'approved',
       // Closing on the technician's behalf needs everything closing normally would
       // produce. It is not a way to tidy the inbox — the closed sheet is the document.
@@ -4128,11 +4239,72 @@ class Component extends DCLogic {
         ? 'Approved and sealed. Ask the operations manager to make any correction.'
         : (t && t.officeClosed ? 'Closed in the office by ' + (t.closedBy || 'the operations manager') + '. Ask them to make any correction.' : ''),
       doneLabel: t && t.status !== 'logging' ? 'Reopen for corrections' : 'Job done',
+      // Asked once, at the moment of closing, and only of a technician who was actually
+      // given something. A job with no allocated kit closes exactly as it did before.
+      assetPromptOpen: !!S.assetPrompt && !!t && (t.assets || []).length > 0,
+      assetPromptRows: ASSET_QUESTIONS.map(q => {
+        const picked = (S.assetDraft || {})[q.key] || {};
+        return {
+          key: q.key, label: q.label, border: q.border,
+          options: q.presets.map(text => ({
+            text: text,
+            bg: picked.text === text && !picked.manual ? q.border : q.bg,
+            fg: picked.text === text && !picked.manual ? 'var(--on-accent)' : q.fg,
+            border: q.border,
+            pick: () => this.setState({ assetDraft: Object.assign({}, S.assetDraft, { [q.key]: { text: text, manual: false } }) }),
+          })),
+          manualLabel: 'Type manually instead',
+          manualActive: !!picked.manual,
+          manualText: picked.manual ? (picked.text || '') : '',
+          openManual: () => this.setState({ assetDraft: Object.assign({}, S.assetDraft, { [q.key]: { text: '', manual: true } }) }),
+          onManual: e => {
+            const v = e.target.value;
+            this.setState({ assetDraft: Object.assign({}, S.assetDraft, { [q.key]: { text: v, manual: true } }) });
+          },
+        };
+      }),
+      assetPromptBlocked: !ASSET_QUESTIONS.every(q => {
+        const a = (S.assetDraft || {})[q.key];
+        return a && String(a.text || '').trim() !== '';
+      }),
+      assetPromptOpacity: ASSET_QUESTIONS.every(q => {
+        const a = (S.assetDraft || {})[q.key];
+        return a && String(a.text || '').trim() !== '';
+      }) ? 1 : 0.5,
+      assetPromptReady: ASSET_QUESTIONS.every(q => {
+        const a = (S.assetDraft || {})[q.key];
+        return a && String(a.text || '').trim() !== '';
+      }),
+      assetPromptNote: ASSET_QUESTIONS.every(q => {
+        const a = (S.assetDraft || {})[q.key];
+        return a && String(a.text || '').trim() !== '';
+      }) ? 'All three answered — these stay on the ticket for the office.'
+        : 'Answer all three before closing. Pick an option or type your own.',
+      cancelAssetPrompt: () => this.setState({ assetPrompt: false }),
+      confirmAssetPrompt: () => {
+        if (!t) return;
+        const draft = S.assetDraft || {};
+        if (!ASSET_QUESTIONS.every(q => draft[q.key] && String(draft[q.key].text || '').trim())) return;
+        const when = iso(new Date());
+        this.mutate(d => {
+          const x = d.tickets.find(y => y.id === t.id);
+          x.assetCheck = Object.assign({}, draft, { at: when, by: myName });
+        });
+        this.log('Allocated assets accounted for on closing — '
+          + ASSET_QUESTIONS.map(q => q.label.replace(/\?$/, '') + ': ' + draft[q.key].text).join(' · ') + '.', 'lifecycle');
+        this.setState({ assetPrompt: false, assetDraft: null, dialog: 'done' });
+      },
+
       askJobDone: () => {
         if (t && (t.status === 'approved' || t.officeClosed)) {
           this.toast('tech-sealed', t.status === 'approved'
             ? 'This ticket is approved and sealed. Ask the operations manager to make any correction.'
             : 'The operations manager closed this job. Ask them to make any correction.', 'warn');
+          return;
+        }
+        // Kit was handed out and the job is being closed: account for it first.
+        if (t && t.status === 'logging' && (t.assets || []).length && !t.assetCheck) {
+          this.setState({ assetPrompt: true, assetDraft: null });
           return;
         }
         this.setState({ dialog: t && t.status !== 'logging' ? 'reopenTech' : 'done' });
