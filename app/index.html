@@ -3,7 +3,43 @@
 <head>
 <meta charset="utf-8">
 <title>Makaman Job Tickets</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+// Zoom policy, decided before first paint.
+//
+// A phone is locked at the scale it opens on: this is a field tool used one-handed in
+// gloves, and a stray pinch that leaves someone reading a ticket at 3x with no obvious
+// way back is a worse failure than not being able to magnify. Anything larger — tablet,
+// laptop, desktop — keeps normal zoom, because there the gesture is deliberate.
+//
+// Judged on the smaller side of the physical screen rather than on window width, so a
+// phone held in landscape is still a phone and a narrow browser window on a desktop is
+// still a desktop.
+//
+// Worth knowing: iOS has ignored user-scalable=no for pinch since iOS 10, on purpose,
+// and no page can override that. What this reliably stops is the *automatic* zoom, and
+// the 16px floor on form controls further down does the heavy lifting there.
+(function () {
+  var PHONE_MAX = 480;
+  function apply() {
+    var s = window.screen || {};
+    var small = Math.min(s.width || window.innerWidth, s.height || window.innerHeight);
+    var phone = small <= PHONE_MAX;
+    var content = 'width=device-width, initial-scale=1, viewport-fit=cover'
+      + (phone ? ', maximum-scale=1, user-scalable=no' : '');
+    var metas = document.querySelectorAll('meta[name="viewport"]');
+    for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', content);
+  }
+  apply();
+  // The template runtime injects its own <helmet> viewport tag once it renders, which
+  // would otherwise land after this ran and quietly restore the default.
+  if (document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', apply);
+    window.addEventListener('load', apply);
+    window.addEventListener('orientationchange', apply);
+  }
+})();
+</script>
 <!-- Self-hosted runtime. support.js otherwise pulls React, ReactDOM and
      @babel/standalone from unpkg.com on every cold start, and a CDN it cannot reach
      means the app does not boot at all — which defeats the point of an offline-first
@@ -29,7 +65,8 @@
 <body>
 <x-dc>
 <helmet>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Kept in step with the tag in <head>; the script there rewrites both. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- PWA installability — lets any role add this to a phone/tablet/laptop home screen
      and open it like a native app on whatever device they have on hand, not just their
      usual one. manifest.webmanifest + sw.js are sibling files next to this .dc.html. -->
@@ -135,6 +172,18 @@
   @media (max-width: 980px) {
     .mk-2col { grid-template-columns: 1fr !important; }
     .mk-stats4 { grid-template-columns: repeat(2,1fr) !important; }
+  }
+  /* Touch devices only. Safari zooms the page in whenever a form control smaller than
+     16px takes focus, and since this is a single-page app that zoom never resets — tap
+     the password field on the login screen and you land on your ticket list still
+     magnified, which is exactly the "why is it zoomed in" that gets reported. Nothing
+     in the meta tag reliably stops it; a 16px floor does.
+
+     Sized in px rather than rem because that threshold is 16 CSS pixels flat, not
+     16 of whatever the root happens to be. Desktop keeps the denser sizes the design
+     was drawn at, because a mouse never triggers this. */
+  @media (pointer: coarse) {
+    input, select, textarea { font-size: 16px !important; }
   }
   @media (max-width: 480px) {
     /* Top nav: logo + session pill + gear button don't all fit next to the full
@@ -1129,6 +1178,9 @@
               <sc-if value="{{ numberingBlocked }}" hint-placeholder-val="{{ false }}">
                 <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ numberingBlockText }}</div>
               </sc-if>
+              <sc-if value="{{ numberingForced }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Forced — job still running.</strong> {{ numberingForcedText }}</div>
+              </sc-if>
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Ticket No. (unique)</label>
@@ -1308,6 +1360,9 @@
                   </div>
                 </sc-for>
               </div>
+              <sc-if value="{{ approvalForced }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Approving on the technician's behalf.</strong> {{ approvalForcedText }}</div>
+              </sc-if>
               <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
               <sc-if value="{{ assetsEditable }}" hint-placeholder-val="{{ false }}">
                 <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.12)">
@@ -4225,13 +4280,21 @@ class Component extends DCLogic {
     // work nobody has failed to do yet trains people to ignore the warning.
     const assetJustifyRequired = !!S.assetAttempted && !assetAllAnswered;
     const assetPromptReady = assetAllAnswered || String(S.assetJustify || '').trim() !== '';
+    // Three of these are hard and stay hard. They are not about convenience — they are
+    // what stops two people issuing the same number onto two client sheets, which is the
+    // one mistake here that cannot be corrected afterwards.
     const numberingBlock = (() => {
       if (S.role !== 'mgr' && S.role !== 'admin') return 'Only the operations manager assigns ticket numbers.';
-      if (t && t.status === 'logging') return 'This job is still running. A number is assigned once it is closed.';
       if (!this.holdsNumbering()) return (claim.holderName || 'Another manager') + ' holds the numbering claim. Ask them to hand it over before assigning.';
       if (!S.online) return 'Connect to the internet first — offline this device cannot see numbers taken on tickets it has not received yet.';
       return '';
     })();
+    // The fourth used to be hard too, and is now a warning instead. Normally a number is
+    // assigned once the job is closed, because until then the job can still change. But
+    // a technician can be unreachable — a dead phone, a rig with no signal, a rotation
+    // out — and the office still has to be able to get the paperwork moving. So the
+    // office may do it early, and the ticket says plainly that it did.
+    const numberingForced = !numberingBlock && !!t && t.status === 'logging';
     const approved = D.tickets.filter(x => x.status === 'approved');
     const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
 
@@ -4397,6 +4460,16 @@ class Component extends DCLogic {
             + ': ' + show(before) + ' → ' + show(after) + '.', 'edit');
         },
       };
+    };
+    // Written once per ticket, not once per keystroke, and as 'lifecycle' rather than
+    // 'edit' — the field and the Observer only read lifecycle entries, and the whole
+    // point is that the technician finds out this happened without being told.
+    const noteForcedNumber = (tk, num) => {
+      if (!tk || tk.status !== 'logging') return;
+      if ((tk.audit || []).some(a => a.kind === 'lifecycle' && /assigned while the job was still running/i.test(a.text || ''))) return;
+      this.logOn(tk.id, 'Ticket No. ' + num + ' assigned while the job was still running, by '
+        + (myName || 'the office') + '. ' + (tk.holder || tk.tech || 'The technician')
+        + ' had not closed it.', 'lifecycle');
     };
     const commitTicketNo = fieldCommit('ticketNo', 'Ticket No.');
     const commitMileage = fieldCommit('mileage', 'Mileage');
@@ -5079,6 +5152,10 @@ class Component extends DCLogic {
         // is no series counter that would ever have produced it.
         const v = (ev.target.value || '').trim();
         if (!v || !t) return;
+        // Typing a number onto a running job is the same forced act as taking one from a
+        // series, so it leaves the same record. On blur rather than onChange, or it
+        // would fire once per digit.
+        if (numberingForced) noteForcedNumber(t, v);
         const known = (D.series || []).some(x => x.prefix
           ? (v.toUpperCase().indexOf(x.prefix.toUpperCase()) === 0 && /^\d+$/.test(v.slice(x.prefix.length)))
           : /^\d+$/.test(v));
@@ -5508,6 +5585,17 @@ class Component extends DCLogic {
       numberingAllowed: numberingBlock === '',
       numberingBlocked: numberingBlock !== '',
       numberingBlockText: numberingBlock,
+      numberingForced: numberingForced,
+      numberingForcedText: 'This job is still running. Assigning a number now is a forced action — '
+        + ((t && (t.holder || t.tech)) || 'the technician')
+        + ' will be told, and it is recorded on the ticket.',
+      // Forced approval: the technician never closed this himself, the office did. Worth
+      // saying at the moment of approval rather than only in the trail, because it is the
+      // last point at which somebody can decide to phone him instead.
+      approvalForced: !!t && !!t.officeClosed && t.status !== 'approved',
+      approvalForcedText: t ? ('Closed in the office by ' + (t.closedBy || 'the operations manager')
+        + ', not by ' + (t.holder || t.tech || 'the technician')
+        + '. Approving now approves on their behalf; they are notified and can see who did it.') : '',
       numberingHolderLabel: (D.numbering || {}).holderName
         ? ((D.numbering || {}).holderName + ' holds the numbering claim')
         : 'No one holds the numbering claim',
@@ -5526,6 +5614,7 @@ class Component extends DCLogic {
         const cand = s.prefix + n;
         return { label: s.label, next: cand, disabled: numberingBlock !== '', take: () => {
           if (numberingBlock) { this.toast('numbering-blocked', numberingBlock, 'warn'); return; }
+          if (numberingForced) noteForcedNumber(t, cand);
           if (D.tickets.some(x => x.id !== t.id && (x.ticketNo || '') === cand)) {
             // Rare race (another device took it between render and click): re-derive the
             // next free number and jump the series counter to just before it, so every
@@ -5698,7 +5787,14 @@ class Component extends DCLogic {
             line.frozenCost = Number(line.cost) || 0;
             line.frozen = true;
           });
-          (x.audit = x.audit || []).push({ ts: when, kind: 'lifecycle', by: who, text: 'Approved by ' + who + ' · ticket total ' + total + '. Prices frozen against the ' + x.customer + ' price list.' });
+          // Where the office both closed and approved a job the technician never closed,
+          // the trail says so in one entry rather than leaving it to be inferred from
+          // two. Lifecycle, so it reaches the technician's Activity.
+          const behalf = x.officeClosed
+            ? ' Approved on behalf of ' + (x.holder || x.tech || 'the technician')
+              + ', who had not closed it — closed in the office by ' + (x.closedBy || who) + '.'
+            : '';
+          (x.audit = x.audit || []).push({ ts: when, kind: 'lifecycle', by: who, text: 'Approved by ' + who + ' · ticket total ' + total + '. Prices frozen against the ' + x.customer + ' price list.' + behalf });
         });
         this.setState({ dialog: 'approved' });
       },

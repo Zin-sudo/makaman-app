@@ -89,7 +89,7 @@ const openReview = async (p, text) => {
   check('and the number field is inert for them', disabled === true, String(disabled));
   await p.close();
 
-  // ── an in-progress job takes no number ───────────────────────────────────
+  // ── an in-progress job takes a number, but only as a declared exception ──
   p = await signIn(ctx, 'omar@makaman.ly');
   // A running job reaches the office in the background — that is what keeps the live
   // panel and the emergency coordinates working — so the office can open it.
@@ -98,7 +98,15 @@ const openReview = async (p, text) => {
   await p.waitForTimeout(800);
   await openReview(p, 'Northern Gulf');
   body = await p.innerText('body');
-  check('a running job refuses a number', /still running\. A number is assigned once it is closed/i.test(body));
+  // The rule changed on purpose: the office can now number a job that is still running,
+  // because a technician can be unreachable and the paperwork still has to move. What
+  // must not change is that it happens quietly — so this asserts the warning, not the
+  // refusal it replaced.
+  check('a running job no longer refuses a number outright',
+    !/A number is assigned once it is closed/i.test(body));
+  check('but numbering one is declared as forced',
+    /Forced — job still running/i.test(body),
+    (body.split('\n').find(l => /forced/i.test(l)) || '(no notice)').trim().slice(0, 70));
 
   // ── closing for the technician needs the data ────────────────────────────
   check('the office can close a running job', /Close the job for the technician/i.test(body));
