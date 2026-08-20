@@ -223,6 +223,28 @@
      and settings layers (z-index 50) and below the bottom bar. */
   .mk-appbar { position:sticky; top:0; z-index:30; }
 
+  /* An A4 sheet is a client document that will be printed on white paper. It is the one
+     part of the app that must not follow the theme. The backgrounds here were already
+     hardcoded, but the value cells set no colour at all, so they inherited
+     body { color: var(--ink) } — which is near-white in the dark theme. White text on a
+     white sheet: the labels showed and the data did not.
+     Colour, font and the ink of everything inside are pinned here, so no descendant can
+     pick the theme back up. */
+  .mk-sheet {
+    width:100%; max-width:640px; aspect-ratio:210/297;
+    overflow-y:auto; padding:18px; font-size:12px;
+    display:flex; flex-direction:column;
+    background:#ffffff;
+    color:#1d1f20;
+    border:1px solid rgba(29,31,32,0.3);
+    box-shadow:0 3px 10px rgba(43,43,45,0.16);
+    color-scheme:light;
+  }
+  .mk-sheet * { color:inherit; }
+  /* Cells that deliberately carry their own muted or accent ink keep it. */
+  .mk-sheet [style*="color:rgba(29,31,32"],
+  .mk-sheet [style*="color:#1d2d3d"] { color:revert; }
+
   /* One live job. The presence badge used to sit in its own flex:none column beside a
      hard 230px who-column, which on a phone added up to more than the card was wide and
      pushed the badge outside it. It now rides with the who block, and min-width:0 lets
@@ -919,6 +941,7 @@
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Sync</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last position</th>
                   <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
@@ -930,6 +953,10 @@
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6);display:flex;align-items:center;gap:5px">
                       <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
+                    </td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ u.posDim }};overflow-wrap:anywhere">{{ u.posText }}</div>
+                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45)">{{ u.posStamp }}</div>
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
@@ -1230,7 +1257,7 @@
              than a real page. -->
         <div style="display:flex;flex-direction:column;align-items:center;gap:22px">
           <sc-for list="{{ sheets }}" as="sh" hint-placeholder-count="4">
-            <div style="width:100%;max-width:640px;aspect-ratio:210/297;overflow-y:auto;background:#fff;border:1px solid rgba(29,31,32,0.3);padding:18px;box-shadow:0 3px 10px rgba(43,43,45,0.16);font-size:12px;display:flex;flex-direction:column">
+            <div class="mk-sheet">
               <!-- Letterhead — reproduces the real workbook's own header area above the
                    title row: an English company WordArt block and an Arabic one flanking
                    the Makaman logo, taken from the actual drawing XML embedded in
@@ -1480,6 +1507,7 @@
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Sync</th>
+                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last position</th>
                   <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
@@ -1491,6 +1519,10 @@
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.6);display:flex;align-items:center;gap:5px">
                       <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
+                    </td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ u.posDim }};overflow-wrap:anywhere">{{ u.posText }}</div>
+                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45)">{{ u.posStamp }}</div>
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
@@ -1650,7 +1682,7 @@
           </thead>
           <tbody>
             <sc-for list="{{ founderRows }}" as="t" hint-placeholder-count="3">
-              <tr>
+              <tr onClick="{{ t.open }}" style="cursor:pointer">
                 <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
                 <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
                 <td data-label="Well" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.well }}</td>
@@ -1752,7 +1784,7 @@
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
             <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Reports</div>
             <label style="display:block;font-size:13px;margin-bottom:8px;color:rgba(var(--ink-rgb),0.75)">Report size — last {{ founderCount }} approved jobs</label>
-            <input type="range" min="5" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:12px">
+            <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:12px">
             <button onClick="{{ generateReport }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate report</button>
           </div>
         </sc-if>
@@ -1828,7 +1860,7 @@
 
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;roundTripFactor&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:1,&quot;max&quot;:3,&quot;section&quot;:&quot;Charging&quot;},&quot;strictNumberFormat&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Rules&quot;}}">
-const BUILD = 'night-shift.1 · 19 Aug 2026';
+const BUILD = 'night-shift.2 · 20 Aug 2026';
 const K = 'makaman.jobtickets.v2';
 const SK = 'makaman.jobtickets.session.v1';
 // The seeded initial Admin account — permanently undeletable, regardless of who is
@@ -2528,6 +2560,16 @@ class Component extends DCLogic {
     if (!keys.length) return money(0);
     return keys.sort().map(c => money(buckets[c], c)).join('  ·  ');
   }
+  // Where a person was last recorded, for whoever asks. Newest fix across every ticket
+  // they are on the crew of — the opening pin if no later one exists. Returns the
+  // "No Location Shared" text rather than a blank when there is nothing, so an empty
+  // cell always means "they chose not to share", never "something broke".
+  lastFixFor(user) {
+    const tickets = (this.state.data.tickets || []).filter(x => inCrew(x, user.name, user.email));
+    const fixes = tickets.map(x => (x.geo || {}).last || (x.geo || {}).open).filter(Boolean)
+      .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+    return fixes[0] || null;
+  }
   ticketCurrency(t) {
     if (!t) return DEFAULT_CURRENCY;
     return t.currency || (this.client(t.customer) || {}).currency || DEFAULT_CURRENCY;
@@ -2695,7 +2737,12 @@ class Component extends DCLogic {
     // technician alone: the Ops Manager could still change a quantity, a unit cost or an
     // arrival stamp on an approved ticket with no reopen and no explanation, which is
     // exactly the ticket most likely to have been printed, signed and invoiced already.
-    const locked = !!(t && t.status === 'approved');
+    // The Observer reads the same review screen as the Ops Manager rather than a second
+    // read-only copy of it — one screen, one place for the position panel to live. Their
+    // read-only-ness is folded into the same flag that seals an approved ticket, so every
+    // field, item row, drag handle and remove button it already governs is covered.
+    const readOnly = S.role === 'founder';
+    const locked = readOnly || !!(t && t.status === 'approved');
 
     // Sheet ordering rank for a charged line. Transportation is the standing first line
     // on a ticket (MKN-1801 is the travel line — the same code addItemByCode already
@@ -3056,9 +3103,10 @@ class Component extends DCLogic {
       // unconditional and the switching happens one level further in.)
       // Tickets means the work, for every office role. The Admin's toolbox is a
       // thing you open from Account, not the meaning of a tab on the bottom bar.
-      showMgrPage: (S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab,
+      showMgrPage: ((S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab)
+        || (S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen === 'review'),
       showAdminPage: S.role === 'admin' && S.roleTab === 'tickets' && !!S.adminTab,
-      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets',
+      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review',
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
       deskTabs: S.role !== 'tech' && S.roleTab !== 'tickets',
@@ -3251,7 +3299,7 @@ class Component extends DCLogic {
       showProfile: S.role === 'tech',
       // Report controls, moved off the Observer's ticket list — generating a report is
       // an account action, not part of reading the work.
-      showReports: S.role === 'founder',
+      showReports: S.role === 'founder' || S.role === 'mgr' || S.role === 'admin',
 
       showSettings: S.showSettings,
       openSettings: () => this.setState({ showSettings: true }),
@@ -3474,7 +3522,7 @@ class Component extends DCLogic {
       // Only the person actually holding the job can hand it on or log to it. A
       // previous holder still sees the ticket; the buttons are simply not there.
       canHandOver: !!t && t.status === 'logging' && holderOf(t) === myName,
-      mgrCanHandOver: !!t && t.status !== 'approved',
+      mgrCanHandOver: !readOnly && !!t && t.status !== 'approved',
       isHolder: !!t && holderOf(t) === myName,
       notHolder: !!t && holderOf(t) !== myName,
       holderName: t ? holderOf(t) : '',
@@ -3792,11 +3840,11 @@ class Component extends DCLogic {
         : 'This ticket is approved and frozen. Reopen it to change anything.',
       grandTotal: t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0),
       checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? 'var(--accent-deep)' : 'rgba(var(--ink-rgb),0.55)' })),
-      approveDisabled: !canApprove || (t && t.status === 'approved'),
-      approveOpacity: (!canApprove || (t && t.status === 'approved')) ? 0.45 : 1,
-      approveLabel: t && t.status === 'approved' ? 'Approved' : 'Approve ticket',
+      approveDisabled: readOnly || !canApprove || (t && t.status === 'approved'),
+      approveOpacity: (readOnly || !canApprove || (t && t.status === 'approved')) ? 0.45 : 1,
+      approveLabel: readOnly ? 'Read-only — Observer' : (t && t.status === 'approved' ? 'Approved' : 'Approve ticket'),
       approve: () => {
-        if (!canApprove || !t || t.status === 'approved') return;
+        if (readOnly || !canApprove || !t || t.status === 'approved') return;
         const who = (S.session && S.session.name) || 'Ops Manager';
         const when = iso(new Date());
         const total = money(this.ticketTotal(t), this.ticketCurrency(t));
@@ -3894,9 +3942,14 @@ class Component extends DCLogic {
         this.mutate(d => { if (d.jobTypes.indexOf(v) < 0) d.jobTypes.push(v); });
         this.setState({ newJobType: '' });
       },
-      users: (D.users || []).map(u => ({
+      users: (D.users || []).map(u => {
+        const fix = this.lastFixFor(u);
+        return {
         name: u.name, role: u.status === 'pending' ? 'Pending approval' : u.role, base: u.base, lastSync: u.lastSync,
         isPending: u.status === 'pending',
+        posText: fix ? geoText(fix) : NO_LOCATION,
+        posStamp: fix ? F.stamp(fix.ts) : '',
+        posDim: fix ? 'rgba(var(--ink-rgb),0.75)' : 'rgba(var(--ink-rgb),0.4)',
         // Green means connected right now, and nothing else. Matching on the exact
         // word is the point: an earlier version excluded anything containing "ago",
         // which let "yesterday" through as though that user were online.
@@ -3927,7 +3980,8 @@ class Component extends DCLogic {
         // by design, not merely by convention.
         canDelete: S.role === 'admin' && u.email !== MASTER_ADMIN_EMAIL,
         delete: () => this.setState({ dialog: 'deleteUser', deleteUserEmail: u.email, deleteUserName: u.name }),
-      })),
+        };
+      }),
       clientCards: D.clients.map(c => ({ name: c.name, fields: c.fields, rigs: c.rigs, itemCount: c.items.length })),
       systemRows: [
         { label: 'Mileage charging', hint: 'One-way KM entered, charged both ways', value: '× ' + roundTrip },
@@ -3954,7 +4008,9 @@ class Component extends DCLogic {
         { label: 'Awaiting manager', value: String(awaiting.length) },
       ],
       founderCount: S.founderCount,
-      founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => this.ticketView(x)),
+      founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
+        open: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+      })),
       generateReport: () => this.toast('report', 'Last ' + S.founderCount + ' approved jobs exported as a read-only summary.', 'ok'),
 
       // Live activity — the only view in the app that shows tickets still being logged
