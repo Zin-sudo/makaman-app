@@ -2369,6 +2369,10 @@ class Component extends DCLogic {
     if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+    // A handle on the running component, so the request coalescer can be exercised
+    // directly by tests rather than only inferred from what the UI happens to show.
+    if (typeof window !== 'undefined') window.__mkApp = this;
+
     // Connectivity is a fact about the device, not a preference. It used to be a
     // button the technician could hold in "no signal" while actually connected —
     // which is a demo control, not a status. The browser tells us instead.
@@ -2571,7 +2575,12 @@ class Component extends DCLogic {
   // ticket) but silent: no confirmation dialog, and audit entries say "Auto-synced"
   // instead of "Uploaded" so the trail shows which happened. Only runs once someone is
   // logged in and the device currently has signal, and no-ops when nothing is pending.
-  autoSync() {
+  // Runs on a timer, so it is the one most able to stack: a slow upload on a weak
+  // connection must not have the next tick start a second one behind it. Coalesced under
+  // the same key as the manual button, because they do the same work — pressing Sync
+  // while the background pass is running joins it rather than racing it.
+  autoSync() { return this.runLatest('sync', () => this.autoSyncNow()); }
+  autoSyncNow() {
     const S = this.state;
     if (!S.online || !S.session) return;
     const pending = (S.data.tickets || []).filter(x => !x.synced);
@@ -2794,6 +2803,42 @@ class Component extends DCLogic {
   // megabyte of parse time on every launch, for something most sessions never touch, is
   // a bad trade on a field phone. Loaded once on the first export; offline the service
   // worker serves them from cache, which is the whole reason they are precached.
+  // Offline, work does not queue up — it collapses. A button pressed six times while
+  // out of signal must not become six requests the moment signal returns; that is how a
+  // reconnecting phone knocks over its own backend and how a UI ends up replaying stale
+  // work over fresh. One run per key at a time, and at most one waiting behind it: a
+  // request arriving while another is in flight REPLACES whatever was queued rather than
+  // joining a line, so only the newest intent survives.
+  //
+  // Nothing here retries on failure. A failed call that re-arms itself is the other way
+  // a client spams a server, and a person pressing the button again is a better signal
+  // than a loop deciding on their behalf.
+  runLatest(key, fn) {
+    this._flight = this._flight || {};
+    this._queued = this._queued || {};
+    if (this._flight[key]) {
+      this._queued[key] = fn;                    // replaces any earlier queued call
+      return this._flight[key];
+    }
+    const start = (job) => {
+      const done = () => {
+        const next = this._queued[key];
+        delete this._queued[key];
+        delete this._flight[key];
+        if (next) start(next);
+      };
+      let out;
+      try { out = job(); } catch (e) { done(); throw e; }
+      const promise = (out && typeof out.then === 'function') ? out : Promise.resolve(out);
+      this._flight[key] = promise.then(
+        (v) => { done(); return v; },
+        (e) => { done(); throw e; }
+      );
+      return this._flight[key];
+    };
+    return start(fn);
+  }
+
   loadExporters() {
     if (this._exporters) return this._exporters;
     const need = [];
@@ -3800,41 +3845,47 @@ class Component extends DCLogic {
       syncOpacity: S.online ? 1 : 0.45,
       sync: () => {
         if (!S.online) return;
-        // Pressed with nothing closed to upload, answer rather than doing nothing. The
-        // in-progress tickets are deliberately left exactly where they are.
-        if (!myPending.length) {
-          if (myInProgress.length && !myClosed.length) this.toast('sync-open', 'Close Ticket To Sync', 'warn');
-          else this.toast('sync-done', 'Tickets Already Synchronized', 'ok');
-          return;
-        }
-        const now = iso(new Date());
-        // A job the office already closed is settled. Uploading this device's copy would
-        // overwrite a sheet someone has already reviewed, so the field copy is dropped
-        // and the technician is told plainly rather than left wondering why his edits
-        // vanished. Losing the local version is the decision on record; what is on the
-        // office copy stands.
-        const clashed = myPending.filter(x => x.officeClosed && x.closedBy && x.closedBy !== myName);
-        const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
-        this.mutate(d => d.tickets.forEach(x => {
-          if (clashed.some(c => c.id === x.id)) {
-            x.synced = true; x.syncedAt = x.closedAt || now;
-            (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
-              text: 'Field copy discarded on sync — already closed in the office by ' + x.closedBy + '.' });
+        // Shares the 'sync' key with the background pass, so pressing the button while
+        // one is already running joins it instead of starting a second upload of the
+        // same tickets. Holding the button cannot queue a dozen of them either — only
+        // the most recent press survives to run after the current one finishes.
+        return this.runLatest('sync', () => {
+          // Pressed with nothing closed to upload, answer rather than doing nothing. The
+          // in-progress tickets are deliberately left exactly where they are.
+          if (!myPending.length) {
+            if (myInProgress.length && !myClosed.length) this.toast('sync-open', 'Close Ticket To Sync', 'warn');
+            else this.toast('sync-done', 'Tickets Already Synchronized', 'ok');
             return;
           }
-          if (ids.indexOf(x.id) === -1) return;
-          x.synced = true; x.syncedAt = now;
-          (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' });
-        }));
-        if (clashed.length) {
-          const one = clashed[0];
-          this.toast('sync-clash', (clashed.length === 1
-            ? one.customer + ' was already closed in the office by ' + one.closedBy + '.'
-            : clashed.length + ' tickets were already closed in the office.')
-            + ' Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.', 'warn');
-          if (!ids.length) { this.setState({ syncedCount: 0 }); return; }
-        }
-        this.toast('sync-up', ids.length === 1 ? '1 closed ticket uploaded — the operations manager can see it now.' : ids.length + ' closed tickets uploaded — the operations manager can see them now.', 'ok');
+          const now = iso(new Date());
+          // A job the office already closed is settled. Uploading this device's copy would
+          // overwrite a sheet someone has already reviewed, so the field copy is dropped
+          // and the technician is told plainly rather than left wondering why his edits
+          // vanished. Losing the local version is the decision on record; what is on the
+          // office copy stands.
+          const clashed = myPending.filter(x => x.officeClosed && x.closedBy && x.closedBy !== myName);
+          const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
+          this.mutate(d => d.tickets.forEach(x => {
+            if (clashed.some(c => c.id === x.id)) {
+              x.synced = true; x.syncedAt = x.closedAt || now;
+              (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
+                text: 'Field copy discarded on sync — already closed in the office by ' + x.closedBy + '.' });
+              return;
+            }
+            if (ids.indexOf(x.id) === -1) return;
+            x.synced = true; x.syncedAt = now;
+            (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' });
+          }));
+          if (clashed.length) {
+            const one = clashed[0];
+            this.toast('sync-clash', (clashed.length === 1
+              ? one.customer + ' was already closed in the office by ' + one.closedBy + '.'
+              : clashed.length + ' tickets were already closed in the office.')
+              + ' Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.', 'warn');
+            if (!ids.length) { this.setState({ syncedCount: 0 }); return; }
+          }
+          this.toast('sync-up', ids.length === 1 ? '1 closed ticket uploaded — the operations manager can see it now.' : ids.length + ' closed tickets uploaded — the operations manager can see them now.', 'ok');
+        });
       },
 
       techName: myName,
@@ -4515,20 +4566,27 @@ class Component extends DCLogic {
       pickReportMonth: e => this.setState({ reportMonth: e.target.value }),
       reportRows: reportRows.map(x => Object.assign(this.ticketView(x), {
         // Each row can be taken on its own — the slider governs the bundle, not this.
-        download: () => this.exportTicketZip(x)
-          .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in the other.', 'ok'))
-          .catch(() => this.toast('zip-fail', 'Could not build that download on this device.', 'warn')),
+        download: () => {
+          if (!S.online) { this.toast('report-offline', 'Reports need a connection. What is on this device may not be the whole month — reconnect and try again.', 'warn'); return; }
+          // Keyed per ticket: hammering one row cannot stack, and two different rows are
+          // still allowed to run independently.
+          this.runLatest('zip:' + x.id, () => this.exportTicketZip(x)
+            .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in the other.', 'ok'))
+            .catch(() => this.toast('zip-fail', 'Could not build that download on this device.', 'warn')));
+        },
       })),
       reportCountLabel: reportRows.length === 1
         ? '1 ticket' : reportRows.length + ' tickets',
       hasReportRows: reportRows.length > 0,
       noReportRows: reportRows.length === 0,
+      reportOffline: !S.online,
       generateBundle: () => {
+        if (!S.online) { this.toast('report-offline', 'Reports need a connection. What is on this device may not be the whole month — reconnect and try again.', 'warn'); return; }
         if (!reportRows.length) { this.toast('bundle-empty', 'Nothing to bundle for that month.', 'warn'); return; }
         const label = S.reportMonth || 'all months';
-        this.exportBundle(reportRows, label)
+        this.runLatest('bundle', () => this.exportBundle(reportRows, label)
           .then(n => this.toast('bundle', 'Overview of ' + n + ' ticket(s) downloaded.', 'ok'))
-          .catch(() => this.toast('bundle-fail', 'Could not build the overview on this device.', 'warn'));
+          .catch(() => this.toast('bundle-fail', 'Could not build the overview on this device.', 'warn')));
       },
       founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
         open: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
