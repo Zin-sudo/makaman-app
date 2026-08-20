@@ -15,6 +15,7 @@ const audit = (page) => page.evaluate(() => {
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  await page.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   const errs = [];
   page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/404|Failed to load/.test(m.text())) errs.push('CONSOLE: ' + m.text()); });
@@ -25,7 +26,7 @@ const audit = (page) => page.evaluate(() => {
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
   const i = page.locator('input');
-  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('x');
+  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('makaman2026');
   await page.getByRole('button', { name: /log in/i }).click();
   await page.waitForTimeout(1000);
   await page.getByRole('button', { name: /^Review$/i }).first().click();

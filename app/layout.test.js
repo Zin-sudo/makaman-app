@@ -6,13 +6,14 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
 
 async function signIn(browser, email, w, h) {
   const p = await browser.newPage({ viewport: { width: w, height: h } });
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(300);
   await p.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(600);
   const i = p.locator('input');
-  await i.nth(0).fill(email); await i.nth(1).fill('x');
+  await i.nth(0).fill(email); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(900);
   return p;

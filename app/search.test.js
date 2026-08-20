@@ -11,13 +11,14 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
 
   // 26 tickets, so paging has something to page
   const setup = await ctx.newPage();
+  await setup.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await setup.goto(URL, { waitUntil: 'networkidle' });
   await setup.waitForTimeout(250);
   await setup.evaluate(() => localStorage.clear());
   await setup.reload({ waitUntil: 'networkidle' });
   await setup.waitForTimeout(600);
   let si = setup.locator('input');
-  await si.nth(0).fill('yousef@makaman.ly'); await si.nth(1).fill('x');
+  await si.nth(0).fill('yousef@makaman.ly'); await si.nth(1).fill('makaman2026');
   await setup.getByRole('button', { name: /log in/i }).click();
   await setup.waitForTimeout(900);
   await setup.getByRole('button', { name: /^Account$/i }).last().click();
@@ -48,10 +49,11 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   // ── Ops Manager inbox ────────────────────────────────────────────────────
   const p = await ctx.newPage();
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(600);
   let i = p.locator('input');
-  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('x');
+  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(1000);
 
@@ -96,13 +98,14 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
 
   // ── the technician's own list ────────────────────────────────────────────
   const t2 = await ctx.newPage();
+  await t2.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await t2.goto(URL, { waitUntil: 'networkidle' });
   await t2.waitForTimeout(300);
   await t2.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
   await t2.reload({ waitUntil: 'networkidle' });
   await t2.waitForTimeout(700);
   let ti = t2.locator('input');
-  await ti.nth(0).fill('yousef@makaman.ly'); await ti.nth(1).fill('x');
+  await ti.nth(0).fill('yousef@makaman.ly'); await ti.nth(1).fill('makaman2026');
   await t2.getByRole('button', { name: /log in/i }).click();
   await t2.waitForTimeout(1000);
   const cards = () => t2.locator('.mk-ticket-card').count();

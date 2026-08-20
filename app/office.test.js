@@ -8,13 +8,14 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
 async function signIn(browser, email) {
   const p = await browser.newPage({ viewport: { width: 1300, height: 950 } });
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(400);
   await p.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
   const i = p.locator('input');
-  await i.nth(0).fill(email); await i.nth(1).fill('x');
+  await i.nth(0).fill(email); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(1000);
   return p;

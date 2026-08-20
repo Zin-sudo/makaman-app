@@ -11,13 +11,14 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   const p = await ctx.newPage();
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
   await p.addInitScript(() => { window.__TOAST_TEST_MS = 20000; });
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(250);
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(600);
   const i = p.locator('input');
-  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('x');
+  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(1000);
 

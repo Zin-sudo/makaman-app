@@ -22,6 +22,8 @@
 <script src="./vendor/react.production.min.js"></script>
 <script src="./vendor/react-dom.production.min.js"></script>
 <script src="./vendor/babel.min.js"></script>
+<script src="./vendor/supabase.umd.js"></script>
+<script src="./config.js"></script>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -353,7 +355,7 @@
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
-          <button onClick="{{ doLogin }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand)">Log in</button>
+          <button onClick="{{ doLogin }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ loginLabel }}</button>
           <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
           <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin-top:16px">BUILD {{ buildStamp }}</div>
         </div>
@@ -2076,6 +2078,43 @@
 const BUILD = 'night-shift.2 · 20 Aug 2026';
 const K = 'makaman.jobtickets.v2';
 const SK = 'makaman.jobtickets.session.v1';
+
+// Seeded demo accounts need a password like any other. Before this, the local login
+// found the email and let anyone in — a stub that was fine while nothing real was behind
+// it and is not fine now. Real deployments do not use these accounts at all; they exist
+// so the app can be demonstrated and tested without a network.
+const DEMO_PASSWORD = 'makaman2026';
+
+const CFG = (typeof window !== 'undefined' && window.MAKAMAN_CONFIG) || {};
+// One question asked once: is there a real backend behind this build?
+const CLOUD_READY = !!(CFG.supabaseUrl && CFG.supabaseKey
+  && typeof window !== 'undefined' && window.supabase && window.supabase.createClient);
+const AUTH_MODE = CFG.authMode || 'auto';
+const USE_CLOUD = AUTH_MODE === 'cloud' || (AUTH_MODE === 'auto' && CLOUD_READY);
+
+let _sb = null;
+function sb() {
+  if (_sb) return _sb;
+  if (!CLOUD_READY) return null;
+  _sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {
+    auth: {
+      // The session lives in localStorage and is read back without a network call, which
+      // is what lets a technician stay signed in at a wellhead with no signal. Losing
+      // your login because you drove out of coverage would end the app's usefulness.
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: 'makaman.auth.v1',
+    },
+  });
+  return _sb;
+}
+
+// The database speaks technician / ops_manager / admin / founder; the app has always
+// spoken tech / mgr / admin / founder. Translated in one place rather than in every
+// comparison, so neither vocabulary leaks into the other.
+const ROLE_FROM_DB = { technician: 'tech', ops_manager: 'mgr', admin: 'admin', founder: 'founder' };
+const ROLE_TO_DB = { tech: 'technician', mgr: 'ops_manager', admin: 'admin', founder: 'founder' };
+const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
 // The seeded initial Admin account — permanently undeletable, regardless of who is
 // logged in or how many other admins exist. Every other user, including other admins,
 // can be deleted by an Admin.
@@ -2511,6 +2550,91 @@ class Component extends DCLogic {
     } catch (e) { /* first run */ }
     return session ? { data: data, session: session, role: session.roleKey } : { data: data };
   }
+  // Two ways in, one shape out. Everything above this cares only that it gets a session
+  // with a name, an email and a role — not where the password was checked.
+  signIn(email, pass) {
+    return USE_CLOUD ? this.signInCloud(email, pass) : this.signInLocal(email, pass);
+  }
+  signUp(name, email, pass) {
+    return USE_CLOUD ? this.signUpCloud(name, email, pass) : this.signUpLocal(name, email, pass);
+  }
+
+  signInCloud(email, pass) {
+    const client = sb();
+    if (!client) return Promise.reject(new Error('This build has no server configured.'));
+    return client.auth.signInWithPassword({ email: email, password: pass })
+      .then(res => {
+        // Supabase reports a wrong password and an unknown email identically, on purpose:
+        // telling them apart is how an attacker enumerates who works here.
+        if (res.error) throw new Error('Email or password is not correct.');
+        const uid = res.data.user.id;
+        return client.from('profiles').select('email, full_name, role, status').eq('id', uid).single();
+      })
+      .then(res => {
+        if (res.error || !res.data) throw new Error('Signed in, but this account has no profile yet. Ask an admin.');
+        const p = res.data;
+        // An account exists from the moment someone signs up; being allowed in is a
+        // separate decision an admin makes. Enforced here and in RLS, not only in the UI.
+        if (p.status !== 'active') {
+          return client.auth.signOut().catch(() => {}).then(() => {
+            throw new Error('This account is waiting for an admin to approve it.');
+          });
+        }
+        return {
+          email: p.email,
+          name: p.full_name || p.email,
+          roleKey: ROLE_FROM_DB[p.role] || 'tech',
+          status: p.status,
+        };
+      });
+  }
+
+  signUpCloud(name, email, pass) {
+    const client = sb();
+    if (!client) return Promise.reject(new Error('This build has no server configured.'));
+    return client.auth.signUp({
+      email: email, password: pass, options: { data: { full_name: name } },
+    }).then(res => {
+      if (res.error) throw new Error(res.error.message || 'Could not create the account.');
+      // The database trigger writes the profile as pending. Nothing here needs to, and
+      // nothing here could be trusted to — a client that could set its own role would be
+      // no protection at all.
+      return true;
+    });
+  }
+
+  // The demo store. Used when no server is configured, and by the behaviour tests, which
+  // are about what the screens do rather than who signed in. It checks the password like
+  // any other path: the previous version found the email and let anyone through, which
+  // was acceptable only while there was nothing real behind it.
+  signInLocal(email, pass) {
+    const users = this.state.data.users || [];
+    const user = users.find(u => (u.email || '').toLowerCase() === email);
+    if (!user) return Promise.reject(new Error('Email or password is not correct.'));
+    const expected = user.password || DEMO_PASSWORD;
+    if (pass !== expected) return Promise.reject(new Error('Email or password is not correct.'));
+    if (user.status && user.status !== 'active') {
+      return Promise.reject(new Error('This account is waiting for an admin to approve it.'));
+    }
+    return Promise.resolve({
+      email: user.email, name: user.name, roleKey: user.roleKey, status: user.status,
+    });
+  }
+
+  signUpLocal(name, email, pass) {
+    const users = this.state.data.users || [];
+    if (users.some(u => (u.email || '').toLowerCase() === email)) {
+      return Promise.reject(new Error('An account with that email already exists.'));
+    }
+    this.mutate(d => {
+      (d.users = d.users || []).push({
+        name: name, role: 'Pending', roleKey: null, email: email, password: pass,
+        base: '—', lastSync: '—', status: 'pending',
+      });
+    });
+    return Promise.resolve(true);
+  }
+
   persistSession(session) {
     try {
       if (session) localStorage.setItem(SK, JSON.stringify(session));
@@ -3724,11 +3848,19 @@ class Component extends DCLogic {
       const email = (S.authEmail || '').trim().toLowerCase();
       const pass = S.authPassword || '';
       if (!email || !pass) { this.setState({ authError: 'Enter your email and password.' }); return; }
-      const user = (D.users || []).find(u => (u.email || '').toLowerCase() === email);
-      if (!user) { this.setState({ authError: 'No account with that email.' }); return; }
-      const session = { email: user.email, name: user.name, roleKey: user.roleKey, status: user.status };
-      this.persistSession(session);
-      this.setState({ session: session, role: user.roleKey || S.role, authEmail: '', authPassword: '', authError: '' });
+      this.setState({ authBusy: true, authError: '' });
+      // Deliberately the same key for both paths and both outcomes: a signed-in session
+      // is one thing whether it came from the server or the demo store, and pressing the
+      // button twice must not start two sign-ins.
+      this.runLatest('auth', () => this.signIn(email, pass)
+        .then(session => {
+          this.persistSession(session);
+          this.setState({
+            session: session, role: session.roleKey || S.role,
+            authEmail: '', authPassword: '', authError: '', authBusy: false,
+          });
+        })
+        .catch(err => this.setState({ authError: err.message || 'Could not sign you in.', authBusy: false })));
     };
     const doSignup = () => {
       const name = (S.authFullName || '').trim();
@@ -3738,16 +3870,19 @@ class Component extends DCLogic {
       if (!name || !email || !pass || !confirm) { this.setState({ authError: 'Fill in every field.' }); return; }
       if (pass.length < 8) { this.setState({ authError: 'Password must be at least 8 characters.' }); return; }
       if (pass !== confirm) { this.setState({ authError: 'Passwords do not match.' }); return; }
-      if ((D.users || []).some(u => (u.email || '').toLowerCase() === email)) { this.setState({ authError: 'An account with that email already exists.' }); return; }
-      this.mutate(d => {
-        (d.users = d.users || []).push({
-          name: name, role: 'Pending', roleKey: null, email: email, password: pass,
-          base: '—', lastSync: '—', status: 'pending',
-        });
-      });
-      this.setState({ signupDone: true, authError: '' });
+      this.setState({ authBusy: true, authError: '' });
+      this.runLatest('auth', () => this.signUp(name, email, pass)
+        .then(() => this.setState({ signupDone: true, authError: '', authBusy: false }))
+        .catch(err => this.setState({ authError: err.message || 'Could not create the account.', authBusy: false })));
     };
-    const doLogout = () => { this.persistSession(null); this.setState({ session: null, showSettings: false, dialog: null }); };
+    const doLogout = () => {
+      // Clear the local session first. If the network call fails there is no way back to
+      // a signed-in screen, which is the right way round: a logout that half-works must
+      // leave you out, never in.
+      this.persistSession(null);
+      this.setState({ session: null, showSettings: false, dialog: null });
+      if (USE_CLOUD && sb()) sb().auth.signOut().catch(() => {});
+    };
     const createTechnician = () => {
       const name = (S.newTechName || '').trim();
       const email = (S.newTechEmail || '').trim().toLowerCase();
@@ -3775,6 +3910,9 @@ class Component extends DCLogic {
       // The four auth inputs bind value="{{ authEmail }}" etc. Without these the
       // view never receives the typed value, so React re-rendered them back to ''
       // on every keystroke and the login/signup fields could not be typed into.
+      authBusy: !!S.authBusy,
+      authBusyDim: S.authBusy ? 0.6 : 1,
+      loginLabel: S.authBusy ? 'Signing in…' : 'Log in',
       authEmail: S.authEmail || '',
       authPassword: S.authPassword || '',
       authFullName: S.authFullName || '',

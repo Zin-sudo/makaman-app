@@ -13,6 +13,7 @@ async function signIn(ctx, email, fresh) {
   const p = await ctx.newPage();
   await p.setViewportSize({ width: 1300, height: 950 });
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(250);
   await p.evaluate((wipe) => {
@@ -22,7 +23,7 @@ async function signIn(ctx, email, fresh) {
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(600);
   const i = p.locator('input');
-  await i.nth(0).fill(email); await i.nth(1).fill('x');
+  await i.nth(0).fill(email); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(900);
   return p;

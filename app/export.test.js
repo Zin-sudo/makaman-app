@@ -17,13 +17,14 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   // first mutation, so a page that only reads has nothing to seed into. The seed carries
   // one approved ticket, which cannot demonstrate a limit — give it three.
   const setup = await ctx.newPage();
+  await setup.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await setup.goto(URL, { waitUntil: 'networkidle' });
   await setup.waitForTimeout(250);
   await setup.evaluate(() => localStorage.clear());
   await setup.reload({ waitUntil: 'networkidle' });
   await setup.waitForTimeout(600);
   let si = setup.locator('input');
-  await si.nth(0).fill('yousef@makaman.ly'); await si.nth(1).fill('x');
+  await si.nth(0).fill('yousef@makaman.ly'); await si.nth(1).fill('makaman2026');
   await setup.getByRole('button', { name: /log in/i }).click();
   await setup.waitForTimeout(900);
   await setup.getByRole('button', { name: /^Account$/i }).last().click();
@@ -54,10 +55,11 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   const p = await ctx.newPage();
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
   await p.addInitScript(() => { window.__TOAST_TEST_MS = 20000; });
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(600);
   let i = p.locator('input');
-  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('x');
+  await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(1000);
   await p.getByRole('button', { name: /^Account$/i }).last().click();
@@ -120,12 +122,13 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   // Done on a fresh page: nothing above this mutated, so the store was never written
   // and there was nothing to edit. A technician toggling a setting persists the seed.
   const h = await ctx.newPage();
+  await h.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await h.goto(URL, { waitUntil: 'networkidle' });
   await h.waitForTimeout(250);
   await h.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
   await h.reload({ waitUntil: 'networkidle' }); await h.waitForTimeout(600);
   let hi = h.locator('input');
-  await hi.nth(0).fill('yousef@makaman.ly'); await hi.nth(1).fill('x');
+  await hi.nth(0).fill('yousef@makaman.ly'); await hi.nth(1).fill('makaman2026');
   await h.getByRole('button', { name: /log in/i }).click(); await h.waitForTimeout(900);
   await h.getByRole('button', { name: /^Account$/i }).last().click(); await h.waitForTimeout(400);
   await h.evaluate(() => { const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px'); if (t) { t.click(); t.click(); } });
@@ -141,7 +144,7 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   });
   await h.reload({ waitUntil: 'networkidle' }); await h.waitForTimeout(700);
   hi = h.locator('input');
-  await hi.nth(0).fill('omar@makaman.ly'); await hi.nth(1).fill('x');
+  await hi.nth(0).fill('omar@makaman.ly'); await hi.nth(1).fill('makaman2026');
   await h.getByRole('button', { name: /log in/i }).click(); await h.waitForTimeout(1000);
   await h.getByRole('button', { name: /^Account$/i }).last().click(); await h.waitForTimeout(800);
 

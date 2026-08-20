@@ -10,13 +10,14 @@ async function signIn(ctx, email, fresh) {
   await p.setViewportSize({ width: 1300, height: 980 });
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
   await p.addInitScript(() => { window.__TOAST_TEST_MS = 20000; });
+  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
   await p.waitForTimeout(250);
   await p.evaluate((w) => { if (w) localStorage.clear(); else localStorage.removeItem('makaman.jobtickets.session.v1'); }, !!fresh);
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(600);
   const i = p.locator('input');
-  await i.nth(0).fill(email); await i.nth(1).fill('x');
+  await i.nth(0).fill(email); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(900);
   return p;

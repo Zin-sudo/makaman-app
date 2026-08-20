@@ -14,6 +14,7 @@ async function boot(ctx, errs) {
   const page = await ctx.newPage();
   page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/404|Failed to load/.test(m.text())) errs.push('CONSOLE: ' + m.text()); });
+  await page.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await page.addInitScript(([p, t]) => {
     window.__GEO_PING_TEST_MS = p;
     window.__GEO_TICK_TEST_MS = t;
@@ -35,7 +36,7 @@ async function boot(ctx, errs) {
 }
 async function login(page, email) {
   const i = page.locator('input');
-  await i.nth(0).fill(email); await i.nth(1).fill('x');
+  await i.nth(0).fill(email); await i.nth(1).fill('makaman2026');
   await page.getByRole('button', { name: /log in/i }).click();
   await page.waitForTimeout(900);
 }
@@ -55,9 +56,11 @@ const geoOf = (page) => page.evaluate(() => {
   await page.getByRole('button', { name: /New Job Ticket/i }).click();
   await page.waitForTimeout(400);
   await page.locator('select').first().selectOption({ index: 1 });
-  await page.locator('input').nth(1).fill('Test Field');
-  await page.locator('input').nth(2).fill('TG-1');
-  await page.locator('input').nth(3).fill('RIG-9');
+  // Field / Well / Rig. The customer is a <select>, chosen above, so these are the
+  // only three inputs on the screen — nth(3) is off the end of the form.
+  await page.locator('input').nth(0).fill('Test Field');
+  await page.locator('input').nth(1).fill('TG-1');
+  await page.locator('input').nth(2).fill('RIG-9');
   await page.getByRole('button', { name: /Start Logging/i }).click();
   await page.waitForTimeout(1500);
 
@@ -151,7 +154,7 @@ const geoOf = (page) => page.evaluate(() => {
   await page.getByRole('button', { name: /New Job Ticket/i }).click();
   await page.waitForTimeout(400);
   await page.locator('select').first().selectOption({ index: 1 });
-  await page.locator('input').nth(1).fill('X'); await page.locator('input').nth(2).fill('Y'); await page.locator('input').nth(3).fill('Z');
+  await page.locator('input').nth(0).fill('X'); await page.locator('input').nth(1).fill('Y'); await page.locator('input').nth(2).fill('Z');
   await page.getByRole('button', { name: /Start Logging/i }).click();
   await page.waitForTimeout(PING * 2);
   const offCalls = await page.evaluate(() => window.__geoCalls);
