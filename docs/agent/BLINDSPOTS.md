@@ -1,0 +1,795 @@
+# Makaman — Blind Spots & Failure Mode Registry
+> **Pre-mortem analysis: every failure mode we can derive before it happens in production.**
+> **Read this BEFORE starting any task. Reference entries by ID in commit messages.**
+> **Last updated:** 2026-08-24
+
+---
+
+## How to Use This File
+
+### For Agents (Before Every Task)
+1. Check if your task touches any subsystem listed below.
+2. Read the failure modes for that subsystem.
+3. Apply the **Prevention Rule** proactively.
+4. After coding, run the **Detection Method** to verify you didn't introduce the failure.
+
+### For Humans (Reviewing Agent Output)
+If an agent's commit touches a subsystem with 🔴 or 🟡 severity below, verify the Detection Method was run.
+
+---
+
+## Severity Legend
+| Icon | Level | Meaning |
+|------|-------|---------|
+| 🔴 | **Crash** | App becomes unusable. Data loss possible. |
+| 🟡 | **Bug** | Feature broken or data incorrect. Workaround may exist. |
+| 🟠 | **Performance** | App slows, battery drains, or memory leaks. |
+| 🔵 | **Security** | Unauthorized access or data exposure. |
+| ⚪ | **UX** | Confusing behavior. No data loss. |
+
+---
+
+## 1. OFFLINE STORAGE (`localStorage` → IndexedDB)
+
+### B-1.1 🔴 localStorage 5MB Quota Exceeded
+**Symptom:** App crashes on ticket creation. `QuotaExceededError` in console. Unsynced tickets lost.
+**Root Cause:** Price list cache (2,274 items) + ticket queue + audit log buffer exceeds 5MB. `localStorage` has no eviction policy.
+**Prevention Rule:**
+- NEVER store price lists in `localStorage`. Cache in memory only, or use IndexedDB (P1.3).
+- NEVER store `audit_log` entries locally. They are server-only.
+- Monitor `JSON.stringify(localStorage).length` before every write. If >4MB, alert user.
+**Detection Method:**
+```bash
+# Grep for localStorage.setItem without size check
+grep -n "localStorage.setItem" app/support.js app/index.html
+# If found without preceding length check → FAIL
+```
+**Linked Rule:** CONSTRAINTS.md §6 (Offline-first)
+
+### B-1.2 🔴 Data Corruption on Write Interruption
+**Symptom:** Ticket appears in list but is missing lines/items. Or `JSON.parse()` throws on load.
+**Root Cause:** Browser crash/tab close during `localStorage.setItem()` leaves partial write.
+**Prevention Rule:**
+- ALWAYS write to a temp key first, then atomic rename:
+  ```js
+  localStorage.setItem('makaman.temp', JSON.stringify(data));
+  localStorage.setItem('makaman.jobtickets.v2', localStorage.getItem('makaman.temp'));
+  localStorage.removeItem('makaman.temp');
+  ```
+- NEVER write directly to the primary key.
+**Detection Method:**
+```bash
+grep -n "localStorage.setItem.*makaman" app/support.js
+# If any line writes directly to primary key without temp key → FAIL
+```
+
+### B-1.3 🟡 Queue Grows Unbounded During Long Offline Period
+**Symptom:** App takes 30+ seconds to open. Sync never completes. Out of memory.
+**Root Cause:** Technician offline for 3 days accumulates 50+ tickets. Each sync attempt retries ALL 50.
+**Prevention Rule:**
+- Queue must have a MAX_SIZE (e.g., 100 tickets). When exceeded, force user to sync or delete old drafts.
+- Sync must be chunked: max 10 tickets per batch.
+**Detection Method:**
+```bash
+grep -n "queue" app/support.js | grep -i "length\|size\|batch\|chunk"
+# If no max length or batching logic found → FAIL
+```
+
+---
+
+## 2. SUPABASE RLS & AUTH
+
+### B-2.1 🔵 RLS Policy Silently Returns Empty Instead of Error
+**Symptom:** Ticket list is empty. User thinks there are no tickets. Actually, RLS is misconfigured.
+**Root Cause:** RLS `USING` clause is too restrictive. No error is thrown — just empty result.
+**Prevention Rule:**
+- Every SELECT query in app MUST check `data.length === 0` and distinguish "no data" from "no permission."
+- If `data.length === 0` AND user has permission, show "No tickets found." If permission missing, show "Access denied."
+**Detection Method:**
+```bash
+grep -n "\.select\|\.from" app/support.js app/index.html | head -20
+# For each SELECT, check if result handling distinguishes empty vs denied → if not → FAIL
+```
+
+### B-2.2 🔴 Auth Token Refresh Failure in Background
+**Symptom:** User clicks "Save" and nothing happens. No error shown. Token expired 2 hours ago.
+**Root Cause:** Supabase auto-refresh fails silently in background tab. App doesn't detect stale token.
+**Prevention Rule:**
+- EVERY write operation MUST check `supabase.auth.getSession()` before executing.
+- If session is null or expires in <5 min, redirect to login with "Session expired. Please log in again."
+- NEVER assume the session is valid because the user is "logged in."
+**Detection Method:**
+```bash
+grep -n "getSession\|onAuthStateChange" app/support.js app/index.html
+# If no getSession guard found before writes → FAIL
+```
+
+### B-2.3 🟠 Realtime Subscription Drops Without Error
+**Symptom:** Ops Manager doesn't see new tickets. Notifications stop. No error in console.
+**Root Cause:** Supabase Realtime channel times out or hits max connections. No reconnect logic.
+**Prevention Rule:**
+- EVERY Realtime subscription MUST have `.on('system', ...)` handler for `disconnected` / `error` events.
+- MUST implement exponential backoff reconnect (max 5 retries, then show "Connection lost" banner).
+**Detection Method:**
+```bash
+grep -n "supabase.channel\|Realtime" app/support.js app/index.html
+# If no 'system' event handler or reconnect logic → FAIL
+```
+
+### B-2.4 🟠 429 Rate Limiting at 6PM (B4 in MINDMAP.md)
+**Symptom:** All 50 technicians get "Something went wrong" at shift end. Supabase returns 429.
+**Root Cause:** Everyone presses "Job Done" simultaneously. No client-side rate limiting.
+**Prevention Rule:**
+- Implement client-side request queue with debounce (max 1 req/sec per user).
+- Show "Syncing..." spinner with queue position if backed up.
+- NEVER fire multiple Supabase requests in parallel from the same user action.
+**Detection Method:**
+```bash
+grep -n "Promise.all\|await.*await" app/support.js | head -10
+# If parallel Supabase calls found without throttling → FAIL
+```
+
+---
+
+## 3. TICKET NUMBERING & RESERVATION
+
+### B-3.1 🔴 Race Condition: Two Ops Click "Take Next" Simultaneously
+**Symptom:** Two tickets get the same number. Finance finds duplicates. Legal issue.
+**Root Cause:** "Take next" reads `next_number`, increments, writes back — non-atomic in client-side JS.
+**Prevention Rule:**
+- "Take next" MUST use Supabase RPC or Edge Function with `SELECT ... FOR UPDATE` or atomic increment.
+- NEVER implement "take next" as read-then-write in client JS.
+**Detection Method:**
+```bash
+grep -n "take next\|next_number\|reserved_by" app/support.js app/index.html
+# If "take next" logic is client-side read-then-write → FAIL
+```
+
+### B-3.2 🟡 Reservation Not Released on Browser Crash
+**Symptom:** Number sequence has gaps. "Next" number jumps ahead. Unused reservations pile up.
+**Root Cause:** Ops Manager reserves a number, browser crashes before approve/cancel. `reserved_by` stays set.
+**Prevention Rule:**
+- Auto-cleanup MUST be server-side (Supabase cron job or Edge Function), NOT client-side.
+- Cleanup runs every hour: `UPDATE numbering_series SET reserved_by = NULL WHERE reserved_at < now() - interval '1 hour' AND used = false`.
+- Client can trigger cleanup on load, but MUST NOT rely on it.
+**Detection Method:**
+```bash
+grep -n "reserved_at\|auto.*clean\|cron" app/support.js supabase/
+# If cleanup logic is client-side only (setTimeout, interval) → FAIL
+```
+
+### B-3.3 🟡 Number Assigned but Ticket Never Approved
+**Symptom:** Number MKN-1882 is "used" but no approved ticket exists. Sequence gap.
+**Root Cause:** Ticket gets number, then Ops Manager reopens it (status → `awaiting_review`), then abandons it.
+**Prevention Rule:**
+- Reopening a ticket MUST release the number reservation (set `reserved_by = NULL`, `used = false`).
+- Number becomes "used = true" ONLY on approval, not on assignment.
+**Detection Method:**
+```bash
+grep -n "reopen\|release.*number\|used = true" app/support.js
+# If reopen logic doesn't release number → FAIL
+```
+
+---
+
+## 4. ITEM ORDERING & DRAG-AND-DROP
+
+### B-4.1 🟡 Touch DnD Conflicts with Scroll on Mobile
+**Symptom:** Ops Manager tries to drag item on tablet, but page scrolls instead. Item doesn't move.
+**Root Cause:** Touch event handlers for DnD intercept scroll gestures. No `touch-action: pan-y` or threshold.
+**Prevention Rule:**
+- DnD touch handlers MUST use a 10px movement threshold before initiating drag.
+- CSS must set `touch-action: pan-y` on the container so vertical scroll isn't blocked.
+- Test on actual tablet, not just Chrome DevTools.
+**Detection Method:**
+```bash
+grep -n "touchstart\|touchmove\|touch-action" app/support.js app/theme.css
+# If touch handlers exist without threshold or touch-action → FAIL
+```
+
+### B-4.2 🟡 order_index Collisions After Multiple Reorders
+**Symptom:** Items appear in wrong order after several drag-and-drop operations. Sort is unstable.
+**Root Cause:** Dragging item between two others sets `order_index = (prev + next) / 2`. After many operations, floats collide or precision is lost.
+**Prevention Rule:**
+- `order_index` MUST be integer. After any reorder operation, renumber ALL items sequentially (0, 1, 2, 3...) in a single transaction.
+- NEVER use fractional indices.
+**Detection Method:**
+```bash
+grep -n "order_index" app/support.js
+# If order_index is set to a non-integer or fractional value → FAIL
+```
+
+---
+
+## 5. EXCEL / PDF GENERATION
+
+### B-5.1 🔴 Memory Crash on Large Ticket Export
+**Symptom:** App freezes, then tab crashes with "Out of Memory" when generating Excel for 24-item ticket.
+**Root Cause:** SheetJS or similar loads entire workbook into memory. 24 items × formulas × styling = 50MB+ heap.
+**Prevention Rule:**
+- Excel generation MUST be streamed or offloaded to Edge Function.
+- If client-side, use lightweight library (not full SheetJS). Or use Edge Function + `xlsx-template`.
+- NEVER generate Excel in the main thread for >10 items.
+**Detection Method:**
+```bash
+grep -n "xlsx\|SheetJS\|excel\|workbook" app/support.js app/index.html
+# If full SheetJS is imported and used client-side for >10 items → FAIL
+```
+
+### B-5.2 🟡 Arabic Text Rendering as Gibberish in Excel
+**Symptom:** Arabic customer names appear as `????` or squares in downloaded Excel.
+**Root Cause:** Excel template font doesn't support Arabic. Or JS string encoding issue.
+**Prevention Rule:**
+- Template MUST use a font with Arabic glyphs (e.g., Arial, Tahoma, or Noto Sans Arabic).
+- All text MUST be UTF-8 encoded. Test with `encodeURIComponent(arabicText)` before write.
+**Detection Method:**
+```bash
+grep -n "UTF-8\|arabic\|Noto\|Tahoma" app/support.js reference/
+# If no Arabic font or encoding check found → FLAG (not fail — P2.4)
+```
+
+### B-5.3 🟠 Blob URL Memory Leak
+**Symptom:** App slows over time. Memory profiler shows detached Blob URLs accumulating.
+**Root Cause:** `URL.createObjectURL()` called for every download, but `URL.revokeObjectURL()` never called.
+**Prevention Rule:**
+- EVERY `createObjectURL()` MUST have a matching `revokeObjectURL()` within 30 seconds or on `beforeunload`.
+**Detection Method:**
+```bash
+grep -n "createObjectURL" app/support.js app/index.html
+# Count createObjectURL vs revokeObjectURL. If counts don't match → FAIL
+```
+
+---
+
+## 6. NOTIFICATIONS & PUSH
+
+### B-6.1 🟡 Push Subscription Expires Silently
+**Symptom:** Notifications stop arriving. User doesn't know. Ops Manager misses urgent tickets.
+**Root Cause:** VAPID subscription expires after ~30 days. No re-subscription logic.
+**Prevention Rule:**
+- On every app load, check `pushManager.getSubscription()`. If null or expired, re-subscribe.
+- Store subscription `expirationTime` in `localStorage`. Check daily.
+**Detection Method:**
+```bash
+grep -n "getSubscription\|expirationTime\|pushManager" app/support.js app/sw.js
+# If no expiration check or re-subscription logic → FAIL
+```
+
+### B-6.2 🟠 Notification Flood on Bulk Approve
+**Symptom:** Ops Manager approves 20 tickets at once. Technician gets 20 push notifications. Phone vibrates for 2 minutes.
+**Root Cause:** Each approve triggers independent notification. No batching.
+**Prevention Rule:**
+- Notifications MUST be batched: if >3 notifications for same recipient within 60 seconds, send single "3 tickets approved" summary.
+- Use Supabase `pg_cron` or Edge Function to aggregate before insert.
+**Detection Method:**
+```bash
+grep -n "notify\|notification" app/support.js supabase/
+# If notify() is called in a loop without batching guard → FAIL
+```
+
+### B-6.3 🔴 Service Worker Update Kills Old Push Handlers
+**Symptom:** After app update, push notifications stop. SW is new but push subscription points to old handler.
+**Root Cause:** New `sw.js` is installed but old push event listeners are gone. Subscription still points to old endpoint logic.
+**Prevention Rule:**
+- `sw.js` MUST handle `push` event in EVERY version. Never remove it.
+- On SW update, re-register push subscription to ensure endpoint is current.
+**Detection Method:**
+```bash
+grep -n "push" app/sw.js
+# If sw.js has no 'push' event listener → FAIL
+```
+
+---
+
+## 7. PERMISSIONS SYSTEM
+
+### B-7.1 🔵 hasPermission() Returns Stale Cached Value
+**Symptom:** Admin disables a permission for a user. User still sees the feature until hard refresh.
+**Root Cause:** `hasPermission()` caches role defaults in `localStorage` or memory. No invalidation on permission change.
+**Prevention Rule:**
+- `hasPermission()` MUST query `user_permissions` from Supabase on every app load.
+- Cache in memory only (not `localStorage`). TTL = 5 minutes max.
+- After Admin changes a permission, broadcast Realtime event to force refresh.
+**Detection Method:**
+```bash
+grep -n "hasPermission\|localStorage.*permission\|permission.*cache" app/support.js
+# If permissions are cached in localStorage without TTL → FAIL
+```
+
+### B-7.2 🔵 Role Change Doesn't Invalidate JWT
+**Symptom:** User is promoted to Admin. Still has old Technician JWT. Can access admin features via old token.
+**Root Cause:** JWT contains `role` claim. Supabase doesn't auto-refresh JWT on role change.
+**Prevention Rule:**
+- After ANY role change, force sign-out and re-login.
+- RLS policies MUST check `profiles.role` (DB lookup) NOT `auth.jwt()->>role` (stale claim).
+**Detection Method:**
+```bash
+grep -n "jwt.*role\|auth.jwt" supabase/migrations/
+# If RLS uses JWT role claim instead of DB lookup → FAIL
+```
+
+---
+
+## 8. AUDIT LOG
+
+### B-8.1 🟠 Audit Log Grows Unbounded → DB Bloat
+**Symptom:** Supabase queries slow down. `audit_log` table is 500MB+.
+**Root Cause:** Every timestamp edit, item add, price override writes a row. No retention policy.
+**Prevention Rule:**
+- Implement tiered retention: keep 90 days in hot table, archive older to Supabase Storage (CSV).
+- Add `created_at` index. Partition by month if possible.
+**Detection Method:**
+```bash
+grep -n "audit_log\|retention\|archive" supabase/migrations/
+# If no retention or partitioning strategy → FLAG (not fail — post-launch)
+```
+
+### B-8.2 🔴 Audit Log Write Fails but Main Transaction Succeeds
+**Symptom:** Ticket is approved but no audit entry. Compliance gap.
+**Root Cause:** `auditLog()` is called after the main UPDATE. If audit INSERT fails, main transaction already committed.
+**Prevention Rule:**
+- Audit log MUST be written in the SAME database transaction as the main operation.
+- Use Supabase RPC or Edge Function that wraps both in a single transaction.
+- NEVER call `auditLog()` as a separate client-side INSERT after the main write.
+**Detection Method:**
+```bash
+grep -n "auditLog\|audit_log" app/support.js
+# If auditLog() is called as separate supabase.from('audit_log').insert() after main write → FAIL
+```
+
+---
+
+## 9. DC-RUNTIME & STATIC HTML
+
+### B-9.1 🔴 Inline Ternary in {{ }} Binding Causes Silent Render Failure
+**Symptom:** Part of the page is blank. No error in console. dc-runtime silently skips the binding.
+**Root Cause:** dc-runtime doesn't support ternaries inside `{{ }}`. `{{ isAdmin ? 'Admin' : 'User' }}` fails silently.
+**Prevention Rule:**
+- NEVER use ternaries in `{{ }}`. Precompute in JS and bind to a plain variable.
+- Use `data-perm-*` attributes for conditional visibility, not template logic.
+**Detection Method:**
+```bash
+grep -n '{{.*?' app/index.html | grep -E '\?.*:'
+# If any {{ }} contains ? and : → FAIL
+```
+
+### B-9.2 🔴 Missing Data Property Causes "undefined" to Render
+**Symptom:** Page shows "undefined" or "[object Object]" in random places.
+**Root Cause:** dc-runtime binds to `data.fieldName` but `fieldName` is undefined or missing in the data object.
+**Prevention Rule:**
+- EVERY data object passed to dc-runtime MUST be validated with a schema check before render.
+- Use `data.fieldName || ''` as fallback in JS, not in template.
+**Detection Method:**
+```bash
+grep -n "data\..*=" app/support.js | head -20
+# If data objects are built without default values for all bound fields → FLAG
+```
+
+### B-9.3 🟠 Template Re-Render Wipes DOM Event Listeners
+**Symptom:** Button clicks stop working after data update. No error.
+**Root Cause:** dc-runtime re-renders template, replacing DOM nodes. Event listeners attached directly to old nodes are lost.
+**Prevention Rule:**
+- ALWAYS use event delegation (`document.addEventListener('click', ...)` with selector check) or re-attach listeners after every render.
+- NEVER attach `element.onclick = ...` to nodes inside a dc-runtime template.
+**Detection Method:**
+```bash
+grep -n "\.onclick\|\.addEventListener" app/support.js app/index.html | grep -v "document"
+# If event listeners are attached directly to template elements → FAIL
+```
+
+### B-9.4 🟠 Service Worker Serves Stale index.html After Deploy
+**Symptom:** User sees old UI but new Supabase schema. Forms submit to non-existent columns. Errors everywhere.
+**Root Cause:** `sw.js` caches `index.html` aggressively. New deploy doesn't invalidate cache.
+**Prevention Rule:**
+- `sw.js` MUST include `Cache-Control: no-cache` for `index.html`.
+- On app load, check `fetch('/version.json')` against cached version. If mismatch, force reload.
+- NEVER cache `config.js` — it contains Supabase keys that may rotate.
+**Detection Method:**
+```bash
+grep -n "cache\|Cache" app/sw.js
+# If sw.js caches index.html or config.js without version check → FAIL
+```
+
+---
+
+## 10. GENERAL APP ARCHITECTURE
+
+### B-10.1 🔴 One JS Error Kills Entire App (No Error Boundaries)
+**Symptom:** White screen. Nothing works. User must reload.
+**Root Cause:** Static HTML has no React error boundaries. One unhandled exception stops all JS.
+**Prevention Rule:**
+- EVERY async function MUST have `.catch()` or `try/catch`.
+- Wrap `dc-runtime` render calls in `try/catch`. On error, show "Something went wrong. Please reload." instead of white screen.
+- Use `window.onerror` and `window.onunhandledrejection` to log to `audit_log` or console.
+**Detection Method:**
+```bash
+grep -n "try\|catch\|onerror\|unhandledrejection" app/support.js app/index.html | wc -l
+# If <5 occurrences in a 427KB file → FAIL
+```
+
+### B-10.2 🔵 Hardcoded Keys in config.js Committed to Repo
+**Symptom:** Supabase keys leaked. Security incident.
+**Root Cause:** `config.js` contains `VITE_SUPABASE_ANON_KEY`. Committed to GitHub.
+**Prevention Rule:**
+- `config.js` MUST read from environment variables at build time, or use `.env` file excluded from Git.
+- NEVER commit actual keys. Use placeholder values in repo.
+**Detection Method:**
+```bash
+grep -E "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9|supabase.*key" app/config.js
+# If real-looking key is present → FAIL
+```
+
+### B-10.3 🟠 No Session Timeout → Unlocked Phone = Exposed
+**Symptom:** Technician leaves phone unlocked at well site. Anyone can access all tickets.
+**Root Cause:** No auto-lock or session timeout.
+**Prevention Rule:**
+- Implement idle timeout: after 5 minutes of no interaction, blur screen and require PIN/biometric.
+- Store last activity timestamp in `localStorage`. Check on every route change.
+**Detection Method:**
+```bash
+grep -n "idle\|timeout\|lastActivity\|blur" app/support.js
+# If no idle timeout logic → FLAG (post-launch)
+```
+
+---
+
+
+
+---
+
+## 11. TIMESTAMP EDITING (Technician + Ops/Admin)
+
+> **Standing Decision #7 (Updated 2026-08-24):** Auto-captured by default. Technician MAY optionally edit ticket-level AND line-level timestamps before pressing "Job Done". After "Job Done", timestamps are locked. Ops/Admin can edit at any time. Every edit -> `audit_log` with old→new values, editor role, and reason.
+
+### B-11.1 🔴 Technician Edits Timestamp After "Job Done"
+**Symptom:** Approved ticket has timestamps that don't match rig records. Compliance audit fails.
+**Root Cause:** UI doesn't lock timestamp fields after "Job Done" is pressed. Or RLS policy allows `timestamp_edited` events on `status != 'logging'` tickets.
+**Prevention Rule:**
+- Timestamp input fields MUST be `disabled` when `ticket.status != 'logging'`.
+- RLS policy on `audit_log` MUST reject `timestamp_edited` events where `ticket.status != 'logging'` AND `editor_role = 'technician'`.
+- Client-side check is NOT enough — RLS must enforce.
+**Detection Method:**
+```bash
+grep -n "timestamp.*disabled\|status.*logging\|timestamp_edited" app/support.js app/index.html
+# If no disabled state tied to status check → FAIL
+grep -n "timestamp_edited\|editor_role" supabase/migrations/
+# If RLS doesn't restrict technician timestamp edits by status → FAIL
+```
+**Linked Rule:** CONSTRAINTS.md §7, MINDMAP.md §5.1 #7
+
+### B-11.2 🔴 Future Timestamp Submitted
+**Symptom:** Ticket shows arrival time of 2027-01-01. Impossible. Data integrity compromised.
+**Root Cause:** No validation that edited timestamp is not in the future.
+**Prevention Rule:**
+- EVERY timestamp edit (by any role) MUST validate `new_timestamp <= now()`.
+- If future timestamp entered, show error: "Timestamp cannot be in the future."
+- Validation MUST be on client AND server (RLS or trigger).
+**Detection Method:**
+```bash
+grep -n "Date.now\|new Date\|<= now\|future" app/support.js
+# If no future-date validation found → FAIL
+```
+
+### B-11.3 🔴 Timestamp Before Ticket Creation
+**Symptom:** Ticket created at 14:00 but shows arrival at 08:00 (before creation). Logical impossibility.
+**Root Cause:** No validation that `arrival_at >= created_at` or that line timestamps are within ticket window.
+**Prevention Rule:**
+- `arrival_at` MUST be >= `ticket.created_at`.
+- `start_job_at` MUST be >= `arrival_at`.
+- `end_job_at` MUST be >= `start_job_at`.
+- Line-level timestamps MUST be within `arrival_at` and `end_job_at`.
+- Validation on client AND server.
+**Detection Method:**
+```bash
+grep -n "created_at\|arrival_at\|start_job_at\|end_job_at" app/support.js | grep -i "valid\|check\|>=\|<=" | head -10
+# If no chronological validation logic → FAIL
+```
+
+### B-11.4 🔵 Technician Edits Without Audit Trail
+**Symptom:** Compliance audit shows timestamp changed but no `audit_log` entry. Who changed it? When? Why?
+**Root Cause:** `auditLog()` call is forgotten in the technician timestamp edit flow.
+**Prevention Rule:**
+- Timestamp edit UI MUST call `auditLog()` BEFORE the Supabase UPDATE returns success.
+- `auditLog()` MUST include: `{ field, old_value, new_value, editor_role: 'technician', reason: user_provided_reason }`.
+- NEVER allow timestamp update without corresponding audit log entry.
+**Detection Method:**
+```bash
+grep -n "timestamp.*edit\|timestamp.*update\|auditLog" app/support.js
+# For every timestamp edit path, verify auditLog() is called in same function → if not → FAIL
+```
+
+### B-11.5 🟡 Line-Level Timestamps Don't Match Ticket-Level Window
+**Symptom:** Ticket says job ran 08:00–16:00, but a line item shows 18:00. Inconsistent data.
+**Root Cause:** Line-level timestamp editing doesn't validate against ticket-level `arrival_at` / `end_job_at`.
+**Prevention Rule:**
+- When editing a `ticket_lines.timestamp`, validate it falls within `ticket.arrival_at` and `ticket.end_job_at`.
+- If outside window, warn user: "This timestamp is outside the ticket time window. Continue?"
+**Detection Method:**
+```bash
+grep -n "ticket_lines.*timestamp\|line.*timestamp" app/support.js | grep -i "valid\|check\|window\|arrival\|end_job"
+# If no window validation for line timestamps → FLAG
+```
+
+### B-11.6 🟠 Offline Device Syncs Stale Timestamp Edit
+**Symptom:** Technician edits timestamp offline. Meanwhile, Ops Manager approves ticket online. Sync resolves with old timestamp, overwriting approval-time data.
+**Root Cause:** No conflict resolution for timestamp edits on approved tickets.
+**Prevention Rule:**
+- If ticket status on server is `approved` or `awaiting_review`, reject any client-side timestamp edits from technician.
+- Sync logic MUST check server status before applying local timestamp changes.
+- If conflict detected, show user: "Ticket was updated by Ops Manager. Your timestamp edit was not applied."
+**Detection Method:**
+```bash
+grep -n "sync\|conflict\|approved.*edit\|status.*check" app/support.js | grep -i "timestamp\|line"
+# If sync logic doesn't check server status before applying timestamp edits → FLAG
+```
+
+### B-11.7 ⚪ Technician Forgets to Edit, Auto-Stamp Is Wrong
+**Symptom:** Technician intended to align with rig records but forgot to edit. Auto timestamp is off by 2 hours. Ops Manager rejects ticket.
+**Root Cause:** No visual reminder that timestamp is auto-captured and MAY need adjustment.
+**Prevention Rule:**
+- Timestamp field MUST show visual indicator: "Auto-captured — tap to edit if needed".
+- If timestamp is edited, show "Edited by technician" badge.
+- If NOT edited, show "Auto — verify" badge in subtle color.
+**Detection Method:**
+```bash
+grep -n "auto.*timestamp\|tap to edit\|verify\|badge" app/support.js app/index.html | grep -i "timestamp"
+# If no visual indicator for auto vs edited timestamp → FLAG (UX, not crash)
+```
+
+---
+
+
+
+---
+
+## 12. SIGNED DOCUMENT ATTACHMENT (PDF Upload & Outstanding Tasks)
+
+> **Standing Decision #26 (Added 2026-08-24):** After technician downloads sheets and obtains physical signature/stamp, either technician or ops manager may attach a scanned PDF of the signed documents to the approved ticket. PDF format only. Stored in Supabase Storage with DB reference. Accessible by Admin, Ops Manager, and Observer. Technicians and Ops Managers can view an "Outstanding Tasks" list showing approved tickets missing signed documents.
+
+### B-12.1 🔵 Non-PDF File Upload Accepted
+**Symptom:** Malicious `.exe` or `.html` file uploaded as "signed document." User opens it, malware executes.
+**Root Cause:** Client-side validation only (checking file extension). Server accepts any MIME type.
+**Prevention Rule:**
+- `mime_type` column MUST have `CHECK (mime_type = 'application/pdf')` at database level.
+- Supabase Storage bucket MUST have file type filter configured.
+- Client MUST check `file.type === 'application/pdf'` before upload.
+- NEVER rely on file extension alone.
+**Detection Method:**
+```bash
+grep -n "mime_type\|application/pdf\|file.type" app/support.js app/index.html supabase/migrations/
+# If no DB-level CHECK constraint on mime_type → FAIL
+# If client only checks file extension (endsWith('.pdf')) → FAIL
+```
+
+### B-12.2 🔴 Large PDF Upload Crashes Browser Tab
+**Symptom:** Technician selects 50MB scan. Browser freezes, then "Aw, snap!" Tab reloads, ticket data lost.
+**Root Cause:** File is read entirely into memory before upload. No size limit or chunking.
+**Prevention Rule:**
+- MAX file size: 10MB. Check `file.size` before upload. Show error if exceeded.
+- Use chunked upload (resumable) for files >5MB.
+- Show progress bar so user knows upload is in progress.
+- NEVER read entire file into a base64 string in memory.
+**Detection Method:**
+```bash
+grep -n "file.size\|MAX_SIZE\|10MB\|chunk" app/support.js app/index.html
+# If no size validation or chunking logic → FAIL
+```
+
+### B-12.3 🟡 Orphan File in Supabase Storage (DB Record Deleted, File Remains)
+**Symptom:** Storage bucket grows to 50GB. Admin sees files with no linked tickets. Cannot clean up safely.
+**Root Cause:** Ticket is deleted (or document record deleted) but Supabase Storage file is not removed. No cascade delete.
+**Prevention Rule:**
+- `ON DELETE CASCADE` on `ticket_id` FK deletes the DB record, but NOT the Storage file.
+- MUST implement a Supabase trigger or Edge Function that deletes the Storage object when `ticket_documents` row is deleted.
+- OR use a periodic cleanup job that finds Storage objects with no DB reference.
+**Detection Method:**
+```bash
+grep -n "storage\|delete.*file\|remove.*object" app/support.js supabase/migrations/ supabase/functions/
+# If no Storage cleanup logic on ticket/document deletion → FAIL
+```
+
+### B-12.4 🔵 Storage Bucket Is Public — Anyone with URL Can Access
+**Symptom:** Signed document URL is leaked. Competitor or unauthorized party views confidential rig data.
+**Root Cause:** Supabase Storage bucket has `public` access policy. No signed URLs or RLS.
+**Prevention Rule:**
+- Storage bucket MUST be `private`.
+- Files MUST be served via signed URLs with expiration (e.g., 1 hour).
+- `ticket_documents` RLS MUST restrict SELECT to Admin, Ops Manager, Observer (and uploaders for their own).
+- NEVER return a permanent public URL to the client.
+**Detection Method:**
+```bash
+grep -n "public.*bucket\|publicUrl\|signedUrl\|createSignedUrl" app/support.js app/index.html
+# If public URLs are used instead of signed URLs → FAIL
+# If bucket is configured as public → FAIL
+```
+
+### B-12.5 🟡 Outstanding Tasks List Shows Ticket as Missing Doc When It Has One
+**Symptom:** Ops Manager sees ticket in "Outstanding" list. Clicks it — signed PDF is already there. Wastes time.
+**Root Cause:** Outstanding tasks query uses stale cache or incorrect JOIN. Race condition between upload completion and list refresh.
+**Prevention Rule:**
+- Outstanding tasks MUST query `tickets` where `status = 'approved'` AND `NOT EXISTS (SELECT 1 FROM ticket_documents WHERE ticket_id = tickets.id)`.
+- NO client-side caching of the outstanding list. Always fresh query.
+- After upload, invalidate outstanding tasks cache immediately.
+**Detection Method:**
+```bash
+grep -n "outstanding\|missing.*doc\|ticket_documents" app/support.js | grep -i "cache\|localStorage\|stored"
+# If outstanding list is cached in localStorage without invalidation → FAIL
+```
+
+### B-12.6 🔴 Upload Succeeds but DB Record Fails — File Exists but Not Linked
+**Symptom:** File is in Storage. Ticket shows no attachment. User re-uploads. Now two orphan files exist.
+**Root Cause:** Storage upload succeeds, but `ticket_documents` INSERT fails (network error, RLS rejection). No transaction rollback.
+**Prevention Rule:**
+- Upload and DB insert MUST be in a single atomic operation.
+- Use Supabase RPC or Edge Function: upload to Storage → get path → INSERT into `ticket_documents` → return success/failure.
+- If DB insert fails, delete the Storage object immediately.
+- NEVER do Storage upload and DB insert as two separate client-side calls.
+**Detection Method:**
+```bash
+grep -n "upload\|storage\|ticket_documents.*insert" app/support.js
+# If upload and insert are separate async calls without rollback → FAIL
+```
+
+### B-12.7 🟡 Multiple Uploads for Same Ticket — No Version Control
+**Symptom:** Technician uploads scan, then Ops Manager uploads better scan. Two PDFs exist. Which is the "official" one?
+**Root Cause:** No restriction on number of uploads per ticket. No "latest" or "primary" flag.
+**Prevention Rule:**
+- Allow multiple uploads (for corrections), but UI MUST show upload history with timestamp and uploader.
+- Most recent upload is displayed as "current." Older uploads are in "History."
+- OR: restrict to 1 upload per ticket, with replace (delete old, upload new) + audit log.
+**Detection Method:**
+```bash
+grep -n "multiple.*upload\|version\|history\|replace.*doc" app/support.js app/index.html
+# If no upload history or replacement logic → FLAG (not fail — design choice)
+```
+
+### B-12.8 🟠 Technician Cannot See Their Own Upload in Archive
+**Symptom:** Technician uploads signed doc. Wants to verify it uploaded correctly. Cannot view it. Confused.
+**Root Cause:** RLS restricts SELECT on `ticket_documents` to Admin/Ops/Observer. Technician who uploaded cannot view.
+**Prevention Rule:**
+- Technicians MUST be able to view `ticket_documents` they uploaded (their own uploads only).
+- RLS: `SELECT ... WHERE uploaded_by = auth.uid()` for technicians.
+- Admin/Ops/Observer can view all.
+**Detection Method:**
+```bash
+grep -n "ticket_documents.*SELECT\|uploaded_by.*auth" supabase/migrations/
+# If technician cannot SELECT their own uploads → FAIL
+```
+
+### B-12.9 ⚪ Outstanding Tasks Badge Never Clears
+**Symptom:** Technician uploads signed doc. Navigates back to dashboard. Badge still shows "1 outstanding." Hard refresh required.
+**Root Cause:** Badge count is computed on page load, not updated after upload. No real-time subscription to `ticket_documents`.
+**Prevention Rule:**
+- Outstanding tasks count MUST update via Supabase Realtime when `ticket_documents` changes.
+- OR: decrement badge count client-side immediately after successful upload.
+- NEVER require manual refresh to clear a notification/badge.
+**Detection Method:**
+```bash
+grep -n "outstanding.*count\|badge\|realtime\|subscription" app/support.js | grep -i "document\|upload"
+# If no realtime or immediate client-side update → FLAG (UX)
+```
+
+---
+
+
+
+---
+
+## 13. PRICE LIST & "QUOTED SEPARATELY" DISPLAY
+
+> **Standing Decision #27 (Added 2026-08-20):** 110 price-list rows have NULL `unit_cost` (quoted per job, e.g., "as per third party company invoice", "50% from first day charge"). The app MUST display "Quoted Separately" or the descriptive text — NEVER 0.00. This affects Ops Review, Print Preview, and Excel generation. Do NOT invent prices for these items.
+
+### B-13.1 🔴 NULL unit_cost Displays as 0.00 on Client Invoice
+**Symptom:** Client receives Excel/PDF showing $0.00 for chargeable work that should be "Quoted Separately." Client refuses to pay. Business relationship damaged.
+**Root Cause:** `money()` or `itemTotal()` helper treats NULL as 0. No special handling for NULL unit_cost.
+**Prevention Rule:**
+- `money()` helper MUST check for NULL/undefined before formatting. If NULL, return "Quoted Separately" (or localized equivalent).
+- `itemTotal()` MUST skip NULL-cost items in subtotal calculation. Do NOT add 0.00.
+- Print Preview and Excel generation MUST use the same logic.
+- NEVER format NULL as 0.00. NEVER.
+**Detection Method:**
+```bash
+grep -n "money\|itemTotal\|unit_cost\|0.00" app/support.js
+# If money() doesn't handle NULL/undefined → FAIL
+# If NULL unit_cost is formatted as 0.00 anywhere → FAIL
+```
+
+### B-13.2 🔴 Invented Numbers Used for Waha Code Conflicts
+**Symptom:** Invoice shows MKN100-710 at $45,970 (average of $68,200 and $23,740). Real item is $68,200. Company undercharges by $22,230 per job.
+**Root Cause:** Agent "resolves" conflict by inventing a new code or averaging prices instead of waiting for real codes from Makaman.
+**Prevention Rule:**
+- The 10 Waha conflicts are PARKED in `backup.price_list_conflicts_20260820`.
+- NEVER invent item numbers. NEVER average prices. NEVER drop rows.
+- If a conflicted code is searched/used, show: "Code ambiguous — contact admin for resolution."
+- Admin UI must show the backup table for manual resolution.
+**Detection Method:**
+```bash
+grep -n "price_list_conflicts\|invent\|average\|MKN100-710" app/support.js supabase/migrations/
+# If any code invents numbers or averages prices → FAIL
+# If conflicts table is not referenced in admin UI → FLAG
+```
+
+### B-13.3 🔴 Price List Import Drops Quoted-Separately Rows
+**Symptom:** 110 items that should be "quoted separately" are missing from the price list. Ops Manager cannot find them when building a ticket.
+**Root Cause:** Import script filters out rows with NULL unit_cost to avoid the 0.00 display problem. Or RLS prevents reading NULL-cost items.
+**Prevention Rule:**
+- ALL price-list rows MUST be imported, including NULL unit_cost rows.
+- `price_list_items` table MUST allow NULL `unit_cost`.
+- Item search MUST return NULL-cost items. Display must show "Quoted Separately."
+- NEVER filter out NULL-cost rows at the database or import level.
+**Detection Method:**
+```bash
+grep -n "unit_cost.*NOT NULL\|unit_cost.*!=.*null\|unit_cost.*IS NOT NULL" supabase/migrations/
+# If any constraint or query excludes NULL unit_cost → FAIL
+```
+
+### B-13.4 🟡 "Quoted Separately" Text Not Localized for Arabic
+**Symptom:** Arabic-speaking client sees "Quoted Separately" in English on an otherwise Arabic invoice. Unprofessional.
+**Root Cause:** Hardcoded English string. No i18n framework.
+**Prevention Rule:**
+- Even without full i18n, "Quoted Separately" MUST be a configurable string in `org_defaults` or `localStorage` settings.
+- Default Arabic: "السعر حسب العرض" or similar (user-provided).
+- NEVER hardcode English business terms in display logic.
+**Detection Method:**
+```bash
+grep -n "Quoted Separately\|quoted separately" app/support.js app/index.html
+# If hardcoded English string found → FLAG (P2.4 Arabic support)
+```
+
+### B-13.5 🟡 Ops Manager Accidentally Adds "Quoted Separately" Item with Qty > 1
+**Symptom:** Ticket shows "Quoted Separately × 3 = Quoted Separately." Nonsensical. Client confused.
+**Root Cause:** NULL-cost items allow quantity entry but quantity is meaningless without a unit price.
+**Prevention Rule:**
+- For NULL-cost items, qty field SHOULD be disabled or hidden.
+- OR: qty is always 1 for NULL-cost items, enforced by UI and DB.
+- Display: "Quoted Separately" (no qty, no total column).
+**Detection Method:**
+```bash
+grep -n "qty\|quantity\|NULL.*cost\|quoted" app/support.js | grep -i "disable\|hide\|enforce"
+# If NULL-cost items allow arbitrary qty without restriction → FLAG
+```
+
+### B-13.6 🟠 Excel Formula Breaks on "Quoted Separately" Text in Numeric Cell
+**Symptom:** Excel shows `#VALUE!` error because "Quoted Separately" was written to a cell expected to contain a number.
+**Root Cause:** Excel template has formulas (e.g., `=B8*C8`) that expect numeric cost. Text breaks the formula.
+**Prevention Rule:**
+- Excel generation MUST handle NULL cost as empty cell or text in a separate column — NOT in the numeric cost column.
+- If the template formula references the cost cell, the formula must handle text gracefully (e.g., `=IF(ISNUMBER(B8), B8*C8, "Quoted Separately")`).
+- OR: Use a separate "Remarks" column for quoted-separately items.
+**Detection Method:**
+```bash
+grep -n "Excel\|xlsx\|template\|formula" app/support.js reference/
+# If Excel generation writes text to numeric cells → FAIL
+```
+
+---
+
+## Token-Efficient Diagnostic Protocol
+
+### Pre-Flight (Before Writing Code) — 30 seconds
+```
+1. Does my task touch any subsystem in BLINDSPOTS.md? [Y/N]
+2. If Y, read the failure modes for that subsystem.
+3. Apply Prevention Rules proactively.
+4. Note the Blind Spot IDs in commit message: "Fixes B-3.1, prevents B-3.2"
+```
+
+### Post-Flight (After Writing Code) — 60 seconds
+```
+1. Run Detection Method grep for each touched subsystem.
+2. If FAIL → fix before commit.
+3. If FLAG → note in commit message for human review.
+4. Update BLINDSPOTS.md if you discovered a NEW failure mode.
+```
+
+### Commit Message Format
+```
+P1.1: Port Settings screen
+- Pre-flight: touches Settings (no blind spots), Nav (B-9.3 check)
+- Post-flight: B-9.3 PASS (event delegation used)
+- No new blind spots discovered.
+```
+
+---
+
+*This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*
