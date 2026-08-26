@@ -133,7 +133,7 @@
   :root[data-mkn-theme="light"] { color-scheme: light; }
 </style>
 <style>
-  body { margin:0; background:var(--ground); color:var(--ink); font-family:"Barlow",system-ui,sans-serif; font-size:15px; line-height:1.55; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:"Barlow","Noto Sans Arabic",system-ui,sans-serif; font-size:15px; line-height:1.55; }
   /* Wordmark: makaman-logo-full.png has "Makaman" baked in as flat black — invisible on
      the dark theme's near-black surfaces. The icon mark (red rings + black dot, ringed
      in white) is colour-safe on both themes, so full-brand moments (login, pending
@@ -141,7 +141,7 @@
      the PNG's own black+red styling in light mode and inverting cleanly in dark mode. */
   .mk-wordmark { display:flex; align-items:center; gap:10px; }
   .mk-wordmark img { height:100%; width:auto; flex:none; }
-  .mk-wordmark span { font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:-0.01em; line-height:1; }
+  .mk-wordmark span { font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:700; letter-spacing:-0.01em; line-height:1; }
   .mk-wordmark .mk-wm-1 { color:var(--ink-strong); }
   .mk-wordmark .mk-wm-2 { color:var(--brand); }
   *,*::before,*::after { box-sizing:border-box; }
@@ -245,13 +245,46 @@
     padding-bottom:env(safe-area-inset-bottom);
   }
   .mk-tab-body { padding-bottom:88px !important; }
+
+  /* The technician's column at real desktop widths.
+     It was held to 760px at every size above a phone, on the reasoning that a log line
+     spanning a metre of monitor reads worse than a short one. That reasoning is sound
+     and it is kept — but it was solved by throwing the rest of the screen away, so a
+     technician on a 1920px laptop got a 760px strip with 580px of black either side.
+     The app looked like a phone someone had photographed and put on a monitor.
+     A wider screen should buy *more content*, not longer lines. So the column steps up
+     to the same 1420px ceiling the office pages already use, and the cards inside it
+     become a grid rather than a single file — the measure of any one line stays
+     readable while the screen stops being empty.
+     !important because the widths are inline on the element, and an inline style beats
+     any stylesheet rule regardless of specificity (see the note above the breakpoints).
+     The bottom bar tracks the same widths so it stays the width of the thing it
+     belongs to instead of floating as an island in the middle. */
+  @media (min-width: 1024px) {
+    .mk-phone-frame, .mk-bottom-nav { max-width:1040px !important; }
+    /* 400px is about the narrowest a ticket card stays readable at — customer name,
+       location line and the footer row all have to fit without wrapping mid-word. */
+    .mk-card-grid {
+      display:grid !important;
+      grid-template-columns:repeat(auto-fill, minmax(400px, 1fr)) !important;
+      align-items:start;
+    }
+    /* Create and search stack full-width on a phone, where that is the whole screen.
+       At 1280px a full-width button is a metre of blue, so they share one row instead —
+       search takes what is left, create keeps only the width its label needs. */
+    .mk-tech-actions { display:flex; gap:10px; align-items:stretch; }
+    .mk-tech-actions > button { width:auto !important; flex:0 0 260px; }
+    .mk-tech-actions > input { margin-top:0 !important; flex:1 1 auto; }
+  }
+  @media (min-width: 1440px) { .mk-phone-frame, .mk-bottom-nav { max-width:1280px !important; } }
+  @media (min-width: 1800px) { .mk-phone-frame, .mk-bottom-nav { max-width:1420px !important; } }
   /* Back-navigation as a visible, bounded button rather than a plain text link —
      some field/office staff being trained on this aren't habitual app/mobile users,
      so a same-color underline-less text link is too easy to miss or mistake for a label. */
   .back-btn {
     display:inline-flex; align-items:center; gap:5px;
     padding:6px 12px; margin-bottom:10px;
-    font-family:'Barlow Condensed',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.02em;
+    font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:600; font-size:13px; letter-spacing:0.02em;
     color:var(--accent-ink); background:var(--accent-wash-2); border:1px solid rgba(var(--accent-deep-rgb),0.35);
     cursor:pointer;
   }
@@ -282,14 +315,39 @@
      pick the theme back up. */
   .mk-sheet {
     width:100%; max-width:640px; aspect-ratio:210/297;
-    overflow-y:auto; padding:18px; font-size:12px;
+    overflow-y:auto; padding:18px;
     display:flex; flex-direction:column;
     background:#ffffff;
     color:#1d1f20;
     border:1px solid rgba(29,31,32,0.3);
     box-shadow:0 3px 10px rgba(43,43,45,0.16);
     color-scheme:light;
+    /* ── The lock ──
+       This sheet is the document the customer signs, and it must look the same after any
+       future restyling of the app around it. Its own colours and boxes are already
+       written as literals rather than theme tokens, and its layout is inline, which an
+       external rule cannot override. What was still reaching in was *inheritance*: the
+       sheet took its font family, size, line-height and weight from `body`, so a change
+       to the app's base typography would silently reflow a client document.
+       Every inherited property the sheet's contents depend on is therefore restated
+       here, and box-sizing is restated on the subtree so a change to the global reset
+       cannot move a border either. Nothing outside this block should be able to alter
+       what prints. `mk-sheet.test.js` proves it by rendering the sheet with the app's
+       own stylesheets disabled and checking the geometry does not shift. */
+    font-family:'Barlow','Noto Sans Arabic',system-ui,sans-serif;
+    font-size:12px;
+    line-height:1.45;
+    font-weight:400;
+    font-style:normal;
+    letter-spacing:normal;
+    word-spacing:normal;
+    text-transform:none;
+    text-indent:0;
+    text-align:left;
+    direction:ltr;
+    box-sizing:border-box;
   }
+  .mk-sheet *, .mk-sheet *::before, .mk-sheet *::after { box-sizing:border-box; }
   .mk-sheet * { color:inherit; }
   /* Cells that deliberately carry their own muted or accent ink keep it. */
   .mk-sheet [style*="color:rgba(29,31,32"],
@@ -395,7 +453,7 @@
 
       <sc-if value="{{ authIsLogin }}" hint-placeholder-val="{{ true }}">
         <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
-          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Makaman Job Tickets</h2>
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Makaman Job Tickets</h2>
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
           <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Password</div>
@@ -403,7 +461,7 @@
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
-          <button onClick="{{ doLogin }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ loginLabel }}</button>
+          <button onClick="{{ doLogin }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ loginLabel }}</button>
           <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
           <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin-top:16px">BUILD {{ buildStamp }}</div>
         </div>
@@ -411,9 +469,9 @@
 
       <sc-if value="{{ authIsSignup }}" hint-placeholder-val="{{ false }}">
         <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
-          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Full name</div>
-          <input value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
           <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Password</div>
@@ -423,16 +481,16 @@
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
-          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Request account</button>
+          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Request account</button>
           <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
         </div>
       </sc-if>
 
       <sc-if value="{{ signupDone }}" hint-placeholder-val="{{ false }}">
         <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14);text-align:center">
-          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Request sent</h2>
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Request sent</h2>
           <p style="font-size:14px;color:rgba(var(--ink-rgb),0.7);line-height:1.5;margin:0 0 20px">An Ops Manager needs to approve your account before you can log in. You'll be assigned the Field Technician role automatically once approved.</p>
-          <button onClick="{{ goToLogin }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to login</button>
+          <button onClick="{{ goToLogin }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to login</button>
         </div>
       </sc-if>
     </div>
@@ -446,10 +504,10 @@
         <span style="font-size:30px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
       </div>
       <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14);text-align:center">
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Waiting for approval</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Waiting for approval</h2>
         <p style="font-size:14px;color:rgba(var(--ink-rgb),0.7);line-height:1.5;margin:0 0 20px">Signed in as {{ sessionName }}. An Ops Manager or Admin still needs to approve your account.</p>
-        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Check again</button>
-        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
+        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Check again</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
   </sc-if>
@@ -460,7 +518,7 @@
   <div class="mk-appbar" style="display:flex;align-items:center;gap:20px;padding:12px 22px;background:var(--navbar);color:var(--on-accent)">
     <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
-      <div class="mk-nav-title" style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
+      <div class="mk-nav-title" style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
     <sc-if value="{{ showBarFix }}" hint-placeholder-val="{{ true }}">
       <div class="mk-nav-fix" onPointerDown="{{ holdCopyStart }}" onPointerUp="{{ holdCopyCancel }}" onPointerLeave="{{ holdCopyCancel }}" onPointerCancel="{{ holdCopyCancel }}" onContextMenu="{{ swallowMenu }}" title="{{ barFixHint }}" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
@@ -472,10 +530,10 @@
          thing it changes is who the app thinks you are working as, and that has to be
          readable from the same glance that tells you who you are. -->
     <sc-if value="{{ showSwapIn }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ swapToTech }}" title="Raise and run a job yourself. Your name stays on everything you do." style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:inherit;border:1px solid rgba(var(--on-navbar-rgb),0.22);white-space:nowrap">Work as technician</button>
+      <button onClick="{{ swapToTech }}" title="Raise and run a job yourself. Your name stays on everything you do." style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:inherit;border:1px solid rgba(var(--on-navbar-rgb),0.22);white-space:nowrap">Work as technician</button>
     </sc-if>
     <sc-if value="{{ showSwapOut }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning);border:1px solid var(--warning);white-space:nowrap">{{ swapBackLabel }}</button>
+      <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning);border:1px solid var(--warning);white-space:nowrap">{{ swapBackLabel }}</button>
     </sc-if>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:13px">
       <span class="mk-nav-name" style="font-weight:600">{{ sessionName }}</span>
@@ -492,13 +550,13 @@
           <img src="uploads/makaman-logo-mark.png" alt="">
           <span style="font-size:22px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
         </div>
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
 
         <div style="margin-bottom:28px">
           <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Appearance</div>
           <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22);margin-bottom:16px">
             <sc-for list="{{ themeOptions }}" as="o" hint-placeholder-count="3">
-              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
           </div>
           <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:10px">Applies across every screen.</div>
@@ -511,7 +569,7 @@
           </div>
           <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22)">
             <sc-for list="{{ timeFormatOptions }}" as="o" hint-placeholder-count="2">
-              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+              <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
           </div>
         </div>
@@ -537,10 +595,10 @@
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div style="font-size:14px;font-weight:600">OneDrive</div>
                 <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-                  <button onClick="{{ disconnectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
+                  <button onClick="{{ disconnectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
                 </sc-if>
                 <sc-if value="{{ cloudOneDriveNotConnected }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ connectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
+                  <button onClick="{{ connectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
                 </sc-if>
               </div>
               <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
@@ -552,10 +610,10 @@
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
                 <div style="font-size:14px;font-weight:600">Google Drive</div>
                 <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-                  <button onClick="{{ disconnectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
+                  <button onClick="{{ disconnectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
                 </sc-if>
                 <sc-if value="{{ cloudGoogleNotConnected }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ connectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
+                  <button onClick="{{ connectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
                 </sc-if>
               </div>
               <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
@@ -566,7 +624,7 @@
         </sc-if>
 
         <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin:2px 0 10px">BUILD {{ buildStamp }}</div>
-        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
   </sc-if>
@@ -596,7 +654,7 @@
             <div style="display:flex;align-items:center;gap:10px;margin:6px 14px 0;padding:9px 11px;background:{{ bannerBg }};border:1px solid {{ bannerBorder }}">
               <span style="width:8px;height:8px;flex:none;background:{{ bannerDot }};animation:pulse 2s infinite"></span>
               <div style="flex:1;font-size:12px;line-height:1.35;color:var(--ink-strong)">{{ bannerText }}</div>
-              <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;border:1px solid var(--accent);background:{{ syncBg }};color:{{ syncFg }};opacity:{{ syncOpacity }}">SYNC</button>
+              <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;border:1px solid var(--accent);background:{{ syncBg }};color:{{ syncFg }};opacity:{{ syncOpacity }}">SYNC</button>
             </div>
           </sc-if>
 
@@ -607,13 +665,15 @@
             <!-- technician: ticket list -->
             <sc-if value="{{ techList }}" hint-placeholder-val="{{ true }}">
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
-                <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">My Job Tickets</h2>
+                <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">My Job Tickets</h2>
               </div>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:14px">{{ techName }} · {{ myCount }}</div>
-              <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
-              <input value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="width:100%;min-height:40px;margin-top:16px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
+              <div class="mk-tech-actions">
+              <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
+              <input dir="auto" value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="width:100%;min-height:40px;margin-top:16px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
+              </div>
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:16px 0 8px">On this device</div>
-              <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
                   <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -629,7 +689,7 @@
                     <div style="display:flex;align-items:center;gap:11px">
                       <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
                       <div style="flex:1;min-width:0">
-                        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
+                        <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
                         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.7)">{{ t.locLine }}</div>
                       </div>
                     </div>
@@ -641,17 +701,17 @@
                 </sc-for>
               </div>
               <sc-if value="{{ myHasMore }}" hint-placeholder-val="{{ true }}">
-                <button onClick="{{ loadMoreTickets }}" style="width:100%;min-height:42px;margin-top:12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ myMoreLabel }}</button>
+                <button onClick="{{ loadMoreTickets }}" style="width:100%;min-height:42px;margin-top:12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ myMoreLabel }}</button>
               </sc-if>
             </sc-if>
 
             <!-- technician: new ticket -->
             <sc-if value="{{ techNew }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ backToList }}" class="back-btn">‹ Cancel</button>
-              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0 0 12px">New Job Ticket</h2>
+              <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0 0 12px">New Job Ticket</h2>
               <div style="padding:11px 12px;border:1px solid var(--accent);background:var(--accent-wash);margin-bottom:16px">
                 <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--accent-deep)">Arrival to location — stamped</div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;color:var(--ink-strong)">{{ draftArrival }}</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;color:var(--ink-strong)">{{ draftArrival }}</div>
               </div>
               <div style="display:flex;flex-direction:column;gap:13px">
                 <div>
@@ -675,24 +735,24 @@
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:rgba(var(--warning-rgb),0.16);color:var(--warning)">{{ icField }}</div>
                     <label style="font-size:13px;color:var(--ink)">Field Name</label>
                   </div>
-                  <input value="{{ d.field }}" onChange="{{ f.field }}" maxLength="10" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input dir="auto" value="{{ d.field }}" onChange="{{ f.field }}" maxLength="10" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
                     <label style="font-size:13px;color:var(--ink)">Well No.</label>
                   </div>
-                  <input value="{{ d.well }}" onChange="{{ f.well }}" maxLength="10" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input dir="auto" value="{{ d.well }}" onChange="{{ f.well }}" maxLength="10" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-indigo-wash);color:var(--hue-indigo)">{{ icRig }}</div>
                     <label style="font-size:13px;color:var(--ink)">Rig Name</label>
                   </div>
-                  <input value="{{ d.rig }}" onChange="{{ f.rig }}" maxLength="10" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input dir="auto" value="{{ d.rig }}" onChange="{{ f.rig }}" maxLength="10" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
               </div>
-              <button onClick="{{ createTicket }}" disabled="{{ createDisabled }}" style="width:100%;min-height:52px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ createOpacity }}">Start Logging</button>
+              <button onClick="{{ createTicket }}" disabled="{{ createDisabled }}" style="width:100%;min-height:52px;margin-top:20px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ createOpacity }}">Start Logging</button>
               <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px;text-align:center">Saved on the device. No connection needed.</div>
             </sc-if>
 
@@ -701,7 +761,7 @@
               <button onClick="{{ backToList }}" class="back-btn">‹ All tickets</button>
               <div style="display:flex;align-items:flex-start;gap:8px">
                 <div style="flex:1">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:23px;line-height:1.15">{{ cur.customer }}</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:23px;line-height:1.15">{{ cur.customer }}</div>
                   <div style="font-size:12px;color:rgba(var(--ink-rgb),0.65)">{{ cur.locLine }}</div>
                 </div>
                 <span style="font-size:11px;padding:3px 9px;background:{{ cur.chipBg }};color:{{ cur.chipFg }};letter-spacing:0.04em">{{ cur.statusLabel }}</span>
@@ -722,7 +782,7 @@
               </div>
               <div style="margin:14px 0 4px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Job type (objective)</label>
-                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+                <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
                 <datalist id="jobtypes">
                   <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="4">
                     <option value="{{ j.name }}"></option>
@@ -733,8 +793,8 @@
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
-                    <div style="width:74px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:rgba(var(--ink-rgb),0.55)">{{ e.timeLine }}</span></div>
-                    <textarea value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
+                    <div style="width:74px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:rgba(var(--ink-rgb),0.55)">{{ e.timeLine }}</span></div>
+                    <textarea dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
                     <button onClick="{{ e.remove }}" title="Delete line" style="width:26px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
                   </div>
                 </sc-for>
@@ -744,11 +804,11 @@
               </sc-if>
               <sc-if value="{{ isHolder }}" hint-placeholder-val="{{ true }}">
               <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
-                <textarea value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
-                <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
+                <textarea dir="auto" value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
+                <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
                 <sc-if value="{{ assetPromptOpen }}" hint-placeholder-val="{{ false }}">
                   <div style="padding:13px;border:2px solid var(--danger);background:rgba(var(--danger-rgb),0.07)">
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;color:var(--danger);margin-bottom:4px">Account for the tools before closing</div>
+                    <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;color:var(--danger);margin-bottom:4px">Account for the tools before closing</div>
                     <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);line-height:1.45;margin-bottom:12px">{{ assetPromptNote }}</div>
                     <sc-for list="{{ assetPromptRows }}" as="q" hint-placeholder-count="3">
                       <div style="margin-bottom:13px">
@@ -760,7 +820,7 @@
                         </div>
                         <div style="display:flex;flex-wrap:wrap;gap:6px">
                           <sc-for list="{{ q.options }}" as="o" hint-placeholder-count="3">
-                            <button onClick="{{ o.pick }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:{{ o.weight }};font-size:12px;letter-spacing:0.03em;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }}">{{ o.text }}</button>
+                            <button onClick="{{ o.pick }}" style="padding:7px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:{{ o.weight }};font-size:12px;letter-spacing:0.03em;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }};border:1px solid {{ o.border }}">{{ o.text }}</button>
                           </sc-for>
                         </div>
                         <sc-if value="{{ q.showMissed }}" hint-placeholder-val="{{ false }}">
@@ -773,9 +833,9 @@
                          answered; red and mandatory the moment one is not. -->
                     <sc-if value="{{ assetJustifyShow }}" hint-placeholder-val="{{ true }}">
                       <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.14)">
-                        <button onClick="{{ openAssetJustify }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:transparent;color:{{ assetJustifyFg }};border:1px solid {{ assetJustifyBorder }}">{{ assetJustifyLabel }}</button>
+                        <button onClick="{{ openAssetJustify }}" style="padding:7px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;cursor:pointer;background:transparent;color:{{ assetJustifyFg }};border:1px solid {{ assetJustifyBorder }}">{{ assetJustifyLabel }}</button>
                         <sc-if value="{{ assetJustifyOpen }}" hint-placeholder-val="{{ false }}">
-                          <textarea value="{{ assetJustifyText }}" onChange="{{ onAssetJustify }}" rows="2" placeholder="Type the answer…" style="width:100%;margin-top:8px;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid {{ assetJustifyBorder }};color:var(--ink);resize:vertical"></textarea>
+                          <textarea dir="auto" value="{{ assetJustifyText }}" onChange="{{ onAssetJustify }}" rows="2" placeholder="Type the answer…" style="width:100%;margin-top:8px;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid {{ assetJustifyBorder }};color:var(--ink);resize:vertical"></textarea>
                           <sc-if value="{{ showAssetJustifyNote }}" hint-placeholder-val="{{ false }}">
                             <div style="font-size:11px;color:var(--danger);margin-top:5px">{{ assetJustifyNote }}</div>
                           </sc-if>
@@ -783,17 +843,17 @@
                       </div>
                     </sc-if>
 
-                    <button onClick="{{ confirmAssetPrompt }}" style="width:100%;min-height:46px;margin-top:14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:#fff;border:1px solid var(--danger)">Confirm and close the job</button>
-                    <button onClick="{{ cancelAssetPrompt }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to the log</button>
+                    <button onClick="{{ confirmAssetPrompt }}" style="width:100%;min-height:46px;margin-top:14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:#fff;border:1px solid var(--danger)">Confirm and close the job</button>
+                    <button onClick="{{ cancelAssetPrompt }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to the log</button>
                   </div>
                 </sc-if>
 
                 <sc-if value="{{ techSealed }}" hint-placeholder-val="{{ false }}">
                   <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ techSealedNote }}</div>
                 </sc-if>
-                <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
+                <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
                 <sc-if value="{{ canHandOver }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ askHandover }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Hand over job</button>
+                  <button onClick="{{ askHandover }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Hand over job</button>
                 </sc-if>
               </div>
               </sc-if>
@@ -803,7 +863,7 @@
             <!-- end Tickets tab -->
 
             <sc-if value="{{ navActivity }}" hint-placeholder-val="{{ false }}">
-              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Activity</h2>
+              <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Activity</h2>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">{{ activityScope }} · newest first</div>
               <sc-if value="{{ hasActivity }}" hint-placeholder-val="{{ true }}">
                 <div style="display:flex;flex-direction:column;gap:2px">
@@ -824,7 +884,7 @@
             </sc-if>
 
             <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
-              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Sync</h2>
+              <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Sync</h2>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">Last upload: {{ syncLastLabel }}</div>
               <div style="display:flex;align-items:center;gap:9px;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:16px">
                 <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ netDot }}"></span>
@@ -833,17 +893,17 @@
               </div>
               <sc-if value="{{ syncNothingPending }}" hint-placeholder-val="{{ false }}">
                 <div style="padding:22px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">{{ syncEmptyLabel }}</div>
-                <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
+                <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
               </sc-if>
               <sc-if value="{{ syncHasPending }}" hint-placeholder-val="{{ true }}">
                 <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:8px">{{ syncPendingLabel }}</div>
-                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+                <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
                   <sc-for list="{{ syncRows }}" as="t" hint-placeholder-count="2">
                     <div class="mk-ticket-card" style="padding:11px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }}">
                       <div style="display:flex;align-items:center;gap:10px">
                         <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
                         <div style="flex:1;min-width:0">
-                          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.customer }}</div>
+                          <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.customer }}</div>
                           <div style="font-size:12px;color:rgba(var(--ink-rgb),0.65)">{{ t.locLine }}</div>
                         </div>
                         <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
@@ -851,13 +911,13 @@
                     </div>
                   </sc-for>
                 </div>
-                <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
+                <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
                 <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px;text-align:center">Uploads happen on their own once there is signal.</div>
               </sc-if>
             </sc-if>
 
             <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ false }}">
-              <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Account</h2>
+              <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Account</h2>
               <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-bottom:16px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
 
               <!-- Approved work, printable here. The office no longer posts a hardcopy
@@ -878,10 +938,10 @@
                       <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="2">
                         <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(var(--ink-rgb),0.12)">
                           <div style="flex:1;min-width:0">
-                            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }} · {{ r.customer }}</div>
+                            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }} · {{ r.customer }}</div>
                             <div style="font-size:11px;color:rgba(var(--ink-rgb),0.6);overflow-wrap:anywhere">{{ r.locLine }} · {{ r.dateRange }}</div>
                           </div>
-                          <button onClick="{{ r.download }}" style="flex:none;padding:6px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                          <button onClick="{{ r.download }}" style="flex:none;padding:6px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
                         </div>
                       </sc-for>
                     </div>
@@ -889,7 +949,7 @@
                   <sc-if value="{{ noReportRows }}" hint-placeholder-val="{{ false }}">
                     <div style="padding:14px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.5)">Nothing approved yet for that month. Sheets can be printed once the operations manager approves the job.</div>
                   </sc-if>
-                  <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
+                  <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
                   <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.45">ZIP gives that job's four sheets to print and sign — originals in one PDF, copies in the other.</div>
                 </div>
               </sc-if>
@@ -909,19 +969,19 @@
                   </div>
                 </div>
               </sc-if>
-              <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="2">
                   <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:12px;padding:13px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                     <div class="mk-icon-chip" style="background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.glyph }}</div>
                     <div style="flex:1;min-width:0">
-                      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px">{{ m.label }}</div>
+                      <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:17px">{{ m.label }}</div>
                       <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6)">{{ m.hint }}</div>
                     </div>
                     <span style="flex:none;color:rgba(var(--ink-rgb),0.35)">{{ m.chevron }}</span>
                   </button>
                 </sc-for>
               </div>
-              <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:18px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
+              <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:18px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
               <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.3);margin-top:14px">BUILD {{ buildStamp }}</div>
             </sc-if>
 
@@ -948,11 +1008,11 @@
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
         <div class="mk-pagehead" style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
           <div>
-            <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
+            <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
             <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Uploaded from the field · {{ awaitingCount }} awaiting review</div>
           </div>
-          <button onClick="{{ goNewTicket }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New ticket</button>
-          <input value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="min-height:36px;width:230px;max-width:100%;padding:7px 10px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
+          <button onClick="{{ goNewTicket }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New ticket</button>
+          <input dir="auto" value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="min-height:36px;width:230px;max-width:100%;padding:7px 10px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
           <select value="{{ techFilterValue }}" onChange="{{ setTechFilter }}" style="min-height:36px;padding:7px 10px;font-size:13px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
             <sc-for list="{{ techFilterOptions }}" as="o" hint-placeholder-count="3">
               <option value="{{ o.name }}">{{ o.label }}</option>
@@ -963,7 +1023,7 @@
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
             <div style="padding:13px 14px;border:1px solid rgba(var(--ink-rgb),0.16)">
               <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55)">{{ s.label }}</div>
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:{{ s.color }}">{{ s.value }}</div>
+              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:{{ s.color }}">{{ s.value }}</div>
             </div>
           </sc-for>
         </div>
@@ -984,7 +1044,7 @@
             <tbody>
               <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
                 <tr>
-                  <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                  <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
                   <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <div style="display:flex;align-items:center;gap:9px">
                       <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
@@ -1009,7 +1069,7 @@
                     </div>
                   </td>
                   <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
-                    <button onClick="{{ t.review }}" style="padding:6px 13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ t.actionLabel }}</button>
+                    <button onClick="{{ t.review }}" style="padding:6px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ t.actionLabel }}</button>
                   </td>
                 </tr>
               </sc-for>
@@ -1019,19 +1079,19 @@
         <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
           <div style="font-size:12px;color:rgba(var(--ink-rgb),0.5)">{{ inboxCountLabel }}</div>
           <sc-if value="{{ inboxHasMore }}" hint-placeholder-val="{{ true }}">
-            <button onClick="{{ loadMoreTickets }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ inboxMoreLabel }}</button>
+            <button onClick="{{ loadMoreTickets }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ inboxMoreLabel }}</button>
           </sc-if>
         </div>
       </sc-if>
 
       <sc-if value="{{ mgrNew }}" hint-placeholder-val="{{ false }}">
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">New ticket</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">New ticket</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">For work called in to the office. The technician picks it up on their device.</div>
         <div style="max-width:520px;display:flex;flex-direction:column;gap:14px">
           <div>
             <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Customer</label>
-            <input value="{{ md.customer }}" onChange="{{ fm.customer }}" list="customers" placeholder="Start typing to find an existing customer…" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <input dir="auto" value="{{ md.customer }}" onChange="{{ fm.customer }}" list="customers" placeholder="Start typing to find an existing customer…" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
             <datalist id="customers">
               <sc-for list="{{ customerOptions }}" as="c" hint-placeholder-count="3">
                 <option value="{{ c.name }}"></option>
@@ -1046,16 +1106,16 @@
           </div>
           <div>
             <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Field name</label>
-            <input value="{{ md.field }}" onChange="{{ fm.field }}" maxLength="10" placeholder="e.g. Defa" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <input dir="auto" value="{{ md.field }}" onChange="{{ fm.field }}" maxLength="10" placeholder="e.g. Defa" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
           </div>
           <div style="display:flex;gap:12px">
             <div style="flex:1">
               <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Well No.</label>
-              <input value="{{ md.well }}" onChange="{{ fm.well }}" maxLength="10" placeholder="e.g. DF-12" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <input dir="auto" value="{{ md.well }}" onChange="{{ fm.well }}" maxLength="10" placeholder="e.g. DF-12" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
             </div>
             <div style="flex:1">
               <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Rig name</label>
-              <input value="{{ md.rig }}" onChange="{{ fm.rig }}" maxLength="10" placeholder="e.g. RIG-4" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <input dir="auto" value="{{ md.rig }}" onChange="{{ fm.rig }}" maxLength="10" placeholder="e.g. RIG-4" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
             </div>
           </div>
           <div>
@@ -1067,17 +1127,17 @@
               </sc-for>
             </select>
           </div>
-          <button onClick="{{ createMgrTicket }}" disabled="{{ mgrNewDisabled }}" style="width:100%;min-height:48px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ mgrNewOpacity }}">Raise ticket</button>
+          <button onClick="{{ createMgrTicket }}" disabled="{{ mgrNewDisabled }}" style="width:100%;min-height:48px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ mgrNewOpacity }}">Raise ticket</button>
         </div>
       </sc-if>
 
       <sc-if value="{{ mgrTeam }}" hint-placeholder-val="{{ false }}">
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Team</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Team</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Approve signups and create technician accounts directly.</div>
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
                 <tr>
@@ -1104,7 +1164,7 @@
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
                         <div style="display:flex;gap:6px;align-items:center">
@@ -1126,9 +1186,9 @@
             </table>
           </div>
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Full name</div>
-            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <input dir="auto" value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
             <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
@@ -1139,7 +1199,7 @@
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
-            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
           </div>
         </div>
       </sc-if>
@@ -1148,7 +1208,7 @@
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
         <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:18px">
           <div>
-            <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:rgba(var(--ink-rgb),0.45)">· {{ cur.well }}</span></h2>
+            <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:rgba(var(--ink-rgb),0.45)">· {{ cur.well }}</span></h2>
             <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ cur.locLine }} · {{ cur.crewLabel }} · uploaded {{ cur.syncLabel }}</div>
           </div>
           <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
@@ -1164,7 +1224,7 @@
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
               <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">1 · Ticket number &amp; mileage</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">1 · Ticket number &amp; mileage</div>
                 <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
                   <!-- Who holds the claim stays here, because it is the reason the
                        controls below are live or inert. Handing it over does not: it is
@@ -1183,20 +1243,20 @@
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Ticket No. (unique)</label>
-                  <input value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ numberingBlocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
+                  <input dir="auto" value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ numberingBlocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
                 </div>
                 <div style="flex:1">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Take next from series</label>
                   <div style="display:flex;gap:8px;flex-wrap:wrap">
                     <sc-for list="{{ seriesBtns }}" as="s" hint-placeholder-count="3">
-                      <button onClick="{{ s.take }}" disabled="{{ s.disabled }}" style="padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ s.label }} → {{ s.next }}</button>
+                      <button onClick="{{ s.take }}" disabled="{{ s.disabled }}" style="padding:7px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ s.label }} → {{ s.next }}</button>
                     </sc-for>
                   </div>
                 </div>
                 <div style="width:230px">
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Mileage one way (KM)</label>
-                  <input value="{{ cur.mileage }}" onChange="{{ f.mileage }}" onFocus="{{ onMileageFocus }}" onBlur="{{ onMileageBlur }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input dir="auto" value="{{ cur.mileage }}" onChange="{{ f.mileage }}" onFocus="{{ onMileageFocus }}" onBlur="{{ onMileageBlur }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.6)">{{ mileageNote }}</div>
                 </div>
               </div>
@@ -1204,17 +1264,17 @@
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">2 · Charged items</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">2 · Charged items</div>
                 <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.6)">Price list: {{ cur.customer }}</div>
               </div>
               <sc-if value="{{ ticketEditable }}" hint-placeholder-val="{{ true }}">
                 <div style="position:relative;margin-bottom:12px">
-                  <input value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" onKeyDown="{{ onItemSearchKey }}" placeholder="Search item no. or description… (or press ENTER to add selected)" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                  <input dir="auto" value="{{ itemSearch }}" onChange="{{ f.itemSearch }}" onKeyDown="{{ onItemSearchKey }}" placeholder="Search item no. or description… (or press ENTER to add selected)" style="width:100%;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   <sc-if value="{{ showSearchResults }}" hint-placeholder-val="{{ false }}">
                     <div style="position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.2);border-top:0;max-height:280px;overflow-y:auto;z-index:10;margin-top:0">
                       <sc-for list="{{ searchResults }}" as="sr" hint-placeholder-count="8">
                         <button onClick="{{ sr.add }}" style="width:100%;text-align:left;padding:8px 10px;border:0;background:transparent;color:var(--ink);cursor:pointer;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;display:block">
-                          <div style="font-weight:600;font-family:'Barlow Condensed',sans-serif">{{ sr.code }}</div>
+                          <div style="font-weight:600;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif">{{ sr.code }}</div>
                           <div style="font-size:11px;color:rgba(var(--ink-rgb),0.6)">{{ sr.desc }} · {{ sr.detail }}</div>
                         </button>
                       </sc-for>
@@ -1250,18 +1310,18 @@
                 <tbody>
                   <sc-for list="{{ curItems }}" as="it" hint-placeholder-count="3">
                     <tr draggable="{{ it.draggable }}" onDragStart="{{ it.onDragStart }}" onDragOver="{{ it.onDragOver }}" onDrop="{{ it.onDrop }}" onDragEnd="{{ it.onDragEnd }}" style="cursor:{{ it.dragCursor }};opacity:{{ it.dragOpacity }}">
-                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
+                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.desc }}" onChange="{{ it.onDesc }}" onFocus="{{ it.onDescFocus }}" onBlur="{{ it.onDescBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input dir="auto" value="{{ it.desc }}" onChange="{{ it.onDesc }}" onFocus="{{ it.onDescFocus }}" onBlur="{{ it.onDescBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.qty }}" onChange="{{ it.onQty }}" onFocus="{{ it.onQtyFocus }}" onBlur="{{ it.onQtyBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input dir="auto" value="{{ it.qty }}" onChange="{{ it.onQty }}" onFocus="{{ it.onQtyFocus }}" onBlur="{{ it.onQtyBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.uom }}" onChange="{{ it.onUom }}" onFocus="{{ it.onUomFocus }}" onBlur="{{ it.onUomBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input dir="auto" value="{{ it.uom }}" onChange="{{ it.onUom }}" onFocus="{{ it.onUomFocus }}" onBlur="{{ it.onUomBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input value="{{ it.cost }}" onChange="{{ it.onCost }}" onFocus="{{ it.onCostFocus }}" onBlur="{{ it.onCostBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                        <input dir="auto" value="{{ it.cost }}" onChange="{{ it.onCost }}" onFocus="{{ it.onCostFocus }}" onBlur="{{ it.onCostBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
@@ -1276,24 +1336,24 @@
               <div style="display:flex;align-items:baseline;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16)">
                 <div style="font-size:11px;color:rgba(var(--ink-rgb),0.6)">Overridden cells are tinted — price-list value kept in the audit trail.</div>
                 <div style="margin-left:auto;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55)">Ticket total</div>
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums">{{ grandTotal }}</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums">{{ grandTotal }}</div>
               </div>
             </div>
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">3 · Job log from the field</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">3 · Job log from the field</div>
                 <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.6)">Line timestamps editable — every change is written to the audit trail</div>
               </div>
               <div style="margin-bottom:12px;max-width:420px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:rgba(var(--ink-rgb),0.7)">Job type (objective)</label>
-                <input value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+                <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
-                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);padding:6px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35)">
-                    <input value="{{ e.text }}" onChange="{{ e.onChange }}" onFocus="{{ e.onTextFocus }}" onBlur="{{ e.onTextBlur }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                    <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);padding:6px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35)">
+                    <input dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" onFocus="{{ e.onTextFocus }}" onBlur="{{ e.onTextBlur }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                   </div>
                 </sc-for>
               </div>
@@ -1309,23 +1369,23 @@
             <sc-if value="{{ assetsEditable }}" hint-placeholder-val="{{ false }}">
               <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
                 <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Tools &amp; crossovers allocated</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Tools &amp; crossovers allocated</div>
                   <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ assetHolderLabel }}</div>
                 </div>
                 <sc-for list="{{ assetRows }}" as="a" hint-placeholder-count="2">
                   <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
-                    <input value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                    <input value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                    <input value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                    <input dir="auto" value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                    <input dir="auto" value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
+                    <input dir="auto" value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
                     <button onClick="{{ a.remove }}" title="Remove" style="width:24px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
                   </div>
                 </sc-for>
-                <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
+                <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
                 <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.4">The technician is asked to account for these when they close the job.</div>
               </div>
             </sc-if>
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket header</div>
+              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket header</div>
               <sc-for list="{{ headerFields }}" as="h" hint-placeholder-count="7">
                 <div class="mk-kv" style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;align-items:center">
                   <div style="width:104px;flex:none;color:rgba(var(--ink-rgb),0.55)">{{ h.label }}</div>
@@ -1336,7 +1396,7 @@
                     <input type="datetime-local" value="{{ h.tsInput }}" onChange="{{ h.onChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35);color:var(--ink)">
                   </sc-if>
                   <sc-if value="{{ h.isTextField }}" hint-placeholder-val="{{ false }}">
-                    <input value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35);color:var(--ink)">
+                    <input dir="auto" value="{{ h.textInput }}" onChange="{{ h.onTextChange }}" onBlur="{{ h.onCommit }}" disabled="{{ h.locked }}" style="flex:1;font-size:13px;padding:5px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35);color:var(--ink)">
                   </sc-if>
                 </div>
               </sc-for>
@@ -1374,7 +1434,7 @@
             </div>
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">4 · Approval</div>
+              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">4 · Approval</div>
               <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
                 <sc-for list="{{ checks }}" as="c" hint-placeholder-count="3">
                   <div style="display:flex;gap:9px;font-size:13px;color:{{ c.color }}">
@@ -1385,7 +1445,7 @@
               <sc-if value="{{ approvalForced }}" hint-placeholder-val="{{ false }}">
                 <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Approving on the technician's behalf.</strong> {{ approvalForcedText }}</div>
               </sc-if>
-              <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
+              <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
               <sc-if value="{{ showAssetAnswers }}" hint-placeholder-val="{{ false }}">
                 <div style="margin-top:14px;padding:11px 13px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.08)">
                   <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--warning-ink);margin-bottom:8px">Allocated assets — accounted for on closing</div>
@@ -1405,20 +1465,20 @@
               </sc-if>
 
               <sc-if value="{{ mgrCanClose }}" hint-placeholder-val="{{ false }}">
-                <button onClick="{{ askOfficeClose }}" disabled="{{ mgrCloseDisabled }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--warning-ink);border:1px solid var(--warning);opacity:{{ mgrCloseOpacity }}">Close the job for the technician</button>
+                <button onClick="{{ askOfficeClose }}" disabled="{{ mgrCloseDisabled }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--warning-ink);border:1px solid var(--warning);opacity:{{ mgrCloseOpacity }}">Close the job for the technician</button>
                 <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.55);line-height:1.4">{{ mgrCloseNote }}</div>
               </sc-if>
               <sc-if value="{{ mgrCanHandOver }}" hint-placeholder-val="{{ true }}">
-                <button onClick="{{ askHandover }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Reassign to another technician</button>
+                <button onClick="{{ askHandover }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Reassign to another technician</button>
               </sc-if>
-              <button onClick="{{ goPrint }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Preview 4 sheets</button>
+              <button onClick="{{ goPrint }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Preview 4 sheets</button>
               <sc-if value="{{ cur.isApproved }}" hint-placeholder-val="{{ false }}">
-                <button onClick="{{ askReopen }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent-deep);border:1px solid rgba(var(--ink-rgb),0.3)">Reopen ticket</button>
+                <button onClick="{{ askReopen }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent-deep);border:1px solid rgba(var(--ink-rgb),0.3)">Reopen ticket</button>
               </sc-if>
             </div>
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px">Audit trail</div>
+              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px">Audit trail</div>
               <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">{{ curAuditScope }}</div>
               <sc-if value="{{ curAuditEmpty }}" hint-placeholder-val="{{ false }}">
                 <div style="padding:14px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">Nothing recorded on this ticket yet.</div>
@@ -1444,12 +1504,12 @@
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-bottom:8px">
           <button onClick="{{ backToReview }}" class="back-btn" style="margin-bottom:0">‹ Back to review</button>
           <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-            <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Fill Excel &amp; download</button>
+            <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Fill Excel &amp; download</button>
             <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ uploadOneDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to OneDrive</button>
+              <button onClick="{{ uploadOneDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to OneDrive</button>
             </sc-if>
             <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ uploadGoogleDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to Google Drive</button>
+              <button onClick="{{ uploadGoogleDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to Google Drive</button>
             </sc-if>
           </div>
         </div>
@@ -1457,7 +1517,7 @@
         <sc-if value="{{ printOverflow }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:18px;padding:12px 14px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.1)">
             <div style="flex:1;min-width:220px;font-size:14px;line-height:1.4;color:var(--ink)">{{ printOverflowText }}</div>
-            <button onClick="{{ backToReview }}" style="padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--warning);color:var(--warning-deep)">‹ Back to review</button>
+            <button onClick="{{ backToReview }}" style="padding:8px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--warning);color:var(--warning-deep)">‹ Back to review</button>
           </div>
         </sc-if>
         <!-- This preview reproduces the real "Autofill_ServiceTikcet_System.xlsx" template
@@ -1489,12 +1549,12 @@
               </div>
               <div style="display:flex;align-items:stretch;gap:0;border:1px solid rgba(29,31,32,0.3);margin-bottom:0">
                 <div style="flex:1;padding:8px 10px;border-right:1px solid rgba(29,31,32,0.3)">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN LIBYA OIL SERVICES INC.</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN LIBYA OIL SERVICES INC.</div>
                   <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(29,31,32,0.6);margin-top:2px">{{ sh.title }} ({{ sh.mark }}){{ sh.pageLabel }}</div>
                 </div>
                 <div style="width:96px;flex:none;padding:6px 8px;text-align:center;background:#eef3f8">
                   <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(29,31,32,0.6)">Ticket NO:</div>
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:25px;color:#1d2d3d;line-height:1.1">{{ sh.no }}</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:700;font-size:25px;color:#1d2d3d;line-height:1.1">{{ sh.no }}</div>
                 </div>
               </div>
 
@@ -1514,15 +1574,15 @@
                   </div>
                 </sc-for>
                 <div style="padding:6px 8px;border:1px solid rgba(29,31,32,0.3);border-top:0;background:#eef3f8;font-weight:700;text-align:center">{{ sh.jobType }}</div>
-                <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:10px">
+                <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:10px;margin-top:10px">
                   <thead>
                     <tr>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Item no.</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Item Description</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;background:#e9e9ea">Qty</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;background:#e9e9ea">Unit</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea">Unit Cost</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea">Total Cost</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:13%">Item no.</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:48%">Item Description</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;background:#e9e9ea;width:6%">Qty</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:center;background:#e9e9ea;width:7%">Unit</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea;width:12%">Unit Cost</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:right;background:#e9e9ea;width:14%">Total Cost</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1569,14 +1629,14 @@
                     </div>
                   </sc-for>
                 </div>
-                <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:10px">
+                <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:10px;margin-top:10px">
                   <thead>
                     <tr>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:56px">Date</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:46px">Time</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:44px">Pressure</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:36px">Total</th>
-                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea">Details of the Job</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:10%">Date</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:8%">Time</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:8%">Pressure</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:7%">Total</th>
+                      <th style="padding:4px 5px;border:1px solid rgba(29,31,32,0.3);text-align:left;background:#e9e9ea;width:67%">Details of the Job</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1627,7 +1687,7 @@
       <!-- The tools are chosen from the Account tab, which shows what is inside each
            one. A strip of four equal words here said less and said it twice. -->
       <button onClick="{{ backToAccount }}" class="back-btn">‹ Account</button>
-      <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">{{ adminToolTitle }}</h2>
+      <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">{{ adminToolTitle }}</h2>
       <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">{{ adminToolHint }}</div>
 
       <sc-if value="{{ adminPrice }}" hint-placeholder-val="{{ true }}">
@@ -1641,7 +1701,7 @@
             </select>
           </div>
           <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);padding-bottom:9px">{{ adminPriceNote }}</div>
-          <button onClick="{{ addPriceRow }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add item</button>
+          <button onClick="{{ addPriceRow }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add item</button>
         </div>
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -1657,10 +1717,10 @@
             <tbody>
               <sc-for list="{{ priceRows }}" as="p" hint-placeholder-count="5">
                 <tr>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.code }}" onChange="{{ p.onCode }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><button onClick="{{ p.remove }}" style="width:22px;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button></td>
                 </tr>
               </sc-for>
@@ -1672,7 +1732,7 @@
       <sc-if value="{{ adminNumbers }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Numbering series</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Numbering series</div>
             <div style="font-size:12px;color:rgba(var(--ink-rgb),0.65);margin-bottom:14px">Enter the last number you reached on paper. The system continues from there and refuses any number already used.</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
@@ -1687,9 +1747,9 @@
                 <sc-for list="{{ seriesRows }}" as="s" hint-placeholder-count="3">
                   <tr>
                     <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ s.label }}</td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600">{{ s.prefix }}</td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input value="{{ s.last }}" onChange="{{ s.onLast }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;color:var(--accent-deep)">{{ s.next }}</td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600">{{ s.prefix }}</td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ s.last }}" onChange="{{ s.onLast }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;color:var(--accent-deep)">{{ s.next }}</td>
                   </tr>
                 </sc-for>
               </tbody>
@@ -1697,10 +1757,10 @@
             <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16);font-size:12px;color:rgba(var(--ink-rgb),0.6)">Numbers in use: {{ usedNumbers }}</div>
           </div>
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Job types</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Job types</div>
             <div style="display:flex;gap:8px;margin-bottom:12px">
-              <input value="{{ newJobType }}" onChange="{{ f.newJobType }}" placeholder="e.g. COMBINATION FOR LOCATE LEAK" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
-              <button onClick="{{ addJobType }}" style="padding:7px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Add</button>
+              <input dir="auto" value="{{ newJobType }}" onChange="{{ f.newJobType }}" placeholder="e.g. COMBINATION FOR LOCATE LEAK" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+              <button onClick="{{ addJobType }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Add</button>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="6">
@@ -1715,7 +1775,7 @@
       <sc-if value="{{ adminPeople }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
             <table style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
                 <tr>
@@ -1742,7 +1802,7 @@
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
                         <div style="display:flex;gap:6px;align-items:center">
@@ -1764,12 +1824,12 @@
             </table>
           </div>
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Customers, fields &amp; rigs</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Customers, fields &amp; rigs</div>
             <div style="display:flex;flex-direction:column;gap:12px">
               <sc-for list="{{ clientCards }}" as="c" hint-placeholder-count="2">
                 <div style="border:1px solid rgba(var(--ink-rgb),0.12);padding:12px">
                   <div style="display:flex;align-items:baseline;gap:8px">
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px">{{ c.name }}</div>
+                    <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px">{{ c.name }}</div>
                     <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ c.itemCount }} priced items</div>
                   </div>
                   <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);margin-top:6px">Fields: {{ c.fields }}</div>
@@ -1782,9 +1842,9 @@
             </div>
           </div>
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Full name</div>
-            <input value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <input dir="auto" value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
             <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Temporary password (8+ characters)</div>
@@ -1795,7 +1855,7 @@
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
-            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
           </div>
         </div>
       </sc-if>
@@ -1805,25 +1865,25 @@
           <sc-for list="{{ adminAssetRows }}" as="q" hint-placeholder-count="3">
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);border-left:3px solid {{ q.swatch }};padding:14px;margin-bottom:12px">
               <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-                <input value="{{ q.label }}" onChange="{{ q.onLabel }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;font-weight:600;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                <input dir="auto" value="{{ q.label }}" onChange="{{ q.onLabel }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;font-weight:600;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 <button onClick="{{ q.removeQuestion }}" title="Remove question" style="width:28px;flex:none;font-size:16px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
               </div>
               <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
                 <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5)">Options offered</div>
-                <button onClick="{{ q.toggleMulti }}" style="margin-left:auto;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:{{ q.multiBg }};color:{{ q.multiFg }};border:1px solid {{ q.multiBorder }}">{{ q.multiLabel }}</button>
+                <button onClick="{{ q.toggleMulti }}" style="margin-left:auto;padding:4px 10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:{{ q.multiBg }};color:{{ q.multiFg }};border:1px solid {{ q.multiBorder }}">{{ q.multiLabel }}</button>
               </div>
               <sc-for list="{{ q.options }}" as="o" hint-placeholder-count="3">
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-                  <input value="{{ o.text }}" onChange="{{ o.onText }}" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:{{ o.bg }};border:1px solid {{ o.border }};color:{{ o.fg }}">
+                  <input dir="auto" value="{{ o.text }}" onChange="{{ o.onText }}" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:{{ o.bg }};border:1px solid {{ o.border }};color:{{ o.fg }}">
                   <button onClick="{{ o.remove }}" title="Remove option" style="width:24px;flex:none;font-size:15px;color:rgba(var(--ink-rgb),0.45);background:none;border:0;cursor:pointer">×</button>
                 </div>
               </sc-for>
-              <button onClick="{{ q.addOption }}" style="padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add option</button>
+              <button onClick="{{ q.addOption }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add option</button>
             </div>
           </sc-for>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
-            <button onClick="{{ addAssetQuestion }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add question</button>
-            <button onClick="{{ resetAssetQuestions }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Reset to defaults</button>
+            <button onClick="{{ addAssetQuestion }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add question</button>
+            <button onClick="{{ resetAssetQuestions }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Reset to defaults</button>
           </div>
           <div style="font-size:12px;color:rgba(var(--ink-rgb),0.55);margin-top:12px;line-height:1.5">A technician who was allocated tools answers these when they close a job. Anything left unanswered forces a written justification before the job can close, so removing every option does not remove the question — it just moves the answer into free text.</div>
         </div>
@@ -1832,7 +1892,7 @@
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Charging &amp; export rules</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Charging &amp; export rules</div>
             <div style="display:flex;flex-direction:column;gap:12px">
               <sc-for list="{{ systemRows }}" as="s" hint-placeholder-count="4">
                 <div style="display:flex;gap:12px;align-items:center;padding-bottom:10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
@@ -1840,23 +1900,23 @@
                     <div style="font-size:14px">{{ s.label }}</div>
                     <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ s.hint }}</div>
                   </div>
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;color:var(--accent-deep)">{{ s.value }}</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;color:var(--accent-deep)">{{ s.value }}</div>
                 </div>
               </sc-for>
             </div>
           </div>
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Ticket defaults</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Ticket defaults</div>
             <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-bottom:14px">Pre-filled onto every new ticket. Stays constant unless the Ops Manager changes it for one specific ticket during review — not technician input, not a formula.</div>
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Base Location</div>
-            <input value="{{ defBaseLocation }}" onChange="{{ f.defBaseLocation }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <input dir="auto" value="{{ defBaseLocation }}" onChange="{{ f.defBaseLocation }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
             <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Customer Rep.</div>
-            <input value="{{ defCustomerRep }}" onChange="{{ f.defCustomerRep }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <input dir="auto" value="{{ defCustomerRep }}" onChange="{{ f.defCustomerRep }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
           </div>
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Danger zone</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Danger zone</div>
             <div style="font-size:12px;color:rgba(var(--ink-rgb),0.7);margin-bottom:12px">Resets this prototype's local data back to the seeded demo tickets and price lists.</div>
-            <button onClick="{{ resetAll }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Reset demo data</button>
+            <button onClick="{{ resetAll }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Reset demo data</button>
           </div>
         </div>
       </sc-if>
@@ -1868,7 +1928,7 @@
       <sc-if value="{{ adminPerms }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:0;overflow:hidden">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);padding:14px 16px 10px">Who</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);padding:14px 16px 10px">Who</div>
             <sc-for list="{{ permPeople }}" as="u" hint-placeholder-count="4">
               <div onClick="{{ u.pick }}" style="padding:10px 16px;cursor:pointer;border-top:1px solid rgba(var(--ink-rgb),0.08);background:{{ u.rowBg }}">
                 <div style="font-size:14px">{{ u.name }}</div>
@@ -1885,16 +1945,16 @@
             <sc-if value="{{ permTargetName }}" hint-placeholder-val="{{ '' }}">
               <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
                 <div style="flex:1;min-width:160px">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.02em">{{ permTargetName }}</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.02em">{{ permTargetName }}</div>
                   <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6)">{{ permTargetRole }} · {{ permExceptionLabel }}</div>
                 </div>
-                <button onClick="{{ permClearAll }}" disabled="{{ permNoExceptions }}" style="padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Back to role defaults</button>
+                <button onClick="{{ permClearAll }}" disabled="{{ permNoExceptions }}" style="padding:8px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Back to role defaults</button>
               </div>
               <div style="font-size:12px;color:var(--warning);margin-bottom:10px">{{ permReadOnlyNote }}</div>
 
               <sc-for list="{{ permGroups }}" as="g" hint-placeholder-count="3">
                 <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
-                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">{{ g.name }}</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">{{ g.name }}</div>
                   <sc-for list="{{ g.rows }}" as="p" hint-placeholder-count="4">
                     <div style="display:flex;gap:12px;align-items:flex-start;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                       <div style="flex:1;min-width:0">
@@ -1902,7 +1962,7 @@
                         <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);line-height:1.45">{{ p.description }}</div>
                         <div style="font-size:11px;color:{{ p.exceptionTone }};margin-top:3px">{{ p.exception }}</div>
                       </div>
-                      <button onClick="{{ p.toggle }}" disabled="{{ permCannotEdit }}" style="min-width:64px;padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:{{ p.tileBg }};color:{{ p.tileFg }};border:1px solid {{ p.tileFg }}">{{ p.onLabel }}</button>
+                      <button onClick="{{ p.toggle }}" disabled="{{ permCannotEdit }}" style="min-width:64px;padding:7px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:{{ p.tileBg }};color:{{ p.tileFg }};border:1px solid {{ p.tileFg }}">{{ p.onLabel }}</button>
                     </div>
                   </sc-for>
                 </div>
@@ -1919,7 +1979,7 @@
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1180px;margin:0 auto">
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px">
         <div>
-          <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0">Observer View</h2>
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">Observer View</h2>
           <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">Read-only. Approved jobs only — nothing here can be edited.</div>
         </div>
         <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:var(--accent-wash);color:var(--accent-ink);letter-spacing:0.05em">OBSERVER</span>
@@ -1928,14 +1988,14 @@
         <sc-for list="{{ founderStats }}" as="s" hint-placeholder-count="4">
           <div style="padding:13px 14px;border:1px solid rgba(var(--ink-rgb),0.16)">
             <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55)">{{ s.label }}</div>
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:var(--ink-strong)">{{ s.value }}</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:var(--ink-strong)">{{ s.value }}</div>
           </div>
         </sc-for>
       </div>
       <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:24px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite"></span>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Live activity — in the field right now</div>
+          <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Live activity — in the field right now</div>
           <div style="margin-left:auto;font-size:11px;color:rgba(var(--ink-rgb),0.5)">Read-only · refreshes automatically</div>
         </div>
         <sc-if value="{{ hasLiveTickets }}" hint-placeholder-val="{{ true }}">
@@ -1944,7 +2004,7 @@
               <div class="mk-live-row">
                 <div class="mk-live-head">
                   <div style="min-width:0">
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
+                    <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
                     <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);line-height:1.35">{{ lt.tech }} · {{ lt.locLine }}</div>
                   </div>
                   <div class="mk-live-presence"><span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}</div>
@@ -1979,7 +2039,7 @@
           <tbody>
             <sc-for list="{{ founderRows }}" as="t" hint-placeholder-count="3">
               <tr onClick="{{ t.open }}" style="cursor:pointer">
-                <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
                 <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
                 <td data-label="Well" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.well }}</td>
                 <td data-label="Job type" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:rgba(var(--ink-rgb),0.75);font-size:13px">{{ t.jobType }}</td>
@@ -2000,12 +2060,12 @@
     <div class="mk-page" style="padding:26px 30px 96px;max-width:900px;margin:0 auto">
 
       <sc-if value="{{ navActivity }}" hint-placeholder-val="{{ false }}">
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Activity</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Activity</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">{{ activityScope }} · newest first</div>
         <sc-if value="{{ showActivityChips }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;gap:8px;margin-bottom:18px">
             <sc-for list="{{ activityChips }}" as="c" hint-placeholder-count="3">
-              <button onClick="{{ c.pick }}" style="padding:6px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:{{ c.bg }};color:{{ c.fg }};border:1px solid rgba(var(--ink-rgb),0.22)">{{ c.label }}</button>
+              <button onClick="{{ c.pick }}" style="padding:6px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:{{ c.bg }};color:{{ c.fg }};border:1px solid rgba(var(--ink-rgb),0.22)">{{ c.label }}</button>
             </sc-for>
           </div>
         </sc-if>
@@ -2031,7 +2091,7 @@
            device: an office user never creates tickets, so their own pending list is
            permanently empty and tells them nothing. -->
       <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Field devices</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Field devices</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Longest out of contact first. Positions refresh only while a job is open.</div>
         <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;flex-direction:column;gap:10px">
@@ -2040,7 +2100,7 @@
                 <div class="mk-dev-top">
                   <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:7px"></span>
                   <div style="flex:1;min-width:0">
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
+                    <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
                     <div style="font-size:13px;color:rgba(var(--ink-rgb),0.65)">{{ d.base }} · {{ d.tollLabel }}</div>
                   </div>
                   <div class="mk-dev-contact">
@@ -2074,7 +2134,7 @@
       </sc-if>
 
       <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ true }}">
-        <h2 style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Account</h2>
+        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Account</h2>
         <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:20px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
         <sc-if value="{{ showReports }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
@@ -2104,13 +2164,13 @@
                   <tbody>
                     <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="3">
                       <tr>
-                        <td data-label="Ticket No." style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }}</td>
+                        <td data-label="Ticket No." style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }}</td>
                         <td data-label="Technician" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.crewLabel }}</td>
                         <td data-label="Customer" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.customer }}</td>
                         <td data-label="Field / Well / Rig" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:rgba(var(--ink-rgb),0.75)">{{ r.locLine }}</td>
                         <td data-label="Date" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:rgba(var(--ink-rgb),0.75)">{{ r.dateRange }}</td>
                         <td style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
-                          <button onClick="{{ r.download }}" title="Download this ticket only" style="padding:5px 11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                          <button onClick="{{ r.download }}" title="Download this ticket only" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
                         </td>
                       </tr>
                     </sc-for>
@@ -2122,7 +2182,7 @@
               <div style="padding:18px 0;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.5)">No approved jobs finished in that month.</div>
             </sc-if>
 
-            <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
+            <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
             <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.45">The bundle is one overview table of everything listed above. ZIP on a row gives that ticket alone: originals in one PDF, copies in the other.</div>
           </div>
         </sc-if>
@@ -2133,22 +2193,22 @@
         <sc-if value="{{ showMasterExport }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
+              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
               <div style="flex:1;min-width:0">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
                 <div style="font-size:12px;color:{{ masterTone }};margin-top:2px">{{ masterState }}</div>
               </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button onClick="{{ downloadMaster }}" disabled="{{ masterCannotDownload }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download</button>
-              <button onClick="{{ refreshMaster }}" disabled="{{ masterBusy }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Rebuild now</button>
+              <button onClick="{{ downloadMaster }}" disabled="{{ masterCannotDownload }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download</button>
+              <button onClick="{{ refreshMaster }}" disabled="{{ masterBusy }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Rebuild now</button>
             </div>
             <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px;line-height:1.45">One row per approved job. The server rebuilds it on its own within a minute of any approval — Rebuild now is only for when you do not want to wait. The download link expires after a minute.</div>
           </div>
         </sc-if>
         <sc-if value="{{ showClaimPanel }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
-            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket numbering claim</div>
+            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket numbering claim</div>
             <div style="font-size:14px;font-weight:600;margin-bottom:2px">{{ claimHolderName }}</div>
             <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-bottom:4px">{{ claimSinceLabel }}</div>
             <div style="font-size:11px;color:rgba(var(--ink-rgb),0.45);margin-bottom:10px">{{ claimLastMove }}</div>
@@ -2157,7 +2217,7 @@
               <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ claimAdminOverrideText }}</div>
             </sc-if>
             <sc-if value="{{ claimCanTransfer }}" hint-placeholder-val="{{ true }}">
-              <button onClick="{{ claimTransfer }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">{{ claimTransferLabel }}</button>
+              <button onClick="{{ claimTransfer }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">{{ claimTransferLabel }}</button>
             </sc-if>
             <sc-if value="{{ claimCannotTransfer }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:12px;line-height:1.45;color:rgba(var(--ink-rgb),0.55)">{{ claimCannotText }}</div>
@@ -2169,14 +2229,14 @@
             <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:13px;padding:15px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
               <div class="mk-icon-chip" style="background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.glyph }}</div>
               <div style="flex:1;min-width:0">
-                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px">{{ m.label }}</div>
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px">{{ m.label }}</div>
                 <div style="font-size:13px;color:rgba(var(--ink-rgb),0.6)">{{ m.hint }}</div>
               </div>
               <span style="flex:none;color:rgba(var(--ink-rgb),0.35)">{{ m.chevron }}</span>
             </button>
           </sc-for>
         </div>
-        <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:20px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
+        <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:20px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
         <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.3);margin-top:14px">BUILD {{ buildStamp }}</div>
       </sc-if>
 
@@ -2207,7 +2267,7 @@
   <sc-if value="{{ hasDialog }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;display:grid;place-items:center;padding:20px;background:var(--scrim);z-index:50">
       <div style="width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--ground);border:1px solid rgba(var(--ink-rgb),0.3);box-shadow:0 12px 32px rgba(var(--shadow-rgb),0.32)">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px">{{ dialog.title }}</div>
+        <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px">{{ dialog.title }}</div>
         <div style="font-size:14px;color:rgba(var(--ink-rgb),0.8)">{{ dialog.body }}</div>
         <sc-if value="{{ dialog.needsPerson }}" hint-placeholder-val="{{ false }}">
           <select value="{{ handoverTo }}" onChange="{{ setHandoverTo }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.22);color:var(--ink)">
@@ -2218,13 +2278,13 @@
           </select>
         </sc-if>
         <sc-if value="{{ dialog.needsReason }}" hint-placeholder-val="{{ false }}">
-          <textarea value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="Reason for reopening — recorded in the audit trail" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
+          <textarea dir="auto" value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="Reason for reopening — recorded in the audit trail" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
         </sc-if>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
           <sc-if value="{{ dialog.hasCancel }}" hint-placeholder-val="{{ true }}">
-            <button onClick="{{ dialog.cancel }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:{{ dialog.cancelFg }};border:1px solid {{ dialog.cancelBorder }}">{{ dialog.cancelLabel }}</button>
+            <button onClick="{{ dialog.cancel }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:{{ dialog.cancelFg }};border:1px solid {{ dialog.cancelBorder }}">{{ dialog.cancelLabel }}</button>
           </sc-if>
-          <button onClick="{{ dialog.confirm }}" style="padding:9px 16px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:{{ dialog.okBg }};color:{{ dialog.okFg }};border:1px solid {{ dialog.okBg }}">{{ dialog.okLabel }}</button>
+          <button onClick="{{ dialog.confirm }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:{{ dialog.okBg }};color:{{ dialog.okFg }};border:1px solid {{ dialog.okBg }}">{{ dialog.okLabel }}</button>
         </div>
       </div>
     </div>
@@ -2915,6 +2975,65 @@ function diffOps(before, after) {
   }
   return ops;
 }
+// ── The printed sheet's geometry ──────────────────────────────────────────────────
+// One set of numbers for two renderers. The A4 preview lays the sheet out in CSS pixels
+// across a 602px content column; the PDF draws the same document in millimetres. Rather
+// than keep two sets of measurements in step by hand — which is exactly how the PDF came
+// to be a different document from the preview — everything below is stated once, in the
+// preview's pixels, and drawSheet scales it into the printable area.
+//
+// Change a number here and both move together. `mksheet.test.js` fails if they stop
+// agreeing.
+const SHEET = {
+  M: 12,      // page margin, mm — all four sides
+  W: 186,     // printable width, mm (210 less two margins)
+  PX: 602,    // the preview's content width in CSS pixels; the unit for everything below
+  // Band heights, measured off the rendered preview.
+  letterhead: 71.6,
+  titleBar: 64.9,
+  fieldRow: 24.4,
+  jobType: 30.4,
+  headRow: 21,
+  itemRow: 21.5,
+  totalRow: 30.4,
+  timeHead: 19,
+  timeVal: 23,
+  signFoot: 72,   // from the foot of the printable area to the first signature rule
+  // Column widths, fixed rather than content-derived. The preview's table used to size
+  // its own columns, so a long item description moved every column and no two tickets
+  // printed alike. Fixed shares make the form a form.
+  itemCols: [
+    { w: 78.26,  align: 'left' },    // Item no.        13%
+    { w: 288.96, align: 'left' },    // Item Description 48%
+    { w: 36.12,  align: 'center' },  // Qty              6%
+    { w: 42.14,  align: 'center' },  // Unit             7%
+    { w: 72.24,  align: 'right' },   // Unit Cost       12%
+    { w: 84.28,  align: 'right' },   // Total Cost      14%
+  ],
+  // The printable height, in the same pixels.
+  get PAGE_PX() { return this.PX * (297 - 2 * this.M) / this.W; },
+  // How many ruled rows fit on a page of each kind, once the fixed bands above and the
+  // signature block below have taken their share. Computed rather than picked, so a
+  // change to any band height cannot leave a stale cap behind it — which is exactly how
+  // the signature block ended up printed through the item table.
+  rowsFor: function (kind) {
+    const above = kind === 'service'
+      ? this.letterhead + this.titleBar + 6 * this.fieldRow + this.jobType + this.headRow + this.totalRow
+      : this.letterhead + this.titleBar + 4 * this.fieldRow + this.timeHead + this.timeVal + 10 + this.headRow;
+    return Math.max(1, Math.floor((this.PAGE_PX - above - this.signFoot) / this.itemRow));
+  },
+  // `halign` is the heading's alignment where it differs from the data's. On the log
+  // sheet the Pressure and Total headings sit left while their figures are centred,
+  // which is what the preview does and therefore what the PDF must do.
+  logCols: [
+    { w: 60.20,  align: 'left' },                     // Date              10%
+    { w: 48.16,  align: 'left' },                     // Time               8%
+    { w: 48.16,  align: 'center', halign: 'left' },   // Pressure           8%
+    { w: 42.14,  align: 'center', halign: 'left' },   // Total              7%
+    { w: 403.34, align: 'left' },                     // Details of the Job 67%
+  ],
+};
+
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -4347,12 +4466,60 @@ class Component extends DCLogic {
     const need = [];
     if (!(window.jspdf && window.jspdf.jsPDF)) need.push('./vendor/jspdf.umd.min.js');
     if (!window.JSZip) need.push('./vendor/jszip.min.js');
+    // The Arabic face the sheets are drawn with. Kept out of the boot path for the same
+    // reason jsPDF is: most sessions never export anything, and nobody should pay for a
+    // font they will not use until they ask for a file.
+    if (!window.MK_ARABIC_FONT) need.push('./vendor/jspdf-noto-arabic.js');
     this._exporters = Promise.all(need.map(src => new Promise((resolve, reject) => {
       const el = document.createElement('script');
       el.src = src; el.onload = resolve; el.onerror = () => reject(new Error(src));
       document.head.appendChild(el);
     })));
+    this._exporters = this._exporters.then(() => this.loadSheetLogo());
     return this._exporters;
+  }
+
+  // The sheet's geometry, reachable from a test. Both renderers scale from these numbers,
+  // so a test that cannot read them can only check that the two look similar — not that
+  // they are driven by the same constants, which is the property that stops them drifting.
+  sheetGeometry() { return SHEET; }
+
+  // The letterhead logo, as a data URL, fetched once and kept.
+  //
+  // jsPDF's addImage needs the bytes in hand — there is no async form — so the fetch has
+  // to finish before any sheet is drawn, which is why it is chained onto loadExporters
+  // rather than attempted at draw time. It goes through a canvas because that is what
+  // turns an <img> into the base64 the PDF embeds.
+  //
+  // A missing or unreadable logo resolves to null and the sheet simply draws without it.
+  // A technician who cannot produce a ticket at all is a worse failure than a ticket
+  // with no letterhead mark on it.
+  loadSheetLogo() {
+    if (this._sheetLogoP) return this._sheetLogoP;
+    this._sheetLogoP = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          // Downscaled before it is embedded. The source is 2656px wide and the sheet
+          // draws it at about 46mm, so full resolution put nine megabytes of letterhead
+          // into a ticket — on a file a technician may be sending over a field
+          // connection. 640px is still better than twice what 300dpi print needs.
+          const CAP = 640;
+          const scale = Math.min(1, CAP / img.naturalWidth);
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.naturalWidth * scale);
+          c.height = Math.round(img.naturalHeight * scale);
+          const ctx = c.getContext('2d');
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          this._sheetLogo = c.toDataURL('image/png');
+        } catch (e) { this._sheetLogo = null; }
+        resolve(this._sheetLogo);
+      };
+      img.onerror = () => { this._sheetLogo = null; resolve(null); };
+      img.src = 'uploads/makaman-logo-full.png';
+    });
+    return this._sheetLogoP;
   }
 
   // Hands the browser a file. Revoking on the next tick rather than immediately: Safari
@@ -4368,127 +4535,230 @@ class Component extends DCLogic {
   // One printed sheet, drawn in millimetres on A4. Vector text rather than a screenshot
   // of the preview: it stays crisp at any zoom, the file is a fraction of the size, and
   // the numbers stay selectable and searchable in the client's PDF reader.
+  // ── The printed sheet ────────────────────────────────────────────────────────────
+  //
+  // This draws the same document the A4 preview shows, in vector, at print resolution.
+  //
+  // The two are separate renderers — HTML on screen, jsPDF in the file — and they had
+  // drifted badly. The preview had grown the letterhead, the boxed field grid, the
+  // ticket-number panel and the ruled item table; the PDF had stayed a plain list of
+  // typed lines with no boxes and no logo. The customer signs the PDF, so the PDF is the
+  // one that had to move.
+  //
+  // Geometry is not re-invented here. Every number is the preview's own pixel
+  // measurement scaled into millimetres — SHEET.PX of content across SHEET.W of
+  // printable width — so there is one set of proportions rather than two, and a change
+  // to the preview is a change to one constant here rather than a redesign.
+  // `mksheet.test.js` renders both and fails if the bands stop lining up.
+  //
+  // Colours are the literals the preview uses, converted once. They are deliberately not
+  // theme tokens: this sheet must look the same whatever the app is restyled to.
   drawSheet(doc, page) {
-    const L = 12, R = 198, W = R - L;
-    let y = 14;
-    const line = (y1) => { doc.setDrawColor(70); doc.line(L, y1, R, y1); };
+    const G = SHEET, S = G.W / G.PX;
+    const mm = (px) => px * S;                    // preview pixels → millimetres
+    const pt = (px) => px * S / 0.3527777778;     // preview pixels → points
+    const L = G.M, T = G.M;
+    // The printable area, expressed in the preview's own pixels.
+    const PAGEH = G.PX * (297 - 2 * G.M) / G.W;
 
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(20);
-    doc.text('MAKAMAN LIBYA COMPANY', L, y);
-    doc.text('OIL SERVICES INCORPORATED', L, y + 4);
-    doc.text('TOOLS & TESTING · TRIPOLI - LIBYA', L, y + 8);
-    doc.setFontSize(13);
-    doc.text(page.title.toUpperCase() + ' (' + page.mark + ')' + (page.pageLabel || ''), R, y + 2, { align: 'right' });
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-    doc.text('Ticket No: ' + page.no, R, y + 8, { align: 'right' });
-    y += 13; line(y); y += 6;
+    const INK = [29, 31, 32];
+    const RULE = [186, 187, 187];    // rgba(29,31,32,0.3) over white
+    const LABEL_BG = [233, 233, 234];
+    const PANEL_BG = [238, 243, 248];
+    const MUTED = [105, 106, 107];   // rgba(29,31,32,0.65)
+    const FAINT = [127, 128, 128];   // rgba(29,31,32,0.5)
+    const NAVY = [29, 45, 61];       // #1d2d3d
 
-    // header field rows, two columns where the sheet has two
-    doc.setFontSize(8);
-    const rows = page.isService ? page.svcRows : page.logRows;
-    (rows || []).forEach(r => {
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(105);
-      doc.text(String(r.labelA || ''), L, y);
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
+    const face = (weight) => (weight >= 600 ? 'bold' : 'normal');
+    const ink = (c) => doc.setTextColor(c[0], c[1], c[2]);
+
+    // A filled and/or stroked rectangle in preview pixels.
+    const box = (x, y, w, h, fill) => {
+      if (fill) { doc.setFillColor(fill[0], fill[1], fill[2]); doc.rect(mm(x) + L, mm(y) + T, mm(w), mm(h), 'F'); }
+      doc.setDrawColor(RULE[0], RULE[1], RULE[2]); doc.setLineWidth(0.2);
+      doc.rect(mm(x) + L, mm(y) + T, mm(w), mm(h), 'S');
+    };
+    const vline = (x, y, h) => {
+      doc.setDrawColor(RULE[0], RULE[1], RULE[2]); doc.setLineWidth(0.2);
+      doc.line(mm(x) + L, mm(y) + T, mm(x) + L, mm(y + h) + T);
+    };
+    // Text placed by its box rather than by a baseline, so a cell's vertical centring is
+    // stated once here instead of being guessed per call.
+    const txt = (str, x, y, w, h, o) => {
+      const s = String(str == null ? '' : str);
+      if (!s) return;
+      const opt = o || {};
+      const size = opt.size || 10;
+      doc.setFont('helvetica', face(opt.weight || 400));
+      doc.setFontSize(pt(size));
+      ink(opt.color || INK);
+      let tx = mm(x) + L + mm(opt.padX == null ? 5 : opt.padX);
+      let align = 'left';
+      if (opt.align === 'center') { tx = mm(x + w / 2) + L; align = 'center'; }
+      else if (opt.align === 'right') { tx = mm(x + w) + L - mm(opt.padX == null ? 5 : opt.padX); align = 'right'; }
+      const ty = mm(y + h / 2) + T + pt(size) * 0.3527777778 * 0.36;
+      let out = s;
+      if (opt.clip) {
+        const room = mm(w) - mm(2 * (opt.padX == null ? 5 : opt.padX));
+        while (out.length > 1 && doc.getTextWidth(out) > room) out = out.slice(0, -1);
+      }
+      doc.text(out, tx, ty, { align: align });
+    };
+
+    let y = 0;
+
+    // ── Letterhead ──
+    // English block, logo, Arabic block. The Arabic is drawn through the same wrapper as
+    // everything else, so teachPdfArabic swaps in the embedded face for it.
+    {
+      const H = G.letterhead;
+      const colW = (G.PX - 150 - 28) / 2;
+      const en = ['MAKAMAN LIBYA COMPANY', 'OIL SERVICES INCORPORATED', 'TOOLS & TESTING', 'TRIPOLI- LIBYA'];
+      const ar = ['شركة مكامن ليبيا', 'للخدمات النفطية المساهمة', 'للاختبارات ومعدات صيانة الآبار', 'طرابلس- ليبيا'];
+      const lineH = 9 * 1.6;
+      const top = (H - lineH * 4) / 2;
+      en.forEach((t, i) => txt(t, 0, top + i * lineH, colW, lineH, { size: 9, weight: 700, align: 'center' }));
+      ar.forEach((t, i) => txt(t, colW + 150 + 28, top + i * lineH, colW, lineH, { size: 9, weight: 700, align: 'center' }));
+      const logo = this._sheetLogo;
+      if (logo) {
+        try { doc.addImage(logo, 'PNG', mm(colW + 14) + L, mm(top - 2) + T, mm(150), mm(48)); } catch (e) { /* no logo, no sheet lost */ }
+      }
+      y = H;
+    }
+
+    // ── Title bar: company line + ticket-number panel ──
+    {
+      const H = G.titleBar, panelW = 96;
+      box(0, y, G.PX - panelW, H);
+      box(G.PX - panelW, y, panelW, H, PANEL_BG);
+      txt('MAKAMAN LIBYA OIL SERVICES INC.', 0, y + 6, G.PX - panelW, 24, { size: 19, weight: 600, padX: 10 });
+      txt(String(page.title || '').toUpperCase() + ' (' + (page.mark || '') + ')' + (page.pageLabel || ''),
+        0, y + 32, G.PX - panelW, 18, { size: 12, color: MUTED, padX: 10 });
+      txt('TICKET NO:', G.PX - panelW, y + 6, panelW, 14, { size: 10, color: MUTED, align: 'center' });
+      txt(String(page.no || ''), G.PX - panelW, y + 22, panelW, 30, { size: 25, weight: 700, color: NAVY, align: 'center' });
+      y += H;
+    }
+
+    // ── The header field grid ──
+    const rows = (page.isService ? page.svcRows : page.logRows) || [];
+    const labelW = page.isService ? 110 : 108;
+    rows.forEach((r) => {
+      const H = G.fieldRow;
+      const half = r.hasB ? G.PX / 2 : G.PX;
+      box(0, y, G.PX, H);
+      box(0, y, labelW, H, LABEL_BG);
+      txt(String(r.labelA || '').toUpperCase(), 0, y, labelW, H, { size: 9.5, color: MUTED, padX: 7 });
       const va = String(r.valueA || '');
-      doc.text(va, L + 32, y);
-      // The footnote sits immediately after the value, at two-thirds the size and in
-      // grey. Where it starts is measured from the value rather than fixed, so a long
-      // well number pushes it along instead of being overwritten. The measurement has
-      // to happen while the value's own font is still selected — getTextWidth reports
-      // against whatever is current, so measuring after the switch would size the gap
-      // by the footnote's font and run the two together.
-      const vaWidth = doc.getTextWidth(va);
+      txt(va, labelW, y, half - labelW, H, { size: 12, weight: 600, padX: 7, clip: true });
       if (r.noteA) {
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.6); doc.setTextColor(120);
-        const at = L + 32 + vaWidth + 2;
-        // The right-hand label of the pair starts at L+100, and an unusually long well
-        // number would otherwise walk the footnote straight into it. Same ladder as the
-        // overview table: full precision, then four decimals (about ten metres, which
-        // still finds a wellhead), then nothing rather than an overlap.
-        const room = (L + 97) - at;
-        const note = String(r.noteA);
-        const short = note.replace(/(-?\d+\.\d{4})\d*/g, '$1');
-        const pick = doc.getTextWidth(note) <= room ? note
-          : (doc.getTextWidth(short) <= room ? short : '');
-        if (pick) doc.text(pick, at, y);
-        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(pt(12));
+        const at = labelW + 7 + (doc.getTextWidth(va) / S) + 3;
+        txt(String(r.noteA), at, y, half - at, H, { size: 8, color: FAINT, padX: 0, clip: true });
       }
       if (r.hasB) {
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(105);
-        doc.text(String(r.labelB || ''), L + 100, y);
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
-        doc.text(String(r.valueB || ''), L + 132, y);
+        vline(half, y, H);
+        box(half, y, labelW, H, LABEL_BG);
+        txt(String(r.labelB || '').toUpperCase(), half, y, labelW, H, { size: 9.5, color: MUTED, padX: 7 });
+        txt(String(r.valueB || ''), half + labelW, y, half - labelW, H, { size: 12, weight: 600, padX: 7, clip: true });
       }
-      y += 5.4;
+      y += H;
     });
-    y += 1; line(y); y += 6;
 
     if (page.isService) {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(20);
-      doc.text(String(page.jobType || ''), L + W / 2, y, { align: 'center' });
-      y += 6;
-      const cols = [L, L + 24, L + 108, L + 122, L + 140, L + 166];
-      const heads = ['Item no.', 'Item Description', 'Qty', 'Unit', 'Unit Cost', 'Total Cost'];
-      doc.setFontSize(7.5);
-      heads.forEach((h, i) => doc.text(h, i >= 2 ? cols[i] : cols[i], y));
-      y += 2; line(y); y += 4;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-      (page.items || []).forEach(it => {
+      // ── Job type band ──
+      box(0, y, G.PX, G.jobType, PANEL_BG);
+      txt(String(page.jobType || ''), 0, y, G.PX, G.jobType, { size: 12, weight: 700, align: 'center' });
+      y += G.jobType + 10;
+
+      // ── Charged items ──
+      const cols = G.itemCols, heads = ['Item no.', 'Item Description', 'Qty', 'Unit', 'Unit Cost', 'Total Cost'];
+      let x = 0;
+      cols.forEach((c, i) => {
+        box(x, y, c.w, G.headRow, LABEL_BG);
+        txt(heads[i], x, y, c.w, G.headRow, { size: 10, weight: 600, align: c.align });
+        x += c.w;
+      });
+      y += G.headRow;
+      (page.items || []).forEach((it) => {
+        let cx = 0;
+        cols.forEach((c) => { box(cx, y, c.w, G.itemRow); cx += c.w; });
         if (it.code || it.desc) {
-          doc.setTextColor(20);
-          doc.text(String(it.code || ''), cols[0], y);
-          doc.text(doc.splitTextToSize(String(it.desc || ''), 80)[0] || '', cols[1], y);
-          doc.text(String(it.qty || ''), cols[2], y);
-          doc.text(String(it.uom || ''), cols[3], y);
-          doc.text(String(it.unit || ''), cols[5] - 2, y, { align: 'right' });
-          doc.text(String(it.total || ''), R, y, { align: 'right' });
+          const vals = [it.code, it.desc, it.qty, it.uom, it.unit, it.total];
+          let vx = 0;
+          cols.forEach((c, i) => {
+            txt(vals[i], vx, y, c.w, G.itemRow, { size: 10, align: c.align, clip: true });
+            vx += c.w;
+          });
         }
-        doc.setDrawColor(215); doc.line(L, y + 1.4, R, y + 1.4);
-        y += 5;
+        y += G.itemRow;
       });
       if (page.showTotal) {
-        y += 2; doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(20);
-        doc.text('Total =', cols[4], y);
-        doc.text(String(page.total || ''), R, y, { align: 'right' });
-        y += 4;
+        const tw = 110;
+        box(0, y, G.PX - tw, G.totalRow, LABEL_BG);
+        box(G.PX - tw, y, tw, G.totalRow, LABEL_BG);
+        txt('Total =', 0, y, G.PX - tw, G.totalRow, { size: 12, weight: 700, align: 'right', padX: 8 });
+        txt(String(page.total || ''), G.PX - tw, y, tw, G.totalRow, { size: 12, weight: 700, align: 'right', padX: 8 });
+        y += G.totalRow;
       }
     } else {
-      (page.logTimes || []).forEach(lt => {
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(105); doc.setFontSize(8);
-        doc.text(lt.label + ':', L, y);
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(20);
-        doc.text(String(lt.value || ''), L + 40, y);
-        y += 5;
+      // ── Arrival / start / end, three across ──
+      const times = page.logTimes || [];
+      if (times.length) {
+        const cw = G.PX / times.length;
+        times.forEach((lt, i) => {
+          box(i * cw, y, cw, G.timeHead, LABEL_BG);
+          txt(String(lt.label || '').toUpperCase(), i * cw, y, cw, G.timeHead, { size: 10, color: MUTED, align: 'center' });
+          box(i * cw, y + G.timeHead, cw, G.timeVal);
+          txt(String(lt.value || ''), i * cw, y + G.timeHead, cw, G.timeVal, { size: 12, weight: 600, align: 'center' });
+        });
+        y += G.timeHead + G.timeVal;
+      }
+      y += 10;
+
+      // ── The job log ──
+      const cols = G.logCols, heads = ['Date', 'Time', 'Pressure', 'Total', 'Details of the Job'];
+      let x = 0;
+      cols.forEach((c, i) => {
+        box(x, y, c.w, G.headRow, LABEL_BG);
+        txt(heads[i], x, y, c.w, G.headRow, { size: 10, weight: 600, align: c.halign || c.align });
+        x += c.w;
       });
-      y += 2;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(20);
-      doc.text('Date', L, y); doc.text('Time', L + 22, y); doc.text('Description of Operations', L + 42, y);
-      y += 2; line(y); y += 4;
-      doc.setFont('helvetica', 'normal');
-      (page.events || []).forEach(e => {
+      y += G.headRow;
+      (page.events || []).forEach((e) => {
+        let cx = 0;
+        cols.forEach((c) => { box(cx, y, c.w, G.itemRow); cx += c.w; });
         if (e.text) {
-          doc.setTextColor(20);
-          doc.text(String(e.date || ''), L, y);
-          doc.text(String(e.time || ''), L + 22, y);
-          doc.text(doc.splitTextToSize(String(e.text || ''), 140)[0] || '', L + 42, y);
+          const vals = [e.date, e.time, e.pressure, e.durTotal, e.text];
+          const tone = [INK, INK, FAINT, FAINT, INK];
+          let vx = 0;
+          cols.forEach((c, i) => {
+            txt(vals[i], vx, y, c.w, G.itemRow, { size: 10, align: c.align, color: tone[i], clip: true });
+            vx += c.w;
+          });
         }
-        doc.setDrawColor(215); doc.line(L, y + 1.4, R, y + 1.4);
-        y += 5;
+        y += G.itemRow;
       });
     }
 
+    // ── Signatures, pinned to the foot of the page ──
+    // The preview pins these with margin-top:auto so they sit at the bottom of the A4
+    // card whatever is above them. Same here: measured from the page edge, not from y.
     if (page.showSignature) {
-      const sy = 268;
-      doc.setDrawColor(70);
-      doc.line(L, sy, L + 70, sy);
-      doc.line(R - 70, sy, R, sy);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(105);
-      doc.text('CUSTOMER REPRESENTATIVE', L, sy + 4);
-      doc.text(String(page.signee2 || ''), R, sy + 4, { align: 'right' });
+      const sy = PAGEH - G.signFoot;
+      const gap = 20, colW = (G.PX - gap) / 2;
+      const rule = (x, yy) => {
+        doc.setDrawColor(128, 129, 130); doc.setLineWidth(0.25);
+        doc.line(mm(x) + L, mm(yy) + T, mm(x + colW) + L, mm(yy) + T);
+      };
+      rule(0, sy); rule(colW + gap, sy);
+      txt('Customer or his agent', 0, sy + 4, colW, 14, { size: 11, align: 'center' });
+      txt(String(page.signee2 || ''), colW + gap, sy + 4, colW, 14, { size: 11, align: 'center' });
+      rule(0, sy + 40); rule(colW + gap, sy + 40);
+      txt('Representative Signature', 0, sy + 44, colW, 14, { size: 11, color: MUTED, align: 'center' });
+      txt('Representative Signature', colW + gap, sy + 44, colW, 14, { size: 11, color: MUTED, align: 'center' });
     } else if (page.isContinued) {
-      doc.setFontSize(7.5); doc.setTextColor(120);
-      doc.text('continued overleaf', R, 272, { align: 'right' });
+      const sy = PAGEH - G.signFoot;
+      txt('CONTINUED ON NEXT PAGE…', 0, sy, G.PX, 14, { size: 11, color: FAINT, align: 'center' });
     }
   }
 
@@ -4496,8 +4766,49 @@ class Component extends DCLogic {
   pdfFromPages(pages) {
     const JsPDF = window.jspdf.jsPDF;
     const doc = new JsPDF({ unit: 'mm', format: 'a4' });
+    this.teachPdfArabic(doc);
     pages.forEach((pg, i) => { if (i) doc.addPage(); this.drawSheet(doc, pg); });
     return doc;
+  }
+
+  // Arabic on a printed ticket.
+  //
+  // A Libyan customer's name gets typed in Arabic, and the sheet that name prints on is
+  // the document the client signs. jsPDF already shapes it correctly — it emits the
+  // contextual presentation forms in visual order — but every font it ships with is
+  // WinAnsi, so the shaped text had nothing to draw with and came out as Latin-1
+  // rubbish. This registers a face that can draw it.
+  //
+  // Done by wrapping doc.text once rather than by editing the drawing code, because
+  // drawSheet makes something like forty text calls and each one is preceded by its own
+  // setFont. Teaching each call site about Arabic would mean forty chances to miss one,
+  // and the next field added to the sheet would be the forty-first. Here there is a
+  // single rule: whatever is being drawn, if it contains Arabic it is drawn in the
+  // Arabic face, and the caller's own font is put back afterwards so the following line
+  // is unaffected. Latin text never touches this path and still renders in Helvetica.
+  //
+  // Failing soft is deliberate. If the font file did not load, the sheets must still
+  // export — a ticket with a mangled customer name is bad, a technician who cannot
+  // produce a ticket at all is worse.
+  teachPdfArabic(doc) {
+    const F = typeof window !== 'undefined' && window.MK_ARABIC_FONT;
+    if (!F || doc.__mkArabic) return;
+    let face;
+    try { face = F.register(doc); } catch (e) { return; }
+    doc.__mkArabic = true;
+    const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+    const original = doc.text.bind(doc);
+    doc.text = function (txt, x, y, opts) {
+      // A wrapped line arrives as an array; one Arabic line in it is enough.
+      const probe = Array.isArray(txt) ? txt.join(' ') : String(txt == null ? '' : txt);
+      if (!ARABIC.test(probe)) return original(txt, x, y, opts);
+      const was = doc.getFont();
+      // Only Regular is embedded. Asking for bold would silently fall back to a face
+      // that cannot draw the script, which is the bug this exists to fix.
+      doc.setFont(face, 'normal');
+      try { return original(txt, x, y, opts); }
+      finally { doc.setFont(was.fontName, was.fontStyle); }
+    };
   }
 
   // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF and
@@ -4632,8 +4943,12 @@ class Component extends DCLogic {
     // full-size A4 print page (the actual PDF export target, ~297mm/1122px tall) instead,
     // the real 24/25 counts fit with ~195-210px (10+ rows) to spare before the signature
     // block, so the on-screen cap was the artificial constraint, not the page itself.
-    const ITEM_ROW_CAP = 24;
-    const LOG_ROW_CAP = 25;
+    // How many ruled rows fit on one page beneath the header bands and above the
+    // signature block. Derived from SHEET, not chosen: 24 rows overflowed the printable
+    // area, which the preview hid by scrolling inside its card and the PDF showed by
+    // printing the signatures straight through the table.
+    const ITEM_ROW_CAP = SHEET.rowsFor('service');
+    const LOG_ROW_CAP = SHEET.rowsFor('log');
     const sheetItemsReal = t ? (t.items || []).map(i => ({
       code: i.code, desc: i.desc,
       qty: i.kind === 'percent' ? '—' : String(i.qty),

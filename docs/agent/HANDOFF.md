@@ -343,12 +343,60 @@ you most want attributed when the office is in the field. Now carries `by` and `
 
 ---
 
+## 2i. THE PRINTED SHEET, AND ARABIC CONTENT (2026-08-26)
+
+### What the user decided
+- **The interface stays English.** Arabic/RTL mirroring of the UI was started and then
+  **reverted in full** on the user's instruction: *"Dont bother yourself with mirroring the
+  UI will never be in Arabic that's not needed. Just allow text entry in arabic if
+  necessary."* The `user_settings.dir` column added by migration 0024 was dropped again by
+  **0025** — a preference with no control behind it is drift. Do not re-open this.
+- **The viewport must follow the device, not the role.** A technician on a laptop was
+  getting a 760px strip with 580px of black either side.
+- **The PDF must be the A4 preview.** *"The client should be receiving the pdf as an exact
+  copy of the A4 preview I see when generating"*, and the sheet must hold that layout
+  **even when the app around it is restyled**.
+
+### What shipped
+| What | Where |
+|------|-------|
+| Technician column steps 760 → 1040 → 1280 → 1420px; cards, sync rows and account tiles become a grid; create + search share a row on desktop | `.mk-card-grid`, `.mk-tech-actions` |
+| Arabic **content** support: Noto Sans Arabic vendored and precached, `dir="auto"` on all 40 free-text fields, Arabic-capable stacks everywhere | `vendor/fonts.css`, `vendor/fonts/` |
+| Arabic in the **PDF** — the customer name was printing as `þ¨þ×þŽþÄþàþß` | `vendor/jspdf-noto-arabic.js`, `teachPdfArabic()` |
+| `drawSheet` rewritten to reproduce the preview: letterhead, logo, Arabic block, boxed field grid, ticket panel, ruled table, signatures | `drawSheet()`, `SHEET` |
+| The sheet sealed against the app's own styles | `.mk-sheet` lock |
+| Row caps derived from the page instead of picked | `SHEET.rowsFor()` |
+
+### The rule that matters going forward
+**`SHEET` is the single source of truth for the printed sheet.** The preview and the PDF
+both scale from it. Change a band height or a column share there and both move together;
+hardcode a number in either renderer and they drift again — which is exactly what had
+already happened (B-17.1). `app/mksheet.test.js` fails if they separate.
+
+### Still open on this
+- **The 3px card stripe is dead code** (B-17.5) — an inline `border:1px` beats the class.
+  Left alone: fixing it changes how every ticket card looks, which is the user's call.
+- **`exportExcel` still only opens a dialog.** The ZIP/PDF path is real; the Excel one is not.
+
+### Verification
+`app/mksheet.test.js` — 14 assertions, including that **no band moves with every one of the
+app's stylesheets disabled**, and that the item columns are the same shares in both
+renderers (matched to four decimals). `app/arabic.test.js` — 19, including a PDF check and a
+cold boot with the network cut. Regression: `layout` 13, `tabs` 11, `export` 14, `office` 15,
+`office2` 12, `techreport` 13, `coop` 21, `roles` 11, `observer` 18 — all green.
+
+---
+
 ## 3. NEXT TASK — see §6 for the sequencing decision
 
-Remaining functional work: the **approved-ticket → master Excel** automation (the user asked to be questioned in
-detail first), and **Arabic / RTL**, still marked 🔴 critical for the market.
+Remaining functional work: **`exportExcel` is still a stub** (it logs a line and opens a
+dialog), the **offline/online stress test**, the **"Apper" skill**, and the **Q1 rewording**.
 
-**Do RTL before the design pass** — see §6.
+**Arabic / RTL mirroring is cancelled** — see §2i. The UI stays English; Arabic *content*
+is supported and tested. MINDMAP's 🔴 on P2.4 is superseded by that decision.
+
+The design pass is therefore no longer blocked by RTL. §6 kept as the record of why it
+was sequenced that way, but its premise no longer holds.
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.

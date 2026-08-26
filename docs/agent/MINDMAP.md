@@ -35,7 +35,7 @@
 |-----|----------|-------|
 | **Part B — Excel/PDF Generation** | 🟡 Partly done | P2.1–P2.2 — per-ticket ZIP + monthly overview shipped (`2fc71f8`); the approved-ticket → master-Excel automation is not started |
 | ~~**Prototype -> `app/` Port**~~ | ✅ Done | P1.1 — shipped; see §0.1 |
-| **Arabic / RTL Support** | 🔴 Critical | P2.4 |
+| **Arabic / RTL Support** | ⚪ Cancelled (UI) · ✅ Done (content) | P2.4 — user ruled the interface stays English 2026-08-26; Arabic text entry, storage and PDF output are shipped and tested. See HANDOFF §2i. |
 | **Notifications System** | 🔴 Critical | P1.6–P1.7 |
 | **Notes System (Observer follow-ups)** | 🔴 Critical | P2.6 |
 | **Drag-and-Drop Item Reordering** | 🟡 High | P2.0 |

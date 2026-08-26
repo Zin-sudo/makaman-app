@@ -57,13 +57,24 @@ const boxes = (p) => p.evaluate(() => {
       b.navBottom !== null && Math.abs(b.navBottom - b.vh) < 3, `bottom ${b.navBottom} of ${b.vh}`);
     // Held to a readable column rather than stretched across the whole monitor, and
     // never wider than the window on a small one.
+    //
+    // Asserted as a relationship rather than as a number. This used to read `nav.w <= 762`,
+    // which pinned the column to the phone width it had at the time — so when the
+    // technician's column was widened to use a real laptop screen, a bar correctly
+    // tracking it read as a regression. What must hold is that the bar is exactly as wide
+    // as the content it belongs to, and that neither of them fills the monitor edge to
+    // edge; the specific ceiling is a design value and belongs in the stylesheet.
     const nav = await p.evaluate(() => {
       const el = document.querySelector('.mk-bottom-nav');
+      const col = document.querySelector('.mk-phone-frame');
       const r = el.getBoundingClientRect();
-      return { w: Math.round(r.width), vw: document.documentElement.clientWidth };
+      return { w: Math.round(r.width), colW: col ? Math.round(col.getBoundingClientRect().width) : null,
+               vw: document.documentElement.clientWidth };
     });
     check(`${label}: the bar is a column, not a strip the width of the screen`,
-      nav.w <= 762 && nav.w <= nav.vw + 1, `${nav.w} of ${nav.vw}`);
+      nav.w <= nav.vw + 1 && nav.colW !== null && Math.abs(nav.w - nav.colW) < 3
+      && (nav.vw <= 1440 || nav.w < nav.vw),
+      `bar ${nav.w}, column ${nav.colW}, viewport ${nav.vw}`);
     // The mockup and its reviewer copy are gone at every size.
     const body = await p.innerText('body');
     check(`${label}: no phone-mockup explainer`, !/Field device/i.test(body)

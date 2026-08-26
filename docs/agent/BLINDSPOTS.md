@@ -1163,3 +1163,89 @@ That is how the 401 above was found. Without it the only evidence was an absent
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*
+
+---
+
+## B-17 · The printed sheet (2026-08-26)
+
+### B-17.1 🔴 The preview and the PDF are two renderers, and they drifted
+**Symptom:** The A4 preview on screen shows the designed form — letterhead, Arabic company
+block, boxed field grid, ticket-number panel, ruled item table. The PDF the customer
+actually receives is a plain list of typed lines with no boxes and no logo. Nobody notices,
+because nobody ever puts them side by side.
+**Root Cause:** The sheet is drawn twice — HTML in the preview, jsPDF in the file — from two
+independent sets of numbers. Only the preview was maintained. The code comment claimed
+"the A4 preview and the PDF it produces are the same document", which was true when written
+and had quietly stopped being true.
+**Prevention Rule:**
+- Both renderers MUST scale from one shared constant (`SHEET`), stated in the preview's own
+  pixels. Never hardcode a measurement in `drawSheet` that is not derived from it.
+- A test MUST render both and compare band positions and column shares. "It looked right"
+  is not a check — the drift was invisible for weeks precisely because it looked right on
+  the screen anyone was looking at.
+**Detection Method:**
+```bash
+cd app && NODE_PATH=../node_modules node mksheet.test.js
+# Any FAIL → the two have separated again. Fix SHEET, not one renderer.
+```
+
+### B-17.2 🔴 jsPDF shapes Arabic correctly and then cannot draw it
+**Symptom:** An Arabic customer name prints on the client's ticket as `þ¨þ×þŽþÄþàþß`.
+**Root Cause:** Two correct-looking halves. jsPDF *does* shape Arabic — it converts letters
+to contextual presentation forms and reverses the run — so the right bytes reach the file.
+But its built-in faces are the PDF standard-14, all WinAnsi, none of which has an Arabic
+glyph. The text is present and undrawable. This is B-5.2, which predicted it.
+**Prevention Rule:**
+- An embedded font is mandatory. `/FontFile` absent means no Arabic, whatever the bytes say.
+- The embedded subset MUST cover the presentation forms `U+FB50-FDFF` and `U+FE70-FEFC` —
+  those are what jsPDF emits. A subset carrying only the base `U+0600` block embeds cleanly
+  and still draws nothing.
+- Latin must be in the same face, or a mixed name loses the half the font cannot draw.
+**Detection Method:**
+```bash
+# The byte pattern is NOT the test — the broken and fixed files contain the same bytes.
+grep -c 'FontFile' <(python3 -c "print(open('ticket.pdf','rb').read().decode('latin1'))")
+# 0 → FAIL. Also assert /Subtype /Type0: only a composite font keys off two-byte codepoints.
+```
+
+### B-17.3 🟠 A row cap picked by hand overflows the page
+**Symptom:** The signature block prints straight through the bottom of the item table.
+**Root Cause:** `ITEM_ROW_CAP = 24` was a chosen number, not a derived one. 24 rows plus the
+header bands exceeded the printable height. The preview hid it by scrolling inside its card;
+the PDF, having no scrollbar, drew the signatures on top of the table.
+**Prevention Rule:**
+- Row caps MUST be computed from the page height less the bands above and the signature
+  block below (`SHEET.rowsFor()`), never written as a literal. A band height that changes
+  must not be able to leave a stale cap behind it.
+**Detection Method:**
+```bash
+grep -n 'ROW_CAP = [0-9]' app/index.html
+# Any numeric literal → FAIL. It must read SHEET.rowsFor(...).
+```
+
+### B-17.4 🟠 An embedded image at source resolution
+**Symptom:** One ticket's PDF is 9 MB. A technician on a field connection cannot send it.
+**Root Cause:** `canvas.toDataURL()` on the 2656px letterhead, embedded once per page, for a
+mark drawn at 46 mm.
+**Prevention Rule:** Downscale before embedding — 640px is already twice what 300 dpi needs
+at that size. Assert an upper bound on exported file size in the test.
+**Detection Method:** `mksheet.test.js` asserts the PDF is under 1.5 MB.
+
+### B-17.5 🟡 An inline style silently kills a stylesheet rule
+**Symptom:** `.mk-ticket-card { border-inline-start-width:3px }` has never rendered. Cards
+draw their status stripe at 1px.
+**Root Cause:** The card carries `style="border:1px solid …"` inline, and an inline style
+beats any stylesheet rule regardless of specificity. The class looks live and is dead.
+**Prevention Rule:** A class that styles an element which also carries an inline style for
+the same property must use `!important` or move into the inline style. Left unfixed
+deliberately — changing it alters every ticket card's appearance, which is a design decision.
+**Detection Method:** Read the computed style, never the stylesheet, when asserting a design.
+
+### B-17.6 🟡 A hardcoded line number makes a syntax check lie
+**Symptom:** `node --check` reports SYNTAX OK on a file that was never written, or on a stale
+extraction, because the `awk 'NR>2268'` that extracts the `<script type="text/x-dc">` block
+was pinned to a line number that had since moved.
+**Root Cause:** Extraction by line number, plus `&&` chaining that let a failed extraction
+fall through to a check of the previous run's output.
+**Prevention Rule:** Locate the tag, never the line (`scratchpad/extract.sh`). Delete the
+output file before regenerating it, and assert it exists before checking it.
