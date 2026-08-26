@@ -1298,3 +1298,48 @@ media, printer settings and the other tabs included. Keep each cell's `s=` style
 that index is what carries its border, font and number format.
 **Detection Method:** `template.test.js` compares the output to the template part by part
 and fails on any change outside the four ticket sheets.
+
+---
+
+## B-19 · The device under field conditions (2026-08-26)
+
+### B-19.1 🔴 A refused save, swallowed
+**Symptom:** A technician writes a job-log line at a wellhead. It appears on screen. The
+device is full, the write was refused, and the line exists only in memory. The next reload
+loses it — hours from the office, with nothing on screen to suggest anything went wrong.
+**Root Cause:** Every `localStorage` write in the app read
+`try { setItem } catch (e) { /* quota */ }`. Five of them. The one that mattered was
+`persist()`, which holds the tickets. This is MINDMAP B16, and it is the worst failure the
+app has, because the person it happens to cannot tell it happened.
+**Prevention Rule:**
+- A failed write to the record MUST be surfaced. Silence is never an acceptable response.
+- Say it in a **persistent** element, not a toast: a toast is for something that happened
+  and is over; a full device is a condition that outlives the message.
+- Show it above every screen for every role — a technician cannot be expected to notice a
+  message on a tab he is not looking at.
+- Recover automatically: shed what can be rebuilt, retry, and clear the warning the moment
+  a write gets through.
+**Detection Method:**
+```bash
+grep -n "catch (e) { /\* quota \*/ }" app/index.html
+# Any write to the RECORD (tickets, outbox) with a swallowed quota error → FAIL.
+# Swallowing is still fine for genuinely optional writes (session, dead-letter).
+```
+
+### B-19.2 🟠 Making room by throwing away the record
+**Symptom:** The app frees space and the tickets are gone.
+**Root Cause:** A shed that treats all keys alike.
+**Prevention Rule:** Only shed what can be rebuilt from somewhere else — the store for the
+mode the device is *not* in, and the capped set-aside pile of refused ops. **Never** the
+tickets and **never** the outbox. A storage problem must not be allowed to become a data
+problem.
+**Detection Method:** `stress.test.js` asserts the shed drops the cache and the dead-letter
+and leaves the store and the outbox byte-identical.
+
+### B-19.3 🟡 Reading the DOM before React has painted
+**Symptom:** A fix is in place and the test still reports the old failure.
+**Root Cause:** The reproduction read `document.body.innerText` in the same synchronous
+block as the `setState` that raises the warning. React had not re-rendered, so the test was
+measuring the harness rather than the app — and would have reported a working fix as broken.
+**Prevention Rule:** Assert state first, then wait, then assert the DOM. Any check on
+something rendered *from* state needs a paint between the cause and the reading.

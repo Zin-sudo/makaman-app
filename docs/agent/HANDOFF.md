@@ -383,16 +383,18 @@ cold boot with the network cut. Regression: `layout` 13, `tabs` 11, `export` 14,
 
 ---
 
-## 3. NEXT TASK — Tier 2 of §7
+## 3. NEXT TASK — finish Tier 2, then Tier 3/4 of §7
 
-**The sync engine, before more features are built on it.** Offline/online stress test —
-two devices taking one series number, ops edits during an offline log, a handover made
-offline against a reassigned ticket — plus the localStorage quota guard (B-1.1).
+**Tier 2 is half done.** The storage half shipped (§2k). Still open in Tier 2: the rest of
+the offline/online stress scenarios — two devices taking one series number offline, and a
+technician syncing a ticket the office approved in the meantime. Note that
+`numbering.test.js` already covers the office-*closed* collision and `sync.test.js` the
+three Sync outcomes; do not rebuild those.
 
-Tier 1 is done: see §2j.
+**Tier 3 needs the user** (password rotation, leaked-password protection, Waha codes) and
+can run in parallel. **Tier 4** is the batched migration — do 0002 first.
 
-**Arabic / RTL mirroring is cancelled** — see §2i. The UI stays English; Arabic *content*
-is supported and tested.
+**Arabic / RTL mirroring is cancelled** — see §2i. The UI stays English.
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.
@@ -403,6 +405,45 @@ Stop and log it here rather than guessing:
   need real item numbers from the user. **Never invent codes, average prices, or drop rows.**
 - Supabase "leaked password protection" is still OFF and the seeded Admin password appeared
   in a chat transcript. Both need the user at the dashboard.
+
+---
+
+## 2k. THE DEVICE FILLING UP — TIER 2 (2026-08-26)
+
+### What was wrong
+Every `localStorage` write in the app read `try { setItem } catch (e) { /* quota */ }` —
+five of them. The one that mattered was `persist()`, which holds the technician's tickets.
+Reproduced by refusing writes to the store key: **the log line stayed on screen, never
+reached disk, and nothing on any screen said so.** The next reload would have lost it.
+This is MINDMAP B16, and it is the worst failure the app has, because the person it happens
+to has no way of knowing.
+
+### What it does now
+`persist()` returns whether it succeeded. On refusal it sheds what can be rebuilt, retries
+once, and if it still will not fit raises a **persistent banner above every screen, for
+every role**, with a TRY AGAIN control. Not a toast — a toast is for something that
+happened and is over, and a full device is a condition that outlives the message. The
+banner clears itself the moment a write gets through.
+
+`shedStorage()` only ever drops the store for the mode the device is *not* in, and the
+capped set-aside pile of refused ops. **Never the tickets, never the outbox** — a storage
+problem must not be allowed to become a data problem.
+
+### Verification
+`app/stress.test.js` — 14 assertions: the write really is refused, the app knows, the
+person is told in words, the warning follows them to another tab, retrying clears it and
+the stranded line reaches disk, and the shed keeps the store and outbox byte-identical.
+
+### A harness trap worth remembering
+The first re-test reported the fix as still broken. The reproduction read
+`document.body.innerText` in the same synchronous block as the `setState` that raises the
+banner — React had not painted yet. **Assert state, wait, then assert the DOM.** B-19.3.
+
+### Still open on this
+- No pre-emptive warning before the device is actually full. The app only reacts to a
+  refusal; warning at, say, 80% would give the technician time to sync first.
+- B8 (*flag sync conflicts instead of overwriting*) is still open. `stress.test.js` records
+  what happens today so a future merge has a documented before.
 
 ---
 

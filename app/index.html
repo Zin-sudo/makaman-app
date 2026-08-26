@@ -541,6 +541,18 @@
     </div>
   </div>
 
+  <!-- The device is out of room and the last save was refused. Deliberately not a toast:
+       a toast is for something that happened and is over, and this is a condition that
+       persists until someone acts on it. Above every screen, for every role, because a
+       technician cannot be expected to notice a message on a tab he is not looking at. -->
+  <sc-if value="{{ storageFull }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 22px;background:rgba(var(--danger-rgb),0.14);border-bottom:2px solid var(--danger)">
+      <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--danger);animation:pulse 2s infinite"></span>
+      <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>This device is out of storage — your last change was not saved.</strong> {{ storageFullHint }}</div>
+      <button onClick="{{ retryPersist }}" style="flex:none;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--danger);color:var(--on-accent);border:0">TRY AGAIN</button>
+    </div>
+  </sc-if>
+
   <!-- ══ SETTINGS (overlay, any role) ══ -->
   <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;background:var(--ground);z-index:50;overflow-y:auto">
@@ -2771,6 +2783,23 @@ function hydrate() {
 function outboxRead() {
   try { return JSON.parse(localStorage.getItem(OUTBOX_K) || '[]'); } catch (e) { return []; }
 }
+// Making room without losing the record.
+//
+// Only two things here can be rebuilt from somewhere else: the store belonging to the
+// mode the device is NOT in (a device used for both demo and cloud carries two), and the
+// set-aside pile of refused ops, which is a diagnostic and is capped at fifty anyway.
+// Tickets, audit entries and the outbox are never shed — those are the record, and a
+// storage problem must not become a data problem.
+function shedStorage(keep) {
+  let freed = false;
+  [K, CACHE_K, DEADLETTER_K].forEach((k) => {
+    if (k === keep) return;
+    if (localStorage.getItem(k) === null) return;
+    try { localStorage.removeItem(k); freed = true; } catch (e) { /* nothing to do */ }
+  });
+  return freed;
+}
+
 function outboxWrite(q) {
   try { localStorage.setItem(OUTBOX_K, JSON.stringify(q)); } catch (e) { /* quota */ }
 }
@@ -3651,11 +3680,49 @@ class Component extends DCLogic {
       else localStorage.removeItem(SK);
     } catch (e) { /* quota */ }
   }
+  // Saving the technician's work to the device.
+  //
+  // This used to be `try { setItem } catch (e) { /* quota */ }`. When the device filled
+  // up the write was refused, the exception was swallowed, and the app carried on showing
+  // a job-log line that existed only in memory. The next reload lost it — at a wellhead,
+  // hours from the office, with nothing on screen to suggest anything was wrong. That is
+  // MINDMAP B16 and it is the worst failure this app has, because the person it happens
+  // to has no way of knowing it happened.
+  //
+  // Now: try, shed what can be rebuilt, try once more, and if it still will not fit, say
+  // so and keep saying so. Silence is the one response that is never acceptable here.
   persist(data) {
     // Kept apart from the demo store deliberately. They hold different things under the
     // same shape, and a device that has been used for both must not serve one as the
     // other after a mode change.
-    try { localStorage.setItem(USE_CLOUD ? CACHE_K : K, JSON.stringify(data)); } catch (e) { /* quota */ }
+    const key = USE_CLOUD ? CACHE_K : K;
+    const payload = JSON.stringify(data);
+    if (this.tryWrite(key, payload)) return true;
+    // Room, taken from the things that can be rebuilt rather than from the record.
+    const freed = shedStorage(key);
+    if (freed && this.tryWrite(key, payload)) return true;
+    this.storageRefused();
+    return false;
+  }
+  tryWrite(key, payload) {
+    try {
+      localStorage.setItem(key, payload);
+      // Recovered — either they cleared space or a shed made room.
+      if (this.state.storageFull) this.setState({ storageFull: false, storageHint: '' });
+      return true;
+    } catch (e) { return false; }
+  }
+  storageRefused() {
+    // No byte count. It read "(0.0 MB to save)" on a small store, and a size is not
+    // something a technician at a wellhead can act on anyway — what to DO is.
+    const hint = USE_CLOUD
+      ? 'Sync now while you have signal — once the office has this ticket the copy on the phone can be cleared. Nothing is lost yet, but it will be if the app is closed.'
+      : 'Close and export what you can, then free space on the device. Nothing is lost yet, but it will be if the app is closed.';
+    // setState rather than a toast, and left standing: the condition is still true after
+    // the message would have faded.
+    if (!this.state.storageFull) {
+      this.setState({ storageFull: true, storageHint: hint });
+    }
   }
   // Settings stores 'system' | 'light' | 'dark'; the token blocks key off a
   // data-mkn-theme attribute on <html>. 'system' resolves through the OS preference and
@@ -4523,6 +4590,11 @@ class Component extends DCLogic {
   // so a test that cannot read them can only check that the two look similar — not that
   // they are driven by the same constants, which is the property that stops them drifting.
   sheetGeometry() { return SHEET; }
+
+  // Reachable so the shed can be tested for what it must NOT drop. Asserting that it
+  // frees something is easy; asserting that it never touches the tickets or the outbox is
+  // the part that matters, and that needs to call the real function.
+  shedStorage(keep) { return shedStorage(keep); }
 
   // Same reasoning as sheetGeometry: a test that cannot read the map can only check that
   // the output looks plausible, not that it was driven by the template's own cells.
@@ -6136,6 +6208,20 @@ class Component extends DCLogic {
       // One signal at a time. The Sync tab already says everything the banner would,
       // and louder — showing both meant the technician saw the same warning twice with
       // the tab's own controls right beneath it.
+      // The device is full. Held in state rather than recomputed, because the only thing
+      // that can tell us is a write actually being refused.
+      storageFull: !!S.storageFull,
+      storageFullHint: S.storageHint || '',
+      // Re-attempts the save the device refused. Nothing is re-derived — the replica in
+      // memory is still the truth, so this simply writes it again.
+      retryPersist: () => {
+        if (this.persist(this.state.data)) {
+          this.toast('storage', 'Saved. The device found room.', 'ok');
+        } else {
+          this.toast('storage', 'Still no room on the device. Free some space, or sync this ticket to the office before closing the app.', 'warn');
+        }
+      },
+
       showBanner: myPending.length > 0 && S.roleTab !== 'sync',
       bannerBg: S.online ? 'var(--accent-wash)' : 'var(--field)',
       bannerBorder: S.online ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.16)',
