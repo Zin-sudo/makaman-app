@@ -110,6 +110,63 @@ const login = async (p, email) => {
     await ctx.close();
   }
 
+  // ── The point of the whole thing: raise a real job, under your own name ──
+  // Asserted by driving the form a technician actually fills, not by calling into state.
+  // "They should be able to start a ticket with their own name and do the same as
+  // technicians" is the requirement, and nothing above this actually tested it.
+  {
+    const ctx = await b.newContext();
+    const p = await open(ctx, 430);
+    await login(p, 'omar@makaman.ly');
+    await p.getByRole('button', { name: /work as technician/i }).click();
+    await p.waitForTimeout(900);
+
+    const before = await p.evaluate(() => (window.__mkApp.state.data.tickets || []).length);
+    await p.getByRole('button', { name: /new job ticket/i }).click();
+    await p.waitForTimeout(1000);
+
+    const sel = p.locator('select').first();
+    const opts = await sel.evaluate(e => Array.from(e.options).map(o => o.value));
+    await sel.selectOption(opts.find(o => o) || opts[0]);
+    const inp = p.locator('input');
+    await inp.nth(0).fill('Burgan N');
+    await inp.nth(1).fill('BG-901');
+    await inp.nth(2).fill('WS-9');
+    await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /start logging/i }).click();
+    await p.waitForTimeout(1200);
+
+    const t = await p.evaluate(() => {
+      const app = window.__mkApp, S = app.state, D = S.data;
+      const x = (D.tickets || []).find(y => y.id === S.activeId);
+      return {
+        count: (D.tickets || []).length,
+        tech: x && x.tech, holder: x && x.holder, status: x && x.status,
+        well: x && x.well,
+        crew: x ? (x.crew || []).map(c => c.name) : [],
+        firstAuditBy: x ? ((x.audit || [])[0] || {}).by : null,
+        screen: S.techScreen,
+      };
+    });
+
+    check('the office can raise a job from the field', t.count === before + 1,
+      before + ' → ' + t.count);
+    check('the ticket carries their OWN name, not a technician\'s', t.tech === 'Omar Al-Saleh',
+      'tech: ' + t.tech);
+    check('and they hold it', t.holder === 'Omar Al-Saleh', 'holder: ' + t.holder);
+    check('and they are the crew until it is handed on',
+      t.crew.length === 1 && t.crew[0] === 'Omar Al-Saleh', t.crew.join(', '));
+    check('the job is running and they are on the log screen',
+      t.status === 'logging' && t.screen === 'log', t.status + ' / ' + t.screen);
+    check('what they typed is on the ticket', t.well === 'BG-901', 'well: ' + t.well);
+    // Every ticket's first entry used to have nobody against it — written inline at
+    // creation rather than through logOn(), which is the only place that stamps a name.
+    // Invisible until the Review log started showing them.
+    check('the opening entry is attributed', t.firstAuditBy === 'Omar Al-Saleh',
+      'by: ' + t.firstAuditBy);
+    await ctx.close();
+  }
+
   // ── A swapped person is assignable ──
   {
     const ctx = await b.newContext();

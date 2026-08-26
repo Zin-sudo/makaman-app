@@ -5631,7 +5631,14 @@ class Component extends DCLogic {
             crew: [{ name: dr.tech, email: myEmail }], holder: dr.tech,
             jobType: '', arrival: dr.arrival, start: '', end: '', status: 'logging', synced: false, syncedAt: '',
             currency: ((d.clients || []).find(c => c.name === dr.customer) || {}).currency || DEFAULT_CURRENCY,
-            ticketNo: '', mileage: '', events: [], items: defaultItems, audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.' }],
+            // Written here rather than through logOn() because the ticket does not exist
+            // yet to log against — but it must carry the same shape, or the one entry
+            // every ticket is guaranteed to have is the one with nobody against it. That
+            // was invisible until the Review log started showing names, and it matters
+            // most for the office working in the field: opening a job is precisely the
+            // act you want attributed.
+            ticketNo: '', mileage: '', events: [], items: defaultItems,
+            audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.', kind: 'lifecycle', by: dr.tech }],
             // B13/F14 — permanent admin-configured defaults, pre-filled here, only the
             // Ops Manager can change them afterwards (see the review screen).
             baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',

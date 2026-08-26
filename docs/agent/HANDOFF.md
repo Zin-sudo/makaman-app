@@ -62,7 +62,6 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 
 | Item | Notes |
 |------|-------|
-| **Admin/ops unrestricted ticket access** | Full A–Z technician flow on tickets they opened, audit trail kept throughout. |
 | **User deletion** | The Delete button now says plainly that deletion happens on the server (see §2.4). `admin-actions` has no `delete_user` action yet. |
 | **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** A candidate stylesheet is in the repo — see §5. |
 | **Approved-ticket → master Excel** | PWA → DB → script → shared master file, with a download button for admin/ops/observer. **User asked to be questioned in detail first.** |
@@ -319,22 +318,40 @@ Regressions: 146 assertions across 9 suites, 0 failures.
 
 ---
 
-## 3. NEXT TASK — admin/ops unrestricted ticket access
+## 2f. ADMIN/OPS IN THE FIELD — SETTLED, AND VERIFIED END TO END
 
-The full A–Z technician flow on tickets the office opened, gated on the `ticket.*`
-capabilities rather than role comparisons. Much of it now falls out of the role swap
-(§2d) — an ops manager who swaps in gets the technician's flow entire. **What remains is
-the office acting on a ticket *without* swapping**: raising and logging a job from the desk
-while keeping their own screens.
+**The user confirmed the swap is the intended design**: ops and admin swap into the
+technician state and back; technicians cannot swap unless their own role is ops or admin.
+They also offered to drop the swap and simply grant technician abilities to the office if
+that were lighter. It is not, and the measurement is worth keeping:
 
-Before building, establish which of the two the office actually wants. If swapping covers
-it, this item is smaller than it looks and the remaining work is a shortcut into the swap
-from the inbox rather than a second flow. Ask before assuming — a duplicate flow is the
-kind of thing CLAUD.md §2.4 exists to prevent.
+Ops and admin **already hold** `ticket.create`, `ticket.log`, `ticket.close` and
+`ticket.sync` by default — capabilities were never the obstacle. What they lack without a
+swap is the technician's *screens*; `showMgrPage` routes them to the office inbox. The
+no-swap route would therefore still need a second path into those screens — a parallel
+office-side "raise a job" flow duplicating what exists. The swap reuses the technician
+screens whole, for ~90 lines and one state field.
 
-Then, still open: **user deletion** (`admin-actions` needs a `delete_user`), the
-**app-design polish** (mockups first — see §5), and the **approved-ticket → master Excel**
-automation (the user asked to be questioned in detail first).
+**Verified by driving the real form**, not by calling into state: a swapped ops manager
+raises a job and the ticket carries `tech`, `holder` and `crew` all set to **their own
+name**, status `logging`, on the technician's log screen, with what they typed on it.
+
+### A defect this found
+The opening audit entry — the one entry every ticket is guaranteed to have — was written
+inline at creation rather than through `logOn()`, which is the only place that stamps a
+name. **Every ticket ever created had an unattributed first entry.** Invisible until §2e
+started showing names, and worst exactly where it matters most: opening a job is the act
+you most want attributed when the office is in the field. Now carries `by` and `kind`.
+
+---
+
+## 3. NEXT TASK — see §6 for the sequencing decision
+
+Remaining functional work: **user deletion** (`admin-actions` needs a `delete_user`),
+the **approved-ticket → master Excel** automation (the user asked to be questioned in
+detail first), and **Arabic / RTL**, still marked 🔴 critical for the market.
+
+**Do RTL before the design pass** — see §6.
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.
@@ -405,3 +422,36 @@ and print / reduced-motion / high-contrast blocks.
 Two smaller notes for whoever picks it up: `--mk-bg-tertiary` is referenced in the locked
 toggle rules but never defined, and `--mk-border-focus` is used with a fallback in some
 places and without one in others.
+
+
+---
+
+## 6. SEQUENCING: THE RESPONSIVE THEME vs RTL
+
+Asked directly whether to adopt `reference/makaman-responsive-theme-v2.css` now or later.
+**Later — and specifically after Arabic/RTL.**
+
+The argument is the same one that made P1.8b precede the design pass, and it is about
+double work rather than about taste:
+
+- The theme is not a layer. The app styles inline against `--ink-rgb`, `--accent`,
+  `--success` on essentially every element, so adopting `--mk-*` tokens means editing every
+  screen. That is a rewrite of presentation, not an import.
+- **RTL is also a whole-layout concern** — direction, mirroring, padding that becomes
+  margin, text metrics — and MINDMAP still marks it 🔴 critical for a Libyan market.
+- Restyle first and you restyle again for RTL. Do RTL first and the design pass lands once,
+  on a layout that is already correct in both directions.
+- The theme's three blockers (§5) are unresolved regardless: the Google Fonts `@import`
+  breaks CONSTRAINTS §5, its `data-perm-*` vocabulary contradicts the permission registry,
+  and the palette is a different one.
+- The user asked for **mockups to approve before any code**, which is a round trip that
+  should not be spent twice.
+
+The counter-argument, stated fairly: every feature added now is one more screen to restyle
+later. That cost is real but small — the remaining functional surface is a few screens,
+whereas RTL touches all of them.
+
+**Trigger for revisiting:** once RTL lands and the functional backlog above is closed. At
+that point the design pass should *absorb* the theme — take its tokens, spacing scale,
+breakpoints and component shapes — rather than adopt the file wholesale, because its
+permission vocabulary must be dropped in favour of `hasPermission()`.
