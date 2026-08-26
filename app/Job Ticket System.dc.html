@@ -2126,6 +2126,26 @@
             <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px;line-height:1.45">The bundle is one overview table of everything listed above. ZIP on a row gives that ticket alone: originals in one PDF, copies in the other.</div>
           </div>
         </sc-if>
+        <!-- ══ MASTER WORKBOOK ══ -->
+        <!-- One row per approved job, rebuilt by the server whenever an approval changes.
+             The line beneath says how fresh it is, because a shared file whose age nobody
+             can see is a file nobody trusts. -->
+        <sc-if value="{{ showMasterExport }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
+                <div style="font-size:12px;color:{{ masterTone }};margin-top:2px">{{ masterState }}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button onClick="{{ downloadMaster }}" disabled="{{ masterCannotDownload }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download</button>
+              <button onClick="{{ refreshMaster }}" disabled="{{ masterBusy }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Rebuild now</button>
+            </div>
+            <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:8px;line-height:1.45">One row per approved job. The server rebuilds it on its own within a minute of any approval — Rebuild now is only for when you do not want to wait. The download link expires after a minute.</div>
+          </div>
+        </sc-if>
         <sc-if value="{{ showClaimPanel }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
             <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket numbering claim</div>
@@ -2280,7 +2300,8 @@ const PERMISSION_DEFAULTS = (function () {
     [['tech', 'mgr', 'admin', 'founder'],
       ['report.generate']],
     [['mgr', 'admin', 'founder'],
-      ['ticket.view_all', 'report.all_technicians', 'activity.view_all', 'location.view_team']],
+      ['ticket.view_all', 'report.all_technicians', 'activity.view_all', 'location.view_team',
+        'export.master']],
     [['mgr', 'admin'],
       ['ticket.edit_closed', 'ticket.charge_items', 'ticket.reorder_items',
         'ticket.assign_number', 'ticket.approve', 'ticket.force_number',
@@ -2564,6 +2585,9 @@ function hydrate() {
     // because the catalogue is the same for everybody and the answer is not: the admin
     // screen needs every capability listed, including the ones nobody currently holds.
     all('permissions'), c.rpc('my_permissions'),
+    // Only the newest run matters on screen; the rest is history nobody reads.
+    c.from('export_runs').select('*').eq('kind', 'master')
+      .order('started_at', { ascending: false }).limit(1),
     // Every exception the office has made, for the admin screen. RLS narrows this to
     // your own rows unless you are staff, so a technician's device simply sees less
     // rather than being refused.
@@ -2573,7 +2597,7 @@ function hydrate() {
     if (bad) throw new Error(bad.error.message || 'Could not load data.');
     const [profiles, clients, priceItems, jobTypes, numbering, orgDefaults, assetQs,
       claim, settings, tickets, lines, items, assets, crew, audit,
-      permCatalogue, myPerms, permOverrides] = res.map((r) => r.data || []);
+      permCatalogue, myPerms, lastExport, permOverrides] = res.map((r) => r.data || []);
 
     const nameById = {}, emailById = {}, jobById = {};
     profiles.forEach((p) => { nameById[p.id] = p.full_name || p.email; emailById[p.id] = p.email; });
@@ -2633,6 +2657,17 @@ function hydrate() {
       myPermissionSource: (myPerms || []).reduce((acc, r) => {
         acc[r.permission_id] = r.source; return acc;
       }, {}),
+      // The master workbook's freshness, as the Account tab states it. A failed run is
+      // kept rather than hidden: a stale file with no explanation is worse than one that
+      // says why it stopped.
+      masterExport: (() => {
+        const r = (lastExport || [])[0];
+        if (!r) return null;
+        return {
+          status: r.status, at: r.finished_at || r.started_at,
+          rows: r.row_count, path: r.object_path, error: r.error || '',
+        };
+      })(),
       // Keyed by 'userId|permissionId'. A flat map because that is how the screen reads
       // it — one lookup per checkbox, no scanning a list per row.
       permissionOverrides: (permOverrides || []).reduce((acc, r) => {
@@ -3945,6 +3980,41 @@ class Component extends DCLogic {
   assetQuestions() {
     const q = (this.state.data || {}).assetQuestions;
     return (q && q.length) ? q : ASSET_QUESTIONS_DEFAULT;
+  }
+  // Fetching the master workbook. A link that expires, minted for the person asking —
+  // never a permanent URL, because the object is every approved job's totals and a URL
+  // that never dies is a URL that eventually leaks (B-12.4).
+  downloadMaster() {
+    const c = sb();
+    const m = (this.state.data || {}).masterExport;
+    if (!c || !m || !m.path) { this.toast('master', 'No master file has been built yet.', 'warn'); return; }
+    c.storage.from('exports').createSignedUrl(m.path, 60)
+      .then(r => {
+        if (r.error || !r.data) throw r.error || new Error('Could not get a link.');
+        // Opened rather than fetched: the browser handles the download, and nothing about
+        // the file passes through this app's memory.
+        window.open(r.data.signedUrl, '_blank');
+      })
+      .catch(err => this.toast('master', err.message || 'Could not get a link to the file.', 'warn'));
+  }
+  // Asking for a rebuild now. The schedule does this on its own; this is for when
+  // somebody wants to see a job they just approved without waiting for the next minute.
+  refreshMaster() {
+    const c = sb();
+    if (!c) return;
+    this.setState({ masterBusy: true });
+    c.functions.invoke('master-export', { body: {} })
+      .then(r => {
+        if (r.error) throw new Error((r.data && r.data.error) || r.error.message);
+        if (r.data && r.data.error) throw new Error(r.data.error);
+        return this.refresh();
+      })
+      .then(() => this.setState({ masterBusy: false }))
+      .then(() => this.toast('master', 'Master file rebuilt.', 'ok'))
+      .catch(err => {
+        this.setState({ masterBusy: false });
+        this.refresh().then(() => this.toast('master', err.message || 'The rebuild failed.', 'warn'));
+      });
   }
   // Grant, revoke, or stop having an opinion. Passing a null permission clears every
   // exception for that person and puts them back on their role.
@@ -6456,6 +6526,26 @@ class Component extends DCLogic {
       // Named for what it disables, because that is what the attribute means. Reading
       // the permission through hasPermission rather than comparing to 'admin' is the
       // point of the whole exercise — this screen is the first caller of its own idea.
+      // ── The master workbook ──────────────────────────────────────────────
+      showMasterExport: this.hasPermission('export.master'),
+      masterBusy: !!S.masterBusy,
+      masterState: (() => {
+        const m = D.masterExport;
+        if (!m) return 'No file built yet — it appears within a minute of the first approval.';
+        if (m.status === 'failed') return 'Last build failed: ' + (m.error || 'no reason recorded');
+        if (m.status === 'running') return 'Building now…';
+        return (m.rows === 1 ? '1 approved job' : (m.rows || 0) + ' approved jobs') + ' · built ' + F.stamp(m.at);
+      })(),
+      masterTone: (() => {
+        const m = D.masterExport;
+        if (!m) return 'rgba(var(--ink-rgb),0.55)';
+        return m.status === 'failed' ? 'var(--warning)' : 'rgba(var(--ink-rgb),0.55)';
+      })(),
+      masterCanDownload: !!(D.masterExport && D.masterExport.status === 'ok' && D.masterExport.path),
+      masterCannotDownload: !(D.masterExport && D.masterExport.status === 'ok' && D.masterExport.path),
+      downloadMaster: () => this.downloadMaster(),
+      refreshMaster: () => this.refreshMaster(),
+
       permCannotEdit: !this.hasPermission('user.manage_permissions'),
       permNoExceptions: permOverrideCount === 0,
       permReadOnlyNote: this.hasPermission('user.manage_permissions') ? ''

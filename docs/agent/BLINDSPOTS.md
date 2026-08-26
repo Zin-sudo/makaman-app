@@ -1071,6 +1071,54 @@ about something else.
 
 ---
 
+### B-16.4 🔵 A View Defaults to SECURITY DEFINER and Bypasses RLS
+**Symptom:** None visible. A view over a protected table returns every row to every
+signed-in user, no matter what RLS says on the table underneath.
+**Root Cause:** Postgres views run with the *creator's* permissions unless
+`security_invoker` is set. `master_export_rows` selects from `tickets`, which has RLS
+restricting a technician to their own jobs — and the view handed all of them to anybody.
+**Prevention Rule:**
+- **Every view over an RLS-protected table gets `security_invoker = on`.** No exceptions;
+  if the view genuinely needs elevated reads, that is a SECURITY DEFINER *function* with a
+  guard, not a silently privileged view.
+- Run the security advisor after adding any view or function. This one is an ERROR, not a
+  warning, and it is invisible from the application.
+**Detection Method:**
+```sql
+select c.relname,
+       coalesce((select option_value from pg_options_to_table(c.reloptions)
+                 where option_name='security_invoker'), 'off') as security_invoker
+from pg_class c join pg_namespace n on n.oid=c.relnamespace
+where n.nspname='public' and c.relkind='v';
+-- Any view over a protected table reading 'off' → FAIL
+```
+**Found:** 2026-08-26, by the advisor, immediately after creating the view.
+
+### B-16.5 🟡 A New Capability Added to the Database and Not to the Offline Defaults
+**Symptom:** A feature gated on a brand-new capability never appears — for anyone, in the
+demo store and offline — while the database says the permission exists and is granted.
+**Root Cause:** `hasPermission()` answers from `PERMISSION_DEFAULTS` whenever there is no
+hydrated map: the demo store, and the first render of a cloud session. A key that exists
+only in the database is false everywhere that constant is the source.
+**Prevention Rule:** Adding a capability is **two** edits — the migration and
+`PERMISSION_DEFAULTS` — and they are one commit. The constant is not a convenience copy;
+it is the offline half of the same registry.
+**Detection Method:** `app/permissions.test.js` asserts that every key appearing in a
+`hasPermission('…')` call exists in `PERMISSION_DEFAULTS`. Run it after adding a gate.
+**Found:** 2026-08-26 — `export.master`, caught by its own feature's suite failing.
+
+### B-16.6 ⚪ Scheduling a Rebuild Per Event Makes Events Race
+**Symptom:** A shared generated file is occasionally an older version than the newest
+event, for no reproducible reason.
+**Root Cause:** A trigger firing an HTTP rebuild on every approval. Ten approvals start ten
+rebuilds of the same object; they finish in whatever order the network gives them, and the
+last *writer* wins rather than the last *event*.
+**Prevention Rule:** For a single shared artifact, schedule a cheap check often rather than
+a rebuild per event: "has anything changed since the last good build?" One rebuild at a
+time, no races, and the cost when idle is one index lookup.
+
+---
+
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*

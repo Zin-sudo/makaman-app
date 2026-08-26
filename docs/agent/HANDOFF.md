@@ -63,7 +63,6 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 | Item | Notes |
 |------|-------|
 | **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** A candidate stylesheet is in the repo — see §5. |
-| **Approved-ticket → master Excel** | PWA → DB → script → shared master file, with a download button for admin/ops/observer. **User asked to be questioned in detail first.** |
 | **"Apper" skill** | After the Excel automation. |
 | **Q1 rewording** | To "Tools Allocated Reclaimed or Back-to-Base?" — deferred until the backend is finished; DB (migration 0009) and app differ by one word today. |
 | **Offline/online stress test** | Two devices taking one series number, ops edits during an offline log, etc. |
@@ -467,6 +466,77 @@ implementation follows the promise: **status becomes `disabled`, the row stays.*
 on their tickets and audit entries, they leave the assignment list, and it all reverses.
 Against the live database: an unknown status is refused, disable and restore both work,
 and the row was left as found. Regressions: 160 assertions across 8 suites, 0 failures.
+
+---
+
+## 2h. THE MASTER WORKBOOK
+
+Four decisions were taken by the user before any code: **one row per approved ticket**,
+**stored in Supabase Storage**, **never hand-edited**, **rebuilt server-side on approval**.
+Every one of those makes the design safer, and the third is the load-bearing one — a file
+nobody edits can be rebuilt from scratch, which makes the whole thing idempotent.
+
+### The chain
+`approval` → `public.master_export_rows` (view) → `master-export` (Edge Function) →
+private `exports` bucket → signed link that expires in 60 seconds → Account tab.
+
+- **The shape of a row is a view, not code.** Finance's definition of "one approved job"
+  is a property of the data. Changing what they see is `create or replace view`, not a
+  redeploy.
+- **Rebuild, never append.** A reopened and re-approved ticket, a corrected price, a fixed
+  customer name — all simply come out right next time. An append-only file carries every
+  past mistake forever.
+- **Currency is its own column and totals are never summed across it.** Sirte prices in
+  dinar, everyone else in dollars; one blended Total would be meaningless and would still
+  add up in a spreadsheet.
+- **Scheduling is a watermark, not a trigger.** A trigger firing an HTTP call per approval
+  means ten approvals start ten rebuilds racing to overwrite one object. Instead pg_cron
+  asks every minute whether any approved ticket has changed since the last good build, and
+  almost always does nothing. Same effect as "on approval" — nobody opens anything — with
+  at most a minute's lag.
+- **Failures are kept.** `export_runs` records every attempt; the Account tab shows the
+  reason a file is stale rather than leaving the last success looking current.
+
+### 🔴 ONE STEP IS NOT DONE, AND ONLY THE ACCOUNT OWNER CAN DO IT
+The scheduler needs a service-role key, and **I do not have one and should not**. Until
+this is run once in the SQL editor, `rebuild_master_export()` returns
+`no service_role_key in vault — scheduler idle` and the automatic path does nothing:
+
+```sql
+select vault.create_secret('<service_role_key>', 'service_role_key');
+```
+
+The office's **Rebuild now** button works without it — that path authorises with the
+signed-in person's own token.
+
+### What could NOT be verified from here, stated plainly
+Egress to `*.supabase.co` is blocked from this container, and the vault is empty, so I
+hold no credential that can invoke an Edge Function. **`master-export` has therefore never
+been executed.** What is verified: the view returns 21 correctly-named columns, the bucket
+exists and is private, `export_runs` and its RLS, the scheduler's due-check and its idle
+message, and the whole app half. What is not: that SheetJS writes a valid workbook under
+Deno, and that the storage upload succeeds. **First run will tell you** — press Rebuild
+now as an Ops Manager and read the tile; a failure will name its own reason.
+
+### Two findings from the advisor, one an ERROR
+1. **`master_export_rows` was SECURITY DEFINER** — the Postgres default for views. Any
+   signed-in technician querying it would have read every approved job's totals, straight
+   past the RLS on `tickets`. Fixed with `security_invoker = on` (0022).
+2. **`rebuild_master_export` was callable by `authenticated`** — functions in `public` are
+   granted to it by default, and revoking from PUBLIC does not remove that. Revoked.
+
+`pg_net` sits in the `public` schema and the linter says to move it. It does not support
+`SET SCHEMA`, and dropping it would disturb the request queue for a warning about where a
+name is registered. Left deliberately.
+
+### And a drift the suites now guard
+`export.master` went into the database and into a gate, but not into `PERMISSION_DEFAULTS`
+— so `hasPermission()` answered false for everyone offline and in the demo store, and the
+tile silently never rendered. `permissions.test.js` now asserts that **every capability the
+app asks for is one the offline defaults know**.
+
+### Verification
+`app/excel.test.js` — 14 assertions. Regressions: 160 across 9 suites, 0 failures.
 
 ---
 

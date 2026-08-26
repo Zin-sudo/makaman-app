@@ -192,6 +192,20 @@ const login = async (p, email) => {
       /return !!roles && roles\.indexOf\(this\.state\.role\) >= 0;/.test(src));
     check('the permissions screen gates itself through hasPermission',
       /permCannotEdit: !this\.hasPermission\('user\.manage_permissions'\)/.test(src));
+    // The bug this exists for: export.master was added to the database and to a gate,
+    // and not to PERMISSION_DEFAULTS. hasPermission() then answered false for everyone
+    // offline and in the demo store, and the whole tile silently never rendered. Every
+    // key the app asks for must be a key the offline fallback knows.
+    {
+      const asked = Array.from(new Set(
+        (src.match(/hasPermission\('([a-z_]+\.[a-z_]+)'\)/g) || [])
+          .map(m => m.replace(/.*'([^']+)'.*/, '$1'))));
+      const defs = src.slice(src.indexOf('const PERMISSION_DEFAULTS'), src.indexOf('const PERMISSION_CATALOGUE_DEMO'));
+      const missing = asked.filter(k => defs.indexOf("'" + k + "'") < 0);
+      check('every capability the app asks for is one the offline defaults know',
+        missing.length === 0,
+        missing.length ? 'missing: ' + missing.join(', ') : asked.length + ' keys asked for');
+    }
     check('hydrate pulls the catalogue and the caller\'s own answer',
       /all\('permissions'\), c\.rpc\('my_permissions'\)/.test(src));
     await ctx.close();
