@@ -66,7 +66,7 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 | **Log-events container in Review** | Admin/ops need the event log surfaced inside the Review screen. |
 | **Admin/ops unrestricted ticket access** | Full A–Z technician flow on tickets they opened, audit trail kept throughout. |
 | **User deletion** | The Delete button now says plainly that deletion happens on the server (see §2.4). `admin-actions` has no `delete_user` action yet. |
-| **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** |
+| **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** A candidate stylesheet is in the repo — see §5. |
 | **Approved-ticket → master Excel** | PWA → DB → script → shared master file, with a download button for admin/ops/observer. **User asked to be questioned in detail first.** |
 | **"Apper" skill** | After the Excel automation. |
 | **Q1 rewording** | To "Tools Allocated Reclaimed or Back-to-Base?" — deferred until the backend is finished; DB (migration 0009) and app differ by one word today. |
@@ -225,3 +225,50 @@ Stop and log it here rather than guessing:
 - No ternaries inside `{{ }}` — dc-runtime fails silently (BLINDSPOTS B-9.1).
 - 110 price-list rows have `NULL unit_cost` and mean "quoted separately". They must never
   render as 0.00.
+
+
+---
+
+## 5. THE RESPONSIVE THEME (`reference/makaman-responsive-theme-v2.css`)
+
+Supplied by the user 2026-08-26 and **stored, not wired in**. Nothing in `app/` imports
+it. It is the design direction for the app-design-polish item, to be applied when that
+task comes up — and that task still needs mockups approved first.
+
+What it brings: a token set (`--mk-*`), card/button/input/table/badge components, a
+five-breakpoint responsive system (640 / 1024 / 1440 / 1920 plus a mobile-landscape fix),
+per-role container widths, iOS-style toggle switches, a permissions-page component set,
+and print / reduced-motion / high-contrast blocks.
+
+### Three things to settle before any of it is adopted
+
+1. **It violates CONSTRAINTS §5 as written.** Line 7 is
+   `@import url('https://fonts.googleapis.com/css2?family=Inter...')`. The rule is **no
+   Google Fonts CDN, no CDN dependencies** — a technician at a wellhead has no network,
+   and a webfont fetched over the wire is a font that never arrives. Vendor Inter into
+   `app/vendor/` (or `app/uploads/fonts/`) and replace the `@import` with a local
+   `@font-face` before this file goes anywhere near `app/`.
+
+2. **Its permission vocabulary is not the registry's.** The stylesheet gates on
+   `data-perm-create`, `data-perm-gps`, `data-perm-pricing`, `data-perm-approve`,
+   `data-perm-discount` and about twenty more, scoped by `.role-technician` /
+   `.role-ops` / `.role-observer`. The live registry (migrations 0013–0015) uses
+   `ticket.create`, `ticket.approve`, `pricelist.view` and so on, and does not scope by
+   role at all — the whole point is that a person's capabilities are not their role's.
+   These are two different models of the same idea. **Reconcile before adopting**: either
+   emit `data-perm-<key>` attributes from `hasPermission()` for the registry's keys, or
+   drop the CSS gating and keep the gating in the bindings where it is today. Do not ship
+   both vocabularies — that is exactly the drift B-15.2 warns about.
+   Several of its permissions have no registry equivalent yet and would need seeding:
+   GPS capture, attachments, price visibility to a technician, discount, surcharge
+   removal, all-bases filter, audit visibility for the Observer.
+
+3. **The colours are a different palette, not the current one.** `--mk-accent: #00d4aa`
+   (teal) and `--mk-accent-2: #6366f1` (indigo) against `#0a0a0f`, versus the app's
+   present `--accent` blue on `--ground`. Adopting the tokens means restyling every
+   screen, not adding a layer — the app styles inline against `--ink-rgb`, `--accent`,
+   `--success` etc. throughout. This is the "mockups first" part of the task.
+
+Two smaller notes for whoever picks it up: `--mk-bg-tertiary` is referenced in the locked
+toggle rules but never defined, and `--mk-border-focus` is used with a fallback in some
+places and without one in others.

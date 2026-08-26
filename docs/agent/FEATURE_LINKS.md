@@ -59,6 +59,7 @@
 | **Role swap (act as Technician)** | `profiles`, session | session only | Permission registry | Top bar, assignment lists | ⏳ Not built | — |
 | **User deletion** | `profiles` | — | `admin-actions` has no `delete_user` | Admin Users screen | ⏳ Not built — dialog says so | `approval` |
 | **Theme system** | `localStorage` settings | CSS variables | Settings screen | Every screen | ✅ Shipped | `tabs` |
+| **Responsive theme v2** | `reference/makaman-responsive-theme-v2.css` | — | Not imported by anything | App-design polish (pending mockups) | 📦 Stored, not wired — see HANDOFF §5 | — |
 | **Audit logging** | — | `audit_log` | Every feature that changes data | Activity tab, Permissions | ✅ Shipped | `audit` |
 
 ---
