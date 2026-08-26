@@ -469,9 +469,25 @@ Three loose ends, none of which needed new machinery — each extended something
   problem. What is closed is the specific case that mattered: a settled ticket can no
   longer be overwritten from the field. `stress.test.js` records the rest of today's
   behaviour so a future merge has a documented before.
-- **`cloud.test.js` fails at line 213** — `d.tickets[0]` is undefined, so the mocked cloud
-  fetch is returning nothing. **Pre-existing**: it fails identically on the commit before
-  this work. Not investigated; it is the only red suite in the repo.
+- **`cloud.test.js` is dead, and it looks half-alive.** Investigated 2026-08-26.
+  - **The real app is not affected.** The suite drives a hand-written fake Supabase client,
+    not the real one. The live project loads and writes fine — the master export ran
+    against real rows the same day.
+  - **The failure:** hydration lands nothing. Probed directly: the fake client returns the
+    ticket (`rawRows: 1`) while `app.state.data.tickets` stays at 0, and so do `profiles`.
+    The run then dies where it first touches `d.tickets[0]`.
+  - **The dangerous part is the assertions that still say PASS.** They pass *vacuously*,
+    against seed defaults rather than database values — `since: ''` where the fixture says
+    `2026-08-01`, `hour12=undefined`, `timezone=undefined`. A reader sees four green lines
+    and concludes the cloud path is guarded. Nothing was verified. Same family as B-15.8.
+  - **What is unguarded:** this is the *only* suite that exercises cloud mode — the offline
+    queue, write coalescing ("one upsert, not ten"), the outbox drain. Those are exactly
+    the mechanisms §2k's work leans on.
+  - **One real gap fixed, which was not the cure:** the stub had no `rpc` at all, while
+    hydration calls `c.rpc('my_permissions')` (P1.8). Added. State is still empty with it
+    working, so the root cause is elsewhere and needs proper investigation.
+  - **Recommendation:** chase this before Tier 5. Building more features on a sync path
+    whose only test is dead is how the next silent divergence gets in.
 
 ### Verification (updated)
 `app/stress.test.js` — **22 assertions**, adding: a refusal is kept with its reason, the

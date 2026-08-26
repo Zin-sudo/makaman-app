@@ -114,6 +114,18 @@ window.supabase = {
       return api;
     }
     return {
+      // Postgres functions. The app calls c.rpc('my_permissions') as part of hydration
+      // (P1.8, the permission registry). Without this the call was undefined(...),
+      // which threw inside the Promise.all that loads EVERY table — so nothing landed in
+      // state, and the assertions before the crash went on "passing" against seeded
+      // defaults rather than database values. A stub has to keep up with what the app
+      // asks of it, or it stops testing and starts reassuring.
+      rpc: function () {
+        if (window.__offline) return fail();
+        // Empty map: hasPermission() then falls back to the role defaults, which is what
+        // this suite is about anyway. permissions.test.js covers the registry itself.
+        return Promise.resolve({ data: {}, error: null });
+      },
       auth: {
         signInWithPassword: function (c) {
           if (window.__offline) return fail();

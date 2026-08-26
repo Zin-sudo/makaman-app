@@ -1343,3 +1343,23 @@ block as the `setState` that raises the warning. React had not re-rendered, so t
 measuring the harness rather than the app — and would have reported a working fix as broken.
 **Prevention Rule:** Assert state first, then wait, then assert the DOM. Any check on
 something rendered *from* state needs a paint between the cause and the reading.
+
+### B-19.4 🔴 A dead suite that still prints PASS
+**Symptom:** `cloud.test.js` prints four green lines, then dies. The green lines are
+meaningless — they assert against seeded defaults because the data they were meant to check
+never arrived.
+**Root Cause:** Hydration lands nothing, so every later assertion reads the seed. Checks
+written as "this value is present" pass on a default that happens to match, and checks
+written as "this value is absent" pass on absence caused by the failure itself. Same family
+as B-15.8 (a negative assertion passing on a blank page).
+**Prevention Rule:**
+- A fixture value MUST be distinguishable from the seed. Assert `since === '2026-08-01…'`,
+  never merely that a holder name is present — the seed has one too.
+- A suite MUST fail loudly when its setup did not take. Assert the arrival of the fixture
+  *first*, and stop if it is not there, rather than letting later checks read defaults.
+- Treat a partial run as a failed run. "4 passed" before a crash is not partial credit.
+**Detection Method:**
+```bash
+cd app && NODE_PATH=../node_modules node cloud.test.js 2>&1 | tail -3
+# A suite that ends in a stack trace rather than a count → the count above it means nothing.
+```
