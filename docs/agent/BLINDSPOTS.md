@@ -1411,3 +1411,41 @@ Each failure produced the same symptom — empty state — so fixing one reveale
 cd app && node -e "…build STUB(DB)…" && node --check /tmp/stub.js
 # The suite now does this itself and exits 1 with one line if the stub will not parse.
 ```
+
+### B-20.1 🔴 One notification key carrying more than one message
+**Symptom:** Attach a good file, then immediately pick a `.txt`. The banner still reads
+"signed-ticket.pdf attached." The refusal never appears; the person believes a file they
+were refused went through.
+**Root Cause:** `toast(key, text, tone)` de-duplicated on the **key** alone —
+`if (!cur || cur.key !== key)`. The intent was anti-flicker: pressing the same button
+twice should push the countdown out rather than restart the animation. That is correct
+while a key means one message. Attachments are the first surface where one key (`attach`)
+says four different things — attached, wrong type, too big, could not be attached — so a
+refusal arriving inside the six-second window silently inherited the success's words.
+**Prevention Rule:**
+- De-duplicate on what is **shown**, not on the channel it is shown through. The guard now
+  compares `cur.text !== text`, which preserves the anti-flicker exactly (the same button
+  twice still produces the same string) and lets a different thing to say get said.
+- Before reusing a toast key for a second outcome, check the guard is on the message.
+**Detection Method:**
+```bash
+cd app && grep -n "cur.key !== key" index.html   # must also compare cur.text
+```
+
+### B-20.2 🟠 `isVisible()` is Playwright's definition, not a person's
+**Symptom:** A visually-hidden file input (the standard `clip:rect(0,0,0,0)` sr-only
+pattern) is reported **visible**, so an assertion that it is out of sight fails while the
+screen is correct.
+**Root Cause:** Playwright calls an element visible when it has a non-empty bounding box
+and is not `visibility:hidden`. The sr-only pattern deliberately keeps a 1×1 box so the
+control stays focusable and operable; nothing paints, but the box exists.
+**Prevention Rule:**
+- Assert the **measured box**, not the framework's opinion: `boundingBox()` and check the
+  dimensions. That states the actual claim — it occupies no visible area.
+- `setInputFiles` works on such an input regardless, so hiding it costs nothing in tests.
+- Pair it with a positive check that something visible replaced it. An invisible input
+  with no label to click would otherwise pass every other assertion in the suite.
+**Detection Method:**
+```bash
+cd app && grep -n "isVisible()" *.test.js   # on an sr-only element this is the wrong tool
+```

@@ -873,6 +873,9 @@ The "recommended time" is not advice. It is the gate.
 | S12 | `.mk-ticket-card` 3px stripe is dead code — an inline `border:1px` beats the class (B-17.5). Fixing it changes every card. | CSS | Tier 6 | **user** (design) |
 | S13 | Job Log date column renders `mm-dd-yy` while every other date reads `d-mmm-yyyy`. The template's own formatting, preserved deliberately. | template | Tier 6 | **user** (design) |
 | S14 | "Apper" skill. | — | Tier 7 | — |
+| ~~S16~~ | ~~Notifications and notes are on the ticket-review screen and the app bar. The technician's ticket screen shows neither.~~ **Closed** — attachments hit the same wall (a technician could not attach the signed sheet from the field, which is the whole point), so both panels were added to the technician's log screen. The bindings were already role-agnostic; only the markup was missing. | `index.html` | Tier 5 | done |
+| S17 | Attachments require signal by design (a file cannot sit in localStorage — B-19.1 is what happens when it tries). No offline queueing of uploads; the control is disabled and says why. **Stands, and is now enforced and tested.** Revisit only if the field asks for it. | `index.html` | n/a — a decision | — |
+| S18 | The attachments panel lists files but never previews one. A photo of a wellhead opens in a new tab through a signed URL, which is correct but not quick. A thumbnail strip would need bytes in the page, so it is a deliberate later call, not an oversight. | `index.html` | Tier 6 (with the CSS pass) | — |
 
 ### Baseline — full sweep, 2026-08-26
 **All suites green.** `cloud.test.js` (S1) was the one red and is now 30/30. Every other suite passes, so the

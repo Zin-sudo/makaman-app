@@ -911,6 +911,87 @@
                 </sc-if>
               </div>
               </sc-if>
+
+              <!-- S16. Notes and attachments were built on the office's review screen and
+                   nowhere else, which meant a technician could not read a note raised on
+                   his own job, and could not attach the signed sheet from the field —
+                   the two places each feature is most needed. The bindings were already
+                   role-agnostic (they hang off the open ticket, not off who is looking),
+                   so only the markup was missing. Shown to a technician whether or not he
+                   still holds the ticket: having handed a job on does not stop it being
+                   his to answer for. -->
+              <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-top:16px">
+                  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+                    <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Notes</div>
+                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ notesSummary }}</div>
+                  </div>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">Anything on this job that needs someone's attention.</div>
+                  <sc-if value="{{ notesEmpty }}" hint-placeholder-val="{{ true }}">
+                    <div style="padding:12px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">No notes on this ticket.</div>
+                  </sc-if>
+                  <sc-for list="{{ noteRows }}" as="n" hint-placeholder-count="2">
+                    <div style="display:flex;gap:10px;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                      <span style="width:3px;flex:none;background:{{ n.edge }}"></span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;line-height:1.45;color:{{ n.ink }}">{{ n.body }}</div>
+                        <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:3px">{{ n.meta }}</div>
+                      </div>
+                      <sc-if value="{{ n.canResolve }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ n.resolve }}" style="flex:none;align-self:flex-start;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">ANSWERED</button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ canAddNote }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;gap:8px;margin-top:12px">
+                      <input dir="auto" value="{{ noteDraft }}" onChange="{{ setNoteDraft }}" placeholder="Raise a note on this job…" style="flex:1;min-width:0;min-height:38px;padding:0 11px;font-size:13px;background:var(--field);color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.22)">
+                      <button onClick="{{ addNote }}" disabled="{{ noteDraftEmpty }}" style="flex:none;padding:0 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--accent);color:var(--on-accent);border:0;opacity:{{ noteAddOpacity }}">RAISE</button>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showAttachments }}" hint-placeholder-val="{{ true }}">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-top:16px">
+                  <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+                    <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Attachments</div>
+                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ attachmentsSummary }}</div>
+                  </div>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">The signed sheet, a photo of the wellhead, a third-party invoice.</div>
+                  <sc-if value="{{ attachmentsEmpty }}" hint-placeholder-val="{{ true }}">
+                    <div style="padding:12px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">Nothing attached to this ticket.</div>
+                  </sc-if>
+                  <sc-for list="{{ attachmentRows }}" as="a" hint-placeholder-count="2">
+                    <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:13px;line-height:1.45;color:var(--ink-strong);overflow-wrap:anywhere">{{ a.filename }}</div>
+                        <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:3px">{{ a.meta }}</div>
+                      </div>
+                      <button onClick="{{ a.open }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">OPEN</button>
+                      <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ a.remove }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:rgb(var(--danger-rgb));border:1px solid rgba(var(--danger-rgb),0.45)">REMOVE</button>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ canAddAttachment }}" hint-placeholder-val="{{ true }}">
+                    <div style="margin-top:12px">
+                      <!-- The native file control is the only thing on this screen the
+                           browser draws itself, and it shows: a grey "Choose File" chip
+                           against a dark panel. The input is still the input — it is
+                           moved out of sight rather than removed, so the label opens the
+                           picker natively and nothing depends on script to work. -->
+                      <label style="display:block;width:100%;min-height:40px;line-height:40px;text-align:center;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3);opacity:{{ attachBtnOpacity }};cursor:{{ attachBtnCursor }}">
+                        <input type="file" accept="{{ attachAccept }}" onChange="{{ onAttachPick }}" disabled="{{ attachNeedsSignal }}" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
+                        {{ attachBtnLabel }}
+                      </label>
+                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px">{{ attachHint }}</div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ attachBusy }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--accent-deep);margin-top:6px">Sending…</div>
+                  </sc-if>
+                </div>
+              </sc-if>
             </sc-if>
 
             </sc-if>
@@ -1561,6 +1642,44 @@
                 </sc-if>
               </div>
             </sc-if>
+
+            <sc-if value="{{ showAttachments }}" hint-placeholder-val="{{ true }}">
+              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+                  <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Attachments</div>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ attachmentsSummary }}</div>
+                </div>
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">The signed sheet, a photo of the wellhead, a third-party invoice.</div>
+                <sc-if value="{{ attachmentsEmpty }}" hint-placeholder-val="{{ true }}">
+                  <div style="padding:12px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">Nothing attached to this ticket.</div>
+                </sc-if>
+                <sc-for list="{{ attachmentRows }}" as="a" hint-placeholder-count="2">
+                  <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:13px;line-height:1.45;color:var(--ink-strong);overflow-wrap:anywhere">{{ a.filename }}</div>
+                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:3px">{{ a.meta }}</div>
+                    </div>
+                    <button onClick="{{ a.open }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">OPEN</button>
+                    <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ a.remove }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:rgb(var(--danger-rgb));border:1px solid rgba(var(--danger-rgb),0.45)">REMOVE</button>
+                    </sc-if>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ canAddAttachment }}" hint-placeholder-val="{{ true }}">
+                  <div style="margin-top:12px">
+                    <label style="display:block;width:100%;min-height:40px;line-height:40px;text-align:center;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3);opacity:{{ attachBtnOpacity }};cursor:{{ attachBtnCursor }}">
+                      <input type="file" accept="{{ attachAccept }}" onChange="{{ onAttachPick }}" disabled="{{ attachNeedsSignal }}" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
+                      {{ attachBtnLabel }}
+                    </label>
+                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px">{{ attachHint }}</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ attachBusy }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11px;color:var(--accent-deep);margin-top:6px">Sending…</div>
+                </sc-if>
+              </div>
+            </sc-if>
+
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
               <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px">Audit trail</div>
               <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">{{ curAuditScope }}</div>
@@ -2445,6 +2564,11 @@ const PERMISSION_DEFAULTS = (function () {
     // for the office is the case this exists for. Answering one is the office's job.
     [['tech', 'mgr', 'admin', 'founder'], ['note.add']],
     [['mgr', 'admin'], ['note.resolve']],
+    // Attaching is for the people who were there or who handle the paperwork. The
+    // Observer is deliberately not among them: that role reads a job and flags what it
+    // sees, and putting a file into a client's archive is not reading.
+    [['tech', 'mgr', 'admin'], ['attachment.add']],
+    [['mgr', 'admin'], ['attachment.remove']],
     [['tech', 'mgr', 'admin', 'founder'],
       ['report.generate']],
     [['mgr', 'admin', 'founder'],
@@ -2652,6 +2776,16 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
       by: nameById[n.raised_by] || '', at: tsIn(n.raised_at),
       resolvedBy: nameById[n.resolved_by] || '', resolvedAt: tsIn(n.resolved_at),
     })),
+    // Metadata only, and deliberately so. What a file is called, how big it is and who
+    // put it there is a couple of hundred bytes, which the replica can carry — so a
+    // technician down a hole still sees that the signed sheet came back. The bytes
+    // themselves never enter the replica: they would not fit (B-19.1), and they are only
+    // ever reachable through a signed URL minted at the moment somebody asks.
+    attachments: (k.attachments || []).map((a) => ({
+      id: a.id, path: a.path, filename: a.filename || '', mime: a.mime || '',
+      bytes: Number(a.bytes) || 0,
+      by: nameById[a.uploaded_by] || '', at: tsIn(a.uploaded_at),
+    })),
   };
 }
 
@@ -2733,7 +2867,7 @@ function hydrate() {
     all('ticket_numbering'), all('org_defaults'), all('asset_questions'),
     all('numbering_claim'), all('user_settings'),
     all('tickets'), all('ticket_lines'), all('ticket_items'), all('ticket_assets'),
-    all('ticket_crew'), all('audit_log'), all('ticket_notes'),
+    all('ticket_crew'), all('audit_log'), all('ticket_notes'), all('ticket_attachments'),
     // The catalogue, and this person's own answer to it. Two calls rather than one
     // because the catalogue is the same for everybody and the answer is not: the admin
     // screen needs every capability listed, including the ones nobody currently holds.
@@ -2749,7 +2883,7 @@ function hydrate() {
     const bad = res.find((r) => r.error);
     if (bad) throw new Error(bad.error.message || 'Could not load data.');
     const [profiles, clients, priceItems, jobTypes, numbering, orgDefaults, assetQs,
-      claim, settings, tickets, lines, items, assets, crew, audit, notes,
+      claim, settings, tickets, lines, items, assets, crew, audit, notes, attachments,
       permCatalogue, myPerms, lastExport, permOverrides] = res.map((r) => r.data || []);
 
     const nameById = {}, emailById = {}, jobById = {};
@@ -2766,7 +2900,7 @@ function hydrate() {
     const byTs = (a, b) => new Date(a.logged_at || a.changed_at || 0) - new Date(b.logged_at || b.changed_at || 0);
     const L = by(lines, 'ticket_id'), I = by(items, 'ticket_id'), A = by(assets, 'ticket_id'),
       C = by(crew, 'ticket_id'), U = by(audit, 'ticket_id'), P = by(priceItems, 'client_id'),
-      N = by(notes, 'ticket_id');
+      N = by(notes, 'ticket_id'), AT = by(attachments, 'ticket_id');
 
     const mySettings = settings[0] || {};
     return {
@@ -2847,6 +2981,7 @@ function hydrate() {
         crew: (C[t.id] || []).slice().sort((a, b) => a.position - b.position),
         audit: (U[t.id] || []).slice().sort(byTs),
         notes: (N[t.id] || []).slice().sort((a, b) => new Date(a.raised_at) - new Date(b.raised_at)),
+        attachments: (AT[t.id] || []).slice().sort((a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at)),
       }, nameById, clientById, jobById, emailById)),
     };
   });
@@ -3501,6 +3636,22 @@ function money(n, cur) {
   return (v < 0 ? '-' : '') + c.before + amount + c.after;
 }
 
+// What the bucket accepts, mirrored from migration 0030 so a person gets a sentence
+// instead of a 400 from the storage API. The bucket enforces this regardless — this copy
+// exists to explain the refusal, not to be the refusal.
+const ATTACH_MAX_BYTES = 15728640;
+const ATTACH_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic'];
+// How long a link to a file lives. Sixty seconds is what the master export uses and the
+// reason is the same: long enough to click, short enough that a copied URL is worthless
+// by the time it is pasted anywhere (B-12.4).
+const ATTACH_LINK_TTL = 60;
+function fileSize(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v + ' B';
+  if (v < 1024 * 1024) return Math.round(v / 1024) + ' KB';
+  return (v / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 const BASE_ITEMS = [
   ['MKN-1801', 'Pick-up with tools travelling to wells', 'Km', 3.9],
   ['MKN-1804', 'Supervisor or Engineer per day or fraction', 'Day', 1050],
@@ -3973,10 +4124,19 @@ class Component extends DCLogic {
   // ms overrides the six-second default for the few banners that confirm something the
   // user just did with their own hand and already knows the result of — a copy, say.
   // Six seconds of "Coordinates Copied!" is the app talking long after the point.
+  // The comparison is on the MESSAGE, not the key alone. Keying on it alone meant a
+  // second banner under the same key kept the first one's words — which is right when the
+  // same button is pressed twice and wrong the moment one key carries more than one
+  // outcome. Attachments are the first surface that does: 'attach' says "file attached",
+  // "only PDFs and photos", "that file is 15.0 MB" and "could not be attached", and a
+  // refusal arriving within six seconds of a success was showing the success. Comparing
+  // the text keeps the anti-flicker exactly as it was — the same button twice still
+  // produces the same string and still does not re-render — and lets a different thing to
+  // say actually get said.
   toast(key, text, tone, ms) {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     const cur = this.state.toast;
-    if (!cur || cur.key !== key) this.setState({ toast: { key: key, text: text, tone: tone || 'info' } });
+    if (!cur || cur.key !== key || cur.text !== text) this.setState({ toast: { key: key, text: text, tone: tone || 'info' } });
     this.toastTimer = setTimeout(() => this.setState({ toast: null }), ms || TOAST_MS);
   }
   dismissToast() {
@@ -4830,6 +4990,119 @@ class Component extends DCLogic {
       n.resolvedBy = who; n.resolvedAt = iso(new Date());
     });
     if (body) this.logOn(ticketId, 'Note answered by ' + (who || 'the office') + ': ' + body, 'lifecycle');
+  }
+
+  // ── Attachments ─────────────────────────────────────────────────────────────────────
+  //
+  // The one thing in this app that needs signal, and the only honest way to build it is
+  // to say so in the control rather than pretend otherwise. Everything else a person does
+  // offline lands in the outbox and drains when coverage returns; a file cannot, because
+  // the outbox lives in localStorage and a 15MB photo does not fit in a 5MB quota —
+  // B-19.1 is the record of what happens when something tries. So the bytes go straight
+  // to the bucket and the row straight to the table, both refused outright with no
+  // connection, and nothing is queued that could not later be sent.
+  //
+  // The metadata does reach the replica through hydrate, so a technician down a hole
+  // still sees that the signed sheet came back. Only opening it needs coverage.
+  attachFile(ticketId, file) {
+    if (!ticketId || !file || !this.hasPermission('attachment.add')) return Promise.resolve();
+    const c = sb();
+    if (!c || !USE_CLOUD) {
+      this.toast('attach', 'Attachments need a connection to the office.', 'warn');
+      return Promise.resolve();
+    }
+    if (!this.state.online) {
+      this.toast('attach', 'No signal. A file cannot wait in the queue the way a job log can — try again in coverage.', 'warn');
+      return Promise.resolve();
+    }
+    if (file.size > ATTACH_MAX_BYTES) {
+      this.toast('attach', 'That file is ' + fileSize(file.size) + '. The limit is ' + fileSize(ATTACH_MAX_BYTES) + '.', 'warn');
+      return Promise.resolve();
+    }
+    // An empty file passes no CHECK in the table and would leave bytes in the bucket with
+    // no row pointing at them, so it is stopped before either write.
+    if (!file.size) {
+      this.toast('attach', 'That file is empty.', 'warn');
+      return Promise.resolve();
+    }
+    const mime = file.type || '';
+    if (ATTACH_TYPES.indexOf(mime) < 0) {
+      this.toast('attach', 'Only PDFs and photos can be attached.', 'warn');
+      return Promise.resolve();
+    }
+    const who = (this.state.session && this.state.session.name) || '';
+    const name = String(file.name || 'file').trim() || 'file';
+    const dot = name.lastIndexOf('.');
+    const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+    // The first path segment is the ticket id, and the storage policies key on exactly
+    // that — it is what ties the bytes to the same visibility rule as the job. The rest is
+    // a fresh uuid, so two people attaching "scan.pdf" in the same minute cannot collide
+    // and no client's filename ever becomes a guessable object key.
+    const path = ticketId + '/' + uuid() + (ext ? '.' + ext : '');
+    this.setState({ attachBusy: true });
+    return c.storage.from('attachments').upload(path, file, { contentType: mime, upsert: false })
+      .then((up) => {
+        if (up.error) throw up.error;
+        return c.from('ticket_attachments').insert({
+          ticket_id: ticketId, path: path, filename: name, mime: mime, bytes: file.size,
+          uploaded_by: CLOUD_IDS.me,
+        });
+      })
+      .then((ins) => {
+        if (ins.error) {
+          // The bytes are already in the bucket and nothing now points at them. Left
+          // alone that is an orphan nobody can see, list or delete through the app — so
+          // the upload is undone before the failure is reported.
+          return c.storage.from('attachments').remove([path]).then(() => { throw ins.error; });
+        }
+        // Recorded like everything else. Notifications are derived from the trail, so
+        // this is also what tells the office a signed sheet arrived — no second wiring.
+        this.logOn(ticketId, (who || 'Someone') + ' attached ' + name + ' (' + fileSize(file.size) + ')', 'lifecycle');
+        return this.refresh();
+      })
+      .then(() => { this.setState({ attachBusy: false }); this.toast('attach', name + ' attached.', 'ok'); })
+      .catch((err) => {
+        this.setState({ attachBusy: false });
+        this.toast('attach', (err && err.message) || 'The file could not be attached.', 'warn');
+      });
+  }
+  // A link that expires, minted for the person asking. Never a stored URL: the object is
+  // a client's signed paperwork, and a URL that never dies is a URL that eventually leaks
+  // (B-12.4). Same shape as downloadMaster, for the same reason.
+  openAttachment(path) {
+    const c = sb();
+    if (!c || !path) { this.toast('attach', 'Attachments need a connection to the office.', 'warn'); return; }
+    c.storage.from('attachments').createSignedUrl(path, ATTACH_LINK_TTL)
+      .then((r) => {
+        if (r.error || !r.data) throw r.error || new Error('Could not get a link.');
+        // Opened rather than fetched: the browser handles it, and nothing about the file
+        // passes through this app's memory.
+        window.open(r.data.signedUrl, '_blank');
+      })
+      .catch((err) => this.toast('attach', (err && err.message) || 'Could not get a link to the file.', 'warn'));
+  }
+  // Withdrawing one. The row goes first: if the object delete fails the row is already
+  // gone and a retry is harmless, whereas deleting the bytes first and failing on the row
+  // would leave a listing that points at nothing and an OPEN button that always errors.
+  removeAttachment(ticketId, id) {
+    if (!this.hasPermission('attachment.remove')) return Promise.resolve();
+    const c = sb();
+    if (!c) { this.toast('attach', 'Attachments need a connection to the office.', 'warn'); return Promise.resolve(); }
+    const t = (this.state.data.tickets || []).find((x) => x.id === ticketId);
+    const a = t && (t.attachments || []).find((x) => x.id === id);
+    if (!a) return Promise.resolve();
+    const who = (this.state.session && this.state.session.name) || '';
+    return c.from('ticket_attachments').delete().eq('id', id)
+      .then((del) => {
+        if (del.error) throw del.error;
+        return c.storage.from('attachments').remove([a.path]);
+      })
+      .then(() => {
+        this.logOn(ticketId, (who || 'The office') + ' removed the attachment ' + a.filename, 'lifecycle');
+        return this.refresh();
+      })
+      .then(() => this.toast('attach', a.filename + ' removed.', 'ok'))
+      .catch((err) => this.toast('attach', (err && err.message) || 'The file could not be removed.', 'warn'));
   }
 
   sheetGeometry() { return SHEET; }
@@ -6522,6 +6795,51 @@ class Component extends DCLogic {
         resolve: () => this.resolveNote(t.id, n.id),
       })),
       addNote: () => this.addNote(t && t.id, S.noteDraft),
+
+      // ── Attachments on the open ticket ──
+      // Visible to anyone who can see the ticket, because seeing that the signed sheet
+      // came back is the point. Adding is gated on attachment.add, withdrawing on
+      // attachment.remove, both through hasPermission so a granted exception behaves the
+      // same here as anywhere else.
+      showAttachments: !!t,
+      canAddAttachment: !!t && this.hasPermission('attachment.add'),
+      attachBusy: !!S.attachBusy,
+      // Said in the control, not discovered after tapping it. This is the one feature
+      // that cannot queue, so the person is told before they choose a file rather than
+      // after (S17).
+      attachNeedsSignal: !USE_CLOUD || !S.online,
+      attachHint: !USE_CLOUD
+        ? 'This build has no office connection, so files cannot be attached.'
+        : (!S.online
+          ? 'No signal. A file cannot wait in the queue the way a job log can.'
+          : 'PDF or photo, up to ' + fileSize(ATTACH_MAX_BYTES) + '.'),
+      attachAccept: ATTACH_TYPES.join(','),
+      attachBtnLabel: 'Attach a file',
+      attachBtnOpacity: (!USE_CLOUD || !S.online) ? '0.45' : '1',
+      attachBtnCursor: (!USE_CLOUD || !S.online) ? 'not-allowed' : 'pointer',
+      attachmentsEmpty: !t || !(t.attachments || []).length,
+      attachmentsSummary: (() => {
+        const all = (t && t.attachments) || [];
+        if (!all.length) return '';
+        return all.length + ' · ' + fileSize(all.reduce((n, a) => n + (a.bytes || 0), 0));
+      })(),
+      attachmentRows: ((t && t.attachments) || []).slice().reverse().map((a) => ({
+        filename: a.filename,
+        meta: (a.by || 'Someone') + ' · ' + F.stamp(a.at) + ' · ' + fileSize(a.bytes),
+        canRemove: this.hasPermission('attachment.remove'),
+        open: () => this.openAttachment(a.path),
+        remove: () => this.removeAttachment(t.id, a.id),
+      })),
+      // The handler is given the event, like every other onChange in this file. The input
+      // is cleared afterwards so choosing the same file twice fires again — a browser
+      // reports no change when the value is identical, and a re-attach after a failed one
+      // would silently do nothing.
+      onAttachPick: (e) => {
+        const el = e && e.target;
+        const file = el && el.files && el.files[0];
+        if (!file) return;
+        this.attachFile(t && t.id, file).then(() => { try { el.value = ''; } catch (_) { /* older browsers */ } });
+      },
 
       storageFull: !!S.storageFull,
       storageFullHint: S.storageHint || '',

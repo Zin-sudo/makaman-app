@@ -43,6 +43,7 @@ select statements[1] from supabase_migrations.schema_migrations where version = 
 | 19–31 | `0013…0025` | one file each, same names |
 | 32–34 | `0026…0028` | one file each. 0026 is partly superseded by 0027 and 0028 the same day — read all three together. |
 | 35 | `0029_ticket_notes_and_follow_ups` | one file, same name |
+| 36 | `0030_ticket_attachments` | one file, same name. First client-facing `storage.objects` policies — scoped to the `attachments` bucket alone, `exports` untouched. |
 
 The row data loaded by #14–#18 is **not** in this directory. It lives in
 `supabase/makaman_price_lists_final.sql`, which is the runnable copy of exactly what was
