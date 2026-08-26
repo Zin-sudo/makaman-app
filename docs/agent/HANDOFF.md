@@ -387,6 +387,10 @@ cold boot with the network cut. Regression: `layout` 13, `tabs` 11, `export` 14,
 
 ## 3. NEXT TASK — finish Tier 2, then Tier 3/4 of §7
 
+**Tier 4 is done** — and needed no migration at all. S6 was a recovery, S7 was already
+built, S8 was one word in the app. The register said "batch three schema changes into one
+migration"; checking each first meant zero. See §8 for what each turned out to be.
+
 **Tier 2 is done** (§2k). Next is **Tier 3** — which needs the user, so it can run in
 parallel — and **Tier 4**, the batched migration. Do migration 0002 first, before anything
 forces a rebuild from files alone.
@@ -860,9 +864,9 @@ The "recommended time" is not advice. It is the gate.
 | S4 | Supabase leaked-password protection is OFF. | Supabase dashboard | Tier 3 | **user** |
 | S5 | Stray `service_role_key` placeholder row in the `makaman-libya` vault. | wrong project | Tier 3 | **user** |
 | ~~S6~~ | ~~Migration 0002 missing from the repo~~ — **closed 2026-08-26.** Recovered verbatim from `supabase_migrations.schema_migrations`, along with `snapshot_tickets_before_model_catchup`. `supabase/migrations/README.md` now maps all 31 applied migrations to the file that records each, so the completeness question is answerable in seconds. | repo | ~~Tier 4~~ | — |
-| S7 | `order_index` column for drag-and-drop item reordering. | schema | Tier 4 | — |
+| ~~S7~~ | ~~`order_index` column for drag-and-drop reordering~~ — **closed 2026-08-26, and it was already built.** `ticket_items.sort_order` has existed since the schema catch-up; the app writes it from the row index and reads it back sorted. The drag works too — driven with a real HTML5 drag, not by calling the handler. The register entry was inherited from a plan written before the implementation. Now pinned by `reorder.test.js`. | — | ~~Tier 4~~ | — |
 | S15 | The repo is a *curated* migration history, not a mirror — transient staging create/drop pairs are deliberately absent. Recorded in `supabase/migrations/README.md`; do not "fix" it by dumping all 31. | repo | n/a — a decision, not a debt | — |
-| S8 | Q1 rewording to "Tools Allocated Reclaimed or Back-to-Base?" — DB (0009) and app differ by one word. | schema + app | Tier 4 | — |
+| ~~S8~~ | ~~Q1 rewording — DB and app differ by one word~~ — **closed 2026-08-26.** No migration: the database was already right. The app asked "reclaimed **and** back to base?" where 0009 seeds "reclaimed **or** back-to-base?" — a different question, since "and" demands both. The app moved to the database. | `index.html` | ~~Tier 4~~ | — |
 | S9 | OneDrive / Google Drive upload unimplemented. Buttons are honest about it and write nothing (B-18.1). | `index.html` | Tier 5, or dropped | — |
 | S10 | Excel template holds 24 item rows / 25 log rows. A larger ticket is flagged, not truncated. | `fillWorkbook` | Tier 5 | — |
 | S11 | B8 — flag sync conflicts instead of overwriting, as a general merge. The settled-ticket case is closed (§2k). | `index.html` | Tier 5 | — |

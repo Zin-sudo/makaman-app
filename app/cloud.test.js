@@ -34,7 +34,7 @@ const DB = {
   ticket_numbering: [{ id: 'n1', prefix: '', label: 'Special Tools', next_number: 1883, floor: 1883 }],
   org_defaults: [{ id: true, base_location: 'Ahmadi Base', customer_rep: 'Workover Office' }],
   asset_questions: [
-    { id: 'q1', key: 'reclaimed', label: 'Tools allocated reclaimed and back to base?', tone: 'warning', multi: false, presets: ['Yes', 'Not yet', 'Handed over to replacement'], sort_order: 0 },
+    { id: 'q1', key: 'reclaimed', label: 'Tools allocated reclaimed or back-to-base?', tone: 'warning', multi: false, presets: ['Yes', 'Not yet', 'Handed over to replacement'], sort_order: 0 },
   ],
   numbering_claim: [{ id: true, holder_id: OPS, since: '2026-08-01T00:00:00.000Z' }],
   user_settings: [{ user_id: TECH, theme: 'dark', accent: 'red', timezone: 'Africa/Tripoli', hour12: false, share_location: true }],

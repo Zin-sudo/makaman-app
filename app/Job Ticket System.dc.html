@@ -3314,7 +3314,12 @@ const TOAST_MS = (typeof window !== 'undefined' && window.__TOAST_TEST_MS) || 60
 // company's vocabulary, not the app's, and a preset nobody uses just pushes people into
 // free text.
 const ASSET_QUESTIONS_DEFAULT = [
-  { key: 'reclaimed', label: 'Tools allocated reclaimed and back to base?', tone: 'warning',
+  // The wording is the database's, not this file's. migration 0009 seeds
+  // asset_questions with "reclaimed or back-to-base?" and the app said "reclaimed and
+  // back to base?" — one word apart, and the two mean different things: "and" asks for
+  // both, "or" accepts either. A technician answering the app was answering a question
+  // the office never asked. The database is the record, so the app moves to it.
+  { key: 'reclaimed', label: 'Tools allocated reclaimed or back-to-base?', tone: 'warning',
     multi: false, presets: ['Yes', 'Not yet', 'Handed over to replacement'] },
   // Kit rarely ends up in one place. Where a job used two strings and a vehicle, forcing
   // a single answer would push a true answer into free text.
