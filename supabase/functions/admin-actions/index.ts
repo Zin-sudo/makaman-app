@@ -1,5 +1,5 @@
 // Privileged user-management actions: approve a pending signup, create a
-// technician account directly, or promote a user's role.
+// technician account directly, promote a user's role, or withdraw access.
 //
 // Runs with the service-role key (bypasses RLS) — so it MUST re-derive the
 // caller's identity from their own JWT and re-check their role on every
@@ -10,6 +10,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+// The seeded first Admin. Permanently un-disableable, by design rather than by
+// convention: it is the account that can rescue every other one, and an office
+// that locks itself out has no way back in.
+const MASTER_ADMIN_EMAIL = 'lateri@makaman.ly'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -97,6 +102,46 @@ Deno.serve(async (req) => {
       }
       const { error } = await admin.from('profiles').update({ role }).eq('id', userId)
       if (error) throw error
+      return json({ ok: true })
+    }
+
+    // Withdrawing access, and restoring it. Deliberately NOT a delete: ticket and
+    // audit foreign keys are NO ACTION and would refuse for anyone who has worked,
+    // and ticket_crew is CASCADE and would erase who was on a job. The row stays;
+    // only the ability to sign in changes.
+    if (action === 'set_user_status') {
+      if (!isAdmin) return json({ error: 'Only Admin can disable or restore an account.' }, 403)
+      const userId = body.userId as string
+      const status = body.status as string
+      if (!userId || !['active', 'disabled'].includes(status)) {
+        return json({ error: 'userId and a status of active or disabled are required.' }, 400)
+      }
+
+      // Both guards re-checked here rather than trusted from the UI. The client
+      // hides these buttons; hiding a button is not a permission check.
+      if (userId === callerId) {
+        return json({ error: 'You cannot disable your own account.' }, 400)
+      }
+
+      const { data: target, error: targetErr } = await admin
+        .from('profiles').select('email, status').eq('id', userId).single()
+      if (targetErr || !target) return json({ error: 'That account does not exist.' }, 404)
+
+      if (status === 'disabled'
+        && (target.email || '').toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) {
+        return json({ error: 'The master Admin account cannot be disabled.' }, 400)
+      }
+
+      const { error } = await admin.from('profiles').update({ status }).eq('id', userId)
+      if (error) throw error
+
+      // Signing out is not enough on its own — a disabled account is refused at
+      // sign-in — but it ends any session they already hold rather than letting it
+      // run until the token expires.
+      if (status === 'disabled') {
+        await admin.auth.admin.signOut(userId, 'global').catch(() => {})
+      }
+
       return json({ ok: true })
     }
 

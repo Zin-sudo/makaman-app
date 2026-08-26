@@ -62,7 +62,6 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 
 | Item | Notes |
 |------|-------|
-| **User deletion** | The Delete button now says plainly that deletion happens on the server (see §2.4). `admin-actions` has no `delete_user` action yet. |
 | **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** A candidate stylesheet is in the repo — see §5. |
 | **Approved-ticket → master Excel** | PWA → DB → script → shared master file, with a download button for admin/ops/observer. **User asked to be questioned in detail first.** |
 | **"Apper" skill** | After the Excel automation. |
@@ -347,8 +346,7 @@ you most want attributed when the office is in the field. Now carries `by` and `
 
 ## 3. NEXT TASK — see §6 for the sequencing decision
 
-Remaining functional work: **user deletion** (`admin-actions` needs a `delete_user`),
-the **approved-ticket → master Excel** automation (the user asked to be questioned in
+Remaining functional work: the **approved-ticket → master Excel** automation (the user asked to be questioned in
 detail first), and **Arabic / RTL**, still marked 🔴 critical for the market.
 
 **Do RTL before the design pass** — see §6.
@@ -423,6 +421,52 @@ Two smaller notes for whoever picks it up: `--mk-bg-tertiary` is referenced in t
 toggle rules but never defined, and `--mk-border-focus` is used with a fallback in some
 places and without one in others.
 
+
+---
+
+## 2g. WITHDRAWING ACCESS — AND WHY IT IS NOT A DELETE
+
+The loose end from §2.4 is closed, but not the way it was written down. **The schema
+refuses a delete, and it is right to.**
+
+```
+tickets.technician_id / holder_id / closed_by / approved_by   NO ACTION
+audit_log.changed_by                                          NO ACTION
+ticket_crew.profile_id                                        CASCADE
+```
+Postgres will not remove anybody who has ever touched a ticket — every real user. And
+where a delete *would* go through, `ticket_crew` is CASCADE: it would silently erase who
+was on a job, out of a trail CLAUD.md records as legally required.
+
+The app's own dialog had been promising the correct behaviour all along — *"their name
+stays on any tickets they already touched"* — while the button said Delete. So the
+implementation follows the promise: **status becomes `disabled`, the row stays.**
+
+- `set_user_status` on `admin-actions` (v2), Admin only. Re-checks **server-side** that
+  you are not disabling the master Admin and not disabling yourself — the client hides
+  those buttons, and hiding a button is not a permission check. Also ends any session the
+  target already holds rather than letting their token run out.
+- `user.delete` retired for **`user.disable`**. A key that promises what the database will
+  not do is worse than no key.
+- Disabled accounts stay in the Users list, labelled and dimmed, and drop out of
+  `activeTechnicians()` so they cannot be assigned. Restoring is the same control.
+
+### Two things this turned up
+1. **Migration 0018's constraint did nothing.** `profiles_status_check` from 0001 already
+   restricted the column to pending/active. Two CHECKs on one column both apply, so the
+   stricter won and `disabled` was refused — the new constraint looked like it worked and
+   did not. 0019 retires the original. *One column, one statement of what may go in it.*
+2. **Seeded audit entries carried no `by`.** Harmless until §2e started showing names.
+   Fixed — and while fixing it I nearly reclassified the numbering entry as an `edit`,
+   which would have quietly dropped it out of the Observer's view. Every seeded `kind` now
+   matches what `auditKind()` already inferred, so adding the field changed nobody's view
+   of anything. Widening what is hidden is a product decision, not a tidy-up.
+
+### Verification
+`app/disable.test.js` — 18 assertions, including that the row is **kept**, the name stays
+on their tickets and audit entries, they leave the assignment list, and it all reverses.
+Against the live database: an unknown status is refused, disable and restore both work,
+and the row was left as found. Regressions: 160 assertions across 8 suites, 0 failures.
 
 ---
 

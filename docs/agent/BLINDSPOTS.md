@@ -1008,6 +1008,69 @@ isolates), `innerText` applies `text-transform`, input *values* never appear in
 
 ---
 
+## 16. DESTRUCTIVE OPERATIONS (added 2026-08-26)
+
+### B-16.1 🔵 "Delete the user" Erases the Audit Trail, or Is Refused
+**Symptom:** Either the delete fails with a foreign-key error for every real user, or it
+succeeds and the record of who worked a job quietly changes.
+**Root Cause:** `profiles` is referenced by `tickets` (technician_id, holder_id, closed_by,
+approved_by) and `audit_log.changed_by` with **NO ACTION**, and by `ticket_crew.profile_id`
+with **CASCADE**. So a delete is impossible for anyone who has worked, and destructive
+where it is possible.
+**Prevention Rule:**
+- **Read the FK delete rules before implementing any delete.** They are the schema telling
+  you what the data means: NO ACTION says "this record is referenced and must survive";
+  CASCADE says "this row is part of its parent".
+- For an actor referenced by history, withdraw access by **status**, never by removing the
+  row. Accounts, in this app, are never deleted.
+- If a confirmation dialog already describes the safe behaviour ("their name stays on any
+  tickets they touched"), the dialog is the specification — implement that, do not build
+  the destructive thing the button label implies.
+**Detection Method:**
+```sql
+select tc.table_name, kcu.column_name, rc.delete_rule
+from information_schema.table_constraints tc
+join information_schema.key_column_usage kcu using (constraint_name)
+join information_schema.referential_constraints rc using (constraint_name)
+join information_schema.constraint_column_usage ccu using (constraint_name)
+where tc.constraint_type='FOREIGN KEY' and ccu.table_name='<parent>';
+-- Any NO ACTION → a delete will be refused. Any CASCADE → a delete destroys history.
+```
+
+### B-16.2 🟡 A Second CHECK Constraint Silently Does Nothing
+**Symptom:** A migration adds a CHECK permitting a new value, the migration succeeds, and
+the new value is still rejected.
+**Root Cause:** Multiple CHECK constraints on one column **all** apply — they AND together,
+so the strictest wins. Migration 0018 added `profiles_status_known` allowing `disabled`
+while `profiles_status_check` from 0001 still restricted the column to pending/active. The
+new constraint looked like it worked and had no effect whatsoever.
+**Prevention Rule:**
+- Before adding a CHECK, list the ones already on that column and **replace** rather than
+  add. One column, one statement of what may go in it.
+- Test the new value end to end immediately after the migration. "Migration succeeded" is
+  not evidence that the value is now accepted.
+**Detection Method:**
+```sql
+select conname, pg_get_constraintdef(oid) from pg_constraint
+where conrelid = '<table>'::regclass and contype = 'c';
+-- Two constraints naming the same column → FAIL
+```
+**Found:** 2026-08-26. Fixed by migration 0019.
+
+### B-16.3 ⚪ Fixing Test Data Quietly Changes What a Role Can See
+**Symptom:** Demo data is tidied up; a role's view of it narrows, and no test notices
+because the change looks like a data fix.
+**Root Cause:** Giving seeded audit entries an explicit `kind` to add attribution, and
+labelling one `'edit'` because that read as more accurate. `auditKind()` had been inferring
+`'lifecycle'` from its text, and the Observer is shown lifecycle only — so the entry would
+have silently dropped out of their view.
+**Prevention Rule:** When adding a classification field to existing data, set every value
+to **what the inference already produced**, and verify it. Changing a classification changes
+who sees what; that is a product decision, not a tidy-up, and it does not belong in a commit
+about something else.
+
+---
+
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*

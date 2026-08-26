@@ -1114,8 +1114,8 @@
                             <option value="admin">Admin</option>
                             <option value="founder">Observer</option>
                           </select>
-                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.delete }}" title="Delete technician" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.3);cursor:pointer">Delete</button>
+                          <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
                           </sc-if>
                         </div>
                       </sc-if>
@@ -1752,8 +1752,8 @@
                             <option value="admin">Admin</option>
                             <option value="founder">Observer</option>
                           </select>
-                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.delete }}" title="Delete technician" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.3);cursor:pointer">Delete</button>
+                          <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
                           </sc-if>
                         </div>
                       </sc-if>
@@ -2290,7 +2290,7 @@ const PERMISSION_DEFAULTS = (function () {
         // capabilities: the Observer holds the first and not the second.
         'activity.view_edits', 'user.act_as_technician']],
     [['admin'],
-      ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.delete',
+      ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.disable',
         'user.manage_permissions', 'pricelist.edit', 'jobtype.manage']],
   ];
   const out = {};
@@ -3247,10 +3247,18 @@ function seed() {
           { code: 'MKN-1828', desc: 'Retrievable Bridge Plug Size Thru 7": First Day', qty: 1, uom: 'Day', cost: 1900, ov: {} },
           { code: 'MKN-1829', desc: 'Retrievable Bridge Plug Size Thru 7": Add Day', qty: 13, uom: 'Day', cost: 800, ov: {} },
         ],
+        // Shaped exactly as logOn() writes them — a name and a kind, not only prose.
+        // The Review log reads `by`, so seeded entries without one render a blank line
+        // where the demo should be showing the app at its best.
+        //
+        // Every kind here matches what auditKind() already inferred from the text, so
+        // adding the field changes nothing about who sees what. Labelling the numbering
+        // entry 'edit' looked more accurate and would have quietly dropped it out of the
+        // Observer's view — a product decision, not a tidy-up.
         audit: [
-          { ts: ago(2, 8, 10), text: 'Uploaded from field device (Yousef Al-Harbi).' },
-          { ts: ago(2, 9, 2), text: 'Ticket No. 1882 assigned · mileage 118 km · 4 items priced.' },
-          { ts: ago(2, 9, 6), text: 'Approved by Omar Al-Saleh · 4 sheets downloaded.' },
+          { ts: ago(2, 8, 10), kind: 'lifecycle', by: 'Yousef Al-Harbi', text: 'Uploaded from field device.' },
+          { ts: ago(2, 9, 2), kind: 'lifecycle', by: 'Omar Al-Saleh', text: 'Ticket No. 1882 assigned · mileage 118 km · 4 items priced.' },
+          { ts: ago(2, 9, 6), kind: 'lifecycle', by: 'Omar Al-Saleh', text: 'Approved · 4 sheets downloaded.' },
         ],
       },
       {
@@ -3265,7 +3273,7 @@ function seed() {
           { ts: ago(4, 19, 10), text: 'Pulled out of hole, rigged down, released.' },
         ],
         items: [], ov: {},
-        audit: [{ ts: ago(1, 7, 45), text: 'Uploaded from field device (Mahmoud Zaki).' }],
+        audit: [{ ts: ago(1, 7, 45), kind: 'lifecycle', by: 'Mahmoud Zaki', text: 'Uploaded from field device.' }],
       },
       {
         id: 't3', tech: 'Yousef Al-Harbi', customer: 'Northern Gulf Petroleum', field: 'Sabriyah', well: 'SA-31', rig: 'NG-2',
@@ -3297,7 +3305,7 @@ class Component extends DCLogic {
       authFullName: '', authConfirm: '', authError: '', signupDone: false,
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
       editDraft: {}, dragStartIndex: undefined, dragOverIndex: undefined,
-      deleteUserEmail: null, deleteUserName: null,
+      disableUserEmail: null, disableUserName: null, disableUserRestore: false,
       // Which of the four bottom-nav destinations is showing. One key rather than one
       // per role: only ever one role is signed in, so they cannot both be in play.
       roleTab: 'tickets',
@@ -5085,29 +5093,34 @@ class Component extends DCLogic {
         title: 'Number refused', body: 'That ticket number is already in use. Every ticket number must be unique.',
         okLabel: 'Change it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
-      deleteUser: {
-        title: 'Delete this user?',
-        body: 'This removes ' + (S.deleteUserName || 'this user') + ' permanently. They will no longer be able to log in, and their name stays on any tickets they already touched.',
-        okLabel: 'Delete', cancelLabel: 'Cancel', hasCancel: true,
+      disableUser: {
+        title: S.disableUserRestore ? 'Restore this account?' : 'Disable this account?',
+        body: S.disableUserRestore
+          ? (S.disableUserName || 'This user') + ' will be able to sign in again, with the role they had before.'
+          : (S.disableUserName || 'This user') + ' will no longer be able to sign in, and any session they have open ends. Their name stays on every ticket and audit entry they touched, and you can restore the account later.\n\nAccounts are never deleted: the tickets and the audit trail reference them, and removing the row would either be refused or would erase who worked the job.',
+        okLabel: S.disableUserRestore ? 'Restore' : 'Disable',
+        cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => {
-          const email = S.deleteUserEmail;
-          const who = S.deleteUserName || 'That user';
-          this.setState({ dialog: null, deleteUserEmail: null, deleteUserName: null });
-          // Deleting an account is a privileged profile write, and admin-actions has no
-          // action for it yet. Removing the row from the replica alone would show the
-          // user gone until the next refresh brought them straight back — so say so
-          // plainly rather than perform a deletion that does not happen.
-          if (USE_CLOUD) {
-            this.toast('deluser:' + email, who + ' cannot be removed from here yet — deleting an account is done on the server.', 'warn');
+          const email = S.disableUserEmail;
+          const who = S.disableUserName || 'That account';
+          const restore = !!S.disableUserRestore;
+          const target = (D.users || []).find(x => x.email === email);
+          this.setState({ dialog: null, disableUserEmail: null, disableUserName: null, disableUserRestore: false });
+          if (!target) return;
+
+          if (!USE_CLOUD) {
+            this.mutate(d => {
+              const x = (d.users || []).find(y => y.email === email);
+              if (x) x.status = restore ? 'active' : 'disabled';
+            });
             return;
           }
-          // Ticket audit trails (this.log) are scoped to a single ticket, not the
-          // organization — a user deletion isn't a ticket event, so there is nowhere to
-          // log it yet (see B6, tracked separately). The removal itself still applies.
-          this.mutate(d => {
-            const idx = (d.users || []).findIndex(x => x.email === email);
-            if (idx >= 0) d.users.splice(idx, 1);
-          });
+          if (!target.id) { this.toast('disable:' + email, 'That account has not reached the server yet.', 'warn'); return; }
+          adminAction('set_user_status', { userId: target.id, status: restore ? 'active' : 'disabled' })
+            .then(() => this.refresh())
+            .then(() => this.toast('disable:' + email,
+              restore ? who + ' can sign in again.' : who + ' can no longer sign in. Their work is untouched.', 'ok'))
+            .catch(err => this.refresh().then(() => this.toast('disable:' + email, err.message, 'warn')));
         },
       },
       reset: {
@@ -6507,8 +6520,13 @@ class Component extends DCLogic {
       users: (D.users || []).map(u => {
         const fix = this.lastFixFor(u);
         return {
-        name: u.name, role: u.status === 'pending' ? 'Pending approval' : u.role, base: u.base, lastSync: u.lastSync,
+        // A disabled account stays in the list and says so. Hiding it would look like a
+        // deletion, which is exactly the thing this is not.
+        name: u.name,
+        role: ({ pending: 'Pending approval', disabled: 'Disabled — no access' })[u.status] || u.role,
+        base: u.base, lastSync: u.lastSync,
         isPending: u.status === 'pending',
+        rowDim: u.status === 'disabled' ? '0.55' : '1',
         posText: fix ? geoText(fix) : NO_LOCATION,
         posStamp: fix ? F.stamp(fix.ts) : '',
         posDim: fix ? 'rgba(var(--ink-rgb),0.75)' : 'rgba(var(--ink-rgb),0.4)',
@@ -6516,8 +6534,8 @@ class Component extends DCLogic {
         // word is the point: an earlier version excluded anything containing "ago",
         // which let "yesterday" through as though that user were online.
         syncDot: (u.status === 'active' && u.lastSync === 'live') ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
-        roleBg: u.status === 'pending' ? 'rgba(var(--warning-rgb),0.14)' : 'var(--accent-wash)',
-        roleFg: u.status === 'pending' ? 'var(--warning-ink)' : 'var(--accent-ink)',
+        roleBg: ({ pending: 'rgba(var(--warning-rgb),0.14)', disabled: 'rgba(var(--danger-rgb),0.14)' })[u.status] || 'var(--accent-wash)',
+        roleFg: ({ pending: 'var(--warning-ink)', disabled: 'var(--danger)' })[u.status] || 'var(--accent-ink)',
         // Approving is the server's decision to make, not this device's. In cloud mode
         // the replica is left alone until the function has actually said yes and the
         // refresh has read the new status back — showing "active" first and letting the
@@ -6563,8 +6581,19 @@ class Component extends DCLogic {
         // Admin can delete anyone — including other admins — except the one seeded
         // "master" admin account (lateri@makaman.ly), which is permanently undeletable
         // by design, not merely by convention.
-        canDelete: this.hasPermission('user.delete') && u.email !== MASTER_ADMIN_EMAIL,
-        delete: () => this.setState({ dialog: 'deleteUser', deleteUserEmail: u.email, deleteUserName: u.name }),
+        // The master Admin is never disableable, and nobody may lock themselves out.
+        // Both are re-checked inside admin-actions — hiding a button is not a check.
+        canDisable: this.hasPermission('user.disable')
+          && u.email !== MASTER_ADMIN_EMAIL
+          && u.email !== ((S.session || {}).email || ''),
+        isDisabled: u.status === 'disabled',
+        disableLabel: u.status === 'disabled' ? 'Restore' : 'Disable',
+        disableTone: u.status === 'disabled' ? 'var(--success)' : 'var(--danger)',
+        disableToneRgb: u.status === 'disabled' ? 'var(--success-rgb)' : 'var(--danger-rgb)',
+        disable: () => this.setState({
+          dialog: 'disableUser', disableUserEmail: u.email, disableUserName: u.name,
+          disableUserRestore: u.status === 'disabled',
+        }),
         };
       }),
       clientCards: D.clients.map(c => ({ name: c.name, fields: c.fields, rigs: c.rigs, itemCount: c.items.length })),

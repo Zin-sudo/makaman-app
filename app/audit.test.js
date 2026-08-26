@@ -77,10 +77,18 @@ const audit = (page) => page.evaluate(() => {
   const seeded = await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2') || '{}');
     const t = (d.tickets || []).find(x => x.status === 'approved');
-    return (t.audit || []).map(a => ({ text: a.text, kind: a.kind }));
+    return (t.audit || []).map(a => ({ text: a.text, kind: a.kind, by: a.by }));
   });
-  check('seeded entries carry no kind (classified at read time)', seeded.every(a => a.kind === undefined),
+  // Was: "seeded entries carry no kind". They do now — the demo store writes the same
+  // shape logOn() does, so the Review log has a name to show. What matters was never the
+  // absence of the field but that the classification is right, so that is what is
+  // asserted: every seeded entry agrees with what auditKind() infers from its own text,
+  // which is how adding the field changed nobody's view of anything.
+  check('seeded entries are classified consistently with their text',
+    seeded.every(a => a.kind === (/ changed by | added from the |overrid|removed|deleted/i.test(a.text || '') ? 'edit' : 'lifecycle')),
     `${seeded.length} seeded entries`);
+  check('and every seeded entry says who made it', seeded.every(a => !!a.by),
+    seeded.map(a => a.by || '(nobody)').join(', '));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log('errors:', errs.length ? JSON.stringify(errs, null, 1) : 'none');

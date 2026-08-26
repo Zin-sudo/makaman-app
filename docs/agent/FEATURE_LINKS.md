@@ -57,7 +57,7 @@
 | **Auth (login/signup)** | `auth.users`, `profiles` | `auth.users` (signup only) | Approval flow, role assignment | Every screen (session) | ✅ Shipped (`d3690ae`) | `auth` |
 | **Approval / role management** | `profiles` | `profiles` **via `admin-actions` only** | `profiles` RLS is SELECT-only for clients | Auth, Permissions, Admin Users screen | ✅ Fixed 2026-08-26 | `approval` |
 | **Role swap (act as Technician)** | session, `PERMISSION_DEFAULTS` | session only — **never `profiles`** | `user.act_as_technician`; narrows `hasPermission()` to the acted role | Top bar, `activeTechnicians()` (assignment, co-op, handover, field devices), every capability gate | ✅ Shipped — per device only | `swap` |
-| **User deletion** | `profiles` | — | `admin-actions` has no `delete_user` | Admin Users screen | ⏳ Not built — dialog says so | `approval` |
+| **Disable / restore an account** | `profiles.status` | `profiles.status` **via `admin-actions` `set_user_status`** | `user.disable`; master Admin and self are refused server-side | Admin Users screen, sign-in, `activeTechnicians()` | ✅ Shipped — **never a delete**: ticket/audit FKs are NO ACTION, `ticket_crew` is CASCADE | `disable` |
 | **Theme system** | `localStorage` settings | CSS variables | Settings screen | Every screen | ✅ Shipped | `tabs` |
 | **Responsive theme v2** | `reference/makaman-responsive-theme-v2.css` | — | Not imported by anything | App-design polish (pending mockups) | 📦 Stored, not wired — see HANDOFF §5 | — |
 | **Audit logging** | — | `audit_log` | Every feature that changes data | Activity tab, Permissions | ✅ Shipped | `audit` |
