@@ -84,7 +84,17 @@ const login = async (p, email) => {
       (cat.viewAll || []).indexOf('founder') >= 0 && (cat.viewEdits || []).indexOf('founder') < 0,
       'view_edits: ' + (cat.viewEdits || []).join('+'));
     check('the demo catalogue covers all of them', cat.catN === cat.n, cat.catN + ' vs ' + cat.n);
-    check('a technician holds only routine work', cat.techHas.length === 6, cat.techHas.join(', '));
+    // Not a count. The registry grows — note.add made this 7 the day it landed — and a
+    // magic number turns every intended addition into a failure that says nothing about
+    // what changed. What must hold is that a technician's set is routine work and nothing
+    // that settles money or people.
+    {
+      const privileged = ['ticket.approve', 'ticket.charge_items', 'user.change_role',
+        'user.manage_permissions', 'pricelist.edit', 'note.resolve'];
+      const overreach = cat.techHas.filter(k => privileged.indexOf(k) >= 0);
+      check('a technician holds only routine work', overreach.length === 0,
+        overreach.length ? 'holds: ' + overreach.join(', ') : cat.techHas.join(', '));
+    }
     check('changing a role and managing permissions are admin-only',
       cat.adminOnly.indexOf('user.change_role') >= 0 && cat.adminOnly.indexOf('user.manage_permissions') >= 0,
       cat.adminOnly.join(', '));

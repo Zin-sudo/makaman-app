@@ -96,9 +96,21 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   body = await p.innerText('body');
   check('and reaches the coordinates from there', /Device position/i.test(body) && /32\.887209/.test(body));
   check('but cannot approve anything', /Read-only — Observer/i.test(body));
-  const editable = await p.evaluate(() =>
-    Array.from(document.querySelectorAll('input,textarea,select')).filter(e => !e.disabled && e.type !== 'range').length);
-  check('and no field on the ticket is editable', editable === 0, editable + ' editable');
+  // The Observer may not change the ticket. They MAY raise a note on it — flagging
+  // something for the office is the whole reason the role opens a ticket at all — so the
+  // notes composer is enabled and everything else is not. Counting enabled inputs and
+  // expecting zero stopped meaning "read-only" the moment notes existed.
+  //
+  // Excluding it is only safe alongside the positive check below: if the composer ever
+  // stopped being the thing that is enabled, the exclusion would quietly hide it.
+  const fields = await p.evaluate(() =>
+    Array.from(document.querySelectorAll('input,textarea,select'))
+      .filter(e => !e.disabled && e.type !== 'range')
+      .map(e => e.placeholder || e.tagName));
+  const ticketFields = fields.filter(f => !/Raise a note/i.test(f));
+  check('and no field of the ticket is editable', ticketFields.length === 0, ticketFields.join(', '));
+  check('the one thing they can type into is a note', 
+    fields.length === 1 && /Raise a note/i.test(fields[0]), fields.join(', '));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);
