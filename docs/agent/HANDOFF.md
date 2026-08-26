@@ -233,19 +233,63 @@ one role must be two keys.
 
 ---
 
-## 3. NEXT TASK — the role-swap control
+## 2d. THIS SESSION — THE ROLE-SWAP CONTROL
 
-P1.8 and P1.8b landed, so the items that were waiting on them can proceed. In this order:
+`user.act_as_technician` (migration 0017, ops/admin). The control sits beside the name in
+the top bar, because what it changes is who the app thinks you are working as and that
+belongs in the same glance that tells you who you are.
 
-1. **Role-swap control (top right).** Admin/ops act as Technician and swap back. Swap the
-   *session's* effective role, never the profile row — the profile is the record of who
-   someone is, and `profiles` is not client-writable anyway. Gate it on a new
-   `user.act_as_technician` capability rather than `role === 'admin'`, and list a swapped
-   user among technicians for assignment and co-op while swapped. Everything they do while
-   swapped stays attributed to their real name in the audit trail.
-2. **Log-events container in Review**, gated on `activity.view_all`.
-3. **Admin/ops unrestricted ticket access** — the full A–Z technician flow on tickets they
-   opened, gated on the `ticket.*` capabilities rather than role comparisons.
+### Three properties carry it
+1. **The swap narrows.** While acting, `hasPermission()` resolves against the acted role's
+   defaults and ignores the hydrated map — that map belongs to the real person. An ops
+   manager who could still approve while "working as a technician" would be an ops manager
+   with a different layout, which tells you nothing about what the field experiences. Not
+   a specific technician's exceptions either: this is working as *a* technician, not
+   impersonating one.
+2. **The way back is never gated.** Acting as a technician drops `user.act_as_technician`
+   along with everything else, so a permission check on the swap-back control would be a
+   door that locks from the inside. `showSwapOut` is keyed on `S.actingAs`, nothing else.
+3. **Attribution never moves.** `session.name` is untouched, so every audit entry, holder
+   and crew name stays the real person's. Nothing about the swap is written to `profiles`.
+
+### Decisions worth keeping
+- **It survives a reload.** The swap lives on the session. A refresh mid-job must not
+  quietly hand the office's powers back; undoing it is as deliberate as making it. A fresh
+  login always clears it.
+- **The corner never reads plainly "Technician".** It reads `As Technician · Ops Manager`.
+  An invisible swap is how somebody forgets they are in one and wonders where their
+  approve button went.
+- **`activeTechnicians()`** is now the single answer to "who counts as a technician right
+  now" — four call sites (assignment, co-op, handover, field devices) that previously
+  repeated the same filter.
+- **`CORNER_ROLE`** was added because the top bar had always shortened "Operations
+  Manager" to "Ops Manager" while `ROLE_LABEL` spelled it out; the swap made one control
+  show both. Two deliberate readings, one map each.
+
+### Known limit, stated rather than assumed
+The swap is **per device**. It lives in the session, not in `profiles`, so an ops manager
+swapped in on their own phone still reads as an Ops Manager to everyone else. Making it
+visible org-wide would mean a privileged profile write on every swap — a much larger
+promise than this feature needs. If the office wants to see who is currently in the field,
+that is a separate decision.
+
+### Verification
+`app/swap.test.js` — 22 assertions: who is offered the swap (admin and ops yes; technician
+and observer no), the office inbox disappearing, approving no longer offered, survival
+across a reload, the way back working, and the source-level properties above.
+Regressions: 217 assertions across 13 suites, 0 failures. No overflow at 1280px or 390px.
+
+---
+
+## 3. NEXT TASK — the log-events container in Review
+
+1. **Log-events container in Review** — surface the event log inside the Review screen for
+   admin/ops. Gate it on `activity.view_edits`, not `activity.view_all`: the Observer holds
+   the latter and must not read the edit trail (see §2c and B-15.5).
+2. **Admin/ops unrestricted ticket access** — the full A–Z technician flow on tickets they
+   opened, gated on the `ticket.*` capabilities rather than role comparisons. Much of this
+   now falls out of the role swap (§2d); what remains is the office acting on a ticket
+   *without* swapping.
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.

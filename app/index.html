@@ -468,6 +468,15 @@
         <span style="font-weight:600">{{ barFixText }}</span>
       </div>
     </sc-if>
+    <!-- Swapping into the field, and back out. Always beside the name, because the
+         thing it changes is who the app thinks you are working as, and that has to be
+         readable from the same glance that tells you who you are. -->
+    <sc-if value="{{ showSwapIn }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ swapToTech }}" title="Raise and run a job yourself. Your name stays on everything you do." style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:inherit;border:1px solid rgba(var(--on-navbar-rgb),0.22);white-space:nowrap">Work as technician</button>
+    </sc-if>
+    <sc-if value="{{ showSwapOut }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning);border:1px solid var(--warning);white-space:nowrap">{{ swapBackLabel }}</button>
+    </sc-if>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:13px">
       <span class="mk-nav-name" style="font-weight:600">{{ sessionName }}</span>
       <span class="mk-nav-role" style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
@@ -2239,6 +2248,11 @@ function sb() {
 const ROLE_FROM_DB = { technician: 'tech', ops_manager: 'mgr', admin: 'admin', founder: 'founder' };
 const ROLE_TO_DB = { tech: 'technician', mgr: 'ops_manager', admin: 'admin', founder: 'founder' };
 const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
+// The same four roles, shortened for the top bar. The corner is the tightest space in the
+// app and shares it with a name, coordinates and now a swap control; "Operations Manager"
+// spelled out there pushes the rest off a phone. Kept as its own map rather than
+// truncating ROLE_LABEL, so both readings are deliberate and neither drifts.
+const CORNER_ROLE = { tech: 'Technician', mgr: 'Ops Manager', admin: 'Admin', founder: 'Observer' };
 
 // What each role may do when nobody has decided otherwise about the person.
 //
@@ -2266,7 +2280,7 @@ const PERMISSION_DEFAULTS = (function () {
         'user.approve_signup', 'user.create', 'pricelist.view', 'client.manage',
         // Seeing every ticket's activity and seeing the edit trail are different
         // capabilities: the Observer holds the first and not the second.
-        'activity.view_edits']],
+        'activity.view_edits', 'user.act_as_technician']],
     [['admin'],
       ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.delete',
         'user.manage_permissions', 'pricelist.edit', 'jobtype.manage']],
@@ -3265,6 +3279,7 @@ class Component extends DCLogic {
     super(props);
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, permUser: null,
+      actingAs: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
@@ -3324,7 +3339,16 @@ class Component extends DCLogic {
       const rawS = localStorage.getItem(SK);
       if (rawS) session = JSON.parse(rawS);
     } catch (e) { /* first run */ }
-    return session ? { data: data, session: session, role: session.roleKey } : { data: data };
+    // A reload in the middle of a job must not quietly hand the office's powers back.
+    // The swap is part of the session, so it survives one and has to be undone the same
+    // deliberate way it was made.
+    return session
+      ? {
+        data: data, session: session,
+        role: session.actingAs || session.roleKey,
+        actingAs: session.actingAs || null,
+      }
+      : { data: data };
   }
   // Two ways in, one shape out. Everything above this cares only that it gets a session
   // with a name, an email and a role — not where the password was checked.
@@ -3975,12 +3999,70 @@ class Component extends DCLogic {
   // A key the registry does not contain returns false rather than true. An unrecognised
   // capability is far more likely to be a typo than a new freedom.
   hasPermission(key) {
+    // Swapped into the technician's app, you hold what a technician holds — not your own
+    // capabilities wearing a technician's screens. An ops manager who could still approve
+    // while "working as a technician" would not be working as one; they would be an ops
+    // manager with a different layout, which is no use for finding out what the field
+    // actually experiences.
+    //
+    // Not the map: that belongs to the real person. Not a specific technician's
+    // exceptions either — this is working as *a* technician, not impersonating one.
+    if (this.state.actingAs) {
+      const asRoles = PERMISSION_DEFAULTS[key];
+      return !!asRoles && asRoles.indexOf(this.state.actingAs) >= 0;
+    }
     const mine = (this.state.data || {}).myPermissions;
     if (mine && Object.prototype.hasOwnProperty.call(mine, key)) return !!mine[key];
     // Cloud mode with a hydrated map: absent means the database said no.
     if (mine && Object.keys(mine).length) return false;
     const roles = PERMISSION_DEFAULTS[key];
     return !!roles && roles.indexOf(this.state.role) >= 0;
+  }
+  // Who counts as a technician for assignment, co-op and handover right now.
+  //
+  // Everyone whose role says so, plus whoever is swapped in on this device — the point of
+  // working as a technician is to be assignable like one, and a swap that left you
+  // invisible to the assignment list would be a swap you could not use.
+  //
+  // Only on this device. The swap lives in the session, not in `profiles`, so another
+  // office user swapped in elsewhere still reads as their real role here. Making it
+  // visible everywhere would mean a privileged write to a profile on every swap, which is
+  // a much larger promise than this feature needs — noted rather than quietly assumed.
+  activeTechnicians() {
+    const D = this.state.data || {};
+    const list = (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active');
+    if (!this.state.actingAs) return list;
+    const me = (this.state.session || {}).email;
+    if (!me || list.some(u => (u.email || '').toLowerCase() === me.toLowerCase())) return list;
+    const mine = (D.users || []).find(u => (u.email || '').toLowerCase() === me.toLowerCase());
+    return mine ? list.concat([mine]) : list;
+  }
+  // Going the other way is never gated on a capability. Acting as a technician drops
+  // user.act_as_technician along with everything else the office holds, so a permission
+  // check here would be a door that locks from the inside.
+  swapRole(to) {
+    const S = this.state;
+    const real = (S.session || {}).roleKey || 'tech';
+    if (to === 'tech') {
+      if (S.actingAs || !this.hasPermission('user.act_as_technician')) return;
+      const session = Object.assign({}, S.session, { actingAs: 'tech' });
+      this.persistSession(session);
+      this.setState({
+        session: session, actingAs: 'tech', role: 'tech',
+        roleTab: 'tickets', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, activeId: null,
+      });
+      this.toast('swap', 'Working as a technician. Your own name stays on everything you do.', 'ok');
+      return;
+    }
+    if (!S.actingAs) return;
+    const session = Object.assign({}, S.session);
+    delete session.actingAs;
+    this.persistSession(session);
+    this.setState({
+      session: session, actingAs: null, role: real,
+      roleTab: 'tickets', mgrScreen: 'inbox', techScreen: 'list', adminTab: null, activeId: null,
+    });
+    this.toast('swap', 'Back to ' + (ROLE_LABEL[real] || real) + '.', 'ok');
   }
   holdsNumbering() {
     const claim = this.numberingClaim();
@@ -5035,7 +5117,7 @@ class Component extends DCLogic {
         .then(session => {
           this.persistSession(session);
           this.setState({
-            session: session, role: session.roleKey || S.role,
+            session: session, role: session.roleKey || S.role, actingAs: null,
             authEmail: '', authPassword: '', authError: '', authBusy: false,
           });
           // The screens are already up on whatever the last visit cached. Pulling fresh
@@ -5153,12 +5235,24 @@ class Component extends DCLogic {
         if (user && user.status === 'active') {
           const session = { email: user.email, name: user.name, roleKey: user.roleKey, status: 'active' };
           this.persistSession(session);
-          this.setState({ session: session, role: user.roleKey });
+          this.setState({ session: session, role: user.roleKey, actingAs: null });
         }
       },
 
       isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
-      currentRoleLabel: { tech: 'Technician', mgr: 'Ops Manager', admin: 'Admin', founder: 'Observer' }[S.role] || '',
+      // While swapped the corner must not read plainly "Technician" — that is the one
+      // reading which would make the swap invisible, and an invisible swap is how
+      // somebody forgets they are in it and wonders where their approve button went.
+      currentRoleLabel: S.actingAs
+        ? ('As Technician · ' + (CORNER_ROLE[(S.session || {}).roleKey] || ''))
+        : (CORNER_ROLE[S.role] || ''),
+      showSwapIn: !S.actingAs && !!S.session && this.hasPermission('user.act_as_technician'),
+      showSwapOut: !!S.actingAs && !!S.session,
+      swapBackLabel: 'Back to ' + (CORNER_ROLE[(S.session || {}).roleKey] || 'the office'),
+      swapBackHint: 'You are working as a technician. Everything you do is still recorded against '
+        + ((S.session || {}).name || 'you') + '.',
+      swapToTech: () => this.swapRole('tech'),
+      swapBack: () => this.swapRole('back'),
       // The office roles' own dashboards are what the Tickets destination shows; the
       // other three destinations replace the page rather than nesting inside it.
       // (The technician's tabs live inside the phone frame instead, so isTech is
@@ -5279,7 +5373,7 @@ class Component extends DCLogic {
       // in the app ever updates, so a technician could upload all day and still
       // read "2 h ago".
       fieldDevices: (() => {
-        const techs = (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active');
+        const techs = this.activeTechnicians();
         const now = Date.now();
         return techs.map(u => {
           // Crew membership, not the opener's name — a handed-over job is still that
@@ -5319,7 +5413,7 @@ class Component extends DCLogic {
           };
         }).sort((a, b) => a.sortKey - b.sortKey); // longest out of contact first
       })(),
-      hasFieldDevices: (D.users || []).some(u => u.roleKey === 'tech' && u.status === 'active'),
+      hasFieldDevices: this.activeTechnicians().length > 0,
 
       // ── Account ────────────────────────────────────────────────────────────
       // The tools each role can reach from the account tab. Admin's four are the
@@ -5627,8 +5721,7 @@ class Component extends DCLogic {
       handoverOptions: (S.dialog === 'claimNumbering'
         ? (D.users || []).filter(u => (u.roleKey === 'mgr' || u.roleKey === 'admin')
             && u.status === 'active' && u.name !== (D.numbering || {}).holderName)
-        : (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active'
-            && u.name !== (t ? holderOf(t) : ''))
+        : this.activeTechnicians().filter(u => u.name !== (t ? holderOf(t) : ''))
       ).map(u => ({ name: u.name })),
       askHandover: () => this.setState({ dialog: 'handover', handoverTo: '' }),
       // Only the person actually holding the job can hand it on or log to it. A
@@ -5866,7 +5959,7 @@ class Component extends DCLogic {
       // being retyped as "Al Dhafra Energy" and quietly becoming a second customer
       // with its own empty price list.
       customerOptions: D.clients.map(c => ({ name: c.name })),
-      techOptions: (D.users || []).filter(u => u.roleKey === 'tech' && u.status === 'active').map(u => ({ name: u.name })),
+      techOptions: this.activeTechnicians().map(u => ({ name: u.name })),
       mgrNewIsNewCustomer: (() => {
         const typed = ((S.mgrDraft || {}).customer || '').trim().toLowerCase();
         return !!typed && !D.clients.some(c => c.name.trim().toLowerCase() === typed);

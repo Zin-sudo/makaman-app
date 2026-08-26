@@ -56,7 +56,7 @@
 | **PWA installability** | `manifest.webmanifest`, `sw.js` | — | Service Worker capabilities | Every screen | ⚠️ Partial | — |
 | **Auth (login/signup)** | `auth.users`, `profiles` | `auth.users` (signup only) | Approval flow, role assignment | Every screen (session) | ✅ Shipped (`d3690ae`) | `auth` |
 | **Approval / role management** | `profiles` | `profiles` **via `admin-actions` only** | `profiles` RLS is SELECT-only for clients | Auth, Permissions, Admin Users screen | ✅ Fixed 2026-08-26 | `approval` |
-| **Role swap (act as Technician)** | `profiles`, session | session only | Permission registry | Top bar, assignment lists | ⏳ Not built | — |
+| **Role swap (act as Technician)** | session, `PERMISSION_DEFAULTS` | session only — **never `profiles`** | `user.act_as_technician`; narrows `hasPermission()` to the acted role | Top bar, `activeTechnicians()` (assignment, co-op, handover, field devices), every capability gate | ✅ Shipped — per device only | `swap` |
 | **User deletion** | `profiles` | — | `admin-actions` has no `delete_user` | Admin Users screen | ⏳ Not built — dialog says so | `approval` |
 | **Theme system** | `localStorage` settings | CSS variables | Settings screen | Every screen | ✅ Shipped | `tabs` |
 | **Responsive theme v2** | `reference/makaman-responsive-theme-v2.css` | — | Not imported by anything | App-design polish (pending mockups) | 📦 Stored, not wired — see HANDOFF §5 | — |
@@ -74,7 +74,8 @@
 | `money()` | `app/support.js` | Currency formatting (USD/LYD), negative handling | Ops Review, Print Preview, Excel |
 | `auditLog()` | `app/support.js` | Write to `audit_log` with consistent schema | Every feature that changes data |
 | `notify()` | `app/support.js` | Insert into `notifications` + trigger Realtime | Job Done, Approve, Note add |
-| `hasPermission(key)` | `app/index.html` (component method) | Resolve a capability: hydrated map > `PERMISSION_DEFAULTS` for the role > deny. Never asks the server — the answer must work with no signal. An unknown key is **false**. | 14 call sites: activity depth, numbering, reports, ticket read-only, the claim, promote/delete, the Permissions screen. **Use it for capabilities; a role comparison is still right for presentation and routing.** |
+| `activeTechnicians()` | `app/index.html` (component method) | Who counts as a technician right now: role-technicians plus whoever is swapped in on this device. | Assignment, co-op, handover, field devices |
+| `hasPermission(key)` | `app/index.html` (component method) | Resolve a capability: **acted role's defaults while swapped**, else hydrated map > `PERMISSION_DEFAULTS` for the role > deny. Never asks the server — the answer must work with no signal. An unknown key is **false**. | 14 call sites: activity depth, numbering, reports, ticket read-only, the claim, promote/delete, the Permissions screen. **Use it for capabilities; a role comparison is still right for presentation and routing.** |
 | `roleLabel()` | `app/support.js` | Map DB role key to display label (`founder` -> "Observer") | Users table, nav bar |
 | `normaliseItemNumber()` | Supabase DB function | Strip whitespace around hyphens in item codes | Price list import, item search |
 | `flatSubtotal()` | `app/support.js` | Calculate subtotal of non-percent items only | `itemTotal()`, `ticketTotal()` |

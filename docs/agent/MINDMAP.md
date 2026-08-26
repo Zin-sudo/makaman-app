@@ -26,7 +26,7 @@
 | **Outbox** | ⚠️ Bounded | Coalescing localStorage queue. A refused op is retried 5× then set aside into `makaman.outbox.refused.v1` so it cannot freeze the queue (2026-08-26). Nothing surfaces set-aside ops in the UI yet. |
 | **Service Worker** | ⚠️ Basic | `sw.js` exists but minimal. No Background Sync API. No Push API. |
 | **Offline Storage** | ⚠️ `localStorage` | Simple `synced` boolean + queue. Not IndexedDB. |
-| **Permissions System** | ✅ Live and honoured | `permissions` (32 rows) + `user_permissions`; `has_permission()` / `my_permissions()` in the DB, `hasPermission()` in the app, admin page in Account. **11 capability gates converted; 18 presentation/routing comparisons kept as roles on purpose** (HANDOFF §2c). Migrations 0013–0016. |
+| **Permissions System** | ✅ Live and honoured | `permissions` (33 rows) + `user_permissions`; `has_permission()` / `my_permissions()` in the DB, `hasPermission()` in the app, admin page in Account. **11 capability gates converted; 18 presentation/routing comparisons kept as roles on purpose** (HANDOFF §2c). Migrations 0013–0017. |
 | **Feature Link Map** | ⚠️ Not documented | Cross-feature dependencies are tribal knowledge. Risk of orphaned changes. |
 | **Number Reservation** | ⚠️ Not built | "Take next from series" has no DB reservation. Risk of duplicate numbers. |
 
