@@ -553,6 +553,18 @@
     </div>
   </sc-if>
 
+  <!-- Changes the server refused outright. They were retried, given up on, and set
+       aside so one bad row could not freeze the queue — but until now nobody was told,
+       so the device went on showing a change the office would never receive. Same
+       reasoning as the storage banner: a standing condition, not a passing event. -->
+  <sc-if value="{{ refusedAny }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 22px;background:rgba(var(--warning-rgb),0.16);border-bottom:2px solid var(--warning)">
+      <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--warning)"></span>
+      <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>{{ refusedLabel }}</strong> {{ refusedWhy }}</div>
+      <button onClick="{{ dismissRefused }}" style="flex:none;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.35)">DISMISS</button>
+    </div>
+  </sc-if>
+
   <!-- ══ SETTINGS (overlay, any role) ══ -->
   <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;background:var(--ground);z-index:50;overflow-y:auto">
@@ -2857,7 +2869,7 @@ function outboxDrain() {
     if (n >= q.length) return Promise.resolve();
     return outboxSend(c, q[n]).then(
       () => { done = n + 1; sent += 1; return step(n + 1); },
-      () => {
+      (err) => {
         // A failed op keeps its place: the ops behind it may depend on it, and a lost
         // connection means everything after is about to fail too. But a failure the
         // server will repeat forever — a row RLS refuses, a constraint it violates — is
@@ -2867,7 +2879,7 @@ function outboxDrain() {
         q[n].tries = (q[n].tries || 0) + 1;
         if (q[n].tries < OUTBOX_TRIES) return Promise.resolve();
         done = n + 1;
-        outboxSetAside(q[n]);
+        outboxSetAside(q[n], err);
         return step(n + 1);
       }
     );
@@ -2881,12 +2893,37 @@ function outboxDrain() {
 // replica and on screen, so the only thing lost is the attempt to send it, and a record
 // of which writes the database would not take is the first thing worth having when a
 // device and the office disagree.
-function outboxSetAside(op) {
+function outboxSetAside(op, why) {
   try {
     const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
-    dead.push({ at: new Date().toISOString(), op: op });
+    // The reason is kept, not just the op. Without it the pile answers "something was
+    // refused" and nothing more, which is not enough for anyone to act on — and the most
+    // likely cause here, two devices reaching for one ticket number, has an obvious
+    // remedy the moment it is named.
+    dead.push({ at: new Date().toISOString(), op: op, why: refusalText(why) });
     localStorage.setItem(DEADLETTER_K, JSON.stringify(dead.slice(-50)));
   } catch (e) { /* quota */ }
+}
+// Postgres speaks in constraint names. The office speaks in tickets.
+function refusalText(err) {
+  const raw = (err && (err.message || err.details || err.hint)) || '';
+  if (/ticket_number|duplicate key/i.test(raw)) {
+    return 'That ticket number is already used on another job. Two devices can reach for the same number while one is out of signal — give this job the next free number and sync again.';
+  }
+  if (/row-level security|permission denied|violates/i.test(raw)) {
+    return 'The server would not accept this change from your account.';
+  }
+  return raw || 'The server refused this change.';
+}
+function outboxSetAsideCount() {
+  try { return JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]').length; }
+  catch (e) { return 0; }
+}
+function outboxSetAsideLatest() {
+  try {
+    const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
+    return dead.length ? (dead[dead.length - 1].why || '') : '';
+  } catch (e) { return ''; }
 }
 
 // ── Turning a change in the replica into ops ─────────────────────────────────
@@ -3697,12 +3734,32 @@ class Component extends DCLogic {
     // other after a mode change.
     const key = USE_CLOUD ? CACHE_K : K;
     const payload = JSON.stringify(data);
-    if (this.tryWrite(key, payload)) return true;
+    if (this.tryWrite(key, payload)) {
+      this.watchStorageHeadroom(payload.length);
+      return true;
+    }
     // Room, taken from the things that can be rebuilt rather than from the record.
     const freed = shedStorage(key);
     if (freed && this.tryWrite(key, payload)) return true;
     this.storageRefused();
     return false;
+  }
+  // Reacting to a refusal is not enough on its own: by the time the write fails the
+  // technician is already at the wall, and the remedy — sync, then clear — needs signal
+  // he may no longer have. So the store is measured on the way past, and once it is
+  // large enough to be worth acting on he is told while he can still do something.
+  //
+  // Measured against a conservative 5MB, which is the floor browsers agree on for
+  // localStorage; the real ceiling is usually higher, so this warns early rather than
+  // late. That is the right direction to be wrong in.
+  watchStorageHeadroom(bytes) {
+    const CAP = 5 * 1024 * 1024;
+    const near = bytes > CAP * 0.8;
+    if (near === !!this.state.storageNear) return;
+    this.setState({ storageNear: near });
+    if (near) {
+      this.toast('storage-near', 'This device is running low on storage. Sync your closed tickets while you have signal — once the office has them, the copies here can be cleared.', 'warn');
+    }
   }
   tryWrite(key, payload) {
     try {
@@ -4595,6 +4652,12 @@ class Component extends DCLogic {
   // frees something is easy; asserting that it never touches the tickets or the outbox is
   // the part that matters, and that needs to call the real function.
   shedStorage(keep) { return shedStorage(keep); }
+
+  // The set-aside pile, reachable so a refusal can be driven end to end rather than
+  // inferred. A refused op is the one failure mode that cannot be produced by clicking.
+  setAsideForTest(op, why) { return outboxSetAside(op, why); }
+  refusedCount() { return outboxSetAsideCount(); }
+  refusedLatest() { return outboxSetAsideLatest(); }
 
   // Same reasoning as sheetGeometry: a test that cannot read the map can only check that
   // the output looks plausible, not that it was driven by the template's own cells.
@@ -6210,6 +6273,18 @@ class Component extends DCLogic {
       // the tab's own controls right beneath it.
       // The device is full. Held in state rather than recomputed, because the only thing
       // that can tell us is a write actually being refused.
+      // What the server would not take. Read from the set-aside pile rather than held in
+      // state, so it survives a reload — the change is still missing tomorrow.
+      refusedAny: !S.refusedDismissed && outboxSetAsideCount() > 0,
+      refusedLabel: outboxSetAsideCount() === 1
+        ? 'One change was refused by the server and has not been saved.'
+        : outboxSetAsideCount() + ' changes were refused by the server and have not been saved.',
+      refusedWhy: outboxSetAsideLatest(),
+      dismissRefused: () => {
+        try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
+        this.setState({ refusedDismissed: true });
+      },
+
       storageFull: !!S.storageFull,
       storageFullHint: S.storageHint || '',
       // Re-attempts the save the device refused. Nothing is re-derived — the replica in
@@ -6254,13 +6329,23 @@ class Component extends DCLogic {
           // and the technician is told plainly rather than left wondering why his edits
           // vanished. Losing the local version is the decision on record; what is on the
           // office copy stands.
-          const clashed = myPending.filter(x => x.officeClosed && x.closedBy && x.closedBy !== myName);
+          // Approved counts too, and did not before. The guard only asked whether the
+          // office had CLOSED the job, so a ticket approved while the technician was out
+          // of signal was not a clash — his stale copy uploaded straight over a sheet
+          // that had already been signed off. Approved is sealed for the technician
+          // (§2d), so it is settled in exactly the same way, and the reason is named
+          // rather than lumped in with the other case.
+          const clashed = myPending.filter(x =>
+            (x.officeClosed && x.closedBy && x.closedBy !== myName) || x.status === 'approved');
+          const clashReason = (x) => x.status === 'approved'
+            ? 'already approved in the office'
+            : 'already closed in the office by ' + x.closedBy;
           const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
           this.mutate(d => d.tickets.forEach(x => {
             if (clashed.some(c => c.id === x.id)) {
               x.synced = true; x.syncedAt = x.closedAt || now;
               (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
-                text: 'Field copy discarded on sync — already closed in the office by ' + x.closedBy + '.' });
+                text: 'Field copy discarded on sync — ' + clashReason(clashed.find(c => c.id === x.id)) + '.' });
               return;
             }
             if (ids.indexOf(x.id) === -1) return;
@@ -6270,8 +6355,8 @@ class Component extends DCLogic {
           if (clashed.length) {
             const one = clashed[0];
             this.toast('sync-clash', (clashed.length === 1
-              ? one.customer + ' was already closed in the office by ' + one.closedBy + '.'
-              : clashed.length + ' tickets were already closed in the office.')
+              ? one.customer + ' was ' + clashReason(one) + '.'
+              : clashed.length + ' tickets were already settled in the office.')
               + ' Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.', 'warn');
             if (!ids.length) { this.setState({ syncedCount: 0 }); return; }
           }

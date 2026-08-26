@@ -385,11 +385,11 @@ cold boot with the network cut. Regression: `layout` 13, `tabs` 11, `export` 14,
 
 ## 3. NEXT TASK — finish Tier 2, then Tier 3/4 of §7
 
-**Tier 2 is half done.** The storage half shipped (§2k). Still open in Tier 2: the rest of
-the offline/online stress scenarios — two devices taking one series number offline, and a
-technician syncing a ticket the office approved in the meantime. Note that
-`numbering.test.js` already covers the office-*closed* collision and `sync.test.js` the
-three Sync outcomes; do not rebuild those.
+**Tier 2 is done** (§2k). Next is **Tier 3** — which needs the user, so it can run in
+parallel — and **Tier 4**, the batched migration. Do migration 0002 first, before anything
+forces a rebuild from files alone.
+
+One red suite in the repo: `cloud.test.js` line 213, pre-existing. See §2k.
 
 **Tier 3 needs the user** (password rotation, leaked-password protection, Waha codes) and
 can run in parallel. **Tier 4** is the batched migration — do 0002 first.
@@ -439,11 +439,43 @@ The first re-test reported the fix as still broken. The reproduction read
 `document.body.innerText` in the same synchronous block as the `setState` that raises the
 banner — React had not painted yet. **Assert state, wait, then assert the DOM.** B-19.3.
 
+### The rest of Tier 2, closed the same day
+Three loose ends, none of which needed new machinery — each extended something already there.
+
+1. **Warn before the wall, not only at it.** `watchStorageHeadroom()` measures the store on
+   every successful write and warns past 80% of a conservative 5MB. By the time a write
+   actually fails, the remedy (sync, then clear) needs signal the technician may no longer
+   have; the warning has to arrive while he can still act on it. Measured against the floor
+   browsers agree on rather than the real ceiling, so it warns early — the right direction
+   to be wrong in.
+
+2. **Two devices reaching for one ticket number.** The database already refuses this:
+   `ticket_number text unique`, migration 0001. The collision was never the gap. The gap was
+   the *answer* — the op was retried five times, set aside so one bad row could not freeze
+   the queue, and then never mentioned again while the device went on showing a change the
+   office would never receive. Refusals now carry a reason (`refusalText()` turns a Postgres
+   constraint name into "that ticket number is already used… give this job the next free
+   number and sync again") and raise a standing banner that survives a reload, because the
+   change is still missing tomorrow.
+
+3. **A ticket approved while the technician was offline.** The clash guard asked only
+   whether the office had *closed* the job, so an approved one was not a clash and the
+   stale field copy uploaded straight over a signed-off sheet. Approved is sealed for the
+   technician (§2d), so it is now settled the same way — and the technician is told which
+   of the two happened rather than the two being lumped together.
+
 ### Still open on this
-- No pre-emptive warning before the device is actually full. The app only reacts to a
-  refusal; warning at, say, 80% would give the technician time to sync first.
-- B8 (*flag sync conflicts instead of overwriting*) is still open. `stress.test.js` records
-  what happens today so a future merge has a documented before.
+- B8 (*flag sync conflicts instead of overwriting*) remains open as a general merge
+  problem. What is closed is the specific case that mattered: a settled ticket can no
+  longer be overwritten from the field. `stress.test.js` records the rest of today's
+  behaviour so a future merge has a documented before.
+- **`cloud.test.js` fails at line 213** — `d.tickets[0]` is undefined, so the mocked cloud
+  fetch is returning nothing. **Pre-existing**: it fails identically on the commit before
+  this work. Not investigated; it is the only red suite in the repo.
+
+### Verification (updated)
+`app/stress.test.js` — **22 assertions**, adding: a refusal is kept with its reason, the
+reason names the remedy, it survives a reload, and an approved ticket counts as settled.
 
 ---
 

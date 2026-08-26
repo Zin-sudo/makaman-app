@@ -155,6 +155,62 @@ const freeStorage = (p) => p.evaluate(() => {
     await ctx.close();
   }
 
+  // ── A change the server refuses is not allowed to go quiet ──
+  //
+  // Two devices reaching for one ticket number is the case this exists for. The database
+  // already refuses it — `ticket_number text unique` in 0001 — so the collision is caught
+  // at the right boundary. What was missing was the answer: the op was retried five
+  // times, set aside so it could not freeze the queue, and never mentioned again, while
+  // the device went on showing a change the office would never receive.
+  {
+    const ctx = await b.newContext();
+    const p = await signIn(ctx, 'omar@makaman.ly');
+    const r = await p.evaluate(() => {
+      const app = window.__mkApp;
+      // Exactly what Postgres says when the unique index fires.
+      const pgErr = { message: 'duplicate key value violates unique constraint "tickets_ticket_number_key"' };
+      app.setAsideForTest({ key: 'tickets:t1', table: 'tickets' }, pgErr);
+      return { count: app.refusedCount(), why: app.refusedLatest() };
+    });
+    check('the refusal is kept, with its reason', r.count === 1, r.count + ' set aside');
+    check('and the reason is in words the office can act on',
+      /ticket number is already used/i.test(r.why), r.why.slice(0, 60));
+    check('it names the remedy, not just the fault', /next free number/i.test(r.why));
+
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(1200);
+    const shown = await p.evaluate(() => ({
+      onScreen: /refused by the server/i.test(document.body.innerText),
+      survived: /ticket number is already used/i.test(document.body.innerText),
+    }));
+    check('it is on screen after a reload — the change is still missing', shown.onScreen);
+    check('and still says why', shown.survived);
+    await ctx.close();
+  }
+
+  // ── A ticket the office approved while the technician was offline ──
+  {
+    const ctx = await b.newContext();
+    const p = await signIn(ctx, 'yousef@makaman.ly');
+    const r = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const src = document.querySelector('script[type="text/x-dc"]').textContent;
+      // The guard used to ask only whether the office had CLOSED the job, so a ticket
+      // approved in the meantime was not a clash and the stale field copy uploaded
+      // straight over a signed-off sheet.
+      const guard = src.slice(src.indexOf('const clashed = myPending.filter'), src.indexOf('const clashReason'));
+      return {
+        catchesApproved: /x\.status === 'approved'/.test(guard),
+        catchesClosed: /x\.officeClosed/.test(guard),
+        namesReason: /already approved in the office/.test(src),
+      };
+    });
+    check('an approved ticket counts as settled, like a closed one', r.catchesApproved);
+    check('and the closed case still does', r.catchesClosed);
+    check('the technician is told which of the two it was', r.namesReason);
+    await ctx.close();
+  }
+
   await b.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
