@@ -2188,6 +2188,32 @@ function sb() {
 const ROLE_FROM_DB = { technician: 'tech', ops_manager: 'mgr', admin: 'admin', founder: 'founder' };
 const ROLE_TO_DB = { tech: 'technician', mgr: 'ops_manager', admin: 'admin', founder: 'founder' };
 const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
+
+// Who someone is, and whether they are allowed in, is not the client's to decide.
+// `profiles` grants no INSERT, UPDATE or DELETE to anyone signed in — only SELECT — so
+// every write to it goes through the admin-actions Edge Function, which re-derives the
+// caller from their own JWT and re-checks their role before touching anything. A role
+// or a user id in the body says who is being acted upon, never who is allowed to act.
+//
+// This is also why profiles is absent from the outbox's table list: a profile row sent
+// the ordinary way is refused by the database every single time, and a refusal that can
+// never succeed used to sit at the head of the queue and freeze every write behind it.
+function adminAction(action, payload) {
+  const c = sb();
+  if (!c) return Promise.reject(new Error('This build has no server configured.'));
+  return c.functions.invoke('admin-actions', { body: Object.assign({ action: action }, payload || {}) })
+    .then((r) => {
+      // A non-2xx reply arrives as an error with the body attached rather than as a
+      // rejection, so the function's own message — "Only Admin can change roles" — is
+      // what the person reads, instead of a bare "Edge Function returned a non-2xx".
+      if (r.error) {
+        const said = (r.data && r.data.error) || r.error.message;
+        throw new Error(said || 'The server refused that.');
+      }
+      if (r.data && r.data.error) throw new Error(r.data.error);
+      return r.data;
+    });
+}
 // The seeded initial Admin account — permanently undeletable, regardless of who is
 // logged in or how many other admins exist. Every other user, including other admins,
 // can be deleted by an Admin.
@@ -2226,6 +2252,10 @@ function clampLoc(key, v) {
 const CLOUD_IDS = { job: {}, me: null };
 const CACHE_K = 'makaman.cloud.v1';
 const OUTBOX_K = 'makaman.outbox.v1';
+const DEADLETTER_K = 'makaman.outbox.refused.v1';
+// Enough attempts to ride out a bad connection, few enough that a write the database
+// will never accept stops blocking the queue within one working session.
+const OUTBOX_TRIES = 5;
 
 // Ids are minted on the device, not by the database. An offline technician opening a
 // ticket needs its id immediately — for the ticket's own children, for the audit trail,
@@ -2526,15 +2556,42 @@ function outboxDrain() {
   if (!c) return Promise.resolve(0);
   const q = outboxRead();
   if (!q.length) return Promise.resolve(0);
+  let done = 0;  // how far the queue has been settled — sent, or given up on
   let sent = 0;
   const step = (n) => {
     if (n >= q.length) return Promise.resolve();
-    return outboxSend(c, q[n]).then(() => { sent = n + 1; return step(n + 1); }, () => undefined);
+    return outboxSend(c, q[n]).then(
+      () => { done = n + 1; sent += 1; return step(n + 1); },
+      () => {
+        // A failed op keeps its place: the ops behind it may depend on it, and a lost
+        // connection means everything after is about to fail too. But a failure the
+        // server will repeat forever — a row RLS refuses, a constraint it violates — is
+        // not waiting on anything. Left at the head it stops every later write from ever
+        // being sent, which is how one refused row silently froze the whole device.
+        // After OUTBOX_TRIES attempts the op is set aside so the queue can move again.
+        q[n].tries = (q[n].tries || 0) + 1;
+        if (q[n].tries < OUTBOX_TRIES) return Promise.resolve();
+        done = n + 1;
+        outboxSetAside(q[n]);
+        return step(n + 1);
+      }
+    );
   };
   return step(0).then(() => {
-    outboxWrite(outboxRead().slice(sent));
+    outboxWrite(q.slice(done));
     return sent;
   });
+}
+// Given-up ops are kept rather than discarded quietly: the change itself is still in the
+// replica and on screen, so the only thing lost is the attempt to send it, and a record
+// of which writes the database would not take is the first thing worth having when a
+// device and the office disagree.
+function outboxSetAside(op) {
+  try {
+    const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
+    dead.push({ at: new Date().toISOString(), op: op });
+    localStorage.setItem(DEADLETTER_K, JSON.stringify(dead.slice(-50)));
+  } catch (e) { /* quota */ }
 }
 
 // ── Turning a change in the replica into ops ─────────────────────────────────
@@ -2577,10 +2634,14 @@ function diffOps(before, after) {
     if (!newT[t.id]) ops.push({ key: 'tickets:del:' + t.id, table: 'tickets', action: 'delete', id: t.id });
   });
 
-  // Users, clients and their price lists. Rows the app created offline have no id yet;
-  // one is minted here so the row can be sent and referred to.
+  // Clients and their price lists. Rows the app created offline have no id yet; one is
+  // minted here so the row can be sent and referred to.
+  //
+  // Users are deliberately not here. A profile is written only by the admin-actions Edge
+  // Function (see adminAction), because the database gives a signed-in client no way to
+  // write one — approving a signup through this queue looked like it worked, was refused
+  // by RLS, and was undone by the next refresh.
   const pairs = [
-    ['profiles', 'users', (u) => ({ id: u.id, email: u.email, full_name: u.name, role: ROLE_TO_DB[u.roleKey] || 'technician', status: u.status || 'pending' })],
     ['clients', 'clients', (c) => ({ id: c.id, name: c.name, currency: c.currency || DEFAULT_CURRENCY })],
   ];
   pairs.forEach(([table, key, row]) => {
@@ -4651,6 +4712,16 @@ class Component extends DCLogic {
         okLabel: 'Delete', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => {
           const email = S.deleteUserEmail;
+          const who = S.deleteUserName || 'That user';
+          this.setState({ dialog: null, deleteUserEmail: null, deleteUserName: null });
+          // Deleting an account is a privileged profile write, and admin-actions has no
+          // action for it yet. Removing the row from the replica alone would show the
+          // user gone until the next refresh brought them straight back — so say so
+          // plainly rather than perform a deletion that does not happen.
+          if (USE_CLOUD) {
+            this.toast('deluser:' + email, who + ' cannot be removed from here yet — deleting an account is done on the server.', 'warn');
+            return;
+          }
           // Ticket audit trails (this.log) are scoped to a single ticket, not the
           // organization — a user deletion isn't a ticket event, so there is nowhere to
           // log it yet (see B6, tracked separately). The removal itself still applies.
@@ -4658,7 +4729,6 @@ class Component extends DCLogic {
             const idx = (d.users || []).findIndex(x => x.email === email);
             if (idx >= 0) d.users.splice(idx, 1);
           });
-          this.setState({ dialog: null, deleteUserEmail: null, deleteUserName: null });
         },
       },
       reset: {
@@ -4732,13 +4802,23 @@ class Component extends DCLogic {
       const pass = S.newTechPassword || '';
       if (!name || !email || pass.length < 8) { this.setState({ newTechError: 'Full name, email, and an 8+ character password are required.', newTechDone: false }); return; }
       if ((D.users || []).some(u => (u.email || '').toLowerCase() === email)) { this.setState({ newTechError: 'An account with that email already exists.', newTechDone: false }); return; }
-      this.mutate(d => {
-        (d.users = d.users || []).push({
-          name: name, role: 'Field Technician', roleKey: 'tech', email: email, password: pass,
-          base: '—', lastSync: '—', status: 'active',
+      if (!USE_CLOUD) {
+        this.mutate(d => {
+          (d.users = d.users || []).push({
+            name: name, role: 'Field Technician', roleKey: 'tech', email: email, password: pass,
+            base: '—', lastSync: '—', status: 'active',
+          });
         });
-      });
-      this.setState({ newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: true });
+        this.setState({ newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: true });
+        return;
+      }
+      // Only the server can mint a login. Writing the row here would produce a user in
+      // the list that nobody can actually sign in as.
+      this.setState({ newTechError: '', newTechDone: false, authBusy: true });
+      adminAction('create_technician', { email: email, password: pass, full_name: name })
+        .then(() => this.refresh())
+        .then(() => this.setState({ newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: true, authBusy: false }))
+        .catch(err => this.setState({ newTechError: err.message, newTechDone: false, authBusy: false }));
     };
 
     return {
@@ -5983,10 +6063,24 @@ class Component extends DCLogic {
         syncDot: (u.status === 'active' && u.lastSync === 'live') ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
         roleBg: u.status === 'pending' ? 'rgba(var(--warning-rgb),0.14)' : 'var(--accent-wash)',
         roleFg: u.status === 'pending' ? 'var(--warning-ink)' : 'var(--accent-ink)',
-        approve: () => this.mutate(d => {
-          const target = (d.users || []).find(x => x.email === u.email);
-          if (target) { target.role = 'Field Technician'; target.roleKey = 'tech'; target.status = 'active'; }
-        }),
+        // Approving is the server's decision to make, not this device's. In cloud mode
+        // the replica is left alone until the function has actually said yes and the
+        // refresh has read the new status back — showing "active" first and letting the
+        // database contradict it later is exactly the bug this replaces.
+        approve: () => {
+          if (!USE_CLOUD) {
+            this.mutate(d => {
+              const target = (d.users || []).find(x => x.email === u.email);
+              if (target) { target.role = 'Field Technician'; target.roleKey = 'tech'; target.status = 'active'; }
+            });
+            return;
+          }
+          if (!u.id) { this.toast('approve:' + u.email, 'That account has not reached the server yet.', 'warn'); return; }
+          adminAction('approve_signup', { userId: u.id })
+            .then(() => this.refresh())
+            .then(() => this.toast('approve:' + u.email, u.name + ' can now sign in.', 'ok'))
+            .catch(err => this.toast('approve:' + u.email, err.message, 'warn'));
+        },
         showPromote: S.role === 'admin' && u.status !== 'pending',
         promoteDisabled: u.email === (S.session && S.session.email),
         // Must be a value the dropdown actually offers. An Observer's 'founder' key
@@ -5996,11 +6090,20 @@ class Component extends DCLogic {
         roleKeySafe: u.roleKey || 'tech',
         promote: e => {
           const val = e.target.value;
-          const labelMap = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
-          this.mutate(d => {
-            const target = (d.users || []).find(x => x.email === u.email);
-            if (target) { target.roleKey = val; target.role = labelMap[val] || target.role; }
-          });
+          if (!USE_CLOUD) {
+            this.mutate(d => {
+              const target = (d.users || []).find(x => x.email === u.email);
+              if (target) { target.roleKey = val; target.role = ROLE_LABEL[val] || target.role; }
+            });
+            return;
+          }
+          if (!u.id) { this.toast('promote:' + u.email, 'That account has not reached the server yet.', 'warn'); return; }
+          adminAction('promote_role', { userId: u.id, role: ROLE_TO_DB[val] })
+            .then(() => this.refresh())
+            .then(() => this.toast('promote:' + u.email, u.name + ' is now ' + (ROLE_LABEL[val] || val) + '.', 'ok'))
+            // The dropdown is showing the role the admin picked; the database never took
+            // it. Reading the real one back is what puts the two of them back in step.
+            .catch(err => this.refresh().then(() => this.toast('promote:' + u.email, err.message, 'warn')));
         },
         // Admin can delete anyone — including other admins — except the one seeded
         // "master" admin account (lateri@makaman.ly), which is permanently undeletable

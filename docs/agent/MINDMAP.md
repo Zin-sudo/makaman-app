@@ -1,6 +1,6 @@
 # Makaman PWA — Project Mind Map
 > **Read `docs/agent/CLAUD.md` FIRST, then this file for full project context. Do not re-derive.**
-> **Last updated:** 2026-08-23 (v4 — includes per-user permissions, number reservation, repo placement)
+> **Last updated:** 2026-08-26 (v5 — §0 re-synced against the actual repo; P1.1 is done, not pending)
 
 ---
 
@@ -9,17 +9,21 @@
 ### 0.1 Production-Grade (Exists & Live)
 | Layer | Status | Details |
 |-------|--------|---------|
-| **Supabase Backend** | ✅ Live | `igutjfezxkdncrcpvnqx`, 15 tables, 44 RLS policies, 11 migrations, 2,274 price-list items, `admin-actions` Edge Function |
+| **Supabase Backend** | ✅ Live | `igutjfezxkdncrcpvnqx`, 15 tables, 12 migrations, **2,600 price-list items**, `admin-actions` Edge Function |
 | **Database Schema** | ✅ Locked | PostgreSQL, FKs, cascades, triggers, `audit_log` table |
-| **Auth** | ✅ Working | Supabase Auth + email/password, auto-profile creation, pending->active approval |
+| **Auth** | ✅ Working | Supabase Auth + email/password, auto-profile creation. **Approval goes through the `admin-actions` Edge Function** — `profiles` has SELECT-only RLS, so no client can write it (fixed 2026-08-26; see HANDOFF §2) |
 | **Prototype UX** | ✅ Complete | 16 verified edits in `prototype/Job Ticket System.dc.html` |
+| **P1.1 — Prototype → `app/` port** | ✅ **Done** | Listed as a 🔴 blocker in v4. It shipped: `app/index.html` is 6,159 lines with 26 Playwright suites. See HANDOFF §1.1 for the commit-by-commit record. |
+| **Field/office features A–H** | ✅ Done | Fixed Libya timezone, top-bar coordinates + long-press copy, 10-char location cap, forced admin actions, real tablet/laptop layout, Account-tab numbering claim, tools container. Commits in HANDOFF §1.1. |
 | **Real Excel Template** | ✅ In repo | `reference/Autofill_ServiceTikcet_System.xlsx` — 4 sheets + 6 price-list sheets |
 | **Vercel Deploy** | ✅ Live | `makaman-app`, builds from `claude/makaman-app`, Root Directory = `app` |
 
 ### 0.2 Demo / Needs Work
 | Layer | Status | Details |
 |-------|--------|---------|
-| **`app/` (deployable)** | ⚠️ Static HTML | 427KB `index.html` using dc-runtime, `localStorage`, `authMode` fallback. NO Vite, NO React. |
+| **`app/` (deployable)** | ⚠️ Static HTML | `index.html`, 6,159 lines of dc-runtime + `localStorage` + `authMode` fallback, mirrored byte-identical to `Job Ticket System.dc.html`. NO Vite, NO React. |
+| **Test suites** | ✅ 26 in `app/` | `approval` `assets` `audit` `auth` `claim` `clock` `cloud` `coalesce` `coop` `currency` `export` `forced` `geo` `layout` `lengthcap` `numbering` `observer` `office` `office2` `roles` `search` `sync` `tabs` `techreport` `toast` `wellgeo`. Playwright against vendored Chromium; `playwright-core` is installed on demand, not committed. |
+| **Outbox** | ⚠️ Bounded | Coalescing localStorage queue. A refused op is retried 5× then set aside into `makaman.outbox.refused.v1` so it cannot freeze the queue (2026-08-26). Nothing surfaces set-aside ops in the UI yet. |
 | **Service Worker** | ⚠️ Basic | `sw.js` exists but minimal. No Background Sync API. No Push API. |
 | **Offline Storage** | ⚠️ `localStorage` | Simple `synced` boolean + queue. Not IndexedDB. |
 | **Permissions System** | ⚠️ Not built | No `permissions` table. No per-user overrides. No `data-perm-*` attributes. |
@@ -29,8 +33,8 @@
 ### 0.3 Hard Blockers for Launch
 | Gap | Severity | Phase |
 |-----|----------|-------|
-| **Part B — Excel/PDF Generation** | 🔴 Critical | P2.1–P2.2 |
-| **Prototype -> `app/` Port** | 🔴 Critical | P1.1 |
+| **Part B — Excel/PDF Generation** | 🟡 Partly done | P2.1–P2.2 — per-ticket ZIP + monthly overview shipped (`2fc71f8`); the approved-ticket → master-Excel automation is not started |
+| ~~**Prototype -> `app/` Port**~~ | ✅ Done | P1.1 — shipped; see §0.1 |
 | **Arabic / RTL Support** | 🔴 Critical | P2.4 |
 | **Notifications System** | 🔴 Critical | P1.6–P1.7 |
 | **Notes System (Observer follow-ups)** | 🔴 Critical | P2.6 |

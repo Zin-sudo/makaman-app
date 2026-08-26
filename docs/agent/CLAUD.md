@@ -75,6 +75,18 @@ We use Graphify to understand the codebase before editing:
 | Skill | Source | Status | Install Command | When to Use |
 |-------|--------|--------|-----------------|-------------|
 | **graphify** | https://github.com/Graphify-Labs/graphify | ✅ Required | `uv tool install graphifyy && graphify install --project` | Before refactors, dependency analysis |
+| **claude-mem** | https://github.com/thedotmack/claude-mem | ✅ Installed | `npx claude-mem install` | Cross-session memory, prevents re-explanation — daily sessions |
+| **ponytail** | — | ❌ Rejected | — | Conflicts with BLINDSPOTS.md security rules. Not needed |
+| **code-review** | (external) | ❌ Rejected | — | Agent-spawning bug, duplicates BLINDSPOTS.md. Not needed |
+| **obsidian** | https://obsidian.md | ❌ Rejected | — | Wrong category, duplicates `docs/agent/*.md`. Not needed |
+
+**claude-mem exclusions** (protect the token budget — configure at install):
+`graphify-out/`, `node_modules/`, `app/vendor/`. Tag observations by type:
+`decision`, `bugfix`, `architecture`, `blindspot`.
+
+> **Note for remote sessions:** the Claude Code container is ephemeral and rebuilt per
+> session, so `npx claude-mem install` does not persist here. Run it on the machine you
+> work from; this table is the durable record of the decision either way.
 
 ### 3.2 Skills to Evaluate (from https://x.com/VaibhavSisinty/article/2063290847723192610)
 
@@ -172,6 +184,9 @@ npx serve app/
 | 2026-08-24 | Standing Decision #7 updated: Technician can optionally edit timestamps before "Job Done" (auto by default, audit trail for all edits). | User |
 | 2026-08-24 | Standing Decision #26 added: Signed Document Attachment — PDF upload by Tech/Ops, archive for Admin/Ops/Observer, outstanding tasks tracking. | User |
 | 2026-08-20 | Price list import complete: 2,610 rows (was 2,274). 336 recovered. unit_cost now nullable. 110 rows are "quoted separately" (display as text, not 0.00). Ten Waha code conflicts parked in backup.price_list_conflicts_20260820. | Claude Code |
+| 2026-08-26 | **Agent-loop files re-synced against the repo.** `HANDOFF.md` was a copy of the root session log describing a Vite/React `app/` that does not exist; replaced with a living-state file. MINDMAP §0 corrected (P1.1 is done, not a blocker). FEATURE_LINKS link matrix rewritten with real statuses + the suite covering each feature, and a `profiles` data contract added. BLINDSPOTS §14 added from a live bug. | Claude Code |
+| 2026-08-26 | Signup approval fixed: `profiles` is SELECT-only under RLS, so approvals now go through the `admin-actions` Edge Function (`adminAction()`); `profiles` removed from the outbox pair list; `outboxDrain()` retry bounded so a refused op cannot freeze the queue. New suite `app/approval.test.js` (12 assertions). | Claude Code |
+| 2026-08-26 | Skills registry updated: claude-mem accepted; ponytail, code-review and obsidian rejected with reasons. | User |
 
 ---
 

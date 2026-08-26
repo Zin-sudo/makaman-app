@@ -1,0 +1,8 @@
+# playwright-core is installed on demand to run the suites in app/, never committed —
+# the app itself vendors everything it needs at runtime in app/vendor/.
+node_modules/
+
+# Graphify's generated knowledge graph. Rebuilt with `/graphify .`, not source.
+graphify-out/
+
+.DS_Store

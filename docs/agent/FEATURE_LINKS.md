@@ -24,34 +24,42 @@
 
 ## 1. LINK MATRIX
 
-| Feature | Reads From | Writes To | Affected By | Links To | Status |
-|---------|-----------|-----------|-------------|----------|--------|
-| **Ticket create** | `clients`, `job_types`, `org_defaults`, `permissions`, `numbering_series` | `tickets`, `ticket_lines`, `audit_log`, `numbering_series` (reservation) | `org_defaults`, `job_types`, `permissions`, `numbering_series` | Job log, Ops Review, Notifications, Number Reservation | ⏳ Not ported |
-| **Job log** | `tickets`, `permissions` | `ticket_lines`, `audit_log` | Ticket timestamps, `fmt()` settings, `permissions` | Ticket create, Ops Review, Activity tab | ⏳ Not ported |
-| **Ops Review** | `tickets`, `ticket_lines`, `price_list_items`, `numbering_series`, `permissions`, `ticket_items` | `tickets`, `ticket_items`, `audit_log`, `notifications`, `numbering_series` (approve/release) | Item ordering, surcharge/discount, timestamp editing, permissions, number reservation | Print Preview, Excel generation, Notifications, Activity tab, Number Reservation | ⏳ Not ported |
-| **Item ordering** | `ticket_items`, `permissions` | `ticket_items.order_index` | Ops Review UI, Print Preview, Excel generation | Ops Review, Print Preview, Excel generation | ⏳ Not built |
-| **Print Preview** | `tickets`, `ticket_lines`, `ticket_items`, `permissions` | — | Item ordering, B13/F14, timestamps, logo | Ops Review, Excel generation | ⏳ Not ported |
-| **Excel generation** | `tickets`, `ticket_lines`, `ticket_items` | File buffer | Item ordering, B13/F14, timestamps, print preview layout | Print Preview, Ops Review | ⏳ Not built |
-| **Notifications** | `tickets`, `permissions`, `push_subscriptions` | `notifications` | Job Done, Approve, Note add | Ticket create, Ops Review, Notes, Service Worker | ⏳ Not built |
-| **Notes** | `tickets`, `permissions` | `ticket_notes`, `notifications` | Approve status (only approved tickets), permissions | Ops Review, Notifications, Activity tab | ⏳ Not built |
-| **Settings** | `localStorage`, `permissions` | `localStorage` | Theme CSS, `fmt()` helpers | Every screen (nav bar) | ⏳ Not ported |
-| **Permissions** | `permissions`, `user_permissions`, `auth.users` | `audit_log` | Every new feature | Every feature (gates access) | ⏳ Not built |
-| **Activity tab** | `audit_log`, `permissions` | — | Every feature that writes to `audit_log` | Job log, Ops Review, Notes, Timestamp editing | ⏳ Not built |
-| **Observer live view** | `tickets`, `permissions` | — | Presence badge, auto-sync | Activity tab | ⏳ Not ported |
-| **Number Reservation** | `numbering_series`, `tickets` | `numbering_series` (reserved_by, reserved_at, used) | Ops Review actions, ticket status changes | Ticket create, Ops Review | ⏳ Not built |
-| **Signed Document Attachment** | `tickets`, `ticket_documents`, `permissions` | `ticket_documents`, Supabase Storage | Ticket approval status, permissions | Ops Review, Outstanding Tasks, Admin Archive, Observer view | ⏳ Not built |
-| **Auto-sync timer** | `localStorage` (queue), `permissions` | `tickets` (synced flag), `audit_log` | Offline queue, connectivity | Ticket create, Notifications | ⏳ Not ported |
-| **Presence badge** | `tickets`, `permissions` | — | Auto-sync, connectivity | Observer live view, Ops Review | ⏳ Not ported |
-| **Item search + suggestions** | `price_list_items`, `ticket_items`, `permissions` | `ticket_items` | Price list data, behavioral tracking | Ops Review | ⏳ Not ported |
-| **Cloud storage linking** | `localStorage`, `permissions` | `localStorage` | Settings screen | Print Preview, Excel generation | ⏳ Not ported |
-| **PWA installability** | `manifest.webmanifest`, `sw.js` | — | Service Worker capabilities | Every screen (add-to-homescreen) | ⚠️ Partial |
-| **Responsive CSS** | `theme.css` | — | Screen layouts | Every screen | ✅ Ported |
-| **Auth (login/signup)** | `auth.users`, `profiles`, `permissions` | `auth.users`, `profiles`, `audit_log` | Approval flow, role assignment | Every screen (session) | ⏳ Not ported |
-| **Role management** | `profiles`, `permissions` | `profiles`, `audit_log` | Admin actions | Auth, Permissions | ⏳ Not ported |
-| **Theme system** | `localStorage` (settings), `theme.css` | CSS variables | Settings screen | Every screen | ⚠️ Partial |
-| **CLAUD.md** | `CLAUD.md` | `CLAUD.md` | Every task | Every feature (context) | ✅ Exists |
-| **Graphify** | Entire repo | `graphify-out/` | Every file change | Every feature (impact analysis) | ✅ Setup required |
-| **Audit logging** | — | `audit_log` | Every feature that changes data | Activity tab, Permissions | ✅ Exists (DB) |
+| Feature | Reads From | Writes To | Affected By | Links To | Status | Suite |
+|---------|-----------|-----------|-------------|----------|--------|-------|
+| **Ticket create** | `clients`, `job_types`, `org_defaults`, `numbering_series` | `tickets`, `ticket_lines`, `audit_log` | `org_defaults`, `job_types`, `numbering_series` | Job log, Ops Review, Number Reservation | ✅ Shipped | `roles`, `lengthcap` |
+| **Job log** | `tickets` | `ticket_lines`, `audit_log` | Ticket timestamps, `fmt()` settings | Ticket create, Ops Review, Activity tab | ✅ Shipped | `clock`, `audit` |
+| **Ops Review** | `tickets`, `ticket_lines`, `price_list_items`, `numbering_series`, `ticket_items` | `tickets`, `ticket_items`, `audit_log` | Item ordering, surcharge/discount, timestamp editing, number reservation | Print Preview, Exports, Activity tab | ✅ Shipped | `office`, `office2`, `forced` |
+| **Forced admin/ops action** | `tickets`, session role | `tickets`, `audit_log` | Ops Review, ticket status | Ops Review, Activity tab | ✅ Shipped (`eb01f51`) | `forced` |
+| **Numbering claim** | `numbering` (holder + history) | `numbering` | Account tab, Admin override | Ticket numbering, Activity tab | ✅ Shipped (`d96b512`) | `claim`, `numbering` |
+| **Location cap (10 chars)** | — | `tickets.field/well/rig` | `LOCATION_MAX`, `clampLoc()` | Ticket create, sheets, exports | ✅ Shipped (`a249882`) | `lengthcap` |
+| **Coordinates (top bar + sheets)** | `geo` fixes | clipboard, sheet render | Location sharing toggle, banner system | Top bar, Well No. cell, reports | ✅ Shipped (`dabbbc9`) | `wellgeo`, `geo` |
+| **Clock & timezone** | `settings.timeFormat` | `settings` | `OPERATING_TZ` is fixed (Africa/Tripoli) | Every stamp; exports always 24h | ✅ Shipped (`c2ab70b`) | `clock` |
+| **Item ordering** | `ticket_items` | `ticket_items.order_index` | Ops Review UI, Print Preview, exports | Ops Review, Print Preview, exports | ⏳ Not built | — |
+| **Print Preview** | `tickets`, `ticket_lines`, `ticket_items` | — | Item ordering, timestamps, logo | Ops Review, exports | ✅ Shipped | `techreport` |
+| **Exports (ZIP + overview)** | `tickets`, `ticket_lines`, `ticket_items` | File buffer | Item ordering, timestamps, preview layout | Print Preview, Ops Review, Account tab | ✅ Shipped (`2fc71f8`) | `export` |
+| **Master-Excel automation** | approved `tickets` | shared master workbook | Approval event | Account tab download | ⏳ Not built — ask the user first | — |
+| **Notifications** | `tickets`, `push_subscriptions` | `notifications` | Job Done, Approve, Note add | Ticket create, Ops Review, Notes, SW | ⏳ Not built | — |
+| **Notes** | `tickets` | `ticket_notes`, `notifications` | Approve status (approved only) | Ops Review, Notifications, Activity | ⏳ Not built | — |
+| **Settings** | `localStorage` | `localStorage`, `user_settings` | Theme CSS, `fmt()` helpers | Every screen | ✅ Shipped | `clock`, `tabs` |
+| **Permissions** | `permissions`, `user_permissions`, `profiles` | `audit_log` | Every new feature | Every feature (gates access) | ⏳ **Not built — NEXT TASK (P1.8)** | — |
+| **Activity tab** | `audit_log` | — | Every feature that writes `audit_log` | Job log, Ops Review, Timestamp editing | ✅ Shipped | `audit` |
+| **Log-events container (Review)** | `audit_log` | — | Activity tab derivation | Ops Review | ⏳ Not built | — |
+| **Observer live view** | `tickets` | — | Presence badge, auto-sync | Activity tab | ✅ Shipped | `observer` |
+| **Number Reservation** | `numbering_series`, `tickets` | `numbering_series` | Ops Review actions, status changes | Ticket create, Ops Review | ⏳ Not built (local check only) | `numbering` |
+| **Signed Document Attachment** | `tickets`, `ticket_documents` | `ticket_documents`, Storage | Approval status | Ops Review, Archive, Observer | ⏳ Not built | `assets` (partial) |
+| **Sync / offline queue** | `localStorage` outbox | `tickets`, `audit_log` | Connectivity, coalescing, refusal back-off | Ticket create, Notifications | ✅ Shipped | `sync`, `coalesce`, `cloud` |
+| **Co-op / crew tickets** | `ticket_crew` | `ticket_crew`, `audit_log` | Assignment, handover | Ticket create, Ops Review | ✅ Shipped | `coop` |
+| **Search** | `tickets` | — | Inbox filters | Ops Review inbox | ✅ Shipped | `search` |
+| **Currency** | `clients.currency`, `price_list_items.currency` | — | Per-client decimals | Ops Review, exports, sheets | ✅ Shipped (`fc57078`) | `currency` |
+| **Layout / responsive** | viewport policy in `<head>` | — | Phone vs tablet vs laptop | Every screen | ✅ Shipped (`d96b512`) | `layout` |
+| **Toasts / banners** | — | — | Unified banner system | Every screen | ✅ Shipped | `toast` |
+| **PWA installability** | `manifest.webmanifest`, `sw.js` | — | Service Worker capabilities | Every screen | ⚠️ Partial | — |
+| **Auth (login/signup)** | `auth.users`, `profiles` | `auth.users` (signup only) | Approval flow, role assignment | Every screen (session) | ✅ Shipped (`d3690ae`) | `auth` |
+| **Approval / role management** | `profiles` | `profiles` **via `admin-actions` only** | `profiles` RLS is SELECT-only for clients | Auth, Permissions, Admin Users screen | ✅ Fixed 2026-08-26 | `approval` |
+| **Role swap (act as Technician)** | `profiles`, session | session only | Permission registry | Top bar, assignment lists | ⏳ Not built | — |
+| **User deletion** | `profiles` | — | `admin-actions` has no `delete_user` | Admin Users screen | ⏳ Not built — dialog says so | `approval` |
+| **Theme system** | `localStorage` settings | CSS variables | Settings screen | Every screen | ✅ Shipped | `tabs` |
+| **Audit logging** | — | `audit_log` | Every feature that changes data | Activity tab, Permissions | ✅ Shipped | `audit` |
 
 ---
 
@@ -141,6 +149,27 @@ id, category ('special_tools'|'fishing'|'drilling'), prefix,
 last_number, next_number, reserved_by (uuid), reserved_at (timestamptz), used (boolean)
 ```
 **Dependents:** Ops Review (assign number), Ticket create (pre-fill), Admin Numbering tab
+
+### `profiles` table — **write path is not the ordinary one**
+```
+id (= auth.users.id), email, full_name,
+role ('technician'|'ops_manager'|'admin'|'founder'), status ('pending'|'active')
+```
+RLS carries **SELECT policies only** (`profiles_select_own`, `profiles_select_staff`). No
+signed-in client may INSERT, UPDATE or DELETE, by design — a client that could set its own
+role would be no protection at all (CONSTRAINTS §4).
+
+Therefore:
+- **Reads** come from `hydrate()` like any other table.
+- **Writes** go through the `admin-actions` Edge Function only, via `adminAction()` in
+  `app/index.html`. It re-derives the caller from their JWT; a `userId` or `role` in the
+  body names who is *acted upon*, never who is *allowed to act*.
+- Actions available: `approve_signup`, `promote_role`, `create_technician`. There is **no
+  `delete_user`** — add one before wiring any delete button to the server.
+- `profiles` is deliberately **absent from the `diffOps` pair list**. Never add it back:
+  every such op is refused, and before 2026-08-26 the refusal jammed the whole outbox.
+
+**Dependents:** Auth, Admin Users screen, Permissions (P1.8), Role swap
 
 ---
 

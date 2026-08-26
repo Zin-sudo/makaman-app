@@ -792,4 +792,67 @@ P1.1: Port Settings screen
 
 ---
 
+## 14. PRIVILEGED WRITES & THE OUTBOX (added 2026-08-26, from a live bug)
+
+> Both of these were **found in production behaviour, not theorised**. The signup approval
+> silently reverted, and the cause turned out to be two separate faults compounding.
+
+### B-14.1 🔵 [FIXED] A Client Write to `profiles` Is Refused, and the Refusal Is Invisible
+**Symptom:** An admin approves a pending sign-up. The row shows active. The person still
+cannot log in, and after a refresh the account is pending again.
+**Root Cause:** `profiles` has RLS enabled with **SELECT policies only** — no INSERT,
+UPDATE or DELETE for any signed-in client, deliberately (CONSTRAINTS §4). The approval was
+a local `mutate()`, which `diffOps()` turned into an ordinary `profiles` upsert. Postgres
+refused it, `mutate()` never blocks on send errors, and the next `hydrate()` adopted the
+database's unchanged row.
+**Prevention Rule:**
+- Any table whose writes are privileged must be **absent from the `diffOps` pair list**.
+  Route it through the `admin-actions` Edge Function via `adminAction()` instead.
+- Never "fix" this by adding an UPDATE policy to `profiles`. A staff member who can write
+  their own row can promote themselves to Admin.
+- Optimistic local writes are correct for a technician's own data and wrong for anything
+  the server may refuse. Where the server decides, wait for its answer, then `refresh()`.
+**Detection Method:**
+```bash
+# Reading profiles is fine - hydrate() does it. Only the outbox pair list matters.
+sed -n '/const pairs = ./,/.;/p' app/index.html | grep -c "'profiles'"
+# 0 = PASS. Above 0 → FAIL: profile writes are back on the queue.
+```
+**Fixed:** 2026-08-26 — `adminAction()` + `profiles` removed from the pair list.
+
+### B-14.2 🔴 [FIXED] One Permanently-Refused Op Freezes Every Later Write
+**Symptom:** A device stops syncing entirely. No error, no banner. Tickets pile up unsent
+long after the connection came back.
+**Root Cause:** `outboxDrain()` stopped at the first failure to preserve ordering — right
+for a dropped connection, fatal for a refusal that will never succeed. The rejected op kept
+its place at the head of the queue forever, and everything behind it with it. The comment
+above the function claimed failures did *not* block later ops; the code did the opposite.
+**Prevention Rule:**
+- A retry loop over a queue must be **bounded**. Distinguish "not yet" from "never".
+- After `OUTBOX_TRIES` (5) attempts, set the op aside into `makaman.outbox.refused.v1` and
+  let the queue advance. Keep it — a record of what the database would not take is the
+  first thing worth having when a device and the office disagree.
+- Never discard a refused op silently, and never skip an op *early* — the ops behind it may
+  depend on it (tickets before their children).
+**Detection Method:**
+```bash
+grep -n "tries" app/index.html | grep -i outbox
+# No attempt counter in the drain loop → FAIL
+```
+**Fixed:** 2026-08-26 — bounded retry + `outboxSetAside()`. Covered by `app/approval.test.js`.
+
+### B-14.3 ⚪ A Button That Performs a Write the Server Will Undo
+**Symptom:** A user is deleted, disappears from the list, and reappears after a refresh.
+**Root Cause:** The same shape as B-14.1 — a local-only mutation to a privileged table.
+`admin-actions` has no `delete_user` action, so nothing was ever sent.
+**Prevention Rule:** When a privileged action has no server-side counterpart yet, **say so
+in the UI**. Do not perform the local half. A control that appears to work and silently
+does not is worse than one that explains itself.
+**Status:** Dialog now states it plainly in cloud mode. Wiring `delete_user` is tracked in
+HANDOFF §1.3.
+
+---
+
+---
+
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*
