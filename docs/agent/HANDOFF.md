@@ -859,8 +859,9 @@ The "recommended time" is not advice. It is the gate.
 | S3 | Seeded Admin password appeared in a chat transcript and is unrotated. | Supabase dashboard | Tier 3 | **user** |
 | S4 | Supabase leaked-password protection is OFF. | Supabase dashboard | Tier 3 | **user** |
 | S5 | Stray `service_role_key` placeholder row in the `makaman-libya` vault. | wrong project | Tier 3 | **user** |
-| S6 | Migration 0002 applied to the DB but missing from `supabase/migrations/`. Do not rebuild schema from files alone. | repo | **Tier 4, first** | — |
+| ~~S6~~ | ~~Migration 0002 missing from the repo~~ — **closed 2026-08-26.** Recovered verbatim from `supabase_migrations.schema_migrations`, along with `snapshot_tickets_before_model_catchup`. `supabase/migrations/README.md` now maps all 31 applied migrations to the file that records each, so the completeness question is answerable in seconds. | repo | ~~Tier 4~~ | — |
 | S7 | `order_index` column for drag-and-drop item reordering. | schema | Tier 4 | — |
+| S15 | The repo is a *curated* migration history, not a mirror — transient staging create/drop pairs are deliberately absent. Recorded in `supabase/migrations/README.md`; do not "fix" it by dumping all 31. | repo | n/a — a decision, not a debt | — |
 | S8 | Q1 rewording to "Tools Allocated Reclaimed or Back-to-Base?" — DB (0009) and app differ by one word. | schema + app | Tier 4 | — |
 | S9 | OneDrive / Google Drive upload unimplemented. Buttons are honest about it and write nothing (B-18.1). | `index.html` | Tier 5, or dropped | — |
 | S10 | Excel template holds 24 item rows / 25 log rows. A larger ticket is flagged, not truncated. | `fillWorkbook` | Tier 5 | — |
