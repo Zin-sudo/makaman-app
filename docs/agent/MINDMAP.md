@@ -606,7 +606,7 @@ ALTER TABLE numbering_series ADD COLUMN used boolean DEFAULT false;
 7. Add Background Sync API to Service Worker (P1.4)
 8. Build drag-and-drop item reordering (P2.0)
 9. Build Part B: Excel/PDF generation from real template (P2.1–P2.2)
-10. Add Arabic text rendering (P2.4)
+10. ~~Add Arabic text rendering (P2.4)~~ — UI mirroring cancelled 2026-08-26; Arabic content shipped. **Build order now lives in HANDOFF §7, ranked with dependencies.**
 11. Build notes system + push notifications (P2.6–P2.7)
 12. Retroactively auto-adopt permissions for all P1 features (P2.8)
 13. Build Observer Activity Tab granularity (P2.9)

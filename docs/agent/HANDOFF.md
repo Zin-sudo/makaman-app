@@ -60,13 +60,9 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 
 ### 1.3 Still open
 
-| Item | Notes |
-|------|-------|
-| **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** A candidate stylesheet is in the repo — see §5. |
-| **"Apper" skill** | After the Excel automation. |
-| **Q1 rewording** | To "Tools Allocated Reclaimed or Back-to-Base?" — deferred until the backend is finished; DB (migration 0009) and app differ by one word today. |
-| **Offline/online stress test** | Two devices taking one series number, ops edits during an offline log, etc. |
-| **Migration 0002** | Applied to the DB but missing from `supabase/migrations/`. Do not rebuild the schema from files alone. |
+**Ranked, with dependencies, in §7. Work the tiers in order.** The loose list that used to
+live here is gone — it had no ordering, so it kept being read as "pick anything", which is
+how a screen came to be built after the sequencing decision that was meant to precede it.
 
 ---
 
@@ -387,16 +383,23 @@ cold boot with the network cut. Regression: `layout` 13, `tabs` 11, `export` 14,
 
 ---
 
-## 3. NEXT TASK — see §6 for the sequencing decision
+## 3. NEXT TASK — Tier 1 of §7
 
-Remaining functional work: **`exportExcel` is still a stub** (it logs a line and opens a
-dialog), the **offline/online stress test**, the **"Apper" skill**, and the **Q1 rewording**.
+**`exportExcel` and the two cloud-upload buttons write false audit entries.**
+
+```js
+exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.toast('export', …
+```
+
+Nothing is downloaded. The same pattern is in `uploadOneDrive` and `uploadGoogleDrive`.
+CLAUD.md records the audit trail as legally required, and it currently holds entries for
+exports that never happened. Either implement the export or remove the claim — do not leave
+a success toast over a no-op.
+
+All three share the audit-write path; fix them in one pass.
 
 **Arabic / RTL mirroring is cancelled** — see §2i. The UI stays English; Arabic *content*
 is supported and tested. MINDMAP's 🔴 on P2.4 is superseded by that decision.
-
-The design pass is therefore no longer blocked by RTL. §6 kept as the record of why it
-was sequenced that way, but its premise no longer holds.
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.
@@ -426,9 +429,12 @@ Stop and log it here rather than guessing:
 
 ## 5. THE RESPONSIVE THEME (`reference/makaman-responsive-theme-v2.css`)
 
-Supplied by the user 2026-08-26 and **stored, not wired in**. Nothing in `app/` imports
-it. It is the design direction for the app-design-polish item, to be applied when that
-task comes up — and that task still needs mockups approved first.
+Supplied by the user 2026-08-26 and **stored, not wired in**. Nothing in `app/` imports it.
+It is the design direction for the app-design-polish item.
+
+**Position in the build order: Tier 6 of §7** — after every screen exists, before the field
+test. Mockups approved first. The three blockers below are what must be cleared before any
+of it reaches `app/`.
 
 What it brings: a token set (`--mk-*`), card/button/input/table/badge components, a
 five-breakpoint responsive system (640 / 1024 / 1440 / 1920 plus a mobile-landscape fix),
@@ -598,32 +604,89 @@ app asks for is one the offline defaults know**.
 
 ---
 
-## 6. SEQUENCING: THE RESPONSIVE THEME vs RTL
+## 6. SEQUENCING — SUPERSEDED
 
-Asked directly whether to adopt `reference/makaman-responsive-theme-v2.css` now or later.
-**Later — and specifically after Arabic/RTL.**
+§6 used to argue that the responsive theme should wait for Arabic/RTL, on the grounds that
+restyling before a direction change means restyling twice. **The user cancelled RTL on
+2026-08-26** (§2i), so that argument no longer applies and the section is retired rather
+than edited — a rule kept alive past its reason is how stale sequencing survives.
 
-The argument is the same one that made P1.8b precede the design pass, and it is about
-double work rather than about taste:
+What replaced it is §7. The ordering principle is the same one, generalised: *the theme is
+applied to screens, so every screen must exist before it is applied.*
 
-- The theme is not a layer. The app styles inline against `--ink-rgb`, `--accent`,
-  `--success` on essentially every element, so adopting `--mk-*` tokens means editing every
-  screen. That is a rewrite of presentation, not an import.
-- **RTL is also a whole-layout concern** — direction, mirroring, padding that becomes
-  margin, text metrics — and MINDMAP still marks it 🔴 critical for a Libyan market.
-- Restyle first and you restyle again for RTL. Do RTL first and the design pass lands once,
-  on a layout that is already correct in both directions.
-- The theme's three blockers (§5) are unresolved regardless: the Google Fonts `@import`
-  breaks CONSTRAINTS §5, its `data-perm-*` vocabulary contradicts the permission registry,
-  and the palette is a different one.
-- The user asked for **mockups to approve before any code**, which is a round trip that
-  should not be spent twice.
+---
 
-The counter-argument, stated fairly: every feature added now is one more screen to restyle
-later. That cost is real but small — the remaining functional surface is a few screens,
-whereas RTL touches all of them.
+## 7. BUILD ORDER — RANKED, WITH DEPENDENCIES
 
-**Trigger for revisiting:** once RTL lands and the functional backlog above is closed. At
-that point the design pass should *absorb* the theme — take its tokens, spacing scale,
-breakpoints and component shapes — rather than adopt the file wholesale, because its
-permission vocabulary must be dropped in favour of `hasPermission()`.
+Work the tiers in order. Within a tier, order is free.
+
+### Tier 1 — the record is wrong today
+Cheap, blocks nothing, and every day it runs adds bad data.
+- `exportExcel` logs "4 sheets downloaded" and toasts success for a download that never happens.
+- `uploadOneDrive` / `uploadGoogleDrive` write the same false lifecycle entries.
+- **Do together** — one audit-write path, one pass.
+
+### Tier 2 — the sync engine, before more code sits on it
+- Offline/online stress test: two devices taking one series number, ops edits during an
+  offline log, a handover made offline against a reassigned ticket.
+- localStorage quota guard (B-1.1 / MINDMAP B16) — ticket loss at a well site.
+- **Depends on:** nothing. **Blocks:** Tier 5, which adds features to this engine.
+- **Why here:** test the engine once now, rather than re-testing it after every feature.
+
+### Tier 3 — needs the user, blocks go-live
+- Rotate the seeded Admin password (it appeared in a chat transcript).
+- Enable Supabase leaked-password protection.
+- Real item numbers for the 10 Waha conflicts in `backup.price_list_conflicts_20260820`.
+- Delete the stray `service_role_key` placeholder from the `makaman-libya` vault.
+- **Depends on:** the user at the dashboard. Runs in parallel with everything else.
+
+### Tier 4 — schema, batched into one migration
+- Reconstruct migration 0002 (applied to the DB, missing from `supabase/migrations/`).
+- `order_index` column for item reordering.
+- Q1 rewording to "Tools Allocated Reclaimed or Back-to-Base?" — one word, DB and app
+  disagree today.
+- **Why batched:** three separate migrations is three deploys for one schema change.
+- **Do 0002 first** — before anything forces a rebuild from files alone.
+
+### Tier 5 — every remaining feature that adds a screen
+- Notifications: table, RLS, Realtime channel, bell with unread badge (P1.6–P1.7).
+- Notes / Observer follow-ups: `ticket_notes`, add, acknowledge, audit (P2.6).
+- Signed-document attachment: PDF upload to Storage, outstanding-tasks list (P2.10).
+- Drag-and-drop item reordering — handlers exist in the app, persistence does not (P2.0).
+- **Depends on:** Tier 2 (engine proven), Tier 4 (`order_index` for reordering).
+- **Blocks:** Tier 6. **These are the only items left that create new surfaces.**
+
+### Tier 6 — the CSS responsive theme v2
+`reference/makaman-responsive-theme-v2.css` — the design pass. See §5 for what it brings.
+- **Hard dependency: Tier 5 must be complete.** The theme is applied per screen; a screen
+  built after it is a screen styled twice.
+- **Gated on the user:** mockups approved before any code is written.
+- **Three blockers to clear first, all recorded in §5:**
+  1. Its `@import` of Google Fonts breaks CONSTRAINTS §5 — vendor Inter into `app/vendor/`
+     and replace it with a local `@font-face`.
+  2. Its `data-perm-*` vocabulary contradicts the permission registry. Pick one: emit
+     `data-perm-<key>` from `hasPermission()`, or keep gating in the bindings. **Never ship
+     both** (B-15.2).
+  3. Its palette is a different one — adopting the tokens means restyling every screen, not
+     adding a layer.
+- **Absorb, do not adopt wholesale:** take its tokens, spacing scale, breakpoints and
+  component shapes; drop its permission vocabulary.
+- **Now safe in a way it was not before:** the printed sheet is sealed and tested
+  (`mksheet.test.js`), so a restyle can no longer alter what customers sign. Before §2i that
+  was an unguarded risk.
+- Two defects in the file itself: `--mk-bg-tertiary` is used but never defined, and
+  `--mk-border-focus` is used with a fallback in some places and without one in others.
+
+### Tier 7 — after the PWA is entirely finished
+- Field test: 2–3 technicians at real well sites, three days.
+- Go/no-go.
+- **"Apper" skill — last. Explicitly after the PWA is complete**, per the user
+  (2026-08-26). It is a meta-deliverable built *from* how this project was worked, so it is
+  worth more once there is a finished project to derive it from.
+
+### The two rules this order encodes
+1. **Screens before styles.** Tier 5 precedes Tier 6, or every new screen is styled twice.
+2. **Engine before features.** Tier 2 precedes Tier 5, or the stress test is re-run per feature.
+
+`exportExcel` adds no screen, so its position is order-neutral — it ranks first purely
+because it is corrupting the audit trail today.
