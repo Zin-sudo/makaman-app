@@ -142,17 +142,23 @@ async function office(ctx) {
     check('a failed fill raises rather than returning quietly', after.threw);
     check('and writes no audit entry', after.audit === before, before + ' -> ' + after.audit);
 
-    // The two cloud buttons have no OAuth behind them and must not pretend otherwise.
+    // S9 dropped. The two cloud buttons are gone, and the reason they had to go is that
+    // the Connect step behind them was a mock: it flipped a flag and invented an account
+    // address, so Settings read "Connected as ops@makaman.ly" with nothing connected. The
+    // guard is now on the absence — a mocked integration that reports itself connected is
+    // worse than no integration, and this is what stops one coming back.
     const cloud = await p.evaluate(() => {
       const src = document.querySelector('script[type="text/x-dc"]').textContent;
-      const od = src.slice(src.indexOf('uploadOneDrive:'), src.indexOf('uploadGoogleDrive:'));
-      const gd = src.slice(src.indexOf('uploadGoogleDrive:'), src.indexOf('uploadGoogleDrive:') + 400);
-      return { odLogs: /this\.log\(/.test(od), gdLogs: /this\.log\(/.test(gd),
-               odSays: /not connected yet/.test(od), gdSays: /not connected yet/.test(gd) };
+      const page = document.body.innerText;
+      return {
+        handlers: /uploadOneDrive|uploadGoogleDrive|connectOneDrive|connectGoogleDrive/.test(src),
+        flag: /cloudStorage/.test(src),
+        claims: /Connected as/.test(page),
+      };
     });
-    check('the OneDrive button records no upload', !cloud.odLogs);
-    check('the Google Drive button records no upload', !cloud.gdLogs);
-    check('and both say plainly that they are not connected', cloud.odSays && cloud.gdSays);
+    check('no OneDrive or Google Drive handler is left in the app', !cloud.handlers);
+    check('and no stored flag that could claim a connection', !cloud.flag);
+    check('nothing on screen reports an account that was never connected', !cloud.claims);
     await ctx.close();
   }
 
@@ -169,14 +175,41 @@ async function office(ctx) {
         x.items = [];
         for (let n = 0; n < 30; n++) x.items.push(Object.assign({}, one, { code: 'X-' + n }));
       });
-      const out = await app.fillWorkbook(app.state.data.tickets.find(y => y.id === t.id));
+      const big = app.state.data.tickets.find(y => y.id === t.id);
+      const out = await app.fillWorkbook(big);
       const c = await window.JSZip.loadAsync(await out.blob.arrayBuffer());
       const s1 = await c.file('xl/worksheets/sheet1.xml').async('string');
-      const last = s1.match(/<c r="A39"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/);
-      return { overflow: out.overflow, lastRowFilled: !!(last && /X-23/.test(last[0])) };
+      // Read every amount in the item column and the total cell, so the balance can be
+      // checked as arithmetic rather than asserted as an intention.
+      const num = (ref) => {
+        const m = s1.match(new RegExp('<c r="' + ref + '"[^>]*?><v>([-0-9.eE]+)</v></c>'));
+        return m ? Number(m[1]) : null;
+      };
+      const amounts = [];
+      for (let row = 16; row <= 39; row++) { const v = num('F' + row); if (v !== null) amounts.push(v); }
+      const b23 = s1.match(/<c r="B38"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/);
+      const carry = s1.match(/<c r="B39"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/);
+      return {
+        overflow: out.overflow, carriedItems: out.carriedItems,
+        lastRealRowFilled: !!(b23 && b23[0].length > 30),
+        carryText: carry ? carry[0] : '',
+        sum: Number(amounts.reduce((n, v) => n + v, 0).toFixed(2)),
+        total: num('F40'),
+        appTotal: Number(app.ticketTotal(big).toFixed(2)),
+      };
     });
     check('more lines than the template holds is reported, not silently dropped', r.overflow);
-    check('and the rows it does hold are all filled', r.lastRowFilled);
+    check('and the rows it does hold are all filled', r.lastRealRowFilled);
+    // S10. The workbook used to carry the whole job's total above only the first 24 lines,
+    // so a client's form did not add up to its own printed figure. The last row now
+    // carries what did not fit.
+    check('the overflow is named in the file, not only in a toast that disappears',
+      /further item\(s\)/.test(r.carryText), r.carryText.slice(0, 120));
+    check('and it says how many were carried', r.carriedItems === 7, String(r.carriedItems));
+    check('the visible amounts add up to the total printed beside them',
+      r.sum === r.total, r.sum + ' vs ' + r.total);
+    check('and that total is still the whole job, not a truncated one',
+      r.total === r.appTotal, r.total + ' vs ' + r.appTotal);
     await ctx.close();
   }
 

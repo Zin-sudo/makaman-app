@@ -643,36 +643,20 @@
         <sc-if value="{{ settingsIsMgr }}" hint-placeholder-val="{{ false }}">
           <div style="margin-bottom:28px">
             <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Storage &amp; export</div>
-            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-bottom:12px;line-height:1.4">Exported sheets always download to this device — that never requires an account. Optionally link a cloud account below to also upload straight there from the export screen.</div>
-
-            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-                <div style="font-size:14px;font-weight:600">OneDrive</div>
-                <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-                  <button onClick="{{ disconnectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
-                </sc-if>
-                <sc-if value="{{ cloudOneDriveNotConnected }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ connectOneDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
-                </sc-if>
-              </div>
-              <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-                <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px">Connected as {{ cloudOneDriveAccount }}</div>
-              </sc-if>
-            </div>
-
-            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:10px">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-                <div style="font-size:14px;font-weight:600">Google Drive</div>
-                <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-                  <button onClick="{{ disconnectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Disconnect</button>
-                </sc-if>
-                <sc-if value="{{ cloudGoogleNotConnected }}" hint-placeholder-val="{{ true }}">
-                  <button onClick="{{ connectGoogleDrive }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Connect</button>
-                </sc-if>
-              </div>
-              <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-                <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:8px">Connected as {{ cloudGoogleAccount }}</div>
-              </sc-if>
+            <!-- S9, dropped rather than built. This panel offered OneDrive and Google
+                 Drive, and the Connect button was a mock: it flipped a stored flag and
+                 filled in a plausible account address, so Settings then read "Connected
+                 as ops@makaman.ly" with nothing connected at all. Honest upload buttons
+                 sat behind a dishonest connect step.
+                 It is dropped, not deferred, because the archive it was meant to provide
+                 now exists and is better: attachments live in a private bucket with
+                 row-level security, reachable only through a signed URL that expires, and
+                 the master workbook is built into the same place on a schedule. A copy in
+                 somebody's Drive would be a second, weaker copy of that — no RLS, its own
+                 consent screen, and a token store this app has no reason to hold. -->
+            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
+              <div style="font-size:14px;font-weight:600;margin-bottom:6px">Where files go</div>
+              <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);line-height:1.5">Exported sheets download to this device — that never needs an account. Anything attached to a ticket is kept in the company archive and opened from the ticket itself, through a link that expires. There is no OneDrive or Google Drive step, and nothing is copied outside the company.</div>
             </div>
           </div>
         </sc-if>
@@ -1708,12 +1692,6 @@
           <button onClick="{{ backToReview }}" class="back-btn" style="margin-bottom:0">‹ Back to review</button>
           <div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             <button onClick="{{ exportExcel }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Fill Excel &amp; download</button>
-            <sc-if value="{{ cloudOneDriveConnected }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ uploadOneDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to OneDrive</button>
-            </sc-if>
-            <sc-if value="{{ cloudGoogleConnected }}" hint-placeholder-val="{{ false }}">
-              <button onClick="{{ uploadGoogleDrive }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Upload to Google Drive</button>
-            </sc-if>
           </div>
         </div>
         <div style="text-align:right;font-size:13px;color:rgba(var(--ink-rgb),0.6);margin-bottom:18px">{{ cloudExportNote }}</div>
@@ -3687,19 +3665,6 @@ function seed() {
       // and the payroll month rule keys off the job end date — so a technician whose
       // phone is on the wrong zone must not be able to move a ticket into another month.
       theme: 'dark', timeFormat: '24', shareLocation: true, notificationsReadAt: '',
-      // Ops Manager storage linking — local download always works with no account; the
-      // Ops Manager can additionally connect OneDrive and/or Google Drive to upload
-      // exported sheets straight there instead of only saving to the device. This is a
-      // real UI/UX build (Settings > Storage & Export) but the actual OAuth connect flow
-      // is mocked — a static prototype with no backend can't safely hold a real
-      // Microsoft/Google app registration or do a server-side token exchange, so
-      // "Connect" here just flips a stored flag and fills in a plausible account email,
-      // same mocking approach as the rest of this prototype's connectivity simulation
-      // (S.online, auto-sync). A real build needs a backend for the actual handshake.
-      cloudStorage: {
-        oneDrive: { connected: false, account: '' },
-        googleDrive: { connected: false, account: '' },
-      },
     },
     // Permanent, admin-configured defaults (B13 Base Location / F14 Customer Rep. on the
     // real Service Ticket / Job Log sheets) — not per-ticket technician entry and not a
@@ -5481,8 +5446,28 @@ class Component extends DCLogic {
   fillWorkbook(ticket) {
     const t = ticket;
     const cur = this.ticketCurrency(t);
-    const items = (t.items || []).slice(0, TEMPLATE.itemRows.length);
-    const events = (t.events || []).slice(0, TEMPLATE.eventRows.length);
+    // S10. The template holds 24 item rows and 25 log rows, and a bigger ticket used to
+    // be cut to fit while the total cell still carried the WHOLE job's figure. That gave a
+    // client a form whose visible lines did not add up to its own stated total, with
+    // nothing in the file to say why — the same class of defect as the template's
+    // inherited formulas, and worse, because a warning toast disappears and the file does
+    // not.
+    //
+    // So an overflowing sheet spends its last row saying so. The carry line holds the
+    // money that did not fit, which makes the visible column sum to the printed total
+    // again, and names where the itemised detail is. Nothing is invented: the amount is
+    // the arithmetic remainder of the lines that were dropped.
+    const allItems = t.items || [];
+    const allEvents = t.events || [];
+    const itemCap = TEMPLATE.itemRows.length, eventCap = TEMPLATE.eventRows.length;
+    const itemsOver = allItems.length > itemCap, eventsOver = allEvents.length > eventCap;
+    const items = itemsOver ? allItems.slice(0, itemCap - 1) : allItems.slice(0, itemCap);
+    const events = eventsOver ? allEvents.slice(0, eventCap - 1) : allEvents.slice(0, eventCap);
+    // What the carry line is worth: the printed total less everything actually listed.
+    // Derived by subtraction rather than by re-summing the dropped lines, so it can never
+    // disagree with the total cell beside it.
+    const carriedItems = itemsOver ? allItems.length - items.length : 0;
+    const carriedEvents = eventsOver ? allEvents.length - events.length : 0;
 
     // Excel counts days from 1899-12-30, with its 1900 leap-year bug baked in. Read off
     // the Tripoli wall clock the whole app is pinned to, so a job never files a day early.
@@ -5543,7 +5528,20 @@ class Component extends DCLogic {
       x = setCell(x, M.end, xDate(t.end));
       x = setCell(x, M.baseLocation, t.baseLocation || '');
       x = setCell(x, M.jobType, t.jobType || '');
+      const grand = Number(this.ticketTotal(t).toFixed(2));
+      const listed = items.reduce((n, i) => n + this.itemTotal(i, t), 0);
+      const carriedValue = Number((grand - listed).toFixed(2));
       TEMPLATE.itemRows.forEach((row, n) => {
+        // The carry line, when there is one, is the last row of the block.
+        if (carriedItems && n === TEMPLATE.itemRows.length - 1) {
+          x = setCell(x, 'A' + row, '');
+          x = setCell(x, 'B' + row, '+ ' + carriedItems + ' further item(s) — itemised on the signed PDF');
+          x = setCell(x, 'C' + row, '');
+          x = setCell(x, 'D' + row, '');
+          x = setCell(x, 'E' + row, '');
+          x = setCell(x, 'F' + row, carriedValue);
+          return;
+        }
         const i = items[n];
         const pc = i && i.kind === 'percent';
         x = setCell(x, 'A' + row, i ? (i.code || '') : '');
@@ -5553,7 +5551,7 @@ class Component extends DCLogic {
         x = setCell(x, 'E' + row, i ? (pc ? i.cost + '%' : Number(i.cost)) : '');
         x = setCell(x, 'F' + row, i ? Number(this.itemTotal(i, t).toFixed(2)) : '');
       });
-      return setCell(x, M.total, Number(this.ticketTotal(t).toFixed(2)));
+      return setCell(x, M.total, grand);
     };
 
     const log = (xml) => {
@@ -5576,6 +5574,16 @@ class Component extends DCLogic {
       x = setCell(x, M.endJob, xDate(t.end));
       x = setCell(x, M.arrived, xDate(t.arrival || t.start));
       TEMPLATE.eventRows.forEach((row, n) => {
+        // No money on this sheet, so the carry line is a marker rather than a balance —
+        // but a job log that simply stops is a job log that reads as complete.
+        if (carriedEvents && n === TEMPLATE.eventRows.length - 1) {
+          x = setCell(x, 'A' + row, '');
+          x = setCell(x, 'B' + row, '');
+          x = setCell(x, 'C' + row, '');
+          x = setCell(x, 'D' + row, '');
+          x = setCell(x, 'E' + row, '+ ' + carriedEvents + ' further log line(s) — on the signed PDF');
+          return;
+        }
         const e = events[n];
         x = setCell(x, 'A' + row, e ? xDate(e.ts) : '');
         x = setCell(x, 'B' + row, e ? xTime(e.ts) : '');
@@ -5607,8 +5615,8 @@ class Component extends DCLogic {
           });
         });
       })
-      .then((blob) => ({ blob: blob, overflow: (t.items || []).length > TEMPLATE.itemRows.length
-        || (t.events || []).length > TEMPLATE.eventRows.length }));
+      .then((blob) => ({ blob: blob, overflow: itemsOver || eventsOver,
+        carriedItems: carriedItems, carriedEvents: carriedEvents }));
   }
 
   // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF and
@@ -6688,30 +6696,8 @@ class Component extends DCLogic {
         if (!next) this.toast('geo-off', 'Location sharing is off. Your position will read "No Location Shared" — the office cannot reach you by coordinates if something goes wrong on site.', 'warn');
       },
 
-      // Storage & Export — Ops Manager only. See the seed() comment on cloudStorage for
-      // why "Connect" is mocked rather than a real OAuth flow.
+      // Storage & Export — Ops Manager only.
       settingsIsMgr: S.role === 'mgr',
-      cloudOneDriveConnected: !!((D.settings.cloudStorage || {}).oneDrive || {}).connected,
-      cloudOneDriveNotConnected: !((D.settings.cloudStorage || {}).oneDrive || {}).connected,
-      cloudOneDriveAccount: ((D.settings.cloudStorage || {}).oneDrive || {}).account || '',
-      cloudGoogleConnected: !!((D.settings.cloudStorage || {}).googleDrive || {}).connected,
-      cloudGoogleNotConnected: !((D.settings.cloudStorage || {}).googleDrive || {}).connected,
-      cloudGoogleAccount: ((D.settings.cloudStorage || {}).googleDrive || {}).account || '',
-      connectOneDrive: () => this.mutate(d => {
-        d.settings = d.settings || {}; d.settings.cloudStorage = d.settings.cloudStorage || {};
-        d.settings.cloudStorage.oneDrive = { connected: true, account: (S.session && S.session.email) || 'ops@makaman.ly' };
-      }),
-      disconnectOneDrive: () => this.mutate(d => {
-        (d.settings.cloudStorage = d.settings.cloudStorage || {}).oneDrive = { connected: false, account: '' };
-      }),
-      connectGoogleDrive: () => this.mutate(d => {
-        d.settings = d.settings || {}; d.settings.cloudStorage = d.settings.cloudStorage || {};
-        d.settings.cloudStorage.googleDrive = { connected: true, account: (S.session && S.session.email) || 'ops@makaman.ly' };
-      }),
-      disconnectGoogleDrive: () => this.mutate(d => {
-        (d.settings.cloudStorage = d.settings.cloudStorage || {}).googleDrive = { connected: false, account: '' };
-      }),
-
       clock: F.time(iso(new Date())),
       netDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       netLabel: S.online ? 'ONLINE' : 'NO SIGNAL',
@@ -7722,7 +7708,7 @@ class Component extends DCLogic {
             this.saveBlob(out.blob, 'Makaman-' + no + '.xlsx');
             this.log('4 sheets filled into the workbook and downloaded to this device.', 'lifecycle');
             this.toast('export', out.overflow
-              ? 'Workbook downloaded — but this ticket has more lines than the template holds, so the extra ones are not in it. Use the ZIP for the full record.'
+              ? 'Workbook downloaded. This ticket is bigger than the customer form holds, so the last row carries the rest and the total still balances — the itemised detail is on the signed PDF.'
               : 'The four sheets are filled and downloading to this device.',
               out.overflow ? 'warn' : 'ok');
           })
@@ -7732,22 +7718,7 @@ class Component extends DCLogic {
           })
           .then(() => { this._excelBusy = false; });
       },
-      // Local download always works. OneDrive/Google Drive upload buttons only render
-      // once connected (Settings > Storage & Export) — see the seed() comment on
-      // cloudStorage for why the connect step itself is mocked.
-      cloudExportNote: (!((D.settings.cloudStorage || {}).oneDrive || {}).connected && !((D.settings.cloudStorage || {}).googleDrive || {}).connected)
-        ? 'Download always works, no account needed. Connect OneDrive/Google Drive in Settings to also upload from here.'
-        : 'Download always works, no account needed.',
-      // Both of these used to write "4 sheets uploaded to OneDrive" into the audit trail
-      // and raise a success toast. There is no OAuth behind either button — the connect
-      // step in Settings is explicitly mocked (see the seed() note on cloudStorage) — so
-      // no upload has ever happened. They say so now, and write nothing.
-      uploadOneDrive: () => {
-        this.toast('export-od', 'Uploading straight to OneDrive is not connected yet. Use Fill Excel & download, then put the file where you need it.', 'warn');
-      },
-      uploadGoogleDrive: () => {
-        this.toast('export-gd', 'Uploading straight to Google Drive is not connected yet. Use Fill Excel & download, then put the file where you need it.', 'warn');
-      },
+      cloudExportNote: 'Downloads to this device, no account needed. Anything attached to the ticket is already in the company archive.',
 
       // One tool at a time, chosen from Account. The page names the tool it is
       // showing rather than repeating the whole menu above it.
@@ -7960,11 +7931,8 @@ class Component extends DCLogic {
         { label: 'Excel targets', hint: 'Original + Copy for Service Ticket and Job Log', value: '4 sheets' },
         {
           label: 'Storage',
-          hint: 'Offline-first on device — download never needs an account; Ops Manager can also link OneDrive and/or Google Drive in Settings to upload sheets straight there',
-          value: ['Local device']
-            .concat(((D.settings.cloudStorage || {}).oneDrive || {}).connected ? ['OneDrive'] : [])
-            .concat(((D.settings.cloudStorage || {}).googleDrive || {}).connected ? ['Google Drive'] : [])
-            .join(' + '),
+          hint: 'Offline-first on device; attachments in the company archive, opened through a link that expires',
+          value: 'Device + archive',
         },
       ],
       resetAll: () => this.setState({ dialog: 'reset' }),
