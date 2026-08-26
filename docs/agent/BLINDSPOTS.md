@@ -957,6 +957,57 @@ split is 11 converted, 18 kept — the kept ones are listed in HANDOFF §2c and 
 
 ---
 
+### B-15.7 🔵 Fixing a Leak in One Place Leaves It Open in Another
+**Symptom:** A capability gate is corrected, the suite goes green, and the same data is
+still readable somewhere else.
+**Root Cause:** `activity.view_edits` was applied to the Activity tab. The per-ticket audit
+panel in Review read the same data, was ungated, and the Observer reaches that screen —
+`showMgrPage` admits `founder` at `mgrScreen === 'review'`. Two surfaces onto one dataset,
+and fixing the first told you nothing about the second.
+**Prevention Rule:**
+- When gating a capability, **grep for every other surface onto the same data** before
+  calling it done. Here: `grep -n "audit" app/index.html` would have found both.
+- Name the gate once (`const curAuditDeep = this.hasPermission(...)`) and let the rows, the
+  empty state and the scope line all read that one binding, so they cannot drift apart.
+**Detection Method:**
+```bash
+# For each gated dataset, count the surfaces that render it and the gates that guard them.
+grep -cn "curAudit\|activityFeed" app/index.html
+# Surfaces without a gate → FAIL
+```
+**Found:** 2026-08-26, while building the Review log. Same root as B-15.5, second location.
+
+### B-15.8 ⚪ A Negative Assertion Passes on a Blank Page
+**Symptom:** A test asserting "X is not shown" goes green, and the feature is reported
+fixed. Nothing was shown at all — including the thing that should have been.
+**Root Cause:** `check('the edit is withheld', !/mileage changed/.test(text))` is true when
+`text` is empty. The first run of `reviewlog.test.js` reported the Observer leak as closed
+while the review screen had not rendered, because the seed had silently failed.
+**Prevention Rule:**
+- Every "is not shown" check must be conditional on the container actually being present:
+  `check(..., !!panel && !/thing/.test(panel))`.
+- Pair each negative with a positive on the same surface. Here: the Observer must see the
+  *stage* entry and not the *edit* — if the stage entry is missing, the negative proves
+  nothing.
+**Found:** 2026-08-26, in the first run of `reviewlog.test.js`.
+
+### B-15.9 ⚪ Two Harness Traps, Both Cost Real Time
+**The store is not written until the first mutation.** Seeding through `localStorage`
+before one has happened writes into nothing and reads back null. Use `window.__mkApp` —
+`app.mutate(d => ...)` then `app.setState({ activeId, mgrScreen: 'review' })`. This is the
+handle `forced.test.js` already established.
+
+**Body-text search finds prose before headings.** The Review screen says "every change is
+written to the audit trail" in explanatory text above the panel, so
+`innerText.indexOf('AUDIT TRAIL')` lands there and reads the ticket header as though it
+were the log. Locate a panel by its DOM node, not by searching page text.
+
+Joins the existing traps: `newPage()` shares storage with its context (`newContext()`
+isolates), `innerText` applies `text-transform`, input *values* never appear in
+`innerText`, and on repeated rows locate the button *within* the row (B-15.4).
+
+---
+
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*

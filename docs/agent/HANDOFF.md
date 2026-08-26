@@ -62,8 +62,6 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 
 | Item | Notes |
 |------|-------|
-| **Role-swap control** | Top-right control letting admin/ops act as Technician and swap back, appearing among technicians for assignment. |
-| **Log-events container in Review** | Admin/ops need the event log surfaced inside the Review screen. |
 | **Admin/ops unrestricted ticket access** | Full A–Z technician flow on tickets they opened, audit trail kept throughout. |
 | **User deletion** | The Delete button now says plainly that deletion happens on the server (see §2.4). `admin-actions` has no `delete_user` action yet. |
 | **App-design polish** | Card UI, sticky blurred headers, iOS toggles, empty states. **User asked for mockups to approve before any code.** A candidate stylesheet is in the repo — see §5. |
@@ -281,15 +279,62 @@ Regressions: 217 assertions across 13 suites, 0 failures. No overflow at 1280px 
 
 ---
 
-## 3. NEXT TASK — the log-events container in Review
+## 2e. THIS SESSION — THE PER-TICKET LOG IN REVIEW
 
-1. **Log-events container in Review** — surface the event log inside the Review screen for
-   admin/ops. Gate it on `activity.view_edits`, not `activity.view_all`: the Observer holds
-   the latter and must not read the edit trail (see §2c and B-15.5).
-2. **Admin/ops unrestricted ticket access** — the full A–Z technician flow on tickets they
-   opened, gated on the `ticket.*` capabilities rather than role comparisons. Much of this
-   now falls out of the role swap (§2d); what remains is the office acting on a ticket
-   *without* swapping.
+The container already existed. Three things were wrong with it, and the first is why this
+was worth doing before anything cosmetic.
+
+**It was ungated, and the Observer reaches this screen.** `showMgrPage` admits `founder`
+at `mgrScreen === 'review'`, so the full edit history of every ticket was readable by the
+one role the Activity tab had just been taught to withhold it from. Fixing the feed did
+nothing for this — the same capability, a second place, and no reason for either to know
+about the other. `curAuditDeep` is now named once and read by the rows, the empty state and
+the scope line together, so they cannot drift into disagreeing.
+
+**It dropped who.** Every entry has carried `by` since `logOn()` was written; only the
+Activity tab was showing it. "Ticket approved" with no name is the half of the record that
+does not settle an argument — and attribution is exactly what the forced-action and
+role-swap work depends on.
+
+**It said nothing about what kind of change an entry was.** Stage and Edit now carry a
+badge, matching the Activity tab's own distinction.
+
+### Verification
+`app/reviewlog.test.js` — 15 assertions. The load-bearing one is that the Observer sees the
+stage entry and **not** the edit, on the same ticket where the office sees both.
+
+Two harness traps cost real time here and are worth carrying forward:
+- **The store is not written until the first mutation.** Seeding through `localStorage`
+  before one happens writes into nothing. `window.__mkApp` is the handle the other suites
+  already use; `app.mutate()` then `app.setState({ activeId, mgrScreen: 'review' })`.
+- **The page says "written to the audit trail" in prose further up.** A body-text search
+  for the heading finds that first and reads the ticket header as though it were the log.
+  Locate the panel by its DOM node.
+
+And a mistake worth naming: the first run of this suite reported **the leak as fixed while
+nothing had rendered at all** — a negative assertion passing on a blank page. Every "is not
+shown" check here is now conditional on the panel actually being present.
+
+Regressions: 146 assertions across 9 suites, 0 failures.
+
+---
+
+## 3. NEXT TASK — admin/ops unrestricted ticket access
+
+The full A–Z technician flow on tickets the office opened, gated on the `ticket.*`
+capabilities rather than role comparisons. Much of it now falls out of the role swap
+(§2d) — an ops manager who swaps in gets the technician's flow entire. **What remains is
+the office acting on a ticket *without* swapping**: raising and logging a job from the desk
+while keeping their own screens.
+
+Before building, establish which of the two the office actually wants. If swapping covers
+it, this item is smaller than it looks and the remaining work is a shortcut into the swap
+from the inbox rather than a second flow. Ask before assuming — a duplicate flow is the
+kind of thing CLAUD.md §2.4 exists to prevent.
+
+Then, still open: **user deletion** (`admin-actions` needs a `delete_user`), the
+**app-design polish** (mockups first — see §5), and the **approved-ticket → master Excel**
+automation (the user asked to be questioned in detail first).
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.

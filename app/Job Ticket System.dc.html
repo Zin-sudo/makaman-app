@@ -1418,12 +1418,20 @@
             </div>
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Audit trail</div>
-              <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px">Audit trail</div>
+              <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">{{ curAuditScope }}</div>
+              <sc-if value="{{ curAuditEmpty }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:14px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">Nothing recorded on this ticket yet.</div>
+              </sc-if>
+              <div style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ curAudit }}" as="a" hint-placeholder-count="3">
-                  <div style="font-size:12px;line-height:1.4">
-                    <div style="color:rgba(var(--ink-rgb),0.5)">{{ a.stamp }}</div>
+                  <div style="font-size:12px;line-height:1.45;padding-bottom:9px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+                      <span style="padding:1px 7px;font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;background:{{ a.kindBg }};color:{{ a.kindFg }}">{{ a.kindLabel }}</span>
+                      <span style="color:rgba(var(--ink-rgb),0.5)">{{ a.stamp }}</span>
+                    </div>
                     <div>{{ a.text }}</div>
+                    <div style="color:rgba(var(--ink-rgb),0.55);margin-top:2px">{{ a.by }}</div>
                   </div>
                 </sc-for>
               </div>
@@ -4657,6 +4665,10 @@ class Component extends DCLogic {
     // Two ways the claim moves: its holder hands it on, or somebody with the override
     // takes it — because the reason it usually needs moving is that the holder is not
     // there to move it himself.
+    // Same capability the Activity tab reads. Named once here so the two cannot drift
+    // into disagreeing about what the Observer may see.
+    const curAuditDeep = this.hasPermission('activity.view_edits');
+
     const claimMovable = this.hasPermission('numbering.override')
       || (this.hasPermission('numbering.transfer') && this.holdsNumbering());
 
@@ -6324,7 +6336,32 @@ class Component extends DCLogic {
       },
       askReopen: () => this.setState({ dialog: 'reopen', reasonText: '' }),
       goPrint: () => this.setState({ mgrScreen: 'print' }),
-      curAudit: t ? (t.audit || []).slice().reverse().map(a => ({ stamp: F.stamp(a.ts), text: a.text })) : [],
+      // This ticket's log, newest first.
+      //
+      // Gated the same way the Activity tab is, and for the same reason: the Observer can
+      // reach this screen (showMgrPage lets them in at mgrScreen === 'review'), so an
+      // ungated trail here handed them the edit history the Activity tab had just been
+      // taught to withhold. One capability, both places — see B-15.5.
+      //
+      // Every entry already carried who made it; only the Activity tab was showing it.
+      // "Ticket approved" without a name is the half of the record that does not settle
+      // an argument.
+      curAudit: t
+        ? (t.audit || []).slice().reverse()
+          .filter(a => curAuditDeep || auditKind(a) === 'lifecycle')
+          .map(a => ({
+            stamp: F.stamp(a.ts),
+            text: a.text,
+            by: a.by ? a.by : '',
+            kindLabel: auditKind(a) === 'edit' ? 'Edit' : 'Stage',
+            kindBg: auditKind(a) === 'edit' ? 'rgba(var(--warning-rgb),0.16)' : 'var(--accent-wash)',
+            kindFg: auditKind(a) === 'edit' ? 'var(--warning)' : 'var(--accent-ink)',
+          }))
+        : [],
+      curAuditScope: curAuditDeep
+        ? 'Every recorded change to this ticket'
+        : 'Job stages only',
+      curAuditEmpty: !t || !(t.audit || []).some(a => curAuditDeep || auditKind(a) === 'lifecycle'),
       sheets: SH.pages,
       // Surfaced on the print/preview screen when a ticket has more charged items or
       // job-log lines than fit the one-page cap (ITEM_ROW_CAP=24 / LOG_ROW_CAP=25,

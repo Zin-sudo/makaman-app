@@ -43,7 +43,7 @@
 | **Settings** | `localStorage` | `localStorage`, `user_settings` | Theme CSS, `fmt()` helpers | Every screen | ✅ Shipped | `clock`, `tabs` |
 | **Permissions** | `permissions`, `user_permissions`, `profiles` | `user_permissions` | Every new feature | Every capability gate in the app | ✅ Shipped and honoured — 11 gates converted, presentation stays role-based | `permissions`, `observer`, `roles` |
 | **Activity tab** | `audit_log` | — | Every feature that writes `audit_log` | Job log, Ops Review, Timestamp editing | ✅ Shipped | `audit` |
-| **Log-events container (Review)** | `audit_log` | — | Activity tab derivation | Ops Review | ⏳ Not built | — |
+| **Log-events container (Review)** | ticket `audit` | — | `activity.view_edits` — the Observer reaches this screen, so it is gated exactly as the Activity tab is | Ops Review, Activity tab | ✅ Shipped — gated, attributed, kind-labelled | `reviewlog` |
 | **Observer live view** | `tickets` | — | Presence badge, auto-sync | Activity tab | ✅ Shipped | `observer` |
 | **Number Reservation** | `numbering_series`, `tickets` | `numbering_series` | Ops Review actions, status changes | Ticket create, Ops Review | ⏳ Not built (local check only) | `numbering` |
 | **Signed Document Attachment** | `tickets`, `ticket_documents` | `ticket_documents`, Storage | Approval status | Ops Review, Archive, Observer | ⏳ Not built | `assets` (partial) |
