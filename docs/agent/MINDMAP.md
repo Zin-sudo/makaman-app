@@ -26,7 +26,7 @@
 | **Outbox** | ⚠️ Bounded | Coalescing localStorage queue. A refused op is retried 5× then set aside into `makaman.outbox.refused.v1` so it cannot freeze the queue (2026-08-26). Nothing surfaces set-aside ops in the UI yet. |
 | **Service Worker** | ⚠️ Basic | `sw.js` exists but minimal. No Background Sync API. No Push API. |
 | **Offline Storage** | ⚠️ `localStorage` | Simple `synced` boolean + queue. Not IndexedDB. |
-| **Permissions System** | 🟡 Foundation built | `permissions` (31 rows) + `user_permissions` live; `has_permission()` / `my_permissions()` in the DB, `hasPermission()` in the app, admin page in Account. **The 28 existing `S.role === 'x'` gates have not been converted yet**, so an override changes the screen and not the app. Migrations 0013–0015. |
+| **Permissions System** | ✅ Live and honoured | `permissions` (32 rows) + `user_permissions`; `has_permission()` / `my_permissions()` in the DB, `hasPermission()` in the app, admin page in Account. **11 capability gates converted; 18 presentation/routing comparisons kept as roles on purpose** (HANDOFF §2c). Migrations 0013–0016. |
 | **Feature Link Map** | ⚠️ Not documented | Cross-feature dependencies are tribal knowledge. Risk of orphaned changes. |
 | **Number Reservation** | ⚠️ Not built | "Take next from series" has no DB reservation. Risk of duplicate numbers. |
 
@@ -166,7 +166,7 @@ Zin-sudo/makaman-app/
 | P1.6 | **Notification schema + Supabase Realtime** — `notifications` table, RLS, Realtime channel | ⏳ Pending | 🔴 Critical | Claude Code |
 | P1.7 | **In-app notification bell + badge** — visible to all roles, unread count, click to list | ⏳ Pending | 🔴 Critical | Claude Code |
 | P1.8 | **Permissions system foundation** — `permissions` + `user_permissions` tables, `hasPermission()` helper, per-user overrides, admin page in Account | ✅ Done 2026-08-26 (migrations 0013–0015) | 🟡 High | Claude Code |
-| P1.8b | **Convert the 28 `S.role === 'x'` gates to `hasPermission()`** — until this lands, an override changes the Permissions screen and not the app | ⏳ Pending | 🔴 Critical to P1.8 being real | Claude Code |
+| P1.8b | **Convert the capability gates to `hasPermission()`** — 11 converted, 18 presentation/routing comparisons deliberately left as roles. Surfaced that `activity.view_all` was two capabilities; migration 0016 splits out `activity.view_edits` | ✅ Done 2026-08-26 | 🔴 Was critical to P1.8 being real | Claude Code |
 | P1.9 | **Number reservation system** — `numbering_series.reserved_by`, atomic reservation, auto-cleanup, release on cancel | ⏳ Pending | 🟡 High | Claude Code |
 
 **P1.1 — The 16 Prototype Edits (Port Queue):**

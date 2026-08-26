@@ -185,9 +185,57 @@ Regressions: `roles` 11, `approval` 12, `layout` 13, `tabs` 11, `claim` 23, `obs
 
 ---
 
+## 2c. THIS SESSION — P1.8b, THE GATES ACTUALLY READ THE REGISTRY
+
+**Eleven capability gates converted; eighteen role comparisons deliberately kept.**
+
+### The line between the two
+A role comparison that decides **what someone may do** became `hasPermission()`. One that
+decides **how the app is presented to them** stayed a role comparison, because it is not a
+capability and a permission toggle must never be able to break navigation.
+
+Converted: activity depth, who may put a number on a ticket, whose approved jobs a report
+covers, ticket read-only-ness, the numbering claim panel / transfer / override, promoting a
+user, deleting a user.
+
+Kept, on purpose: which page a role lands on (`showMgrPage`, `showAdminPage`,
+`showFounderPage`), whether the desk nav or the phone frame is used (`deskTabs`,
+`showDeskNav`), the identity flags (`isTech`/`isMgr`/`isAdmin`/`isFounder`), which toolbox
+Account offers, screen titles and labels, the technician's own geolocation loop, and the
+Observer's tool-custody detail. **Do not "finish the job" by converting these** — routing
+gated on a permission is a blank screen waiting to happen.
+
+### `readOnly` is not `ticket.edit_closed`
+The `locked` flag it feeds governs the technician's own job-log editing as well as the ops
+review. Gating it on `ticket.edit_closed` alone would have locked technicians out of their
+own logs. It is now "holds no ticket-writing capability at all" —
+`!hasPermission('ticket.log') && !hasPermission('ticket.edit_closed')` — which is false for
+a technician, false for the office, and true only for the Observer.
+
+### The conversion found a defect in the seed
+Zero behaviour change was the expected result, so the four observer failures were
+informative rather than annoying. `activity.view_all` had been seeded to include `founder`
+and used for the *edit* trail as well as for seeing every ticket — two capabilities under
+one name. The Observer reads the work, not the edit history or the tool-custody answers.
+Migration 0016 adds **`activity.view_edits`** (ops/admin only) and the gates now use it.
+
+This is the argument for doing the conversion at all: a registry seeded from role
+comparisons inherits their imprecision, and only pointing real gates at it exposes where.
+
+### Verification
+195 assertions across 12 suites, 0 failures: `roles` 11, `permissions` 25, `approval` 12,
+`claim` 23, `observer` 18, `office` 15, `office2` 12, `forced` 19, `techreport` 13,
+`audit` 9, `sync` 18, `layout` 13, `tabs` 11, `numbering` 18.
+
+The permissions suite no longer asserts a capability count — a magic number that goes stale
+on every addition. It asserts the invariant instead: two capabilities that differ for any
+one role must be two keys.
+
+---
+
 ## 3. NEXT TASK — the role-swap control
 
-P1.8 landed, so the three items that were waiting on it can proceed. In this order:
+P1.8 and P1.8b landed, so the items that were waiting on them can proceed. In this order:
 
 1. **Role-swap control (top right).** Admin/ops act as Technician and swap back. Swap the
    *session's* effective role, never the profile row — the profile is the record of who
@@ -199,12 +247,8 @@ P1.8 landed, so the three items that were waiting on it can proceed. In this ord
 3. **Admin/ops unrestricted ticket access** — the full A–Z technician flow on tickets they
    opened, gated on the `ticket.*` capabilities rather than role comparisons.
 
-**Then the migration of the existing gates.** The registry is in place and read by the
-Permissions screen, but the other twenty-eight role comparisons in `index.html` still ask
-`S.role === 'x'` directly. They are correct today because the defaults were seeded from
-them — but until they call `hasPermission()`, granting an exception changes what the
-Permissions screen says and not what the app does. Convert them subsystem by subsystem
-with a suite each, not in one sweep.
+The gate conversion is done (§2c). When adding a capability gate, call
+`hasPermission(key)`; when deciding presentation, a role comparison is still right.
 
 ### If blocked
 Stop and log it here rather than guessing:

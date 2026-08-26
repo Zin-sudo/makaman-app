@@ -188,6 +188,7 @@ npx serve app/
 | 2026-08-26 | Signup approval fixed: `profiles` is SELECT-only under RLS, so approvals now go through the `admin-actions` Edge Function (`adminAction()`); `profiles` removed from the outbox pair list; `outboxDrain()` retry bounded so a refused op cannot freeze the queue. New suite `app/approval.test.js` (12 assertions). | Claude Code |
 | 2026-08-26 | Skills registry updated: claude-mem accepted; ponytail, code-review and obsidian rejected with reasons. | User |
 | 2026-08-26 | Responsive theme v2 stored at `reference/makaman-responsive-theme-v2.css` — **not wired in**. Three blockers recorded in HANDOFF §5: a Google Fonts `@import` that breaks CONSTRAINTS §5, a `data-perm-*` vocabulary that does not match the permission registry, and a different accent palette. | User |
+| 2026-08-26 | **P1.8b — the gates now read the registry.** 11 capability gates converted to `hasPermission()`; 18 presentation/routing comparisons kept as roles deliberately. The conversion exposed that `activity.view_all` was two capabilities under one name — the Observer sees every ticket's stages but not the edit trail — so migration 0016 splits out `activity.view_edits`. 195 assertions across 12 suites, 0 failures. | Claude Code |
 | 2026-08-26 | **P1.8 permission registry** — `permissions` (31 capabilities) + `user_permissions`, `has_permission()` / `effective_permissions()` / `my_permissions()`, `hasPermission()` in the app, admin Permissions page in Account. Migrations 0013–0015. Security advisor caught two definer functions reachable by `anon`; 0015 scopes them. New suite `app/permissions.test.js` (23). BLINDSPOTS §15 added. **The 28 existing role comparisons are not yet converted — tracked as P1.8b.** | Claude Code |
 
 ---
@@ -215,7 +216,7 @@ npx serve app/
 - **If stuck >30 min:** Check if duplicating existing code. Check FEATURE_LINKS.md. Query Graphify.
 - **If breaking a constraint:** STOP. Log blocker. Do not proceed.
 - **If unsure about a decision:** Check MINDMAP.md Standing Decisions. Do not re-derive.
-- **Permissions:** the registry is live but the app's 28 `S.role === 'x'` gates still bypass it (P1.8b). Read `hasPermission(key)`, never compare roles, in anything new.
+- **Permissions:** live and honoured. Gate a **capability** with `hasPermission(key)`; a role comparison is still correct for **presentation and routing** (which page a role lands on, phone frame vs desk nav, screen titles). Converting those would let a permission toggle break navigation — see HANDOFF §2c.
 - **Price list context:** 2,610 items live. 110 rows have NULL unit_cost ("quoted separately"). App must display "Quoted Separately" not 0.00. Ten Waha code conflicts parked in backup table — do NOT invent numbers.
 
 ---

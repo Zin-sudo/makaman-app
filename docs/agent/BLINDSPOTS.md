@@ -915,6 +915,48 @@ controls. Joins the existing harness traps: `newPage()` shares storage with its 
 
 ---
 
+### B-15.5 🔵 A Capability Named Too Broadly Grants More Than It Says
+
+**Symptom:** Converting a role comparison to `hasPermission()` changes behaviour when it
+should not. Somebody can suddenly see or do something they could not before.
+**Root Cause:** The registry was seeded *from* the role comparisons, so it inherits their
+imprecision. `activity.view_all` was seeded to `ops_manager, admin, founder` and then used
+for two different gates — "see every ticket's activity" (Observer: yes) and "see the edit
+trail and tool custody" (Observer: **no**). Pointing the second gate at that key silently
+handed the Observer the edit history.
+**Why it is a security finding, not a UX one:** the failure direction is always *wider*.
+A key that is too coarse never denies something it should allow; it allows something it
+should deny, and does it quietly.
+**Prevention Rule:**
+- Before converting a gate, ask which roles it currently produces `true` for and compare
+  that to the key's `default_roles`. **If they differ for even one role, the key is wrong
+  for that gate** — split it rather than widening the role set.
+- One key per gate is safer than one key per noun. `activity.view_all` and
+  `activity.view_edits` are both about activity and are not the same capability.
+- Convert with the suites running. Zero behaviour change is the expected result, so any
+  failure is signal — do not "fix" it by loosening the permission.
+**Detection Method:**
+```bash
+# For each converted gate, the roles it used to be true for must equal the key's roles.
+# There is no grep for this; it is a reading. The suites are the real detector —
+# run the role-shaped ones (roles, observer, office, claim) after every conversion.
+```
+**Found:** 2026-08-26, by the observer suite, during P1.8b. Fixed in migration 0016.
+
+### B-15.6 ⚪ Gating Presentation on a Permission Makes a Blank Screen Possible
+**Symptom:** An admin revokes a capability and a user can no longer navigate — no page
+renders, or the wrong shell does.
+**Root Cause:** Treating every `S.role === 'x'` as a capability. Routing (`showMgrPage`,
+`showAdminPage`, `showFounderPage`), shell choice (`deskTabs`, `showDeskNav`), identity
+flags and screen titles are **not** capabilities. They decide how the app is presented to
+a role, and there is no sensible answer to "what if this is off".
+**Prevention Rule:** Convert a role comparison only when it answers *what may this person
+do*. If it answers *how does the app look to this person*, leave it. In this codebase the
+split is 11 converted, 18 kept — the kept ones are listed in HANDOFF §2c and should not be
+"finished".
+
+---
+
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*

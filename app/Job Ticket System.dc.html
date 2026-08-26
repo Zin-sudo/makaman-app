@@ -2263,7 +2263,10 @@ const PERMISSION_DEFAULTS = (function () {
       ['ticket.edit_closed', 'ticket.charge_items', 'ticket.reorder_items',
         'ticket.assign_number', 'ticket.approve', 'ticket.force_number',
         'ticket.approve_on_behalf', 'ticket.reopen', 'numbering.hold', 'numbering.transfer',
-        'user.approve_signup', 'user.create', 'pricelist.view', 'client.manage']],
+        'user.approve_signup', 'user.create', 'pricelist.view', 'client.manage',
+        // Seeing every ticket's activity and seeing the edit trail are different
+        // capabilities: the Observer holds the first and not the second.
+        'activity.view_edits']],
     [['admin'],
       ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.delete',
         'user.manage_permissions', 'pricelist.edit', 'jobtype.manage']],
@@ -4558,7 +4561,7 @@ class Component extends DCLogic {
       [(t.events || []).length, 'at least one job-log line'], [t.jobType, 'job type'],
     ].filter(pair => !pair[0]).map(pair => pair[1]);
     const closeReady = closeMissing.length === 0;
-    const deepActivity = S.role === 'mgr' || S.role === 'admin';
+    const deepActivity = this.hasPermission('activity.view_edits');
 
     // Every question needs an answer, or a written justification standing in for the
     // ones that have none. Nothing closes on silence.
@@ -4569,6 +4572,12 @@ class Component extends DCLogic {
     // Computed here rather than asked of the database per checkbox: the catalogue and
     // every exception are already in the replica, and the screen has to work offline
     // like everything else.
+    // Two ways the claim moves: its holder hands it on, or somebody with the override
+    // takes it — because the reason it usually needs moving is that the holder is not
+    // there to move it himself.
+    const claimMovable = this.hasPermission('numbering.override')
+      || (this.hasPermission('numbering.transfer') && this.holdsNumbering());
+
     const permCatalogue = D.permissions || [];
     const permOverrideMap = D.permissionOverrides || {};
     const overrideCount = Object.keys(permOverrideMap).length;
@@ -4633,7 +4642,7 @@ class Component extends DCLogic {
     // what stops two people issuing the same number onto two client sheets, which is the
     // one mistake here that cannot be corrected afterwards.
     const numberingBlock = (() => {
-      if (S.role !== 'mgr' && S.role !== 'admin') return 'Only the operations manager assigns ticket numbers.';
+      if (!this.hasPermission('ticket.assign_number')) return 'Only the operations manager assigns ticket numbers.';
       if (!this.holdsNumbering()) return (claim.holderName || 'Another manager') + ' holds the numbering claim. Ask them to hand it over before assigning.';
       if (!S.online) return 'Connect to the internet first — offline this device cannot see numbers taken on tickets it has not received yet.';
       return '';
@@ -4677,7 +4686,7 @@ class Component extends DCLogic {
     // A technician sees only jobs they were on the crew of — the same rule their ticket
     // list uses, so a job they opened and handed over is still theirs to print, and both
     // names are already on the sheet. Everyone else sees every approved job.
-    const reportBase = S.role === 'tech'
+    const reportBase = !this.hasPermission('report.all_technicians')
       ? approved.filter(x => inCrew(x, myName, myEmail))
       : approved;
 
@@ -4726,7 +4735,7 @@ class Component extends DCLogic {
     // read-only copy of it — one screen, one place for the position panel to live. Their
     // read-only-ness is folded into the same flag that seals an approved ticket, so every
     // field, item row, drag handle and remove button it already governs is covered.
-    const readOnly = S.role === 'founder';
+    const readOnly = !this.hasPermission('ticket.log') && !this.hasPermission('ticket.edit_closed');
     const locked = readOnly || !!(t && t.status === 'approved');
 
     // Sheet ordering rank for a charged line. Transportation is the standing first line
@@ -4822,7 +4831,7 @@ class Component extends DCLogic {
     };
     // An Admin moving a claim they do not hold is an override, and reads differently to
     // the holder passing it on deliberately.
-    const adminOverridingClaim = S.role === 'admin' && !this.holdsNumbering()
+    const adminOverridingClaim = this.hasPermission('numbering.override') && !this.holdsNumbering()
       && !!(D.numbering || {}).holderName;
     const commitTicketNo = fieldCommit('ticketNo', 'Ticket No.');
     const commitMileage = fieldCommit('mileage', 'Mileage');
@@ -5207,7 +5216,7 @@ class Component extends DCLogic {
         // The office reads everything. The field and the Observer read job stages only —
         // not the edits behind them, and not tool custody, which is an internal matter
         // between the office and the technician who signed for the kit.
-        const deep = S.role === 'mgr' || S.role === 'admin';
+        const deep = this.hasPermission('activity.view_edits');
         const want = S.activityKind || 'all';
         return D.tickets
           .reduce((acc, x) => acc.concat((x.audit || []).map(a => ({
@@ -5994,7 +6003,7 @@ class Component extends DCLogic {
       // it, and an Admin — because the reason it usually needs moving is that the holder
       // is not there to move it himself, and a claim that can only be released by the
       // person who is unreachable is a claim that strands the whole office.
-      showClaimPanel: (S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'account',
+      showClaimPanel: this.hasPermission('numbering.hold') && S.roleTab === 'account',
       claimHolderName: (D.numbering || {}).holderName
         ? ((D.numbering || {}).holderName + (this.holdsNumbering() ? ' — you' : ''))
         : 'Nobody holds the claim',
@@ -6008,14 +6017,14 @@ class Component extends DCLogic {
         return (last.admin ? 'Moved by Admin ' + last.by : 'Handed over by ' + last.from)
           + ' → ' + last.to + ' · ' + F.stamp(last.ts);
       })(),
-      claimCanTransfer: S.role === 'admin' || (S.role === 'mgr' && this.holdsNumbering()),
-      claimCannotTransfer: !(S.role === 'admin' || (S.role === 'mgr' && this.holdsNumbering())),
+      claimCanTransfer: claimMovable,
+      claimCannotTransfer: !claimMovable,
       claimCannotText: ((D.numbering || {}).holderName || 'Another manager')
         + ' holds it. Ask them to hand it over, or ask an Admin to move it if they are not available.',
       claimTransferLabel: this.holdsNumbering() ? 'Hand over the claim' : 'Move the claim',
       // An Admin taking it off someone is a different act from a holder passing it on,
       // and the trail should be able to tell them apart afterwards.
-      claimAdminOverride: S.role === 'admin' && !this.holdsNumbering() && !!(D.numbering || {}).holderName,
+      claimAdminOverride: this.hasPermission('numbering.override') && !this.holdsNumbering() && !!(D.numbering || {}).holderName,
       claimAdminOverrideText: 'You are moving this on behalf of '
         + ((D.numbering || {}).holderName || 'the holder')
         + ', who is not the one asking. It is recorded as an Admin override.',
@@ -6390,7 +6399,7 @@ class Component extends DCLogic {
             .then(() => this.toast('approve:' + u.email, u.name + ' can now sign in.', 'ok'))
             .catch(err => this.toast('approve:' + u.email, err.message, 'warn'));
         },
-        showPromote: S.role === 'admin' && u.status !== 'pending',
+        showPromote: this.hasPermission('user.change_role') && u.status !== 'pending',
         promoteDisabled: u.email === (S.session && S.session.email),
         // Must be a value the dropdown actually offers. An Observer's 'founder' key
         // had no matching option, so the browser fell back to displaying the first
@@ -6417,7 +6426,7 @@ class Component extends DCLogic {
         // Admin can delete anyone — including other admins — except the one seeded
         // "master" admin account (lateri@makaman.ly), which is permanently undeletable
         // by design, not merely by convention.
-        canDelete: S.role === 'admin' && u.email !== MASTER_ADMIN_EMAIL,
+        canDelete: this.hasPermission('user.delete') && u.email !== MASTER_ADMIN_EMAIL,
         delete: () => this.setState({ dialog: 'deleteUser', deleteUserEmail: u.email, deleteUserName: u.name }),
         };
       }),

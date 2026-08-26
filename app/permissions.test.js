@@ -63,12 +63,26 @@ const login = async (p, email) => {
         catN: fn.cat.length,
         adminOnly: Object.keys(fn.defs).filter(k => fn.defs[k].length === 1 && fn.defs[k][0] === 'admin'),
         techHas: Object.keys(fn.defs).filter(k => fn.defs[k].indexOf('tech') >= 0),
+        viewAll: fn.defs['activity.view_all'],
+        viewEdits: fn.defs['activity.view_edits'],
         levels: fn.cat.reduce((a, r) => { a[r.level] = (a[r.level] || 0) + 1; return a; }, {}),
         categories: Array.from(new Set(fn.cat.map(r => r.category))).sort(),
         rolesAreDbSpelling: fn.cat.every(r => r.defaultRoles.every(x => ['technician','ops_manager','admin','founder'].indexOf(x) >= 0)),
       };
     });
-    check('the registry has 31 capabilities', cat.n === 31, 'got ' + cat.n);
+    // Deliberately not a magic number — the registry grows. What must hold is that it is
+    // populated and that the two sides of it agree.
+    check('the registry is populated', cat.n >= 30, 'got ' + cat.n);
+    // The lesson from converting the activity gates: two capabilities that differ for
+    // any one role must be two keys. Seeing every ticket's stages and seeing the edit
+    // trail differ for the Observer, so they cannot share a row.
+    check('seeing all activity and seeing edits are separate capabilities',
+      cat.techHas.indexOf('activity.view_all') < 0
+      && JSON.stringify(cat.viewAll) !== JSON.stringify(cat.viewEdits),
+      'view_all: ' + (cat.viewAll || []).join('+') + '  view_edits: ' + (cat.viewEdits || []).join('+'));
+    check('the Observer reads the work but not the edit trail',
+      (cat.viewAll || []).indexOf('founder') >= 0 && (cat.viewEdits || []).indexOf('founder') < 0,
+      'view_edits: ' + (cat.viewEdits || []).join('+'));
     check('the demo catalogue covers all of them', cat.catN === cat.n, cat.catN + ' vs ' + cat.n);
     check('a technician holds only routine work', cat.techHas.length === 6, cat.techHas.join(', '));
     check('changing a role and managing permissions are admin-only',
