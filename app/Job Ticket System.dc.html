@@ -4659,6 +4659,11 @@ class Component extends DCLogic {
   // they are driven by the same constants, which is the property that stops them drifting.
   sheetGeometry() { return SHEET; }
 
+  // Hydration, reachable so a failure can be read rather than inferred from an empty
+  // screen. cloud.test.js spent two sessions looking half-alive because the only symptom
+  // of a broken hydrate was state that stayed at its defaults.
+  hydrateForTest() { return hydrate(); }
+
   // Reachable so the shed can be tested for what it must NOT drop. Asserting that it
   // frees something is easy; asserting that it never touches the tickets or the outbox is
   // the part that matters, and that needs to call the real function.

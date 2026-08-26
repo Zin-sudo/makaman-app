@@ -858,7 +858,7 @@ The "recommended time" is not advice. It is the gate.
 
 | # | What is incomplete | Where | Close in | Blocked on |
 |---|---|---|---|---|
-| S1 | `cloud.test.js` hydration lands nothing; the PASS lines before the crash are vacuous. Only suite covering cloud mode, the offline queue and write coalescing. | `app/cloud.test.js` | **Before Tier 5** | — |
+| ~~S1~~ | ~~`cloud.test.js` hydration lands nothing~~ — **closed 2026-08-26. 30/30, and the vacuous passes are now real.** Three faults stacked: the stub had no `rpc` (permission-registry drift), then returned an object where `my_permissions()` is declared `returns table` so hydrate reduced over a non-array, and finally a backtick in one of my own comments truncated the injected template literal. A guard now parses the stub before a browser opens. | `app/cloud.test.js` | ~~before Tier 5~~ | — |
 | S2 | Waha price-list conflicts (10 rows) parked in `backup.price_list_conflicts_20260820`. Never invent codes, average prices, or drop rows. | database | Tier 3 | **user** |
 | S3 | Seeded Admin password appeared in a chat transcript and is unrotated. | Supabase dashboard | Tier 3 | **user** |
 | S4 | Supabase leaked-password protection is OFF. | Supabase dashboard | Tier 3 | **user** |
@@ -875,7 +875,7 @@ The "recommended time" is not advice. It is the gate.
 | S14 | "Apper" skill. | — | Tier 7 | — |
 
 ### Baseline — full sweep, 2026-08-26
-**34 of 35 suites green. One red: `cloud.test.js` (S1).** Every other suite passes, so the
+**All suites green.** `cloud.test.js` (S1) was the one red and is now 30/30. Every other suite passes, so the
 register above is the complete list of what is outstanding, not a sample of it.
 
 Re-run the sweep before closing any tier — it takes about twelve minutes and it is the only

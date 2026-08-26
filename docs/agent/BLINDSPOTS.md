@@ -1384,3 +1384,30 @@ loss, which is the exact failure the surrounding code exists to prevent.
 grep -n -B6 "catch (e) { /\* quota \*/ }" app/index.html
 # More than one statement that can throw inside the try → narrow it.
 ```
+
+### B-19.6 🔴 A fake client that quietly stops keeping up
+**Symptom:** `cloud.test.js` prints PASS for several assertions, then dies. The passes are
+vacuous — they read seeded defaults, because hydration never landed.
+**Root Cause:** Three faults, each hiding the next.
+1. The stub had no `rpc` at all, while hydrate calls `c.rpc('my_permissions')` — added by
+   the permission registry after the stub was written.
+2. Given an `rpc`, it returned `{}`. `my_permissions()` is declared
+   `returns table (permission_id, granted, source)`, so supabase-js yields an **array**;
+   `(myPerms || []).reduce` on an object throws, and `{}` is truthy so the `|| []` guard
+   never fires.
+3. A backtick inside a comment in the stub's own template literal truncated the injected
+   string, leaving the page with no `window.supabase` at all.
+Each failure produced the same symptom — empty state — so fixing one revealed the next.
+**Prevention Rule:**
+- A hand-written fake MUST fail loudly when the app grows a call it does not implement.
+  Returning `undefined` makes the suite lie rather than fail.
+- Match the **declared** shape. `returns table` is an array of rows, not a map.
+- Never put a backtick inside a template literal that is injected as source. Assert the
+  generated string parses **before** launching a browser — `cloud.test.js` now does.
+- When a suite's setup fails, later assertions read defaults. Assert the fixture arrived
+  first, and stop if it did not (B-19.4).
+**Detection Method:**
+```bash
+cd app && node -e "…build STUB(DB)…" && node --check /tmp/stub.js
+# The suite now does this itself and exits 1 with one line if the stub will not parse.
+```

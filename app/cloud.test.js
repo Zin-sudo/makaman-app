@@ -75,6 +75,21 @@ window.supabase = {
           var filtered = rows.slice();
           var chain = {
             eq: function (col, val) { filtered = filtered.filter(function (r) { return r[col] === val; }); return chain; },
+            // The app orders and limits the export_runs lookup. Both are called
+            // synchronously while the Promise.all array is being built, so a missing one
+            // is not a failed query — it throws before a single request is made, and
+            // hydrate() never runs. That is what left this whole suite reading seeded
+            // defaults while printing PASS.
+            order: function (col, opts) {
+              var asc = !(opts && opts.ascending === false);
+              filtered = filtered.slice().sort(function (a, b) {
+                var x = a[col], y = b[col];
+                if (x === y) return 0;
+                return (x > y ? 1 : -1) * (asc ? 1 : -1);
+              });
+              return chain;
+            },
+            limit: function (n) { filtered = filtered.slice(0, n); return chain; },
             single: function () {
               if (window.__offline) return fail();
               return Promise.resolve(filtered.length
@@ -85,7 +100,16 @@ window.supabase = {
               return (window.__offline ? fail() : Promise.resolve({ data: filtered, error: null })).then(ok, no);
             },
           };
-          return chain;
+              // Anything the app calls that this stub has not learned yet is named out loud.
+          // Twice now a method was added to hydrate() -- rpc, then order/limit -- and the
+          // stub answered undefined, which threw somewhere unhelpful and left the suite
+          // looking half-alive. A stub that cannot keep up should say so.
+          return new Proxy(chain, {
+            get: function (target, prop) {
+              if (prop in target || typeof prop === 'symbol') return target[prop];
+              throw new Error('cloud.test.js stub has no .' + String(prop) + '() — the app has grown a call this fake client does not implement');
+            },
+          });
         },
         upsert: function (row, opts) {
           if (window.__offline) return fail();
@@ -122,9 +146,14 @@ window.supabase = {
       // asks of it, or it stops testing and starts reassuring.
       rpc: function () {
         if (window.__offline) return fail();
-        // Empty map: hasPermission() then falls back to the role defaults, which is what
-        // this suite is about anyway. permissions.test.js covers the registry itself.
-        return Promise.resolve({ data: {}, error: null });
+        // my_permissions() is declared "returns table (permission_id, granted, source)",
+        // so supabase-js hands back an ARRAY of rows — hydrate() reduces over it. An
+        // object here is truthy, so the "|| []" guard does not catch it and the reduce
+        // throws, taking the whole Promise.all down with it. Empty is the honest answer
+        // for a person with no explicit exceptions: hasPermission() then falls back to
+        // the role defaults, which is what this suite is about. permissions.test.js
+        // covers the registry itself.
+        return Promise.resolve({ data: [], error: null });
       },
       auth: {
         signInWithPassword: function (c) {
@@ -141,6 +170,23 @@ window.supabase = {
     };
   },
 };`;
+
+// The stub is a template literal injected into the page, so a stray backtick inside it
+// silently truncates the whole thing. When that happened the page had no window.supabase,
+// hydrate() answered "No server configured", state stayed at its seeded defaults, and this
+// suite went on printing PASS against them — which is how it looked half-alive for two
+// sessions. Parsing it here turns that into one loud line before a browser is even opened.
+(function assertStubParses() {
+  const out = STUB(DB);
+  if (/`/.test(out)) {
+    console.error('  FATAL  the injected stub contains a backtick, which truncates it');
+    process.exit(1);
+  }
+  try { new Function(out); } catch (e) {
+    console.error('  FATAL  the injected stub does not parse: ' + e.message);
+    process.exit(1);
+  }
+})();
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
