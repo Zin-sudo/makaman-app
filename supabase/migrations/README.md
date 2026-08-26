@@ -41,6 +41,7 @@ select statements[1] from supabase_migrations.schema_migrations where version = 
 | 17 | `price_list_allow_quoted_separately` | `0012_price_list_reimport.sql` — *the `unit_cost` nullable change* |
 | 18 | `drop_price_list_staging_after_reimport` | — *transient* |
 | 19–31 | `0013…0025` | one file each, same names |
+| 32–34 | `0026…0028` | one file each. 0026 is partly superseded by 0027 and 0028 the same day — read all three together. |
 
 The row data loaded by #14–#18 is **not** in this directory. It lives in
 `supabase/makaman_price_lists_final.sql`, which is the runnable copy of exactly what was

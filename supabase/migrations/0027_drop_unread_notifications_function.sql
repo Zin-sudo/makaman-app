@@ -1,0 +1,13 @@
+-- 20260826 · 0027_drop_unread_notifications_function   [APPLIED]
+--
+-- Retires unread_notifications(), added an hour earlier in 0026.
+--
+-- It was redundant the moment it was written, and I did not notice until wiring the
+-- client. hydrate() already folds audit_log into each ticket's own audit array, narrowed
+-- by the same RLS the function relied on — so the app holds every entry it may see before
+-- the function is ever called. Keeping it would mean two definitions of "unread", one in
+-- SQL and one in JavaScript, free to disagree about what counts.
+--
+-- That is the same duplication 0026 rejected when it declined to build a notifications
+-- table. Declining it there and building it here would have been inconsistent.
+drop function if exists public.unread_notifications();

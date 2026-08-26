@@ -536,6 +536,12 @@
       <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning);border:1px solid var(--warning);white-space:nowrap">{{ swapBackLabel }}</button>
     </sc-if>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:13px">
+      <button onClick="{{ toggleNotifications }}" title="{{ notifyTitle }}" style="position:relative;flex:none;padding:5px 8px;margin-inline-end:4px;cursor:pointer;background:transparent;border:1px solid rgba(var(--on-navbar-rgb),0.22);color:inherit;line-height:1">
+        <span style="font-size:15px">{{ notifyGlyph }}</span>
+        <sc-if value="{{ notifyAny }}" hint-placeholder-val="{{ false }}">
+          <span style="position:absolute;top:-6px;inset-inline-end:-6px;min-width:17px;height:17px;padding:0 4px;font-size:10px;font-weight:700;line-height:17px;text-align:center;background:var(--danger);color:var(--on-accent);border-radius:9px">{{ notifyCount }}</span>
+        </sc-if>
+      </button>
       <span class="mk-nav-name" style="font-weight:600">{{ sessionName }}</span>
       <span class="mk-nav-role" style="opacity:0.6;text-transform:uppercase;font-size:11px;letter-spacing:0.05em">{{ currentRoleLabel }}</span>
     </div>
@@ -562,6 +568,30 @@
       <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--warning)"></span>
       <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>{{ refusedLabel }}</strong> {{ refusedWhy }}</div>
       <button onClick="{{ dismissRefused }}" style="flex:none;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.35)">DISMISS</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showNotifications }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:48;background:rgba(0,0,0,0.35)" onClick="{{ closeNotifications }}"></div>
+    <div style="position:fixed;top:58px;inset-inline-end:14px;z-index:49;width:min(420px,calc(100vw - 28px));max-height:min(70vh,560px);overflow-y:auto;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.2);box-shadow:0 10px 34px rgba(0,0,0,0.32)">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(var(--ink-rgb),0.12)">
+        <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.02em">{{ notifyHeading }}</div>
+        <sc-if value="{{ notifyAny }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ markNotificationsRead }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">MARK ALL READ</button>
+        </sc-if>
+      </div>
+      <sc-if value="{{ notifyNone }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:22px 14px;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.6)">Nothing new since you last looked.</div>
+      </sc-if>
+      <sc-for list="{{ notifyRows }}" as="n" hint-placeholder-count="3">
+        <button onClick="{{ n.open }}" style="width:100%;display:flex;gap:10px;padding:11px 14px;text-align:start;cursor:pointer;background:transparent;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+          <span style="width:3px;flex:none;background:{{ n.edge }}"></span>
+          <span style="flex:1;min-width:0">
+            <span style="display:block;font-size:13px;line-height:1.4;color:var(--ink-strong)">{{ n.text }}</span>
+            <span style="display:block;font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:3px">{{ n.where }} · {{ n.stamp }}</span>
+          </span>
+        </button>
+      </sc-for>
     </div>
   </sc-if>
 
@@ -2710,6 +2740,7 @@ function hydrate() {
       // no control behind it — a setting nobody can set is a bug waiting to be found.
       settings: {
         theme: mySettings.theme || 'system',
+        notificationsReadAt: mySettings.notifications_read_at || '',
         timeFormat: mySettings.hour12 ? '12' : '24',
         shareLocation: !!mySettings.share_location,
       },
@@ -3043,6 +3074,10 @@ function diffOps(before, after) {
       // cannot drift away from the one the app actually formats with.
       timezone: OPERATING_TZ,
       hour12: (after.settings || {}).timeFormat === '12',
+      // Null rather than '' when nothing has been read yet: the column is timestamptz and
+      // an empty string is not one. A refused write jams the head of the outbox, which is
+      // how signup approval broke earlier in this project.
+      notifications_read_at: (after.settings || {}).notificationsReadAt || null,
       share_location: !!(after.settings || {}).shareLocation, updated_at: new Date().toISOString() } });
   }
   return ops;
@@ -3439,7 +3474,7 @@ function seed() {
       // Libya time by default, not the device's. Every operation is at the Ahmadi base,
       // and the payroll month rule keys off the job end date — so a technician whose
       // phone is on the wrong zone must not be able to move a ticket into another month.
-      theme: 'dark', timeFormat: '24', shareLocation: true,
+      theme: 'dark', timeFormat: '24', shareLocation: true, notificationsReadAt: '',
       // Ops Manager storage linking — local download always works with no account; the
       // Ops Manager can additionally connect OneDrive and/or Google Drive to upload
       // exported sheets straight there instead of only saving to the device. This is a
@@ -4657,6 +4692,51 @@ class Component extends DCLogic {
   // The sheet's geometry, reachable from a test. Both renderers scale from these numbers,
   // so a test that cannot read them can only check that the two look similar — not that
   // they are driven by the same constants, which is the property that stops them drifting.
+  // Every audit entry this person is allowed to read, newest first.
+  //
+  // One reducer, not two. The Activity tab and the notification bell are the same
+  // question asked with different filters — "what has happened" and "what has happened
+  // that I have not seen" — and a second copy of the assembly would be free to disagree
+  // with the first about what an entry says or who may read it. The permission gate lives
+  // here, once: the office reads everything, the field and the Observer read job stages
+  // only.
+  activityEntries() {
+    const S = this.state, D = this.state.data, F = this.fmt();
+    const deep = this.hasPermission('activity.view_edits');
+    return (D.tickets || [])
+      .reduce((acc, x) => acc.concat((x.audit || []).map((a) => ({
+        ts: a.ts,
+        by: a.by || '',
+        kind: auditKind(a),
+        text: a.text,
+        stamp: F.stamp(a.ts),
+        where: (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
+        edge: this.cardTreatment(x).edge,
+        open: () => this.setState(S.role === 'tech'
+          ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
+          : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
+      }))), [])
+      .filter((a) => deep || a.kind === 'lifecycle')
+      .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  }
+
+  // What this person has not read yet.
+  //
+  // Derived, never stored. A notification is an audit entry you have not seen, so the
+  // only thing worth keeping is how far you have read — everything else is already in the
+  // trail. A notifications table fanned out by a trigger would be a second copy of a
+  // truth that already exists, and this project has been bitten more than once by two
+  // records of one fact drifting apart quietly.
+  //
+  // Your own actions are excluded. Nobody needs telling what they just did.
+  unreadEntries() {
+    const readAt = ((this.state.data || {}).settings || {}).notificationsReadAt || '';
+    const me = (this.state.session && this.state.session.name) || '';
+    const since = readAt ? new Date(readAt).getTime() : 0;
+    return this.activityEntries().filter((a) =>
+      a.by !== me && new Date(a.ts).getTime() > since);
+  }
+
   sheetGeometry() { return SHEET; }
 
   // Hydration, reachable so a failure can be read rather than inferred from an empty
@@ -6069,25 +6149,9 @@ class Component extends DCLogic {
       // office also sees who changed what. Someone's pay is computed from these
       // tickets, so who altered a figure is the office's business, not the crew's.
       activityFeed: (() => {
-        // The office reads everything. The field and the Observer read job stages only —
-        // not the edits behind them, and not tool custody, which is an internal matter
-        // between the office and the technician who signed for the kit.
-        const deep = this.hasPermission('activity.view_edits');
         const want = S.activityKind || 'all';
-        return D.tickets
-          .reduce((acc, x) => acc.concat((x.audit || []).map(a => ({
-            ts: a.ts,
-            kind: auditKind(a),
-            text: a.text,
-            stamp: F.stamp(a.ts),
-            where: (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
-            edge: this.cardTreatment(x).edge,
-            open: () => this.setState(S.role === 'tech'
-              ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
-              : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
-          }))), [])
-          .filter(a => (deep || a.kind === 'lifecycle') && (want === 'all' || a.kind === want))
-          .sort((a, b) => new Date(b.ts) - new Date(a.ts))
+        return this.activityEntries()
+          .filter(a => want === 'all' || a.kind === want)
           .slice(0, 60);
       })(),
       hasActivity: D.tickets.some(x => (x.audit || []).some(a => deepActivity || auditKind(a) === 'lifecycle')),
@@ -6299,6 +6363,34 @@ class Component extends DCLogic {
       dismissRefused: () => {
         try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
         this.setState({ refusedDismissed: true });
+      },
+
+      // Notifications. Derived from the audit trail on every render rather than stored,
+      // so there is never a count that disagrees with the list beneath it.
+      notifyGlyph: '\u25C9',
+      notifyCount: (() => { const n = this.unreadEntries().length; return n > 99 ? '99+' : String(n); })(),
+      notifyAny: this.unreadEntries().length > 0,
+      notifyNone: this.unreadEntries().length === 0,
+      notifyTitle: (() => {
+        const n = this.unreadEntries().length;
+        return n === 0 ? 'Nothing new' : n === 1 ? '1 thing you have not seen' : n + ' things you have not seen';
+      })(),
+      notifyHeading: (() => {
+        const n = this.unreadEntries().length;
+        return n === 0 ? 'Up to date' : n === 1 ? '1 unread' : n + ' unread';
+      })(),
+      notifyRows: this.unreadEntries().slice(0, 40).map((a) => ({
+        text: a.text, where: a.where, stamp: a.stamp, edge: a.edge,
+        open: () => { this.setState({ showNotifications: false }); a.open(); },
+      })),
+      showNotifications: !!S.showNotifications,
+      toggleNotifications: () => this.setState({ showNotifications: !S.showNotifications }),
+      closeNotifications: () => this.setState({ showNotifications: false }),
+      // Marking read moves one timestamp. Nothing is deleted, so the Activity tab still
+      // shows everything — being read is not the same as being over.
+      markNotificationsRead: () => {
+        this.updateSettings({ notificationsReadAt: iso(new Date()) });
+        this.setState({ showNotifications: false });
       },
 
       storageFull: !!S.storageFull,
