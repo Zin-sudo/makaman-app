@@ -853,6 +853,68 @@ HANDOFF §1.3.
 
 ---
 
+## 15. PERMISSION REGISTRY (added 2026-08-26)
+
+### B-15.1 🔵 [FIXED] A Definer Function Taking Someone Else's Id Is Reachable by `anon`
+**Symptom:** None visible. `POST /rest/v1/rpc/has_permission` with any user id, no
+Authorization header, answers truthfully.
+**Root Cause:** `SECURITY DEFINER` plus a uuid argument plus Postgres's default `EXECUTE`
+grant to `public`. RLS protects tables, not functions — a definer function is a hole
+straight through it, and adding one is easy to do without noticing.
+**Prevention Rule:**
+- After creating **any** definer function, run the security advisor. Do not skip it
+  because "the tables have RLS".
+- `revoke execute ... from anon, public`, then grant only what is needed.
+- A function that takes a subject id must also *check* the caller may ask about that
+  subject. Restricting who can call it is not the same as restricting what they can ask.
+- Prefer a no-argument, self-scoped variant for what the app actually calls
+  (`my_permissions()`), so the call site has nothing to point wrongly.
+**Detection Method:**
+```bash
+# In an agent session, via the Supabase MCP:
+#   get_advisors(type='security')
+# Any anon_security_definer_function_executable lint → FAIL
+```
+**Fixed:** migration 0015.
+
+### B-15.2 🟡 A Registry Nothing Reads Is Decoration
+**Symptom:** An admin grants someone a capability. The screen shows the exception. The app
+behaves exactly as before.
+**Root Cause:** The permission tables, the helper and the admin page can all be correct
+while every actual gate still asks `S.role === 'admin'`. The registry then describes
+intent, not behaviour — and the screen is actively misleading, because it implies a change
+that did not happen.
+**Prevention Rule:**
+- A permission is not "built" until a gate reads it. Ship the registry and the conversion
+  of at least one real gate together, or state plainly in HANDOFF which gates are still
+  role-based.
+- When converting, do it subsystem by subsystem with a suite each. A single sweep over
+  twenty-eight call sites cannot be reviewed.
+**Status:** Open and documented — the Permissions screen gates itself through
+`hasPermission()`; the other twenty-eight comparisons are tracked as P1.8b.
+
+### B-15.3 ⚪ A Toggle That Stores the Answer the Role Already Gives
+**Symptom:** "0 exceptions" becomes "1 exception" after a toggle that changed nothing.
+**Root Cause:** Writing an override row whenever a control is touched, without comparing
+the new value to what the role would say. The count then measures clicks, not exceptions.
+**Prevention Rule:** An override equal to the default is a **delete**, not an upsert.
+Anything that counts "exceptions" must count differences from the default, not rows.
+**Fixed:** `setPermissionOverride()` deletes when the new value matches the role default.
+Covered by `app/permissions.test.js`.
+
+### B-15.4 ⚪ Playwright Clicking "the first button that says Yes"
+**Symptom:** A test fails and blames the app. The app was right; the test clicked a
+different row.
+**Root Cause:** On a screen of repeated rows, `find(b => /^Yes$/.test(b.textContent))`
+picks whichever row sorts first — not the one the test just acted on. An earlier version of
+`permissions.test.js` toggled `report.generate` and asserted about `ticket.approve`.
+**Prevention Rule:** On repeated rows, locate by the row's own label and take the button
+*within* that row (`:scope > button`). Never index into a global list of identical
+controls. Joins the existing harness traps: `newPage()` shares storage with its context,
+`innerText` applies `text-transform`, and input *values* never appear in `innerText`.
+
+---
+
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*

@@ -26,7 +26,7 @@
 | **Outbox** | ⚠️ Bounded | Coalescing localStorage queue. A refused op is retried 5× then set aside into `makaman.outbox.refused.v1` so it cannot freeze the queue (2026-08-26). Nothing surfaces set-aside ops in the UI yet. |
 | **Service Worker** | ⚠️ Basic | `sw.js` exists but minimal. No Background Sync API. No Push API. |
 | **Offline Storage** | ⚠️ `localStorage` | Simple `synced` boolean + queue. Not IndexedDB. |
-| **Permissions System** | ⚠️ Not built | No `permissions` table. No per-user overrides. No `data-perm-*` attributes. |
+| **Permissions System** | 🟡 Foundation built | `permissions` (31 rows) + `user_permissions` live; `has_permission()` / `my_permissions()` in the DB, `hasPermission()` in the app, admin page in Account. **The 28 existing `S.role === 'x'` gates have not been converted yet**, so an override changes the screen and not the app. Migrations 0013–0015. |
 | **Feature Link Map** | ⚠️ Not documented | Cross-feature dependencies are tribal knowledge. Risk of orphaned changes. |
 | **Number Reservation** | ⚠️ Not built | "Take next from series" has no DB reservation. Risk of duplicate numbers. |
 
@@ -39,7 +39,7 @@
 | **Notifications System** | 🔴 Critical | P1.6–P1.7 |
 | **Notes System (Observer follow-ups)** | 🔴 Critical | P2.6 |
 | **Drag-and-Drop Item Reordering** | 🟡 High | P2.0 |
-| **Permissions System + Per-User Overrides** | 🟡 High | P1.8 |
+| ~~**Permissions System + Per-User Overrides**~~ | ✅ Foundation done | P1.8 — schema, helpers and admin page shipped 2026-08-26; converting the existing role gates is the remaining work |
 | **Number Reservation / Sequence Tracking** | 🟡 High | P1.9 |
 | **IndexedDB + Migration** | 🟡 High | P1.3 |
 | **Background Sync API** | 🟡 High | P1.4 |
@@ -165,7 +165,8 @@ Zin-sudo/makaman-app/
 | P1.5 | PWA installability verified — Add to Home Screen, dark splash | ⏳ Pending | 🟡 Medium | User test |
 | P1.6 | **Notification schema + Supabase Realtime** — `notifications` table, RLS, Realtime channel | ⏳ Pending | 🔴 Critical | Claude Code |
 | P1.7 | **In-app notification bell + badge** — visible to all roles, unread count, click to list | ⏳ Pending | 🔴 Critical | Claude Code |
-| P1.8 | **Permissions system foundation** — `permissions` + `user_permissions` tables, `hasPermission()` helper, `data-perm-*` CSS, per-user overrides | ⏳ Pending | 🟡 High | Claude Code |
+| P1.8 | **Permissions system foundation** — `permissions` + `user_permissions` tables, `hasPermission()` helper, per-user overrides, admin page in Account | ✅ Done 2026-08-26 (migrations 0013–0015) | 🟡 High | Claude Code |
+| P1.8b | **Convert the 28 `S.role === 'x'` gates to `hasPermission()`** — until this lands, an override changes the Permissions screen and not the app | ⏳ Pending | 🔴 Critical to P1.8 being real | Claude Code |
 | P1.9 | **Number reservation system** — `numbering_series.reserved_by`, atomic reservation, auto-cleanup, release on cancel | ⏳ Pending | 🟡 High | Claude Code |
 
 **P1.1 — The 16 Prototype Edits (Port Queue):**

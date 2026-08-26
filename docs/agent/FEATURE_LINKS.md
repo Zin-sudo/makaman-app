@@ -41,7 +41,7 @@
 | **Notifications** | `tickets`, `push_subscriptions` | `notifications` | Job Done, Approve, Note add | Ticket create, Ops Review, Notes, SW | ⏳ Not built | — |
 | **Notes** | `tickets` | `ticket_notes`, `notifications` | Approve status (approved only) | Ops Review, Notifications, Activity | ⏳ Not built | — |
 | **Settings** | `localStorage` | `localStorage`, `user_settings` | Theme CSS, `fmt()` helpers | Every screen | ✅ Shipped | `clock`, `tabs` |
-| **Permissions** | `permissions`, `user_permissions`, `profiles` | `audit_log` | Every new feature | Every feature (gates access) | ⏳ **Not built — NEXT TASK (P1.8)** | — |
+| **Permissions** | `permissions`, `user_permissions`, `profiles` | `user_permissions` | Every new feature | Every feature (gates access) | 🟡 Foundation shipped; 28 role gates not yet converted | `permissions` |
 | **Activity tab** | `audit_log` | — | Every feature that writes `audit_log` | Job log, Ops Review, Timestamp editing | ✅ Shipped | `audit` |
 | **Log-events container (Review)** | `audit_log` | — | Activity tab derivation | Ops Review | ⏳ Not built | — |
 | **Observer live view** | `tickets` | — | Presence badge, auto-sync | Activity tab | ✅ Shipped | `observer` |
@@ -73,7 +73,7 @@
 | `money()` | `app/support.js` | Currency formatting (USD/LYD), negative handling | Ops Review, Print Preview, Excel |
 | `auditLog()` | `app/support.js` | Write to `audit_log` with consistent schema | Every feature that changes data |
 | `notify()` | `app/support.js` | Insert into `notifications` + trigger Realtime | Job Done, Approve, Note add |
-| `hasPermission()` | `app/support.js` | Resolve per-user permission (user override > role default > hard deny) | Every gated feature |
+| `hasPermission(key)` | `app/index.html` (component method) | Resolve a capability: hydrated map > `PERMISSION_DEFAULTS` for the role > deny. Never asks the server — the answer must work with no signal. An unknown key is **false**. | Permissions screen today; every gated feature once the 28 role comparisons are converted |
 | `roleLabel()` | `app/support.js` | Map DB role key to display label (`founder` -> "Observer") | Users table, nav bar |
 | `normaliseItemNumber()` | Supabase DB function | Strip whitespace around hyphens in item codes | Price list import, item search |
 | `flatSubtotal()` | `app/support.js` | Calculate subtotal of non-percent items only | `itemTotal()`, `ticketTotal()` |

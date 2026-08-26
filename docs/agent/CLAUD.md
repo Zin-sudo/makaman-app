@@ -187,6 +187,7 @@ npx serve app/
 | 2026-08-26 | **Agent-loop files re-synced against the repo.** `HANDOFF.md` was a copy of the root session log describing a Vite/React `app/` that does not exist; replaced with a living-state file. MINDMAP §0 corrected (P1.1 is done, not a blocker). FEATURE_LINKS link matrix rewritten with real statuses + the suite covering each feature, and a `profiles` data contract added. BLINDSPOTS §14 added from a live bug. | Claude Code |
 | 2026-08-26 | Signup approval fixed: `profiles` is SELECT-only under RLS, so approvals now go through the `admin-actions` Edge Function (`adminAction()`); `profiles` removed from the outbox pair list; `outboxDrain()` retry bounded so a refused op cannot freeze the queue. New suite `app/approval.test.js` (12 assertions). | Claude Code |
 | 2026-08-26 | Skills registry updated: claude-mem accepted; ponytail, code-review and obsidian rejected with reasons. | User |
+| 2026-08-26 | **P1.8 permission registry** — `permissions` (31 capabilities) + `user_permissions`, `has_permission()` / `effective_permissions()` / `my_permissions()`, `hasPermission()` in the app, admin Permissions page in Account. Migrations 0013–0015. Security advisor caught two definer functions reachable by `anon`; 0015 scopes them. New suite `app/permissions.test.js` (23). BLINDSPOTS §15 added. **The 28 existing role comparisons are not yet converted — tracked as P1.8b.** | Claude Code |
 
 ---
 
@@ -213,6 +214,7 @@ npx serve app/
 - **If stuck >30 min:** Check if duplicating existing code. Check FEATURE_LINKS.md. Query Graphify.
 - **If breaking a constraint:** STOP. Log blocker. Do not proceed.
 - **If unsure about a decision:** Check MINDMAP.md Standing Decisions. Do not re-derive.
+- **Permissions:** the registry is live but the app's 28 `S.role === 'x'` gates still bypass it (P1.8b). Read `hasPermission(key)`, never compare roles, in anything new.
 - **Price list context:** 2,610 items live. 110 rows have NULL unit_cost ("quoted separately"). App must display "Quoted Separately" not 0.00. Ten Waha code conflicts parked in backup table — do NOT invent numbers.
 
 ---

@@ -35,6 +35,7 @@ Twenty-six Playwright suites sit beside it. The backend is live on `igutjfezxkdn
 | H | Tools/crossover allocation is its own container, between the job-type-objective and ticket-header containers. | `d96b512` |
 | — | Price lists re-imported: **2,610 rows** generated, **2,600 live** (336 recovered). `unit_cost` nullable. | `3876667`, `9b1e785` |
 | — | Signup approval routed through the `admin-actions` Edge Function; outbox no longer jams on a refused write. | *this session* |
+| P1.8 | **Permission registry** — `permissions` + `user_permissions`, `has_permission()` / `my_permissions()`, `hasPermission()` in the app, and an admin Permissions page in Account. 31 capabilities, per-person grant *and* revoke. | *this session* |
 
 Earlier landed work, for orientation: real Supabase auth (`d3690ae`), the app on Supabase
 (`c2ab70b`), per-ticket ZIP + monthly overview exports (`2fc71f8`), currency-aware decimals
@@ -61,7 +62,6 @@ run them in small batches or a 7-suite batch will exceed a 2-minute tool timeout
 
 | Item | Notes |
 |------|-------|
-| **Permission registry (P1.8)** | `permission_ID` / `permission_Name` / `Permission_Level` tables + an admin permissions page in Account. Underpins the three items below. **This is the next task.** |
 | **Role-swap control** | Top-right control letting admin/ops act as Technician and swap back, appearing among technicians for assignment. |
 | **Log-events container in Review** | Admin/ops need the event log surfaced inside the Review screen. |
 | **Admin/ops unrestricted ticket access** | Full A–Z technician flow on tickets they opened, audit trail kept throughout. |
@@ -132,22 +132,79 @@ Re-ran for regressions: `roles` 11, `sync` 18, `numbering` 18, `layout` 13, `cla
 
 ---
 
-## 3. NEXT TASK — P1.8, the permission registry
+## 2b. THIS SESSION — P1.8, THE PERMISSION REGISTRY
 
-Build the foundation, then the page. In this order, because everything else the user has
-asked for reads from it:
+### What was built
+- **`public.permissions`** — `permission_id`, `permission_name`, `permission_level`,
+  plus `category`, `description`, `default_roles`. 31 capabilities, seeded in migration
+  0014 **from the role gates that already exist in `index.html`**, so the registry
+  describes the app rather than proposing a second answer.
+- **`public.user_permissions`** — per-person `granted` boolean. Revoking matters as much
+  as granting: keeping one ops manager out of the price list needs a row saying `false`,
+  not the absence of a row.
+- **`has_permission(uuid, text)`**, **`effective_permissions(uuid)`**, **`my_permissions()`**.
+  All read the role from `profiles`, never from the JWT (B-7.2).
+- **`hasPermission(key)`** in the app — reads the hydrated map, falls back to
+  `PERMISSION_DEFAULTS` when there is none, and returns **false** for an unknown key.
+- **Admin → Account → Permissions**: one person at a time, capabilities grouped by
+  category, each row showing its key and saying which way an exception runs.
 
-1. **Schema.** `permissions` (`permission_id`, `permission_name`, `permission_level`) and
-   `user_permissions` (per-user grant/revoke overriding the role default). RLS: everyone
-   may read their own; only Admin may write. Ship as a numbered migration in
-   `supabase/migrations/`.
-2. **Seed** it from the role behaviour already in `index.html`, so the registry describes
-   the app as it is rather than inventing a second answer.
-3. **`hasPermission(key)`** as a single shared helper — FEATURE_LINKS §2 marks it a god
-   node. Read from a hydrated map, never from a JWT claim (BLINDSPOTS B-7.2: a role change
-   does not invalidate a token).
-4. **Admin permissions page** in the Account tab, per-user toggles.
-5. Only then the role-swap control and the Review log-events container, which both consume it.
+### `permission_level` is severity, not rank
+1 routine field work, 2 supervisory, 3 administrative. It orders the screen and says how
+alarming a grant is. It does **not** mean level 3 contains level 2 — Observer is broad
+read access with almost no writes and fits no ranking, which is why the default set is an
+explicit list of roles rather than a number to compare.
+
+### Security, and what the linter caught
+`has_permission` and `effective_permissions` take somebody else's id and run as definer,
+and were reachable at `/rest/v1/rpc` **without signing in** — making "what may this person
+do" a public question. Migration 0015 revokes `anon`, and both now refuse unless you are
+that person or you are staff. `my_permissions()` takes no argument at all, which is what
+the app calls.
+
+`user_permissions` *is* client-writable, under an admin-only RLS policy — unlike
+`profiles`. The distinction is deliberate: the policy calls `is_admin()`, which looks the
+role up in `profiles`, and the worst an Admin can do there is what an Admin may already do.
+
+### The gap to close next
+The registry is read by the Permissions screen and by `hasPermission()`. **The other
+twenty-eight role comparisons in `index.html` still test `S.role === 'x'` directly.** They
+agree with the registry today because the defaults were seeded from them — but until they
+call `hasPermission()`, granting someone an exception changes what the screen says and not
+what the app does. That conversion is the substantial follow-up.
+
+### Verification
+`app/permissions.test.js` — 23 assertions: the catalogue's shape, the screen rendering,
+a grant writing exactly one exception, and a toggle back to the role's own answer
+**deleting** the row rather than storing a redundant one. Against the live database:
+admin 31 granted / technician 6, an override winning in both directions, `source` reporting
+`override`, and the unauthenticated guard refusing. Database left with zero overrides.
+
+Regressions: `roles` 11, `approval` 12, `layout` 13, `tabs` 11, `claim` 23, `observer` 18,
+`audit` 9 — 97 assertions, 0 failures. No overflow at 1280px or 430px.
+
+---
+
+## 3. NEXT TASK — the role-swap control
+
+P1.8 landed, so the three items that were waiting on it can proceed. In this order:
+
+1. **Role-swap control (top right).** Admin/ops act as Technician and swap back. Swap the
+   *session's* effective role, never the profile row — the profile is the record of who
+   someone is, and `profiles` is not client-writable anyway. Gate it on a new
+   `user.act_as_technician` capability rather than `role === 'admin'`, and list a swapped
+   user among technicians for assignment and co-op while swapped. Everything they do while
+   swapped stays attributed to their real name in the audit trail.
+2. **Log-events container in Review**, gated on `activity.view_all`.
+3. **Admin/ops unrestricted ticket access** — the full A–Z technician flow on tickets they
+   opened, gated on the `ticket.*` capabilities rather than role comparisons.
+
+**Then the migration of the existing gates.** The registry is in place and read by the
+Permissions screen, but the other twenty-eight role comparisons in `index.html` still ask
+`S.role === 'x'` directly. They are correct today because the defaults were seeded from
+them — but until they call `hasPermission()`, granting an exception changes what the
+Permissions screen says and not what the app does. Convert them subsystem by subsystem
+with a suite each, not in one sweep.
 
 ### If blocked
 Stop and log it here rather than guessing:

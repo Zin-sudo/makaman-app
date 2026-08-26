@@ -1843,6 +1843,57 @@
           </div>
         </div>
       </sc-if>
+
+      <!-- ══ PERMISSIONS ══ -->
+      <!-- One person on the left, everything they may do on the right. The other
+           arrangement — capabilities down the side, people across the top — is a
+           thirty-one column grid that cannot be read on anything smaller than a desk. -->
+      <sc-if value="{{ adminPerms }}" hint-placeholder-val="{{ false }}">
+        <div class="mk-2col" style="display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:22px;align-items:start">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:0;overflow:hidden">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);padding:14px 16px 10px">Who</div>
+            <sc-for list="{{ permPeople }}" as="u" hint-placeholder-count="4">
+              <div onClick="{{ u.pick }}" style="padding:10px 16px;cursor:pointer;border-top:1px solid rgba(var(--ink-rgb),0.08);background:{{ u.rowBg }}">
+                <div style="font-size:14px">{{ u.name }}</div>
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55)">{{ u.role }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div>
+            <sc-if value="{{ permNobodyPicked }}" hint-placeholder-val="{{ false }}">
+              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:34px 16px;text-align:center;font-size:13px;color:rgba(var(--ink-rgb),0.55)">Choose someone to see what they may do.</div>
+            </sc-if>
+
+            <sc-if value="{{ permTargetName }}" hint-placeholder-val="{{ '' }}">
+              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <div style="flex:1;min-width:160px">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:17px;letter-spacing:0.02em">{{ permTargetName }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6)">{{ permTargetRole }} · {{ permExceptionLabel }}</div>
+                </div>
+                <button onClick="{{ permClearAll }}" disabled="{{ permNoExceptions }}" style="padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Back to role defaults</button>
+              </div>
+              <div style="font-size:12px;color:var(--warning);margin-bottom:10px">{{ permReadOnlyNote }}</div>
+
+              <sc-for list="{{ permGroups }}" as="g" hint-placeholder-count="3">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
+                  <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">{{ g.name }}</div>
+                  <sc-for list="{{ g.rows }}" as="p" hint-placeholder-count="4">
+                    <div style="display:flex;gap:12px;align-items:flex-start;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <div style="flex:1;min-width:0">
+                        <div style="font-size:14px">{{ p.name }}</div>
+                        <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);line-height:1.45">{{ p.description }}</div>
+                        <div style="font-size:11px;color:{{ p.exceptionTone }};margin-top:3px">{{ p.exception }}</div>
+                      </div>
+                      <button onClick="{{ p.toggle }}" disabled="{{ permCannotEdit }}" style="min-width:64px;padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:{{ p.tileBg }};color:{{ p.tileFg }};border:1px solid {{ p.tileFg }}">{{ p.onLabel }}</button>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
     </div>
   </sc-if>
 
@@ -2189,6 +2240,66 @@ const ROLE_FROM_DB = { technician: 'tech', ops_manager: 'mgr', admin: 'admin', f
 const ROLE_TO_DB = { tech: 'technician', mgr: 'ops_manager', admin: 'admin', founder: 'founder' };
 const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
 
+// What each role may do when nobody has decided otherwise about the person.
+//
+// Migration 0014 is the authority; this mirrors it because the app has to answer the
+// question with no signal. In cloud mode the real answer — role defaults with any
+// per-person override already applied — is pulled by hydrate() into `myPermissions` and
+// persisted with the rest of the replica, so a device that has signed in once keeps
+// answering correctly down a hole. This constant is what the demo store runs on, and
+// what the first render uses before the first hydrate returns.
+//
+// Grouped by role set rather than listed per key: the groups are the actual shape of the
+// policy, and a flat list of thirty-one lines hides which of them are the same decision.
+const PERMISSION_DEFAULTS = (function () {
+  const groups = [
+    [['tech', 'mgr', 'admin'],
+      ['ticket.create', 'ticket.log', 'ticket.close', 'ticket.sync', 'ticket.print_own']],
+    [['tech', 'mgr', 'admin', 'founder'],
+      ['report.generate']],
+    [['mgr', 'admin', 'founder'],
+      ['ticket.view_all', 'report.all_technicians', 'activity.view_all', 'location.view_team']],
+    [['mgr', 'admin'],
+      ['ticket.edit_closed', 'ticket.charge_items', 'ticket.reorder_items',
+        'ticket.assign_number', 'ticket.approve', 'ticket.force_number',
+        'ticket.approve_on_behalf', 'ticket.reopen', 'numbering.hold', 'numbering.transfer',
+        'user.approve_signup', 'user.create', 'pricelist.view', 'client.manage']],
+    [['admin'],
+      ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.delete',
+        'user.manage_permissions', 'pricelist.edit', 'jobtype.manage']],
+  ];
+  const out = {};
+  groups.forEach(([roles, keys]) => keys.forEach((k) => { out[k] = roles; }));
+  return out;
+})();
+
+// The catalogue as the demo store sees it. Derived from the defaults above rather than
+// restating migration 0014's wording, because two copies of the same prose drift and the
+// database's copy is the one that matters. A real session replaces all of this at the
+// first hydrate; this exists so the screen is not empty without a server.
+const PERMISSION_CATALOGUE_DEMO = (function () {
+  const CATEGORY = {
+    ticket: 'Tickets', numbering: 'Numbering', user: 'People',
+    pricelist: 'Data', client: 'Data', jobtype: 'Data',
+    report: 'Reporting', activity: 'Reporting', location: 'Reporting',
+  };
+  return Object.keys(PERMISSION_DEFAULTS).map((key) => {
+    const roles = PERMISSION_DEFAULTS[key];
+    const [head, tail] = key.split('.');
+    const words = (tail || '').replace(/_/g, ' ');
+    return {
+      id: key,
+      name: words.charAt(0).toUpperCase() + words.slice(1),
+      // Severity read off who holds it: admin alone is administrative, no technician is
+      // supervisory, anything a technician has is routine.
+      level: roles.length === 1 ? 3 : (roles.indexOf('tech') < 0 ? 2 : 1),
+      category: CATEGORY[head] || 'Other',
+      description: '',
+      defaultRoles: roles.map((r) => ROLE_TO_DB[r] || r),
+    };
+  }).sort((a, b) => (a.category).localeCompare(b.category) || a.level - b.level || a.name.localeCompare(b.name));
+})();
+
 // Who someone is, and whether they are allowed in, is not the client's to decide.
 // `profiles` grants no INSERT, UPDATE or DELETE to anyone signed in — only SELECT — so
 // every write to it goes through the admin-actions Edge Function, which re-derives the
@@ -2424,11 +2535,20 @@ function hydrate() {
     all('numbering_claim'), all('user_settings'),
     all('tickets'), all('ticket_lines'), all('ticket_items'), all('ticket_assets'),
     all('ticket_crew'), all('audit_log'),
+    // The catalogue, and this person's own answer to it. Two calls rather than one
+    // because the catalogue is the same for everybody and the answer is not: the admin
+    // screen needs every capability listed, including the ones nobody currently holds.
+    all('permissions'), c.rpc('my_permissions'),
+    // Every exception the office has made, for the admin screen. RLS narrows this to
+    // your own rows unless you are staff, so a technician's device simply sees less
+    // rather than being refused.
+    all('user_permissions'),
   ]).then((res) => {
     const bad = res.find((r) => r.error);
     if (bad) throw new Error(bad.error.message || 'Could not load data.');
     const [profiles, clients, priceItems, jobTypes, numbering, orgDefaults, assetQs,
-      claim, settings, tickets, lines, items, assets, crew, audit] = res.map((r) => r.data || []);
+      claim, settings, tickets, lines, items, assets, crew, audit,
+      permCatalogue, myPerms, permOverrides] = res.map((r) => r.data || []);
 
     const nameById = {}, emailById = {}, jobById = {};
     profiles.forEach((p) => { nameById[p.id] = p.full_name || p.email; emailById[p.id] = p.email; });
@@ -2467,6 +2587,32 @@ function hydrate() {
       clients: clients.map((cl) => shapeClient(cl, P[cl.id])),
       jobTypes: jobTypes.map((j) => j.name),
       users: profiles.map(shapeUser),
+      // The catalogue as the admin screen lists it, sorted the way it reads: by
+      // category, then by how much damage the capability can do.
+      permissions: (permCatalogue || []).slice().sort((a, b) =>
+        (a.category || '').localeCompare(b.category || '')
+        || (a.permission_level - b.permission_level)
+        || (a.permission_name || '').localeCompare(b.permission_name || '')
+      ).map((p) => ({
+        id: p.permission_id, name: p.permission_name, level: p.permission_level,
+        category: p.category, description: p.description, defaultRoles: p.default_roles || [],
+      })),
+      // Flattened to { key: true } at the edge rather than carried as rows, so that
+      // every read site is a lookup and none of them has to know the shape it came in.
+      myPermissions: (myPerms || []).reduce((acc, r) => {
+        if (r.granted) acc[r.permission_id] = true;
+        return acc;
+      }, {}),
+      // Which of them are an explicit decision about this person rather than their role.
+      // The admin screen shows the difference; nothing else needs it.
+      myPermissionSource: (myPerms || []).reduce((acc, r) => {
+        acc[r.permission_id] = r.source; return acc;
+      }, {}),
+      // Keyed by 'userId|permissionId'. A flat map because that is how the screen reads
+      // it — one lookup per checkbox, no scanning a list per row.
+      permissionOverrides: (permOverrides || []).reduce((acc, r) => {
+        acc[r.user_id + '|' + r.permission_id] = !!r.granted; return acc;
+      }, {}),
       series: numbering.map((n) => ({
         id: n.id, label: n.label || '', prefix: n.prefix || '',
         last: n.next_number, floor: n.floor,
@@ -3041,6 +3187,10 @@ function seed() {
     // sheet. The claim moves the way a job does: the holder hands it to a named
     // colleague, so cover for a shift change or a holiday is a deliberate act.
     numbering: { holderEmail: 'omar@makaman.ly', holderName: 'Omar Al-Saleh', since: '' },
+    // The registry, as far as a device with no server can know it. hydrate() replaces
+    // both of these wholesale on the first successful pull.
+    permissions: JSON.parse(JSON.stringify(PERMISSION_CATALOGUE_DEMO)),
+    permissionOverrides: {},
     assetQuestions: JSON.parse(JSON.stringify(ASSET_QUESTIONS_DEFAULT)),
     jobTypes: [
       'PKR FOR CSG TEST', 'PKR FOR ACID JOB', 'PKR FOR PRESSURE TEST', 'PKR FOR FRAC JOB',
@@ -3111,7 +3261,7 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = Object.assign({
-      role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null,
+      role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, permUser: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
@@ -3753,6 +3903,82 @@ class Component extends DCLogic {
     const q = (this.state.data || {}).assetQuestions;
     return (q && q.length) ? q : ASSET_QUESTIONS_DEFAULT;
   }
+  // Grant, revoke, or stop having an opinion. Passing a null permission clears every
+  // exception for that person and puts them back on their role.
+  //
+  // Written straight to the database rather than through the outbox: changing what
+  // somebody may do is an office act done with signal, and queueing it would mean a
+  // device could carry a stale opinion about a person's authority for hours. The demo
+  // store keeps its own copy so the screen behaves the same with no server.
+  //
+  // A toggle back to what the role already says deletes the row instead of storing a
+  // redundant one — otherwise "exceptions to their role" would count decisions that are
+  // not exceptions at all.
+  setPermissionOverride(user, permissionId, granted) {
+    const roleDb = ROLE_TO_DB[user.roleKey] || user.roleKey;
+    const perm = ((this.state.data || {}).permissions || []).find(p => p.id === permissionId);
+    const byRole = !!perm && (perm.defaultRoles || []).indexOf(roleDb) >= 0;
+    const redundant = permissionId !== null && granted === byRole;
+
+    const local = (d) => {
+      d.permissionOverrides = Object.assign({}, d.permissionOverrides || {});
+      if (permissionId === null) {
+        Object.keys(d.permissionOverrides).forEach((k) => {
+          if (k.indexOf((user.id || user.email) + '|') === 0) delete d.permissionOverrides[k];
+        });
+      } else if (redundant) {
+        delete d.permissionOverrides[(user.id || user.email) + '|' + permissionId];
+      } else {
+        d.permissionOverrides[(user.id || user.email) + '|' + permissionId] = granted;
+      }
+    };
+
+    if (!USE_CLOUD) { this.mutate(local); return; }
+    if (!user.id) { this.toast('perm', 'That account has not reached the server yet.', 'warn'); return; }
+
+    const c = sb();
+    if (!c) return;
+    const key = 'perm:' + user.email;
+    let q;
+    if (permissionId === null) {
+      q = c.from('user_permissions').delete().eq('user_id', user.id);
+    } else if (redundant) {
+      q = c.from('user_permissions').delete().eq('user_id', user.id).eq('permission_id', permissionId);
+    } else {
+      q = c.from('user_permissions').upsert({
+        user_id: user.id, permission_id: permissionId,
+        granted: granted, set_by: CLOUD_IDS.me || null,
+      });
+    }
+    Promise.resolve(q)
+      .then((r) => { if (r && r.error) throw r.error; })
+      .then(() => this.refresh())
+      .then(() => this.toast(key, permissionId === null
+        ? user.name + ' is back on their role defaults.'
+        : (perm ? perm.name : 'That permission') + (redundant ? ' follows their role again.' : (granted ? ' granted to ' : ' withheld from ') + user.name + '.'), 'ok'))
+      // The database refused it — almost certainly because the person doing this is not
+      // an Admin. Read the real state back so the screen stops showing the wrong answer.
+      .catch(err => this.refresh().then(() => this.toast(key, err.message || 'That change was refused.', 'warn')));
+  }
+  // The one question every gate should ask. Twenty-eight scattered role comparisons say
+  // the same thing less precisely: a role is a shorthand for a set of capabilities, and
+  // the moment one person needs an exception the shorthand has nothing to offer.
+  //
+  // Reads the map hydrate() pulled, which already has any per-person override applied.
+  // Falls back to the role defaults when there is no map — the demo store, and the first
+  // render of a cloud session before the first hydrate has returned. It never asks the
+  // server: the answer must be available with no signal, and it is cached in the replica.
+  //
+  // A key the registry does not contain returns false rather than true. An unrecognised
+  // capability is far more likely to be a typo than a new freedom.
+  hasPermission(key) {
+    const mine = (this.state.data || {}).myPermissions;
+    if (mine && Object.prototype.hasOwnProperty.call(mine, key)) return !!mine[key];
+    // Cloud mode with a hydrated map: absent means the database said no.
+    if (mine && Object.keys(mine).length) return false;
+    const roles = PERMISSION_DEFAULTS[key];
+    return !!roles && roles.indexOf(this.state.role) >= 0;
+  }
   holdsNumbering() {
     const claim = this.numberingClaim();
     const me = (this.state.session || {}).email;
@@ -4337,6 +4563,56 @@ class Component extends DCLogic {
     // Every question needs an answer, or a written justification standing in for the
     // ones that have none. Nothing closes on silence.
     const assetQs = this.assetQuestions();
+
+    // ── Permissions, resolved for the person the admin screen is looking at ──
+    // Effective = the exception if one exists, otherwise whether the role carries it.
+    // Computed here rather than asked of the database per checkbox: the catalogue and
+    // every exception are already in the replica, and the screen has to work offline
+    // like everything else.
+    const permCatalogue = D.permissions || [];
+    const permOverrideMap = D.permissionOverrides || {};
+    const overrideCount = Object.keys(permOverrideMap).length;
+    const permTarget = (D.users || []).find(u => u.email === (S.permUser || '')) || null;
+    const permDefaultFor = (p, roleKey) =>
+      (p.defaultRoles || []).indexOf(ROLE_TO_DB[roleKey] || roleKey) >= 0;
+    let permOverrideCount = 0;
+    const permGroups = (() => {
+      if (!permTarget) return [];
+      const out = [], seen = {};
+      permCatalogue.forEach((p) => {
+        // Keyed by id where there is one and by email where there is not, matching what
+        // setPermissionOverride writes — the demo store's users have never had ids.
+        const key = (permTarget.id || permTarget.email) + '|' + p.id;
+        const has = Object.prototype.hasOwnProperty.call(permOverrideMap, key);
+        const byRole = permDefaultFor(p, permTarget.roleKey);
+        const on = has ? !!permOverrideMap[key] : byRole;
+        if (has && !!permOverrideMap[key] !== byRole) permOverrideCount += 1;
+        if (!seen[p.category]) { seen[p.category] = { name: p.category, rows: [] }; out.push(seen[p.category]); }
+        seen[p.category].rows.push({
+          id: p.id, name: p.name,
+          // The key, when there is no sentence to show. It is the identifier an admin
+          // needs anyway to match a row against a migration or a gate in the code, and
+          // without it the demo store renders two different capabilities as "Manage".
+          description: p.description || p.id,
+          on: on, onLabel: on ? 'Yes' : 'No',
+          // Green for held, plain for not. Read at a glance down a column of thirty-one.
+          tileBg: on ? 'rgba(var(--success-rgb),0.16)' : 'transparent',
+          tileFg: on ? 'var(--success)' : 'rgba(var(--ink-rgb),0.45)',
+          // A level-3 capability is one that acts for somebody else or changes who
+          // people are. Worth marking so a tick is a considered one.
+          heavy: p.level === 3,
+          levelLabel: ['', 'Routine', 'Supervisory', 'Administrative'][p.level] || '',
+          // Say plainly when this is not what the role would give, and which way.
+          exception: (has && !!permOverrideMap[key] !== byRole)
+            ? (on ? 'Granted — their role would not' : 'Withheld — their role would')
+            : '',
+          exceptionTone: on ? 'var(--success)' : 'var(--warning)',
+          toggle: () => this.setPermissionOverride(permTarget, p.id, on ? false : true),
+        });
+      });
+      return out;
+    })();
+
     // A multi-answer question holds a list; a single one holds a string. answeredText
     // flattens both so everything downstream — validation, storage, the printed note —
     // reads one shape.
@@ -5055,6 +5331,7 @@ class Component extends DCLogic {
             tile('Users & Customers', (D.users || []).length + ' users · ' + D.clients.length + ' customers', 'people', 'var(--accent-wash)', 'var(--accent)', go('people')),
             tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
+            tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
             settings,
           ];
         }
@@ -5980,18 +6257,50 @@ class Component extends DCLogic {
       // One tool at a time, chosen from Account. The page names the tool it is
       // showing rather than repeating the whole menu above it.
       adminToolTitle: { price: 'Price Lists', numbers: 'Numbering & Job Types',
-        people: 'Users & Customers', system: 'System', assets: 'Closing Questions' }[S.adminTab] || 'Admin',
+        people: 'Users & Customers', system: 'System', assets: 'Closing Questions',
+        perms: 'Permissions' }[S.adminTab] || 'Admin',
       adminToolHint: {
         price: 'Priced items per customer — changes apply to new ticket lines only.',
         assets: 'What a technician is asked about allocated tools when they close a job.',
         numbers: 'Ticket number series and the job types offered in the field.',
         people: 'Accounts, roles and the customer register.',
         system: 'Charging rules and the danger zone.',
+        perms: 'What each person may do. A role sets the default; a tick here overrides it for one person.',
       }[S.adminTab] || '',
       backToAccount: () => this.setState({ roleTab: 'account', adminTab: null }),
       adminPrice: S.adminTab === 'price', adminNumbers: S.adminTab === 'numbers',
       adminPeople: S.adminTab === 'people', adminSystem: S.adminTab === 'system',
-      adminAssets: S.adminTab === 'assets',
+      adminAssets: S.adminTab === 'assets', adminPerms: S.adminTab === 'perms',
+
+      // ── Permissions ──────────────────────────────────────────────────────
+      // One person at a time. A grid of every user against every capability would be
+      // thirty-one columns wide on a phone, and the question an admin actually arrives
+      // with is "what can this person do", not "who can do this".
+      permPeople: (D.users || [])
+        .filter(u => u.status === 'active')
+        .map(u => ({
+          name: u.name, email: u.email, role: u.role,
+          selected: (S.permUser || '') === u.email,
+          rowBg: (S.permUser || '') === u.email ? 'var(--accent-wash)' : 'transparent',
+          pick: () => this.setState({ permUser: u.email }),
+        })),
+      permNobodyPicked: !permTarget,
+      permTargetName: permTarget ? permTarget.name : '',
+      permTargetRole: permTarget ? permTarget.role : '',
+      permGroups: permGroups,
+      permExceptionCount: permOverrideCount,
+      permExceptionLabel: permOverrideCount === 1 ? '1 exception to their role' : permOverrideCount + ' exceptions to their role',
+      permClearAll: () => {
+        if (!permTarget) return;
+        this.setPermissionOverride(permTarget, null, null);
+      },
+      // Named for what it disables, because that is what the attribute means. Reading
+      // the permission through hasPermission rather than comparing to 'admin' is the
+      // point of the whole exercise — this screen is the first caller of its own idea.
+      permCannotEdit: !this.hasPermission('user.manage_permissions'),
+      permNoExceptions: permOverrideCount === 0,
+      permReadOnlyNote: this.hasPermission('user.manage_permissions') ? ''
+        : 'Only an Admin can change what someone may do.',
       // The whole closing section, editable: wording, options, order. Adding an option
       // people actually use is what keeps them off free text.
       adminAssetRows: assetQs.map((q, qi) => {
