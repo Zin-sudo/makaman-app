@@ -3034,6 +3034,46 @@ const SHEET = {
   ],
 };
 
+// ── The real workbook, and where each field lands in it ───────────────────────────
+// reference/Autofill_ServiceTikcet_System.xlsx, shipped as app/uploads/. The export
+// fills THIS file rather than building a new one, so the sheets the customer receives
+// are the sheets they already know — same column widths, merges, borders, print setup,
+// logo and price-list tabs. Only the values change.
+//
+// Read off the template itself, not invented. seed() already referred to "B13 Base
+// Location / F14 Customer Rep.", which is the same map.
+const TEMPLATE = {
+  file: './uploads/service-ticket-template.xlsx',
+  sheets: [
+    { part: 'xl/worksheets/sheet1.xml', kind: 'service' },  // Service Ticket (Original)
+    { part: 'xl/worksheets/sheet2.xml', kind: 'service' },  // Service Ticket (Copy)
+    { part: 'xl/worksheets/sheet3.xml', kind: 'log' },      // Job Log (Original)
+    { part: 'xl/worksheets/sheet4.xml', kind: 'log' },      // Job Log (Copy)
+  ],
+  service: {
+    customer: 'B8',  ticketNo: 'E8',
+    field: 'B9',
+    well: 'B10',     supervisor: 'E10',
+    rig: 'B11',      start: 'E11',
+    mileage: 'B12',  end: 'E12',
+    baseLocation: 'B13',
+    jobType: 'A14',
+    total: 'F40',
+  },
+  log: {
+    ticketNo: 'H6',
+    customer: 'B10',    date: 'F10',
+    field: 'B12',       jobType: 'F12',
+    well: 'B14',        customerRep: 'F14',
+    supervisor: 'B16',  rig: 'F16',
+    startJob: 'A18',    endJob: 'D18',  arrived: 'F18',
+  },
+  // Row 15 is the item heading, row 40 the total; rows 16-39 are the twenty-four ruled
+  // lines between them. The job log heads at row 19 and signs at row 45.
+  itemRows: [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39],
+  eventRows: [20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44],
+};
+
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // ── Icons ────────────────────────────────────────────────────────────────────
@@ -4484,6 +4524,10 @@ class Component extends DCLogic {
   // they are driven by the same constants, which is the property that stops them drifting.
   sheetGeometry() { return SHEET; }
 
+  // Same reasoning as sheetGeometry: a test that cannot read the map can only check that
+  // the output looks plausible, not that it was driven by the template's own cells.
+  templateMap() { return TEMPLATE; }
+
   // The letterhead logo, as a data URL, fetched once and kept.
   //
   // jsPDF's addImage needs the bytes in hand — there is no async form — so the fetch has
@@ -4809,6 +4853,163 @@ class Component extends DCLogic {
       try { return original(txt, x, y, opts); }
       finally { doc.setFont(was.fontName, was.fontStyle); }
     };
+  }
+
+
+  // ── Filling the real workbook ─────────────────────────────────────────────────────
+  //
+  // "Fill Excel & download" used to log "4 sheets downloaded to this device", raise a
+  // success toast, and download nothing. The audit trail — which CLAUD.md records as
+  // legally required — carried entries for exports that never happened.
+  //
+  // What it does now is fill the actual template, in place. An .xlsx is a zip of XML, so
+  // rewriting only the cell VALUES leaves the branded sheet completely untouched: column
+  // widths, merged ranges, fonts, borders, the print setup, the embedded logo drawing and
+  // the customer price-list tabs all survive byte-for-byte. That is the point — the
+  // client is meant to receive the sheets they already know, filled in, not a new
+  // workbook that resembles them.
+  //
+  // Every cell written here already exists in the template (checked across rows 6-48 of
+  // all four sheets), so this only ever replaces a cell. It never has to insert one into
+  // a row in column order, which is where an XML patcher normally goes wrong.
+  //
+  // Formulas are replaced by their computed values on purpose. The template carries the
+  // pricing of the historical ticket it was saved from — `F24 = -(E24*0.6)` is a 60%
+  // discount and `F22 = E22*0.2` a 20% surcharge, and `E22 = SUM(F16:F21)` only sums six
+  // of the twenty-four item rows. Left in place they would recompute the workbook to a
+  // different total from the PDF the customer signed. The app's own figures win, and the
+  // sheet becomes a record rather than a calculator.
+  fillWorkbook(ticket) {
+    const t = ticket;
+    const cur = this.ticketCurrency(t);
+    const items = (t.items || []).slice(0, TEMPLATE.itemRows.length);
+    const events = (t.events || []).slice(0, TEMPLATE.eventRows.length);
+
+    // Excel counts days from 1899-12-30, with its 1900 leap-year bug baked in. Read off
+    // the Tripoli wall clock the whole app is pinned to, so a job never files a day early.
+    const parts = (iso) => {
+      const p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: OPERATING_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date(iso));
+      const g = (k) => Number((p.find((x) => x.type === k) || {}).value);
+      return { y: g('year'), m: g('month'), d: g('day'), hh: g('hour') % 24, mi: g('minute') };
+    };
+    const EPOCH = Date.UTC(1899, 11, 30);
+    const xDate = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso); if (isNaN(d.getTime())) return '';
+      const q = parts(iso);
+      return Math.round((Date.UTC(q.y, q.m - 1, q.d) - EPOCH) / 86400000);
+    };
+    const xTime = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso); if (isNaN(d.getTime())) return '';
+      const q = parts(iso);
+      return Number(((q.hh * 60 + q.mi) / 1440).toFixed(10));
+    };
+
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Replace one cell, keeping its style index — that index is what carries the border,
+    // fill, font and number format, so dropping it would strip the formatting this whole
+    // approach exists to preserve. Rebuilding the cell also drops any <f>, which is how
+    // the template's own formulas are retired.
+    const setCell = (xml, ref, value) => {
+      const m = xml.match(new RegExp('<c r="' + ref + '"([^>]*?)(?:/>|>[\\s\\S]*?</c>)'));
+      if (!m) return xml;
+      const st = m[1].match(/\ss="(\d+)"/);
+      const s = st ? ' s="' + st[1] + '"' : '';
+      let cell;
+      if (value === null || value === undefined || value === '') {
+        cell = '<c r="' + ref + '"' + s + '/>';
+      } else if (typeof value === 'number' && isFinite(value)) {
+        cell = '<c r="' + ref + '"' + s + '><v>' + value + '</v></c>';
+      } else {
+        cell = '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' + esc(value) + '</t></is></c>';
+      }
+      return xml.slice(0, m.index) + cell + xml.slice(m.index + m[0].length);
+    };
+
+    const svc = (xml) => {
+      const M = TEMPLATE.service;
+      let x = xml;
+      x = setCell(x, M.customer, t.customer || '');
+      x = setCell(x, M.ticketNo, t.ticketNo || '');
+      x = setCell(x, M.field, t.field || '');
+      x = setCell(x, M.well, t.well || '');
+      x = setCell(x, M.supervisor, crewLabel(t));
+      x = setCell(x, M.rig, t.rig || '');
+      x = setCell(x, M.start, xDate(t.start));
+      x = setCell(x, M.mileage, t.mileage === '' || t.mileage == null ? '' : Number(t.mileage));
+      x = setCell(x, M.end, xDate(t.end));
+      x = setCell(x, M.baseLocation, t.baseLocation || '');
+      x = setCell(x, M.jobType, t.jobType || '');
+      TEMPLATE.itemRows.forEach((row, n) => {
+        const i = items[n];
+        const pc = i && i.kind === 'percent';
+        x = setCell(x, 'A' + row, i ? (i.code || '') : '');
+        x = setCell(x, 'B' + row, i ? (i.desc || '') : '');
+        x = setCell(x, 'C' + row, i && !pc ? Number(i.qty) : '');
+        x = setCell(x, 'D' + row, i ? (i.uom || '') : '');
+        x = setCell(x, 'E' + row, i ? (pc ? i.cost + '%' : Number(i.cost)) : '');
+        x = setCell(x, 'F' + row, i ? Number(this.itemTotal(i, t).toFixed(2)) : '');
+      });
+      return setCell(x, M.total, Number(this.ticketTotal(t).toFixed(2)));
+    };
+
+    const log = (xml) => {
+      const M = TEMPLATE.log;
+      let x = xml;
+      // Written as values rather than left to the cross-sheet formulas the template uses
+      // ('Service Ticket (Original)'!B8 and friends). A workbook whose figures only
+      // appear after a recalculation opens blank or stale in viewers that do not
+      // recalculate, and this file is going to a customer.
+      x = setCell(x, M.ticketNo, t.ticketNo || '');
+      x = setCell(x, M.customer, t.customer || '');
+      x = setCell(x, M.date, xDate(t.end || t.start));
+      x = setCell(x, M.field, t.field || '');
+      x = setCell(x, M.jobType, t.jobType || '');
+      x = setCell(x, M.well, t.well || '');
+      x = setCell(x, M.customerRep, t.customerRep || '');
+      x = setCell(x, M.supervisor, crewLabel(t));
+      x = setCell(x, M.rig, t.rig || '');
+      x = setCell(x, M.startJob, xDate(t.start));
+      x = setCell(x, M.endJob, xDate(t.end));
+      x = setCell(x, M.arrived, xDate(t.arrival || t.start));
+      TEMPLATE.eventRows.forEach((row, n) => {
+        const e = events[n];
+        x = setCell(x, 'A' + row, e ? xDate(e.ts) : '');
+        x = setCell(x, 'B' + row, e ? xTime(e.ts) : '');
+        x = setCell(x, 'C' + row, e ? '-' : '');
+        x = setCell(x, 'D' + row, e ? '-' : '');
+        x = setCell(x, 'E' + row, e ? (e.text || '') : '');
+      });
+      return x;
+    };
+
+    return this.loadExporters()
+      .then(() => fetch(TEMPLATE.file))
+      .then((r) => { if (!r.ok) throw new Error('template ' + r.status); return r.arrayBuffer(); })
+      .then((buf) => window.JSZip.loadAsync(buf))
+      .then((zip) => {
+        const jobs = TEMPLATE.sheets.map((sh) =>
+          zip.file(sh.part).async('string').then((xml) => {
+            zip.file(sh.part, sh.kind === 'service' ? svc(xml) : log(xml));
+          }));
+        return Promise.all(jobs).then(() => {
+          // Every formula in the filled region has just been replaced by a value, so the
+          // cached dependency chain now points at cells that no longer compute anything.
+          // Excel rebuilds it from nothing; leaving a stale one is what makes a patched
+          // workbook open with a repair prompt.
+          zip.remove('xl/calcChain.xml');
+          return zip.file('[Content_Types].xml').async('string').then((ct) => {
+            zip.file('[Content_Types].xml', ct.replace(/<Override[^>]*calcChain[^>]*\/>/, ''));
+            return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+          });
+        });
+      })
+      .then((blob) => ({ blob: blob, overflow: (t.items || []).length > TEMPLATE.itemRows.length
+        || (t.events || []).length > TEMPLATE.eventRows.length }));
   }
 
   // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF and
@@ -6780,22 +6981,45 @@ class Component extends DCLogic {
         if (SH.logOverflow) bits.push((SH.eventsReal.length - SH.logCap) + ' more job-log line(s) than the ' + SH.logCap + '-row page limit');
         return 'This ticket has ' + bits.join(' and ') + ' — a second page was added automatically below. Prefer one page? Go back to review and remove some lines, then reopen this preview.';
       })(),
-      exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.toast('export', 'Four sheets generated from the template and downloading to this device.', 'ok'); },
+      // Logs and toasts only once a file has actually reached the device. The previous
+      // version announced "4 sheets downloaded to this device" and raised a success
+      // toast before doing anything at all, so the audit trail — the record CLAUD.md
+      // calls legally required — filled up with exports nobody ever received.
+      exportExcel: () => {
+        if (this._excelBusy) return;
+        this._excelBusy = true;
+        this.toast('export', 'Filling the template…', 'ok');
+        this.fillWorkbook(t)
+          .then((out) => {
+            const no = (t.ticketNo || 'unnumbered').replace(/[^\w.-]+/g, '-');
+            this.saveBlob(out.blob, 'Makaman-' + no + '.xlsx');
+            this.log('4 sheets filled into the workbook and downloaded to this device.', 'lifecycle');
+            this.toast('export', out.overflow
+              ? 'Workbook downloaded — but this ticket has more lines than the template holds, so the extra ones are not in it. Use the ZIP for the full record.'
+              : 'The four sheets are filled and downloading to this device.',
+              out.overflow ? 'warn' : 'ok');
+          })
+          .catch((e) => {
+            // No audit entry on the way out. Nothing happened, so nothing is recorded.
+            this.toast('export', 'The workbook could not be built (' + (e.message || 'unknown') + '). Nothing was downloaded.', 'warn');
+          })
+          .then(() => { this._excelBusy = false; });
+      },
       // Local download always works. OneDrive/Google Drive upload buttons only render
       // once connected (Settings > Storage & Export) — see the seed() comment on
       // cloudStorage for why the connect step itself is mocked.
       cloudExportNote: (!((D.settings.cloudStorage || {}).oneDrive || {}).connected && !((D.settings.cloudStorage || {}).googleDrive || {}).connected)
         ? 'Download always works, no account needed. Connect OneDrive/Google Drive in Settings to also upload from here.'
         : 'Download always works, no account needed.',
+      // Both of these used to write "4 sheets uploaded to OneDrive" into the audit trail
+      // and raise a success toast. There is no OAuth behind either button — the connect
+      // step in Settings is explicitly mocked (see the seed() note on cloudStorage) — so
+      // no upload has ever happened. They say so now, and write nothing.
       uploadOneDrive: () => {
-        const acct = ((D.settings.cloudStorage || {}).oneDrive || {}).account || 'OneDrive';
-        this.log('4 sheets uploaded to OneDrive (' + acct + ').', 'lifecycle');
-        this.toast('export-od', 'All 4 sheets uploaded to OneDrive (' + acct + '). No copy was saved to this device — use Fill Excel & download for that.', 'ok');
+        this.toast('export-od', 'Uploading straight to OneDrive is not connected yet. Use Fill Excel & download, then put the file where you need it.', 'warn');
       },
       uploadGoogleDrive: () => {
-        const acct = ((D.settings.cloudStorage || {}).googleDrive || {}).account || 'Google Drive';
-        this.log('4 sheets uploaded to Google Drive (' + acct + ').', 'lifecycle');
-        this.toast('export-gd', 'All 4 sheets uploaded to Google Drive (' + acct + '). No copy was saved to this device — use Fill Excel & download for that.', 'ok');
+        this.toast('export-gd', 'Uploading straight to Google Drive is not connected yet. Use Fill Excel & download, then put the file where you need it.', 'warn');
       },
 
       // One tool at a time, chosen from Account. The page names the tool it is

@@ -1249,3 +1249,52 @@ was pinned to a line number that had since moved.
 fall through to a check of the previous run's output.
 **Prevention Rule:** Locate the tag, never the line (`scratchpad/extract.sh`). Delete the
 output file before regenerating it, and assert it exists before checking it.
+
+---
+
+## B-18 · Exports (2026-08-26)
+
+### B-18.1 🔴 A success toast and an audit entry over a no-op
+**Symptom:** The audit trail — the record CLAUD.md calls legally required — carries
+"4 sheets downloaded to this device" for exports nobody ever received. Same for
+"4 sheets uploaded to OneDrive".
+**Root Cause:** `exportExcel` logged and toasted *before* doing anything, and there was
+nothing behind it. The cloud buttons did the same with no OAuth behind them at all.
+**Prevention Rule:**
+- **Log after the effect, never before it.** An audit entry is a claim that something
+  happened; write it in the success branch only.
+- A failed export MUST leave the trail untouched.
+- A mocked capability MUST say it is not connected. It must never write a record.
+**Detection Method:**
+```bash
+grep -n "this.log(.*downloaded\|this.log(.*uploaded" app/index.html
+# Any such call not inside a .then() after the file exists → FAIL
+```
+
+### B-18.2 🔴 A template's own formulas recompute someone else's pricing
+**Symptom:** The filled workbook's total disagrees with the PDF the customer signed.
+**Root Cause:** `Autofill_ServiceTikcet_System.xlsx` was saved from a real ticket and kept
+its arithmetic: `F24 = -(E24*0.6)` is a 60% discount, `F22 = E22*0.2` a 20% surcharge, and
+`E22 = SUM(F16:F21)` sums only six of the twenty-four item rows. Fill the values and leave
+the formulas and Excel recalculates to a different figure.
+**Prevention Rule:**
+- Write computed **values** into a filled template and drop the `<f>` element. The exported
+  sheet is a record of what was agreed, not a calculator that may disagree with it.
+- Then remove `xl/calcChain.xml` and its `[Content_Types].xml` override — a cached
+  dependency graph pointing at cells that no longer compute is what triggers Excel's
+  repair prompt.
+**Detection Method:** `template.test.js` asserts zero `<f>` elements survive in the filled
+sheets and that the grand total equals `ticketTotal()`.
+
+### B-18.3 🟠 A generated lookalike instead of the customer's own form
+**Symptom:** The client receives a workbook that resembles their service ticket but is not
+it — different column widths, no logo, no print setup.
+**Root Cause:** Building a new workbook with a spreadsheet library. SheetJS's community
+build does not preserve styles on write, so "fill the template" silently becomes "recreate
+something like it".
+**Prevention Rule:** An `.xlsx` is a zip of XML. Patch **cell values only**, in place, and
+every part that is not a filled sheet comes back byte-identical — styles, theme, drawings,
+media, printer settings and the other tabs included. Keep each cell's `s=` style index;
+that index is what carries its border, font and number format.
+**Detection Method:** `template.test.js` compares the output to the template part by part
+and fails on any change outside the four ticket sheets.

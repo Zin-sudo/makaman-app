@@ -383,23 +383,16 @@ cold boot with the network cut. Regression: `layout` 13, `tabs` 11, `export` 14,
 
 ---
 
-## 3. NEXT TASK — Tier 1 of §7
+## 3. NEXT TASK — Tier 2 of §7
 
-**`exportExcel` and the two cloud-upload buttons write false audit entries.**
+**The sync engine, before more features are built on it.** Offline/online stress test —
+two devices taking one series number, ops edits during an offline log, a handover made
+offline against a reassigned ticket — plus the localStorage quota guard (B-1.1).
 
-```js
-exportExcel: () => { this.log('4 sheets downloaded to this device.', 'lifecycle'); this.toast('export', …
-```
-
-Nothing is downloaded. The same pattern is in `uploadOneDrive` and `uploadGoogleDrive`.
-CLAUD.md records the audit trail as legally required, and it currently holds entries for
-exports that never happened. Either implement the export or remove the claim — do not leave
-a success toast over a no-op.
-
-All three share the audit-write path; fix them in one pass.
+Tier 1 is done: see §2j.
 
 **Arabic / RTL mirroring is cancelled** — see §2i. The UI stays English; Arabic *content*
-is supported and tested. MINDMAP's 🔴 on P2.4 is superseded by that decision.
+is supported and tested.
 
 The gate conversion is done (§2c). When adding a capability gate, call
 `hasPermission(key)`; when deciding presentation, a role comparison is still right.
@@ -410,6 +403,73 @@ Stop and log it here rather than guessing:
   need real item numbers from the user. **Never invent codes, average prices, or drop rows.**
 - Supabase "leaked password protection" is still OFF and the seeded Admin password appeared
   in a chat transcript. Both need the user at the dashboard.
+
+---
+
+## 2j. THE EXCEL EXPORT — TIER 1 (2026-08-26)
+
+### What was wrong
+`exportExcel` wrote **"4 sheets downloaded to this device"** into the audit trail and raised
+a success toast, then downloaded nothing. `uploadOneDrive` and `uploadGoogleDrive` did the
+same for uploads that cannot happen — there is no OAuth behind either, the connect step in
+Settings is explicitly mocked. The trail CLAUD.md calls legally required held entries for
+exports nobody received.
+
+### What it does now
+Fills **the real workbook**, in place. An `.xlsx` is a zip of XML, so rewriting only cell
+*values* leaves the branded sheet untouched: column widths, merges, borders, fonts, print
+setup, the embedded logo and all six customer price-list tabs survive byte-for-byte.
+**55 of 60 parts come back byte-identical**; only the four ticket sheets and the
+content-type map change, and `calcChain.xml` is deliberately dropped.
+
+This was the user's instruction, and it is the right shape anyway: *"generate the same
+original sheets initially provided simply filled with cell mapping … the intention is to
+generate precisely the original layout"*. A workbook built by a library would be a
+lookalike — SheetJS's community build does not preserve styles on write.
+
+### The cell map (`TEMPLATE`, read off the template itself)
+| | Service Ticket (sheets 1–2) | Job Log (sheets 3–4) |
+|---|---|---|
+| Customer | B8 | B10 |
+| Ticket No | E8 | H6 |
+| Field | B9 | B12 |
+| Well | B10 | B14 |
+| Supervisor | E10 | B16 |
+| Rig | B11 | F16 |
+| Start / End | E11 / E12 | A18 / D18 |
+| Mileage | B12 | — |
+| Base Location | B13 | — |
+| Job Type | A14 | F12 |
+| Customer Rep. | — | F14 |
+| Arrived | — | F18 |
+| Rows | items 16–39 (A–F) | events 20–44 (A–E) |
+| Total | F40 | — |
+
+`seed()` already referred to "B13 Base Location / F14 Customer Rep.", which is the same map.
+
+### Two things this turned up
+1. **The template carries someone else's pricing.** It was saved from a real ticket:
+   `F24 = -(E24*0.6)` is a 60% discount, `F22 = E22*0.2` a 20% surcharge, and
+   `E22 = SUM(F16:F21)` sums six of twenty-four rows. Left alive, the workbook would
+   recalculate to a different total from the PDF the customer signed. Every formula in the
+   filled region is replaced by its computed value — the sheet is a record, not a
+   calculator. B-18.2.
+2. **The Job Log's headers were cross-sheet formulas** (`'Service Ticket (Original)'!B8`).
+   They are written as literal values instead: a workbook whose figures only appear after
+   a recalculation opens stale in viewers that do not recalculate, and this file goes to a
+   customer.
+
+### Verification
+`app/template.test.js` — 16 assertions, including that a **failed** fill writes no audit
+entry, that neither cloud button records an upload, that every part outside the four sheets
+is byte-identical, that filled cells keep their style index, and that **zero formulas
+survive**. Read back with openpyxl: dates are real dates in the template's own format, the
+total keeps its currency format, 16 merged ranges and portrait/fit-to-page intact.
+
+### Still open on this
+- The template holds 24 item rows and 25 log rows. A larger ticket is **flagged**, not
+  silently truncated — the toast says so and points at the ZIP.
+- OneDrive/Google Drive remain unimplemented and now say so.
 
 ---
 

@@ -5,7 +5,7 @@
 // layer already handles offline logging via localStorage (see the Field Device notes in
 // the technician screen) — this cache only covers the app shell itself so the page can
 // still load if the device has no signal when it's opened.
-const CACHE = 'makaman-jobtickets-shell-v5';
+const CACHE = 'makaman-jobtickets-shell-v6';
 // The React/Babel bundles and the fonts are part of the shell now, not remote assets.
 // Without them precached the app would show a blank page on an offline cold start, since
 // support.js cannot boot without React. Bumping the cache name retires the v1 shell,
@@ -28,6 +28,10 @@ const SHELL = [
   // parse time on every launch for something most sessions never use.
   './vendor/jspdf.umd.min.js',
   './vendor/jszip.min.js',
+  // The real workbook the Excel export fills. Precached for the same reason as the
+  // exporters: the office may be on a thin connection, and a template that does not
+  // arrive is an export that cannot happen.
+  './uploads/service-ticket-template.xlsx',
   // The Arabic face the PDF embeds. Same reasoning as the exporters themselves: the
   // sheets must be producible with no signal, and a customer's name is not optional.
   './vendor/jspdf-noto-arabic.js',
