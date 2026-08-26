@@ -1119,6 +1119,47 @@ time, no races, and the cost when idle is one index lookup.
 
 ---
 
+### B-16.7 🔵 Comparing a Bearer Token to a Key by String Equality
+**Symptom:** A server-to-server call returns **401** with a message about an invalid
+session, even though the caller was given the correct key. Nothing in the logs explains it.
+**Root Cause:** The function did `if (token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))`.
+Supabase fills that env var with the **legacy `eyJ…` JWT**, while a project configured with
+the newer **`sb_secret_…`** format presents a different string for the same authority. Both
+are valid; `===` cannot see that. The call then falls through to the user-token branch and
+is rejected as a bad session — a misleading error for a key-format mismatch.
+**Prevention Rule:**
+- **Never authenticate a machine caller by string-comparing a platform key.** Key formats
+  get migrated, and the failure is silent and misdiagnosable.
+- Prefer proof the caller can only produce by having the access you actually care about: a
+  single-use nonce written to a table no client can write, consumed on first use.
+- Consume the nonce *before* checking its freshness, so an intercepted one is worth one
+  attempt rather than a two-minute window of attempts.
+- If a shared secret really is unavoidable, do not store a live credential in the database
+  to keep in step with one the platform injects — that is two copies of one secret and they
+  will drift.
+**Detection Method:**
+```bash
+grep -rn "SERVICE_ROLE_KEY" supabase/functions/ | grep -v "createClient"
+# A service key used for anything but constructing the privileged client → FLAG
+```
+**Found:** 2026-08-26, first live run of `master-export`. Fixed by migration 0023.
+
+### B-16.8 ⚪ Diagnosing an Edge Function When Egress Is Blocked
+The build container cannot reach `*.supabase.co`, so an Edge Function cannot be called or
+curled from here. It can still be driven **from inside the database**: `pg_net` runs on the
+right side of the wall.
+
+```sql
+select public.rebuild_master_export(true);          -- fire it
+select status_code, content, error_msg              -- read the actual reply
+from net._http_response order by created desc limit 1;
+```
+
+That is how the 401 above was found. Without it the only evidence was an absent
+`export_runs` row, which says the function refused the call but not why.
+
+---
+
 ---
 
 *This is a living document. Every agent MUST append new failure modes discovered during development. Do not let it drift.*

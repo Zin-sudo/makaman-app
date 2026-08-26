@@ -497,26 +497,36 @@ private `exports` bucket → signed link that expires in 60 seconds → Account 
 - **Failures are kept.** `export_runs` records every attempt; the Account tab shows the
   reason a file is stale rather than leaving the last success looking current.
 
-### 🔴 ONE STEP IS NOT DONE, AND ONLY THE ACCOUNT OWNER CAN DO IT
-The scheduler needs a service-role key, and **I do not have one and should not**. Until
-this is run once in the SQL editor, `rebuild_master_export()` returns
-`no service_role_key in vault — scheduler idle` and the automatic path does nothing:
+### ✅ VERIFIED END TO END — the whole chain has now run
+`200 · {"ok":true,"rows":0,"path":"master/makaman-approved-jobs.xlsx","by":"scheduler"}`,
+a real **17,873-byte** `.xlsx` with the correct Excel MIME type in the bucket, and an
+`export_runs` row reading `ok` in 0.27s. **SheetJS under Deno and the storage upload are
+no longer assumptions.** `rows: 0` is correct — there are no approved tickets yet, and the
+sheet still carries its headings.
 
-```sql
-select vault.create_secret('<service_role_key>', 'service_role_key');
-```
+**No credential is stored anywhere.** The vault is empty and nothing needs it.
 
-The office's **Rebuild now** button works without it — that path authorises with the
-signed-in person's own token.
+### How the scheduler proves itself, and why it is not a key
+The first design had pg_cron present the service-role key and the function compare it to
+`SUPABASE_SERVICE_ROLE_KEY` by string equality. It failed with **401 Invalid session**,
+and the reason is worth carrying: the platform fills that env var with the **legacy `eyJ…`
+JWT**, while a project using Supabase's newer **`sb_secret_…`** format presents a different
+string for the same authority. `===` cannot see they are the same, and nothing in the logs
+explains it.
 
-### What could NOT be verified from here, stated plainly
-Egress to `*.supabase.co` is blocked from this container, and the vault is empty, so I
-hold no credential that can invoke an Edge Function. **`master-export` has therefore never
-been executed.** What is verified: the view returns 21 correctly-named columns, the bucket
-exists and is private, `export_runs` and its RLS, the scheduler's due-check and its idle
-message, and the whole app half. What is not: that SheetJS writes a valid workbook under
-Deno, and that the storage upload succeeds. **First run will tell you** — press Rebuild
-now as an Ops Manager and read the tile; a failure will name its own reason.
+Chasing the matching spelling would have worked and been wrong twice over — a brittle
+comparison, and a live credential parked in the database to keep in step with a format
+Supabase is actively migrating. So the comparison is gone (migration 0023):
+
+- `rebuild_master_export()` mints a row in `export_nonces` and sends it as `x-export-nonce`.
+- The function looks it up, **deletes it whether or not it turns out to be fresh** (a
+  leaked nonce is worth one attempt), then rejects anything older than two minutes.
+- `export_nonces` has RLS on and **deliberately no policies** — the service role bypasses
+  RLS, everyone else sees nothing. A nonce nobody can read is a nonce nobody can replay.
+- Expired rows are swept on each run, so the table cannot grow without bound and no second
+  scheduled job is needed to tidy it.
+
+Nothing here breaks the next time a key format changes.
 
 ### Two findings from the advisor, one an ERROR
 1. **`master_export_rows` was SECURITY DEFINER** — the Postgres default for views. Any

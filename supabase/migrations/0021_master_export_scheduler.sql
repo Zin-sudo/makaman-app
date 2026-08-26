@@ -79,13 +79,9 @@ select cron.schedule(
   $$select public.rebuild_master_export();$$
 );
 
--- ── The one thing that cannot live in a migration ────────────────────────────
--- The scheduler needs a credential, and a service-role key does not belong in a file in
--- a repository. Run this once, in the SQL editor, with the key from
--- Settings → API → service_role:
---
---   select vault.create_secret('<service_role_key>', 'service_role_key');
---
--- Until then `rebuild_master_export()` returns 'no service_role_key in vault — scheduler
--- idle' and does nothing. The office's manual Refresh button works without it, because
--- that path authorises with the signed-in person's own token instead.
+-- ── SUPERSEDED BY 0023 ──────────────────────────────────────────────────────
+-- This migration originally ended with an instruction to place the service-role key in
+-- the vault, and posted it as a bearer token. That failed with 401: the function compared
+-- it to SUPABASE_SERVICE_ROLE_KEY, which the platform fills with the *legacy* JWT, while
+-- the key placed in the vault was the newer `sb_secret_` format. 0023 replaces the whole
+-- arrangement with a single-use nonce, and no credential is needed here at all.

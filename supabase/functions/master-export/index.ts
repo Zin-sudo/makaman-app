@@ -16,29 +16,49 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const OBJECT_PATH = 'master/makaman-approved-jobs.xlsx'
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const NONCE_MAX_AGE_MS = 2 * 60 * 1000
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-export-nonce',
 }
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 }
 
-// verify_jwt is off at the platform level because there are two legitimate callers with
-// different credentials: pg_cron, which holds the service-role key, and a signed-in
-// member of the office asking for a rebuild now. Both are checked here instead, and
-// neither path lets an anonymous caller through.
+// verify_jwt is off at the platform level because there are two legitimate callers and
+// they prove themselves differently. Both are checked here; neither path lets an
+// anonymous caller through.
 async function callerIsAllowed(req: Request, db: ReturnType<typeof createClient>) {
+  // 1. The scheduler, holding a single-use nonce only the database can mint.
+  //
+  //    Deliberately NOT a comparison against SUPABASE_SERVICE_ROLE_KEY. That is the
+  //    legacy JWT spelling of the key, and a project configured with the newer
+  //    `sb_secret_` format presents a different string for the same authority — the
+  //    comparison then fails with 401 for a reason nothing in the logs explains.
+  //    A nonce has no spelling to get wrong.
+  const nonce = req.headers.get('x-export-nonce')
+  if (nonce) {
+    const { data: row } = await db
+      .from('export_nonces').select('nonce, created_at').eq('nonce', nonce).maybeSingle()
+    if (!row) return { ok: false, why: 'That request was not recognised.' }
+
+    // Consumed whether or not it turns out to be fresh, so a leaked nonce is worth one
+    // attempt at most.
+    await db.from('export_nonces').delete().eq('nonce', nonce)
+
+    const age = Date.now() - new Date(row.created_at as string).getTime()
+    if (age > NONCE_MAX_AGE_MS) return { ok: false, why: 'That request expired.' }
+    return { ok: true, why: 'scheduler' }
+  }
+
+  // 2. A person, pressing Rebuild now. Identity from their own token, role from the
+  //    database — never from a claim inside the token, which can be stale after a role
+  //    change.
   const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '')
   if (!token) return { ok: false, why: 'Missing Authorization header.' }
 
-  // The scheduler.
-  if (token === SERVICE_ROLE_KEY) return { ok: true, why: 'scheduler' }
-
-  // A person. Identity comes from their own token, and the role from the database —
-  // never from a claim inside the token, which can be stale after a role change.
   const { data: user, error } = await db.auth.getUser(token)
   if (error || !user?.user) return { ok: false, why: 'Invalid session.' }
 
