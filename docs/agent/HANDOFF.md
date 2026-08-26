@@ -372,7 +372,9 @@ already happened (B-17.1). `app/mksheet.test.js` fails if they separate.
 ### Still open on this
 - **The 3px card stripe is dead code** (B-17.5) — an inline `border:1px` beats the class.
   Left alone: fixing it changes how every ticket card looks, which is the user's call.
-- **`exportExcel` still only opens a dialog.** The ZIP/PDF path is real; the Excel one is not.
+- ~~`exportExcel` still only opens a dialog~~ — **closed in §2j**, two commits later. Left
+  here struck through rather than deleted: this line survived its own fix, which is the
+  exact failure CONSTRAINTS §21 exists to stop.
 
 ### Verification
 `app/mksheet.test.js` — 14 assertions, including that **no band moves with every one of the
@@ -839,3 +841,55 @@ Cheap, blocks nothing, and every day it runs adds bad data.
 
 `exportExcel` adds no screen, so its position is order-neutral — it ranks first purely
 because it is corrupting the audit trail today.
+
+---
+
+## 8. STUB REGISTER
+
+Every deferral in this project, with the tier of §7 it must be closed in. **Governed by
+CONSTRAINTS §21: a tier does not close while an entry against it is open**, and nothing may
+be deferred without being written here in the same commit.
+
+The "recommended time" is not advice. It is the gate.
+
+| # | What is incomplete | Where | Close in | Blocked on |
+|---|---|---|---|---|
+| S1 | `cloud.test.js` hydration lands nothing; the PASS lines before the crash are vacuous. Only suite covering cloud mode, the offline queue and write coalescing. | `app/cloud.test.js` | **Before Tier 5** | — |
+| S2 | Waha price-list conflicts (10 rows) parked in `backup.price_list_conflicts_20260820`. Never invent codes, average prices, or drop rows. | database | Tier 3 | **user** |
+| S3 | Seeded Admin password appeared in a chat transcript and is unrotated. | Supabase dashboard | Tier 3 | **user** |
+| S4 | Supabase leaked-password protection is OFF. | Supabase dashboard | Tier 3 | **user** |
+| S5 | Stray `service_role_key` placeholder row in the `makaman-libya` vault. | wrong project | Tier 3 | **user** |
+| S6 | Migration 0002 applied to the DB but missing from `supabase/migrations/`. Do not rebuild schema from files alone. | repo | **Tier 4, first** | — |
+| S7 | `order_index` column for drag-and-drop item reordering. | schema | Tier 4 | — |
+| S8 | Q1 rewording to "Tools Allocated Reclaimed or Back-to-Base?" — DB (0009) and app differ by one word. | schema + app | Tier 4 | — |
+| S9 | OneDrive / Google Drive upload unimplemented. Buttons are honest about it and write nothing (B-18.1). | `index.html` | Tier 5, or dropped | — |
+| S10 | Excel template holds 24 item rows / 25 log rows. A larger ticket is flagged, not truncated. | `fillWorkbook` | Tier 5 | — |
+| S11 | B8 — flag sync conflicts instead of overwriting, as a general merge. The settled-ticket case is closed (§2k). | `index.html` | Tier 5 | — |
+| S12 | `.mk-ticket-card` 3px stripe is dead code — an inline `border:1px` beats the class (B-17.5). Fixing it changes every card. | CSS | Tier 6 | **user** (design) |
+| S13 | Job Log date column renders `mm-dd-yy` while every other date reads `d-mmm-yyyy`. The template's own formatting, preserved deliberately. | template | Tier 6 | **user** (design) |
+| S14 | "Apper" skill. | — | Tier 7 | — |
+
+### Baseline — full sweep, 2026-08-26
+**34 of 35 suites green. One red: `cloud.test.js` (S1).** Every other suite passes, so the
+register above is the complete list of what is outstanding, not a sample of it.
+
+Re-run the sweep before closing any tier — it takes about twelve minutes and it is the only
+thing that proves the register is still complete:
+```bash
+cd app && for t in *.test.js; do
+  NODE_PATH=../node_modules timeout 200 node "$t" >/dev/null 2>&1 || echo "RED: $t"
+done
+```
+Its first run paid for itself twice: it found `approval.test.js` red — a regression I had
+introduced two commits earlier and not noticed (B-19.5) — and confirmed no other suite was
+quietly failing.
+
+### How to use this
+1. When you defer anything, add a row **in the same commit**. An unregistered deferral is a
+   defect, not a decision.
+2. Before declaring a tier done, walk this table and close every row against it. The work
+   is still loaded; closing it now costs a fraction of returning to it.
+3. If a row genuinely should not be done in its tier, **re-assign it here with a reason** —
+   never carry it silently.
+4. Strike a row through when closed, with the section that closed it, rather than deleting
+   it. S-numbers stay stable so commits and BLINDSPOTS entries can cite them.

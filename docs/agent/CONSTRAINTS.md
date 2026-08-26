@@ -453,3 +453,53 @@ If Post-Flight check FAILS:
 - Do NOT "fix it in the next task."
 - Fix it NOW. The failure mode is documented. The fix is known. There is no excuse.
 
+
+---
+
+## 21. STUBS, DEFERRALS, AND CLOSING A CATEGORY
+
+A stub is cheap to write and expensive to find again. The cost is never the stub itself —
+it is coming back cold to a thing you already had loaded, re-deriving why it was left, and
+discovering it had gone stale in the meantime. This session produced three examples inside
+one day: an `exportExcel` that announced downloads it never performed, a `cloud.test.js`
+that printed PASS over a dead suite, and a HANDOFF line still describing a stub that had
+been implemented two commits earlier.
+
+### 21.1 Register it at the moment you defer it
+Every deferral — a stub, a mock, a "left alone", a "not investigated", a known-red test —
+MUST be written into the **stub register (HANDOFF §8)** in the same commit that creates or
+discovers it, with:
+- what is incomplete, in one line;
+- **the tier it must be closed in** (§7), which is the "recommended time";
+- who it is blocked on, if anyone.
+
+An unregistered deferral is a defect, not a decision.
+
+### 21.2 A tier does not close while its stubs are open
+**Before declaring any tier of §7 done, walk the register and close every entry assigned to
+that tier.** No tier is complete with an open stub against it. This is the whole point: the
+work is still loaded, the reasoning is still in hand, and closing it now costs a fraction
+of what returning to it costs.
+
+If an entry genuinely should not be done in its tier, it is **re-assigned in the register
+with a reason** — not silently carried.
+
+### 21.3 A stub must not lie
+Until it is implemented, a stub MUST tell the truth about itself:
+- It must never write to the audit trail, which is a record of what happened (B-18.1).
+- It must never show success for work it did not do.
+- It must say plainly that it is not connected or not finished.
+A stub that reports success is worse than a missing feature, because it removes the very
+signal that would have got it finished.
+
+### 21.4 Prefer deleting to deferring
+If nothing depends on it and nobody asked for it, remove it rather than register it. The
+register is for work that is genuinely coming, not a graveyard.
+
+### 21.5 Detection
+```bash
+# Anything in the docs that reads like a deferral must appear in the register.
+grep -n -iE "still open|unimplemented|not investigated|mocked|left alone|for now" docs/agent/HANDOFF.md
+# Every red suite is a registered stub until it is green.
+cd app && for t in *.test.js; do NODE_PATH=../node_modules node "$t" >/dev/null 2>&1 || echo "RED: $t"; done
+```

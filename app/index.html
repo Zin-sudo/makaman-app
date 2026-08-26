@@ -2894,13 +2894,19 @@ function outboxDrain() {
 // of which writes the database would not take is the first thing worth having when a
 // device and the office disagree.
 function outboxSetAside(op, why) {
+  // The reason is worked out BEFORE the try, so the try guards only the storage write.
+  // It used to be computed inside, and when refusalText was briefly unreachable the
+  // ReferenceError was caught by a `catch` meant for quota — the refusal was dropped and
+  // the drain reported success. A catch wide enough to hide a programming error is the
+  // same failure this whole file exists to prevent: a record lost in silence.
+  const reason = refusalText(why);
   try {
     const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
     // The reason is kept, not just the op. Without it the pile answers "something was
     // refused" and nothing more, which is not enough for anyone to act on — and the most
     // likely cause here, two devices reaching for one ticket number, has an obvious
     // remedy the moment it is named.
-    dead.push({ at: new Date().toISOString(), op: op, why: refusalText(why) });
+    dead.push({ at: new Date().toISOString(), op: op, why: reason });
     localStorage.setItem(DEADLETTER_K, JSON.stringify(dead.slice(-50)));
   } catch (e) { /* quota */ }
 }

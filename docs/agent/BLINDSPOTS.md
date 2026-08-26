@@ -1363,3 +1363,24 @@ as B-15.8 (a negative assertion passing on a blank page).
 cd app && NODE_PATH=../node_modules node cloud.test.js 2>&1 | tail -3
 # A suite that ends in a stack trace rather than a count → the count above it means nothing.
 ```
+
+### B-19.5 🔴 A catch wide enough to hide a programming error
+**Symptom:** `approval.test.js` went red on "the refusal is kept, not discarded silently".
+The queue drained, the op was given up on, and the set-aside pile came back empty.
+**Root Cause:** `outboxSetAside` computed its reason *inside* a `try` whose `catch` existed
+for quota. When `refusalText` was unreachable in the suite's isolated evaluation, the
+resulting `ReferenceError` was caught by that quota handler and the refusal was dropped —
+while the drain reported success. A broad catch turned a coding mistake into silent data
+loss, which is the exact failure the surrounding code exists to prevent.
+**Prevention Rule:**
+- A `try` guards **one** fallible operation. Compute everything else before it.
+- A `catch` written for a specific failure (quota, network) must not be able to swallow a
+  `ReferenceError` or `TypeError`. If the block can throw for more than one reason, either
+  narrow it or re-throw what you did not mean to handle.
+- When a suite evaluates extracted functions in isolation, every function they call must
+  come with them — otherwise the suite fails for a reason unrelated to what it tests.
+**Detection Method:**
+```bash
+grep -n -B6 "catch (e) { /\* quota \*/ }" app/index.html
+# More than one statement that can throw inside the try → narrow it.
+```

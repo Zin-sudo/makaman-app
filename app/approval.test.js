@@ -71,7 +71,11 @@ async function open(ctx, cfg) {
         }
         return null;
       };
-      const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'outboxSetAside', 'outboxDrain']
+      // Every function the extracted set actually calls has to come with it. Miss one and
+      // it is undefined in here, which is how a ReferenceError got mistaken for a quota
+      // error and this suite went red for a reason that had nothing to do with the queue.
+      const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
+                     'outboxSetAside', 'outboxDrain']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       localStorage.setItem(OUTBOX_K, JSON.stringify([
