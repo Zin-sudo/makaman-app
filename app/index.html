@@ -102,8 +102,18 @@
     --ink-strong:#1d2d3d; --brand:#b0413a;
     --chip-ok-bg:#1d2d3d; --chip-ok-fg:#f2f2f3;
     --danger:#b0413a; --danger-deep:#8c3b3b; --danger-rgb:176,65,58;
+    /* Text on a danger ground. It used to borrow --on-accent, which passed only because
+       both happened to be near-white — and when --on-accent moved for the accent button,
+       the badge went dark-on-red and passed again by a second coincidence (5.57). Twice
+       lucky is not a rule. */
+    --on-danger:#ffffff;
     --warning:#b5790c; --warning-ink:#8a5b09; --warning-deep:#7a5109; --warning-rgb:181,121,12;
     --success:#2f8f5b; --success-rgb:41,143,91;
+    /* The text weight of green, which this palette never had — --success itself measures
+       3.34 on its own wash and 4.04 on a plain surface. #256f47 is 5.04 and 6.10. In the
+       dark theme the bright green already passes as text (6.37), so --success-ink is the
+       same value there and the two themes can share one binding. */
+    --success-ink:#256f47;
     --hue-teal:#2c7a72; --hue-indigo:#4c5c9e; --hue-clay:#b0644a;
     --hue-teal-wash:rgba(44,122,114,0.12); --hue-indigo-wash:rgba(76,92,158,0.12); --hue-clay-wash:rgba(176,100,74,0.12);
     --shadow-rgb:43,43,45; --scrim:rgba(43,43,45,0.55);
@@ -141,8 +151,10 @@
     --brand:#c44034;
     --chip-ok-bg:rgba(48,209,88,0.18); --chip-ok-fg:#30d158;
     --danger:#ff453a; --danger-deep:#ff6961; --danger-rgb:255,69,58;
+    /* White on #ff453a is 3.41:1; near-black is 5.57. */
+    --on-danger:#00121f;
     --warning:#ff9f0a; --warning-ink:#ffcf70; --warning-deep:#ffbf4d; --warning-rgb:255,159,10;
-    --success:#30d158; --success-rgb:48,209,88;
+    --success:#30d158; --success-rgb:48,209,88; --success-ink:#30d158;
     --hue-teal:#40c8e0; --hue-indigo:#bf5af2; --hue-clay:#ff9f0a;
     --hue-teal-wash:rgba(64,200,224,0.16); --hue-indigo-wash:rgba(191,90,242,0.16); --hue-clay-wash:rgba(255,159,10,0.16);
     --shadow-rgb:0,0,0; --scrim:rgba(0,0,0,0.72);
@@ -642,7 +654,7 @@
       <button onClick="{{ toggleNotifications }}" title="{{ notifyTitle }}" style="position:relative;flex:none;padding:5px 8px;margin-inline-end:4px;cursor:pointer;background:transparent;border:1px solid rgba(var(--on-navbar-rgb),0.22);color:inherit;line-height:1">
         <span style="font-size:15px">{{ notifyGlyph }}</span>
         <sc-if value="{{ notifyAny }}" hint-placeholder-val="{{ false }}">
-          <span style="position:absolute;top:-6px;inset-inline-end:-6px;min-width:17px;height:17px;padding:0 4px;font-size:10px;font-weight:700;line-height:17px;text-align:center;background:var(--danger);color:var(--on-accent);border-radius:9px">{{ notifyCount }}</span>
+          <span style="position:absolute;top:-6px;inset-inline-end:-6px;min-width:17px;height:17px;padding:0 4px;font-size:10px;font-weight:700;line-height:17px;text-align:center;background:var(--danger);color:var(--on-danger);border-radius:9px">{{ notifyCount }}</span>
         </sc-if>
       </button>
       <span class="mk-nav-name" style="font-weight:600">{{ sessionName }}</span>
@@ -658,7 +670,7 @@
     <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 22px;background:rgba(var(--danger-rgb),0.14);border-bottom:2px solid var(--danger)">
       <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--danger);animation:pulse 2s infinite"></span>
       <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>This device is out of storage — your last change was not saved.</strong> {{ storageFullHint }}</div>
-      <button onClick="{{ retryPersist }}" style="flex:none;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--danger);color:var(--on-accent);border:0">TRY AGAIN</button>
+      <button onClick="{{ retryPersist }}" style="flex:none;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--danger);color:var(--on-danger);border:0">TRY AGAIN</button>
     </div>
   </sc-if>
 
@@ -783,7 +795,7 @@
               <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ pwError }}</div>
             </sc-if>
             <sc-if value="{{ pwDone }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:var(--success);margin-bottom:10px">Password changed. It applies the next time you sign in.</div>
+              <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Password changed. It applies the next time you sign in.</div>
             </sc-if>
             <button onClick="{{ doChangePassword }}" disabled="{{ pwBusy }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent);opacity:{{ pwBusyDim }}">{{ changePwLabel }}</button>
           </div>
@@ -1509,7 +1521,7 @@
               <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ newTechError }}</div>
             </sc-if>
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:var(--success);margin-bottom:10px">Account created — they can log in now.</div>
+              <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
             <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
           </div>
@@ -1802,7 +1814,7 @@
                 <div style="font-size:11px;margin-top:5px;color:var(--ink-faint);line-height:1.4">Takes it out of every list without erasing anything. The technician who raised it sees who withdrew it and why.</div>
               </sc-if>
               <sc-if value="{{ showRestore }}" hint-placeholder-val="{{ false }}">
-                <button onClick="{{ askRestore }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--success);border:1px solid var(--success)">Restore this ticket</button>
+                <button onClick="{{ askRestore }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--success-ink);border:1px solid var(--success)">Restore this ticket</button>
               </sc-if>
             </div>
 
@@ -2255,7 +2267,7 @@
               <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ newTechError }}</div>
             </sc-if>
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:var(--success);margin-bottom:10px">Account created — they can log in now.</div>
+              <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
             <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
           </div>
@@ -2595,7 +2607,7 @@
         <sc-if value="{{ showMasterExport }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
+              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success-ink);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
               <div style="flex:1;min-width:0">
                 <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
                 <div style="font-size:12px;color:{{ masterTone }};margin-top:2px">{{ masterState }}</div>
@@ -3980,7 +3992,7 @@ const ASSET_QUESTIONS_DEFAULT = [
 const ASSET_TONES = {
   warning: { bg: 'rgba(var(--warning-rgb),0.16)', fg: 'var(--warning-ink)', border: 'var(--warning)' },
   accent:  { bg: 'var(--accent-wash)', fg: 'var(--accent-ink)', border: 'var(--accent)' },
-  success: { bg: 'rgba(var(--success-rgb),0.16)', fg: 'var(--success)', border: 'var(--success)' },
+  success: { bg: 'rgba(var(--success-rgb),0.16)', fg: 'var(--success-ink)', border: 'var(--success)' },
 };
 const assetTone = (q) => ASSET_TONES[q.tone] || ASSET_TONES.accent;
 
@@ -5284,15 +5296,15 @@ class Component extends DCLogic {
   // colour and the active work looking inert.
   statusChip(t) {
     if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
-    if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'rgba(var(--warning-rgb),0.16)', chipFg: 'var(--warning-ink)' };
+    if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'rgba(var(--warning-rgb),0.16)', chipFg: 'var(--warning-deep)' };
     return { statusLabel: 'IN PROGRESS', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
   }
   // The same three stages as a card treatment — a coloured rule down the leading edge
   // and an icon tile — so a ticket is identifiable from its shape before any text is
   // read. Merged into ticketView() so every list that renders a ticket picks it up.
   cardTreatment(t) {
-    if (t.status === 'approved') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success)', tileIcon: icon('check') };
-    if (t.status === 'done') return { edge: 'var(--warning)', tileBg: 'rgba(var(--warning-rgb),0.16)', tileFg: 'var(--warning)', tileIcon: icon('clock') };
+    if (t.status === 'approved') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
+    if (t.status === 'done') return { edge: 'var(--warning)', tileBg: 'rgba(var(--warning-rgb),0.16)', tileFg: 'var(--warning-ink)', tileIcon: icon('clock') };
     return { edge: 'var(--accent)', tileBg: 'var(--accent-wash)', tileFg: 'var(--accent)', tileIcon: icon('rig') };
   }
   ticketView(t) {
@@ -6580,7 +6592,7 @@ class Component extends DCLogic {
           on: on, onLabel: on ? 'Yes' : 'No',
           // Green for held, plain for not. Read at a glance down a column of thirty-one.
           tileBg: on ? 'rgba(var(--success-rgb),0.16)' : 'transparent',
-          tileFg: on ? 'var(--success)' : 'var(--ink-faint)',
+          tileFg: on ? 'var(--success-ink)' : 'var(--ink-faint)',
           // A level-3 capability is one that acts for somebody else or changes who
           // people are. Worth marking so a tick is a considered one.
           heavy: p.level === 3,
@@ -7677,7 +7689,7 @@ class Component extends DCLogic {
         return 'Awaiting ' + missing.length + ' of ' + SIGNED_DOCS.length;
       })(),
       attachSummaryColor: (t && t.status === 'approved' && !this.signedDocsMissing(t).length)
-        ? 'var(--success)' : 'rgba(var(--ink-rgb),0.5)',
+        ? 'var(--success-ink)' : 'var(--ink-faint)',
       // One block per expected document rather than one undifferentiated pile. It is the
       // only shape that shows what is MISSING, which is the question this panel exists to
       // answer.
@@ -7685,7 +7697,7 @@ class Component extends DCLogic {
         label: d.label,
         received: !!d.files.length,
         stateText: d.files.length ? 'Received' : 'Awaited',
-        stateColor: d.files.length ? 'var(--success)' : 'var(--warning)',
+        stateColor: d.files.length ? 'var(--success-ink)' : 'var(--warning-ink)',
         edge: d.files.length ? 'var(--success)' : 'var(--warning)',
         canAttach: this.canAttachTo(t),
         // A second send of the same document is allowed on purpose: a technician who
@@ -8695,8 +8707,8 @@ class Component extends DCLogic {
       })(),
       masterTone: (() => {
         const m = D.masterExport;
-        if (!m) return 'rgba(var(--ink-rgb),0.55)';
-        return m.status === 'failed' ? 'var(--warning)' : 'rgba(var(--ink-rgb),0.55)';
+        if (!m) return 'var(--ink-faint)';
+        return m.status === 'failed' ? 'var(--warning-ink)' : 'var(--ink-faint)';
       })(),
       masterCanDownload: !!(D.masterExport && D.masterExport.status === 'ok' && D.masterExport.path),
       masterCannotDownload: !(D.masterExport && D.masterExport.status === 'ok' && D.masterExport.path),
