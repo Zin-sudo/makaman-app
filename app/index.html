@@ -104,7 +104,17 @@
     --hue-teal:#2c7a72; --hue-indigo:#4c5c9e; --hue-clay:#b0644a;
     --hue-teal-wash:rgba(44,122,114,0.12); --hue-indigo-wash:rgba(76,92,158,0.12); --hue-clay-wash:rgba(176,100,74,0.12);
     --shadow-rgb:43,43,45; --scrim:rgba(43,43,45,0.55);
-    --radius:0px; --radius-lg:0px;
+    /* One shape system, and the same one in both themes.
+       Until now --radius was 0 in light and 12px in dark, so the same card was a
+       different shape depending on the theme — and it made no difference either way,
+       because nothing read the token: every component measured 0px. A declaration with
+       no effect is worse than no declaration, so these are now applied by the classes
+       below and the two themes agree.
+       Restrained on purpose. The app's voice is industrial — condensed uppercase
+       labels, hairline rules, a printed form at the end of it — and the 12-20px radii
+       the reference theme asks for belong to a softer identity than this one. Dialling
+       the whole app up or back to square is these three values. */
+    --radius-sm:4px; --radius:6px; --radius-lg:10px;
   }
   /* Night Shift — the palette from the reference screenshots. Near-black ground, one
      lifted card surface, and saturated hues that carry meaning rather than decoration. */
@@ -125,7 +135,6 @@
     --hue-teal:#40c8e0; --hue-indigo:#bf5af2; --hue-clay:#ff9f0a;
     --hue-teal-wash:rgba(64,200,224,0.16); --hue-indigo-wash:rgba(191,90,242,0.16); --hue-clay-wash:rgba(255,159,10,0.16);
     --shadow-rgb:0,0,0; --scrim:rgba(0,0,0,0.72);
-    --radius:12px; --radius-lg:16px;
   }
   /* Native controls (date pickers, select arrows, scrollbars) follow the theme too —
      without this a dark page still gets a white date-picker panel. */
@@ -437,7 +446,22 @@
      row of every dashboard needs room to clear it. */
   .mk-page { padding-bottom:96px; }
   /* A ticket card: coloured rule down the leading edge, per status. */
-  .mk-ticket-card { border-left-width:3px; border-left-style:solid; }
+  /* S12. This class declared a 3px status stripe that never rendered: every card also
+     carried an inline `border:1px solid`, and an inline shorthand beats a class rule, so
+     the coloured edge came out as a hairline indistinguishable from the ordinary border.
+     Fixed by owning the whole border here rather than by shouting over the inline one
+     with !important — the card markup now sets only the stripe's colour, which is the
+     one part that varies per ticket. */
+  .mk-ticket-card {
+    border:1px solid rgba(var(--ink-rgb),0.16);
+    border-left-width:3px;
+    border-radius:var(--radius);
+  }
+  /* The shared shapes. Kept few and named for what they are, so the tokens above have
+     somewhere real to land instead of being decoration in :root. */
+  .mk-panel { border-radius:var(--radius-lg); }
+  .mk-soft  { border-radius:var(--radius); }
+  .mk-chip  { border-radius:var(--radius-sm); }
 </style>
 </helmet>
 
@@ -793,7 +817,7 @@
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:16px 0 8px">On this device</div>
               <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
-                  <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
+                  <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
@@ -1120,7 +1144,7 @@
                 <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin-bottom:8px">{{ syncPendingLabel }}</div>
                 <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
                   <sc-for list="{{ syncRows }}" as="t" hint-placeholder-count="2">
-                    <div class="mk-ticket-card" style="padding:11px;border:1px solid rgba(var(--ink-rgb),0.16);border-left-color:{{ t.edge }}">
+                    <div class="mk-ticket-card" style="padding:11px;border-left-color:{{ t.edge }}">
                       <div style="display:flex;align-items:center;gap:10px">
                         <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
                         <div style="flex:1;min-width:0">

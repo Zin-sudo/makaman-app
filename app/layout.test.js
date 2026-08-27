@@ -82,6 +82,62 @@ const boxes = (p) => p.evaluate(() => {
     await p.close();
   }
 
+  // ── The shape system is real, in both themes ────────────────────────────
+  //
+  // Two declarations used to exist and do nothing, which is the failure this block
+  // guards against — not "does it look nice", but "does the CSS the file claims to apply
+  // actually reach the pixel".
+  //
+  // S12: `.mk-ticket-card` declared a 3px status stripe while every card also carried an
+  // inline `border:1px solid`. An inline shorthand beats a class rule, so the coloured
+  // edge that tells you a job's status rendered as a hairline no different from the
+  // ordinary border. Measured, never eyeballed: a screenshot of a 1px stripe and a 3px
+  // one look alike at a glance, which is how it survived.
+  //
+  // And `--radius` was 0 in light and 12px in dark, so one card was two shapes depending
+  // on the theme — except it was neither, because nothing read the token and everything
+  // measured 0.
+  {
+    const p = await signIn(browser, 'yousef@makaman.ly', 430, 860);
+    for (const theme of ['dark', 'light']) {
+      await p.evaluate((t) => window.__mkApp.updateSettings({ theme: t }), theme);
+      await p.waitForTimeout(400);
+      const card = await p.evaluate(() => {
+        const el = document.querySelector('.mk-ticket-card');
+        if (!el) return null;
+        const cs = getComputedStyle(el);
+        return {
+          stripe: parseFloat(cs.borderLeftWidth),
+          plain: parseFloat(cs.borderTopWidth),
+          radius: parseFloat(cs.borderTopLeftRadius),
+          stripeColor: cs.borderLeftColor,
+          plainColor: cs.borderTopColor,
+        };
+      });
+      check(`${theme}: the status stripe is three times the ordinary border, not equal to it`,
+        !!card && card.stripe === 3 && card.plain === 1,
+        card ? `stripe ${card.stripe}px, other edges ${card.plain}px` : 'no card found');
+      check(`${theme}: and it carries the status colour, not the border colour`,
+        !!card && card.stripeColor !== card.plainColor,
+        card ? `${card.stripeColor} vs ${card.plainColor}` : '');
+      check(`${theme}: the corner radius the tokens declare is the radius that renders`,
+        !!card && card.radius > 0, card ? card.radius + 'px' : '');
+    }
+    // The same in both, or the app changes shape when somebody changes the lights.
+    const both = await p.evaluate(async () => {
+      const read = () => parseFloat(getComputedStyle(document.querySelector('.mk-ticket-card')).borderTopLeftRadius);
+      window.__mkApp.updateSettings({ theme: 'dark' });
+      await new Promise(r => setTimeout(r, 300));
+      const d = read();
+      window.__mkApp.updateSettings({ theme: 'light' });
+      await new Promise(r => setTimeout(r, 300));
+      return { dark: d, light: read() };
+    });
+    check('a card is the same shape in both themes', both.dark === both.light,
+      `dark ${both.dark}px, light ${both.light}px`);
+    await p.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   await browser.close();
   process.exit(fail ? 1 : 0);
