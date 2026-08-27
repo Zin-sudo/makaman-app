@@ -34,14 +34,19 @@ the rollback itself.
 
 ## The other way back
 
-Git holds the same thing, and the tag `css-baseline-pre-v2` points at it:
+Git holds the same bytes at commit `169399b`:
 
 ```sh
-git checkout css-baseline-pre-v2 -- app/index.html "app/Job Ticket System.dc.html"
+git checkout 169399b -- app/index.html "app/Job Ticket System.dc.html"
 ```
 
-Both routes land on identical bytes. The files here exist so the way back does not depend on
-knowing which commit to look for.
+There is a local tag `css-baseline-pre-v2` on that commit, but **it is local only** — this
+environment's git proxy accepts branch pushes and refuses tag pushes, so the tag does not
+exist on the remote and a fresh clone will not have it. Use the commit hash, or use the
+files in this directory.
+
+That is the reason this directory exists at all rather than a tag alone: a way back that
+depends on remote metadata is a way back that can quietly not be there.
 
 ## Keeping it honest
 
