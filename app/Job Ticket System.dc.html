@@ -710,6 +710,18 @@
               <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
               <input dir="auto" value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="width:100%;min-height:40px;margin-top:16px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
               </div>
+              <sc-if value="{{ awaitingDocsAny }}" hint-placeholder-val="{{ false }}">
+                <div style="padding:12px 14px;margin-bottom:14px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.1)">
+                  <div style="font-size:13px;line-height:1.45;color:var(--ink);margin-bottom:8px">{{ awaitingDocsLabel }}</div>
+                  <sc-for list="{{ awaitingDocsRows }}" as="w" hint-placeholder-count="2">
+                    <button onClick="{{ w.open }}" style="width:100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:7px 0;border:0;border-top:1px solid rgba(var(--ink-rgb),0.1);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
+                      <span style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }}</span>
+                      <span style="flex:1;min-width:0;font-size:12px;color:rgba(var(--ink-rgb),0.7)">{{ w.customer }}</span>
+                      <span style="font-size:11px;color:var(--warning)">{{ w.missing }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.5);margin:16px 0 8px">On this device</div>
               <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
@@ -936,40 +948,46 @@
               </sc-if>
 
               <sc-if value="{{ showAttachments }}" hint-placeholder-val="{{ true }}">
-                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-top:16px">
+                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
                   <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-                    <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Attachments</div>
-                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ attachmentsSummary }}</div>
+                    <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Signed paperwork</div>
+                    <div style="font-size:11px;color:{{ attachSummaryColor }}">{{ attachSummary }}</div>
                   </div>
-                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">The signed sheet, a photo of the wellhead, a third-party invoice.</div>
-                  <sc-if value="{{ attachmentsEmpty }}" hint-placeholder-val="{{ true }}">
-                    <div style="padding:12px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">Nothing attached to this ticket.</div>
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
+                  <sc-if value="{{ attachLocked }}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:rgba(var(--ink-rgb),0.7)">{{ attachLockedNote }}</div>
                   </sc-if>
-                  <sc-for list="{{ attachmentRows }}" as="a" hint-placeholder-count="2">
-                    <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                  <sc-for list="{{ attachDocRows }}" as="d" hint-placeholder-count="2">
+                    <div style="display:flex;gap:10px;padding:11px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                      <span style="width:3px;flex:none;background:{{ d.edge }}"></span>
                       <div style="flex:1;min-width:0">
-                        <div style="font-size:13px;line-height:1.45;color:var(--ink-strong);overflow-wrap:anywhere">{{ a.filename }}</div>
-                        <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:3px">{{ a.meta }}</div>
+                        <div style="display:flex;align-items:baseline;gap:8px">
+                          <div style="flex:1;font-size:13px;font-weight:600;color:var(--ink-strong)">{{ d.label }}</div>
+                          <div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:{{ d.stateColor }}">{{ d.stateText }}</div>
+                        </div>
+                        <sc-for list="{{ d.files }}" as="a" hint-placeholder-count="1">
+                          <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+                            <div style="flex:1;min-width:0">
+                              <div style="font-size:12px;line-height:1.4;color:var(--ink);overflow-wrap:anywhere">{{ a.filename }}</div>
+                              <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:2px">{{ a.meta }}</div>
+                            </div>
+                            <button onClick="{{ a.open }}" style="flex:none;padding:4px 10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">OPEN</button>
+                            <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ false }}">
+                              <button onClick="{{ a.remove }}" style="flex:none;padding:4px 10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:rgb(var(--danger-rgb));border:1px solid rgba(var(--danger-rgb),0.45)">REMOVE</button>
+                            </sc-if>
+                          </div>
+                        </sc-for>
+                        <sc-if value="{{ d.canAttach }}" hint-placeholder-val="{{ false }}">
+                          <label style="display:block;width:100%;min-height:34px;line-height:34px;margin-top:9px;text-align:center;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3);opacity:{{ attachBtnOpacity }};cursor:{{ attachBtnCursor }}">
+                            <input type="file" accept="{{ attachAccept }}" onChange="{{ d.onPick }}" disabled="{{ attachNeedsSignal }}" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
+                            {{ d.btnLabel }}
+                          </label>
+                        </sc-if>
                       </div>
-                      <button onClick="{{ a.open }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">OPEN</button>
-                      <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ a.remove }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:rgb(var(--danger-rgb));border:1px solid rgba(var(--danger-rgb),0.45)">REMOVE</button>
-                      </sc-if>
                     </div>
                   </sc-for>
-                  <sc-if value="{{ canAddAttachment }}" hint-placeholder-val="{{ true }}">
-                    <div style="margin-top:12px">
-                      <!-- The native file control is the only thing on this screen the
-                           browser draws itself, and it shows: a grey "Choose File" chip
-                           against a dark panel. The input is still the input — it is
-                           moved out of sight rather than removed, so the label opens the
-                           picker natively and nothing depends on script to work. -->
-                      <label style="display:block;width:100%;min-height:40px;line-height:40px;text-align:center;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3);opacity:{{ attachBtnOpacity }};cursor:{{ attachBtnCursor }}">
-                        <input type="file" accept="{{ attachAccept }}" onChange="{{ onAttachPick }}" disabled="{{ attachNeedsSignal }}" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
-                        {{ attachBtnLabel }}
-                      </label>
-                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px">{{ attachHint }}</div>
-                    </div>
+                  <sc-if value="{{ attachMayAttach }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:9px">{{ attachHint }}</div>
                   </sc-if>
                   <sc-if value="{{ attachBusy }}" hint-placeholder-val="{{ false }}">
                     <div style="font-size:11px;color:var(--accent-deep);margin-top:6px">Sending…</div>
@@ -1125,6 +1143,18 @@
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
 
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ awaitingDocsAny }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:12px 14px;margin-bottom:14px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.1)">
+            <div style="font-size:13px;line-height:1.45;color:var(--ink);margin-bottom:8px">{{ awaitingDocsLabel }}</div>
+            <sc-for list="{{ awaitingDocsRows }}" as="w" hint-placeholder-count="2">
+              <button onClick="{{ w.open }}" style="width:100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:7px 0;border:0;border-top:1px solid rgba(var(--ink-rgb),0.1);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
+                <span style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }}</span>
+                <span style="flex:1;min-width:0;font-size:12px;color:rgba(var(--ink-rgb),0.7)">{{ w.customer }}</span>
+                <span style="font-size:11px;color:var(--warning)">{{ w.missing }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
         <div class="mk-pagehead" style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
           <div>
             <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
@@ -1630,33 +1660,44 @@
             <sc-if value="{{ showAttachments }}" hint-placeholder-val="{{ true }}">
               <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
                 <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-                  <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Attachments</div>
-                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5)">{{ attachmentsSummary }}</div>
+                  <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">Signed paperwork</div>
+                  <div style="font-size:11px;color:{{ attachSummaryColor }}">{{ attachSummary }}</div>
                 </div>
-                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">The signed sheet, a photo of the wellhead, a third-party invoice.</div>
-                <sc-if value="{{ attachmentsEmpty }}" hint-placeholder-val="{{ true }}">
-                  <div style="padding:12px 0;text-align:center;font-size:12px;color:rgba(var(--ink-rgb),0.45)">Nothing attached to this ticket.</div>
+                <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-bottom:10px">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
+                <sc-if value="{{ attachLocked }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:rgba(var(--ink-rgb),0.7)">{{ attachLockedNote }}</div>
                 </sc-if>
-                <sc-for list="{{ attachmentRows }}" as="a" hint-placeholder-count="2">
-                  <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                <sc-for list="{{ attachDocRows }}" as="d" hint-placeholder-count="2">
+                  <div style="display:flex;gap:10px;padding:11px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                    <span style="width:3px;flex:none;background:{{ d.edge }}"></span>
                     <div style="flex:1;min-width:0">
-                      <div style="font-size:13px;line-height:1.45;color:var(--ink-strong);overflow-wrap:anywhere">{{ a.filename }}</div>
-                      <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:3px">{{ a.meta }}</div>
+                      <div style="display:flex;align-items:baseline;gap:8px">
+                        <div style="flex:1;font-size:13px;font-weight:600;color:var(--ink-strong)">{{ d.label }}</div>
+                        <div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:{{ d.stateColor }}">{{ d.stateText }}</div>
+                      </div>
+                      <sc-for list="{{ d.files }}" as="a" hint-placeholder-count="1">
+                        <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+                          <div style="flex:1;min-width:0">
+                            <div style="font-size:12px;line-height:1.4;color:var(--ink);overflow-wrap:anywhere">{{ a.filename }}</div>
+                            <div style="font-size:11px;color:rgba(var(--ink-rgb),0.55);margin-top:2px">{{ a.meta }}</div>
+                          </div>
+                          <button onClick="{{ a.open }}" style="flex:none;padding:4px 10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">OPEN</button>
+                          <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ a.remove }}" style="flex:none;padding:4px 10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:rgb(var(--danger-rgb));border:1px solid rgba(var(--danger-rgb),0.45)">REMOVE</button>
+                          </sc-if>
+                        </div>
+                      </sc-for>
+                      <sc-if value="{{ d.canAttach }}" hint-placeholder-val="{{ false }}">
+                        <label style="display:block;width:100%;min-height:34px;line-height:34px;margin-top:9px;text-align:center;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3);opacity:{{ attachBtnOpacity }};cursor:{{ attachBtnCursor }}">
+                          <input type="file" accept="{{ attachAccept }}" onChange="{{ d.onPick }}" disabled="{{ attachNeedsSignal }}" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
+                          {{ d.btnLabel }}
+                        </label>
+                      </sc-if>
                     </div>
-                    <button onClick="{{ a.open }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">OPEN</button>
-                    <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ false }}">
-                      <button onClick="{{ a.remove }}" style="flex:none;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:rgb(var(--danger-rgb));border:1px solid rgba(var(--danger-rgb),0.45)">REMOVE</button>
-                    </sc-if>
                   </div>
                 </sc-for>
-                <sc-if value="{{ canAddAttachment }}" hint-placeholder-val="{{ true }}">
-                  <div style="margin-top:12px">
-                    <label style="display:block;width:100%;min-height:40px;line-height:40px;text-align:center;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3);opacity:{{ attachBtnOpacity }};cursor:{{ attachBtnCursor }}">
-                      <input type="file" accept="{{ attachAccept }}" onChange="{{ onAttachPick }}" disabled="{{ attachNeedsSignal }}" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
-                      {{ attachBtnLabel }}
-                    </label>
-                    <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:6px">{{ attachHint }}</div>
-                  </div>
+                <sc-if value="{{ attachMayAttach }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11px;color:rgba(var(--ink-rgb),0.5);margin-top:9px">{{ attachHint }}</div>
                 </sc-if>
                 <sc-if value="{{ attachBusy }}" hint-placeholder-val="{{ false }}">
                   <div style="font-size:11px;color:var(--accent-deep);margin-top:6px">Sending…</div>
@@ -2766,6 +2807,7 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
     version: Number(t.version) || 1,
     attachments: (k.attachments || []).map((a) => ({
       id: a.id, path: a.path, filename: a.filename || '', mime: a.mime || '',
+      docKind: a.doc_kind || 'service_ticket',
       bytes: Number(a.bytes) || 0,
       by: nameById[a.uploaded_by] || '', at: tsIn(a.uploaded_at),
     })),
@@ -3731,6 +3773,13 @@ function money(n, cur) {
 // instead of a 400 from the storage API. The bucket enforces this regardless — this copy
 // exists to explain the refusal, not to be the refusal.
 const ATTACH_MAX_BYTES = 15728640;
+// The two documents the client signs and stamps and sends back. Exactly two, deliberately:
+// a free "other" slot turns this back into a general attachment box, and "pending" is only
+// answerable when every expected document is named. Mirrors migration 0032's CHECK.
+const SIGNED_DOCS = [
+  { key: 'service_ticket', label: 'Signed Service Ticket' },
+  { key: 'job_log', label: 'Signed Job Log' },
+];
 const ATTACH_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic'];
 // How long a link to a file lives. Sixty seconds is what the master export uses and the
 // reason is the same: long enough to click, short enough that a copied URL is worthless
@@ -5138,8 +5187,52 @@ class Component extends DCLogic {
   //
   // The metadata does reach the replica through hydrate, so a technician down a hole
   // still sees that the signed sheet came back. Only opening it needs coverage.
-  attachFile(ticketId, file) {
+  // Who may send the signed paperwork back for a job, and when. Mirrors
+  // can_attach_to_ticket() in migration 0032 — the database is the authority, this is so
+  // the screen can say no before a file is chosen rather than after it is refused.
+  //
+  // Deliberately NOT the same question as "can you see this ticket". Seeing a job and
+  // being answerable for its paperwork are different things, and answering both with one
+  // check is how the second quietly becomes the first.
+  canAttachTo(t) {
+    if (!t || t.status !== 'approved') return false;
+    if (!this.hasPermission('attachment.add')) return false;
+    const role = this.state.actingAs ? 'tech' : this.state.role;
+    if (role === 'mgr' || role === 'admin') return true;
+    // The technician who did the job. Crew, not "a technician": a job passed between two
+    // hands leaves both answerable for it, and nobody else.
+    const me = this.state.session || {};
+    return inCrew(t, me.name, me.email);
+  }
+  // What has come back for a job and what is still owed. One answer, used by the ticket
+  // screen, by the pending list and by the tests — three copies of this rule would be
+  // three chances for the chase list to disagree with the ticket it points at.
+  signedDocs(t) {
+    const got = (t && t.attachments) || [];
+    return SIGNED_DOCS.map((d) => ({
+      key: d.key, label: d.label,
+      files: got.filter((a) => a.docKind === d.key),
+    }));
+  }
+  signedDocsMissing(t) {
+    return this.signedDocs(t).filter((d) => !d.files.length).map((d) => d.label);
+  }
+  // Approved, and still waiting on at least one of the two. This is what "pending" means.
+  awaitingDocs(list) {
+    return (list || []).filter((t) => t.status === 'approved' && this.signedDocsMissing(t).length);
+  }
+  attachFile(ticketId, file, docKind) {
     if (!ticketId || !file || !this.hasPermission('attachment.add')) return Promise.resolve();
+    const t = (this.state.data.tickets || []).find((x) => x.id === ticketId);
+    // The rule the database will apply anyway, applied here so the refusal is a sentence
+    // rather than a 403.
+    if (!this.canAttachTo(t)) {
+      this.toast('attach', t && t.status !== 'approved'
+        ? 'Signed paperwork is collected once the office has approved this job.'
+        : 'Only the technician who did this job, or the office, can send its signed paperwork.', 'warn');
+      return Promise.resolve();
+    }
+    if (SIGNED_DOCS.every((d) => d.key !== docKind)) return Promise.resolve();
     const c = sb();
     if (!c || !USE_CLOUD) {
       this.toast('attach', 'Attachments need a connection to the office.', 'warn');
@@ -5179,7 +5272,7 @@ class Component extends DCLogic {
         if (up.error) throw up.error;
         return c.from('ticket_attachments').insert({
           ticket_id: ticketId, path: path, filename: name, mime: mime, bytes: file.size,
-          uploaded_by: CLOUD_IDS.me,
+          uploaded_by: CLOUD_IDS.me, doc_kind: docKind,
         });
       })
       .then((ins) => {
@@ -5191,7 +5284,8 @@ class Component extends DCLogic {
         }
         // Recorded like everything else. Notifications are derived from the trail, so
         // this is also what tells the office a signed sheet arrived — no second wiring.
-        this.logOn(ticketId, (who || 'Someone') + ' attached ' + name + ' (' + fileSize(file.size) + ')', 'lifecycle');
+        const label = (SIGNED_DOCS.find((d) => d.key === docKind) || {}).label || 'document';
+        this.logOn(ticketId, (who || 'Someone') + ' sent back the ' + label + ' — ' + name + ' (' + fileSize(file.size) + ')', 'lifecycle');
         return this.refresh();
       })
       .then(() => { this.setState({ attachBusy: false }); this.toast('attach', name + ' attached.', 'ok'); })
@@ -5232,7 +5326,8 @@ class Component extends DCLogic {
         return c.storage.from('attachments').remove([a.path]);
       })
       .then(() => {
-        this.logOn(ticketId, (who || 'The office') + ' removed the attachment ' + a.filename, 'lifecycle');
+        const gone = (SIGNED_DOCS.find((d) => d.key === a.docKind) || {}).label || 'document';
+        this.logOn(ticketId, (who || 'The office') + ' withdrew the ' + gone + ' — ' + a.filename, 'lifecycle');
         return this.refresh();
       })
       .then(() => this.toast('attach', a.filename + ' removed.', 'ok'))
@@ -6012,6 +6107,10 @@ class Component extends DCLogic {
     const myClosed = myTickets.filter(x => x.status !== 'logging');
     const myPending = myClosed.filter(x => !x.synced);
     const myInProgress = myTickets.filter(x => x.status === 'logging');
+    // The office chases every outstanding job; a technician chases his own. Same rule,
+    // different list — not a different rule.
+    const awaitingDocs = this.awaitingDocs(
+      (S.role === 'mgr' || S.role === 'admin') && !S.actingAs ? D.tickets : myTickets);
     const issue = t ? this.numberIssue(t) : {};
     const claim = D.numbering || {};
     // What a job must have before anyone can call it finished. The ticket number is not
@@ -6951,50 +7050,105 @@ class Component extends DCLogic {
       })),
       addNote: () => this.addNote(t && t.id, S.noteDraft),
 
-      // ── Attachments on the open ticket ──
-      // Visible to anyone who can see the ticket, because seeing that the signed sheet
-      // came back is the point. Adding is gated on attachment.add, withdrawing on
-      // attachment.remove, both through hasPermission so a granted exception behaves the
-      // same here as anywhere else.
+      // ── Awaiting signed paperwork ──
+      //
+      // The other half of this feature, and the half that makes it a process rather than
+      // a filing cabinet: an approved job whose documents have not come back is owed, and
+      // somebody has to chase it. The office sees every one; a technician sees his own,
+      // because chasing a client for a sheet he signed himself is his to do.
+      //
+      // Derived on every render from the same signedDocs() the ticket screen uses, so the
+      // chase list cannot disagree with the ticket it points at.
+      awaitingDocsAny: awaitingDocs.length > 0,
+      awaitingDocsLabel: awaitingDocs.length === 1
+        ? 'One approved job is still waiting on its signed paperwork.'
+        : awaitingDocs.length + ' approved jobs are still waiting on their signed paperwork.',
+      awaitingDocsRows: awaitingDocs.map((x) => ({
+        noLabel: x.ticketNo || 'No number',
+        customer: x.customer || '',
+        missing: this.signedDocsMissing(x).join(' · '),
+        open: () => this.setState(S.role === 'tech'
+          ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
+          : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
+      })),
+
+      // ── Signed paperwork on the open ticket ──
+      //
+      // Not a general attachment box. This is the two documents the client signs and
+      // stamps and sends back — the Service Ticket and the Job Log — and collecting them
+      // only begins once the office has approved the job. Until both are in, that ticket
+      // number is pending.
+      //
+      // Visible to anyone who can see the ticket, because whether the paperwork came back
+      // is everybody's business. Sending it is not: only the technician who did the job,
+      // or the office (canAttachTo, mirroring the database's own rule).
       showAttachments: !!t,
-      canAddAttachment: !!t && this.hasPermission('attachment.add'),
       attachBusy: !!S.attachBusy,
-      // Said in the control, not discovered after tapping it. This is the one feature
-      // that cannot queue, so the person is told before they choose a file rather than
-      // after (S17).
+      attachMayAttach: this.canAttachTo(t),
+      // Why the controls are absent, when they are. A panel that simply shows nothing
+      // teaches nobody what to do next.
+      attachLocked: !!t && !this.canAttachTo(t),
+      attachLockedNote: (() => {
+        if (!t || this.canAttachTo(t)) return '';
+        if (t.status !== 'approved') return 'The client signs and stamps these once the office approves the job. Nothing to send back yet.';
+        if (!this.hasPermission('attachment.add')) return 'Your account does not send signed paperwork back.';
+        return 'Only the technician who did this job, or the office, can send its signed paperwork.';
+      })(),
+      // Said in the control, not discovered after tapping it. This is the one feature that
+      // cannot queue, so the person is told before choosing a file rather than after (S17).
       attachNeedsSignal: !USE_CLOUD || !S.online,
       attachHint: !USE_CLOUD
-        ? 'This build has no office connection, so files cannot be attached.'
+        ? 'This build has no office connection, so paperwork cannot be sent back.'
         : (!S.online
-          ? 'No signal. A file cannot wait in the queue the way a job log can.'
+          ? 'No signal. A scan cannot wait in the queue the way a job log can.'
           : 'PDF or photo, up to ' + fileSize(ATTACH_MAX_BYTES) + '.'),
       attachAccept: ATTACH_TYPES.join(','),
-      attachBtnLabel: 'Attach a file',
       attachBtnOpacity: (!USE_CLOUD || !S.online) ? '0.45' : '1',
       attachBtnCursor: (!USE_CLOUD || !S.online) ? 'not-allowed' : 'pointer',
-      attachmentsEmpty: !t || !(t.attachments || []).length,
-      attachmentsSummary: (() => {
-        const all = (t && t.attachments) || [];
-        if (!all.length) return '';
-        return all.length + ' · ' + fileSize(all.reduce((n, a) => n + (a.bytes || 0), 0));
+      // What the panel says about itself at a glance: complete, or what is still owed.
+      attachSummary: (() => {
+        if (!t) return '';
+        if (t.status !== 'approved') return 'After approval';
+        const missing = this.signedDocsMissing(t);
+        if (!missing.length) return 'Both received';
+        return 'Awaiting ' + missing.length + ' of ' + SIGNED_DOCS.length;
       })(),
-      attachmentRows: ((t && t.attachments) || []).slice().reverse().map((a) => ({
-        filename: a.filename,
-        meta: (a.by || 'Someone') + ' · ' + F.stamp(a.at) + ' · ' + fileSize(a.bytes),
-        canRemove: this.hasPermission('attachment.remove'),
-        open: () => this.openAttachment(a.path),
-        remove: () => this.removeAttachment(t.id, a.id),
+      attachSummaryColor: (t && t.status === 'approved' && !this.signedDocsMissing(t).length)
+        ? 'var(--success)' : 'rgba(var(--ink-rgb),0.5)',
+      // One block per expected document rather than one undifferentiated pile. It is the
+      // only shape that shows what is MISSING, which is the question this panel exists to
+      // answer.
+      attachDocRows: (t ? this.signedDocs(t) : []).map((d) => ({
+        label: d.label,
+        received: !!d.files.length,
+        stateText: d.files.length ? 'Received' : 'Awaited',
+        stateColor: d.files.length ? 'var(--success)' : 'var(--warning)',
+        edge: d.files.length ? 'var(--success)' : 'var(--warning)',
+        canAttach: this.canAttachTo(t),
+        // A second send of the same document is allowed on purpose: a technician who
+        // scans the wrong page cannot delete it himself (these are signed client
+        // documents, so withdrawal is the office's call) but he can send the right one,
+        // and both stay on the record.
+        btnLabel: d.files.length ? 'Send another' : 'Send it back',
+        files: d.files.slice().reverse().map((a) => ({
+          filename: a.filename,
+          meta: (a.by || 'Someone') + ' · ' + F.stamp(a.at) + ' · ' + fileSize(a.bytes),
+          canRemove: this.hasPermission('attachment.remove'),
+          open: () => this.openAttachment(a.path),
+          remove: () => this.removeAttachment(t.id, a.id),
+        })),
+        // The handler is given the event, like every other onChange in this file. The
+        // input is cleared afterwards so choosing the same file twice fires again — a
+        // browser reports no change when the value is identical, and a re-send after a
+        // failed one would silently do nothing.
+        onPick: (e) => {
+          const el = e && e.target;
+          const file = el && el.files && el.files[0];
+          if (!file) return;
+          this.attachFile(t && t.id, file, d.key)
+            .then(() => { try { el.value = ''; } catch (_) { /* older browsers */ } });
+        },
       })),
-      // The handler is given the event, like every other onChange in this file. The input
-      // is cleared afterwards so choosing the same file twice fires again — a browser
-      // reports no change when the value is identical, and a re-attach after a failed one
-      // would silently do nothing.
-      onAttachPick: (e) => {
-        const el = e && e.target;
-        const file = el && el.files && el.files[0];
-        if (!file) return;
-        this.attachFile(t && t.id, file).then(() => { try { el.value = ''; } catch (_) { /* older browsers */ } });
-      },
 
       storageFull: !!S.storageFull,
       storageFullHint: S.storageHint || '',

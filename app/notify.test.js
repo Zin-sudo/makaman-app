@@ -53,10 +53,30 @@ const bell = (p) => p.locator('.mk-appbar button[title]').filter({ hasText: '◉
 
     await bell(p).click();
     await p.waitForTimeout(500);
+    // Counted INSIDE the notification panel, not "buttons on the page that look like
+    // rows". The old selector was a heuristic — any button containing a middle dot with a
+    // nested span — and the moment another feature put a row-shaped button on the same
+    // screen (the awaiting-paperwork chase list) it started counting that too. A test that
+    // finds its subject by resemblance eventually finds something else.
     const shown = await p.evaluate(() => {
-      const rows = Array.from(document.querySelectorAll('button'))
-        .filter(x => /·/.test(x.textContent) && x.querySelector('span > span'));
-      return { heading: (document.body.innerText.match(/\d+ unread|Up to date/) || [])[0], rows: rows.length };
+      // The panel itself, found from something only it contains and then walked up to the
+      // fixed-position container. Matching on the style ATTRIBUTE does not work — the
+      // runtime re-applies inline styles, so the string in the source is not the string in
+      // the DOM — and matching row-shaped buttons across the whole page is what broke in
+      // the first place: that is a resemblance test, and the page grew another thing that
+      // resembles a row.
+      const anchor = Array.from(document.querySelectorAll('button'))
+        .find(x => /MARK ALL READ/i.test(x.textContent || ''));
+      let panel = anchor;
+      while (panel && getComputedStyle(panel).position !== 'fixed') panel = panel.parentElement;
+      if (!panel) return { heading: null, rows: -1 };
+      return {
+        heading: (panel.innerText.match(/\d+ unread|Up to date/) || [])[0] || null,
+        // Every button in the panel except its one header control. Counting by style
+        // fails for the same reason matching the panel by style did.
+        rows: Array.from(panel.querySelectorAll('button'))
+          .filter(x => !/MARK ALL READ/i.test(x.textContent || '')).length,
+      };
     });
     check('the panel opens and heads with the same number',
       shown.heading === n.unread + ' unread', JSON.stringify(shown.heading));
