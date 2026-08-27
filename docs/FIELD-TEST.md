@@ -20,9 +20,9 @@ the wrong thing.
 
 | # | Check | Who | Done |
 |---|---|---|---|
-| 0.1 | Seeded Admin password rotated (it appeared in a chat transcript, so treat it as public) | Admin | ☐ |
-| 0.2 | Supabase leaked-password protection **on** | Admin | ☐ |
-| 0.3 | A real account for each tester — right name, right role, status **active**, own password they chose themselves | Admin | ☐ |
+| 0.1 | Seeded Admin password rotated — it appeared in a chat transcript, so treat it as public. Do it **in the app**: Account → Settings → Password | Admin | ☐ |
+| 0.2 | ~~Supabase leaked-password protection~~ — nothing to switch on. It is a paid feature on this plan, so the check is built into the app and runs on every password set here. No action | — | ☑ |
+| 0.3 | A real account for each tester — right name, right role, status **active**, and a password **they** chose in Settings → Password, not one you handed them | Admin | ☐ |
 | 0.4 | Ops Manager and Observer accounts working on the office side | Admin | ☐ |
 | 0.5 | Database snapshot taken, with the time written down | Admin | ☐ |
 | 0.6 | Price list checked for the **specific client** each crew will visit — open it in the app and read three prices against the client's own sheet | Ops | ☐ |
