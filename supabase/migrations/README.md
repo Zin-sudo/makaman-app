@@ -47,6 +47,8 @@ select statements[1] from supabase_migrations.schema_migrations where version = 
 | 37 | `0031_tickets_carry_a_version` | one file, same name. Extends the existing `enforce_ticket_update_rules()` rather than adding a second BEFORE UPDATE trigger — two on one event fire in alphabetical name order. |
 | 38 | `0032_attachments_are_the_signed_paperwork_coming_back` | one file, same name. Narrows 0030: attachments are the two client-signed documents, collectable only after approval and only by the job's own technician or the office. |
 | 39 | `0033_parked_waha_rows_return_under_suffixed_codes` | one file, same name. Data, not schema. The ten rows parked 2026-08-20 return with `-1` appended so they cannot collide with Waha's liner hangers. Landed as `MKN-100-7xx-1`, not `MKN100-7xx-1`: `trg_price_list_items_normalise` rewrites the prefix on insert. |
+| 40 | `0034_tickets_can_be_cancelled_and_withdrawn` | one file, same name. Adds `cancelled` to the status check and the soft-delete columns, and extends `enforce_ticket_update_rules()` — extended, not a second trigger, because two BEFORE UPDATE triggers fire in alphabetical name order. |
+| 41 | `0035_capabilities_for_cancelling_and_withdrawing` | one file, same name. Registers the four capability keys. Required: `hasPermission()` treats a hydrated map as final, so a key only the client knows reads as false for every real user. |
 
 The row data loaded by #14–#18 is **not** in this directory. It lives in
 `supabase/makaman_price_lists_final.sql`, which is the runnable copy of exactly what was

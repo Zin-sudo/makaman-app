@@ -877,6 +877,16 @@
             <!-- technician: job log -->
             <sc-if value="{{ techLog }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ backToList }}" class="back-btn">‹ All tickets</button>
+              <!-- Above the fold and outside the holder check on purpose. Whoever raised
+                   the ticket is owed the explanation whether or not he still holds it,
+                   and a withdrawal a person can only discover by noticing the ticket has
+                   gone is not a record of anything. -->
+              <sc-if value="{{ isWithdrawn }}" hint-placeholder-val="{{ false }}">
+                <div style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>The office withdrew this ticket.</strong> {{ withdrawnLine }}. {{ withdrawnWhy }}</div>
+              </sc-if>
+              <sc-if value="{{ isCancelled }}" hint-placeholder-val="{{ false }}">
+                <div style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
+              </sc-if>
               <div style="display:flex;align-items:flex-start;gap:8px">
                 <div style="flex:1">
                   <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:23px;line-height:1.15">{{ cur.customer }}</div>
@@ -972,6 +982,12 @@
                 <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
                 <sc-if value="{{ canHandOver }}" hint-placeholder-val="{{ true }}">
                   <button onClick="{{ askHandover }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">Hand over job</button>
+                </sc-if>
+                <!-- A job that was called off. Without this the only honest options were
+                     to leave the ticket open forever or to mark work done that nobody
+                     did — so people marked it done, and the record carried a fiction. -->
+                <sc-if value="{{ showCancelJob }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ askCancelJob }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.55)">Job cancelled — call it off</button>
                 </sc-if>
               </div>
               </sc-if>
@@ -1299,6 +1315,25 @@
             <button onClick="{{ loadMoreTickets }}" style="margin-left:auto;padding:8px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ inboxMoreLabel }}</button>
           </sc-if>
         </div>
+
+        <!-- Withdrawn tickets, below the work rather than inside it. Deliberately not
+             hidden behind a filter: a list of removed things that nobody can see is how
+             a removal becomes a disappearance. -->
+        <sc-if value="{{ hasWithdrawn }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:28px;border:1px solid rgba(var(--ink-rgb),0.16)">
+            <div style="padding:10px 14px;border-bottom:1px solid rgba(var(--ink-rgb),0.12);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.6)">{{ withdrawnHeading }}</div>
+            <sc-for list="{{ withdrawnRows }}" as="w" hint-placeholder-count="2">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-top:1px solid rgba(var(--ink-rgb),0.08)">
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }} · {{ w.customer }}</div>
+                  <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);margin-top:2px">{{ w.who }}</div>
+                  <div style="font-size:12px;color:var(--ink);margin-top:4px;overflow-wrap:anywhere">{{ w.why }}</div>
+                </div>
+                <button onClick="{{ w.open }}" style="flex:none;padding:6px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Open</button>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
       </sc-if>
 
       <sc-if value="{{ mgrNew }}" hint-placeholder-val="{{ false }}">
@@ -1498,6 +1533,10 @@
                     </div>
                   </sc-if>
                 </div>
+                <sc-if value="{{ priceListEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">There is no price list for this customer yet. Type the lines in by hand — item number, description, quantity, unit and unit cost.</div>
+                </sc-if>
+                <button onClick="{{ addBlankItem }}" style="margin-bottom:12px;padding:7px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent);border:1px solid var(--accent)">+ Add a line by hand</button>
               </sc-if>
               <sc-if value="{{ showSuggestedEditable }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
@@ -1659,6 +1698,12 @@
                   </div>
                 </sc-for>
               </div>
+              <sc-if value="{{ isWithdrawn }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>This ticket has been withdrawn.</strong> {{ withdrawnLine }}. {{ withdrawnWhy }}</div>
+              </sc-if>
+              <sc-if value="{{ isCancelled }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
+              </sc-if>
               <sc-if value="{{ approvalForced }}" hint-placeholder-val="{{ false }}">
                 <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Approving on the technician's behalf.</strong> {{ approvalForcedText }}</div>
               </sc-if>
@@ -1691,6 +1736,13 @@
               <button onClick="{{ goPrint }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Preview 4 sheets</button>
               <sc-if value="{{ cur.isApproved }}" hint-placeholder-val="{{ false }}">
                 <button onClick="{{ askReopen }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent-deep);border:1px solid rgba(var(--ink-rgb),0.3)">Reopen ticket</button>
+              </sc-if>
+              <sc-if value="{{ showWithdraw }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ askWithdraw }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.55)">Withdraw this ticket</button>
+                <div style="font-size:11px;margin-top:5px;color:rgba(var(--ink-rgb),0.55);line-height:1.4">Takes it out of every list without erasing anything. The technician who raised it sees who withdrew it and why.</div>
+              </sc-if>
+              <sc-if value="{{ showRestore }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ askRestore }}" style="width:100%;min-height:40px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--success);border:1px solid var(--success)">Restore this ticket</button>
               </sc-if>
             </div>
 
@@ -2568,7 +2620,7 @@
           </select>
         </sc-if>
         <sc-if value="{{ dialog.needsReason }}" hint-placeholder-val="{{ false }}">
-          <textarea dir="auto" value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="Reason for reopening — recorded in the audit trail" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
+          <textarea dir="auto" value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="{{ dialog.reasonHint }}" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
         </sc-if>
         <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
           <sc-if value="{{ dialog.hasCancel }}" hint-placeholder-val="{{ true }}">
@@ -2743,6 +2795,12 @@ const PERMISSION_DEFAULTS = (function () {
     // sees, and putting a file into a client's archive is not reading.
     [['tech', 'mgr', 'admin'], ['attachment.add']],
     [['mgr', 'admin'], ['attachment.remove']],
+    // Calling off a job you opened, and the office's power to unwind one. Registered in
+    // migration 0035 as well as here, and that is not belt-and-braces: hasPermission()
+    // treats a hydrated map as final, so a key the database has never heard of reads as
+    // false for every real signed-in user however this constant reads.
+    [['tech', 'mgr', 'admin'], ['ticket.cancel_own']],
+    [['mgr', 'admin'], ['ticket.close_any', 'ticket.withdraw', 'ticket.restore']],
     [['tech', 'mgr', 'admin', 'founder'],
       ['report.generate']],
     [['mgr', 'admin', 'founder'],
@@ -2924,6 +2982,14 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
     baseLocation: t.base_location || '', customerRep: t.customer_rep || '',
     officeClosed: !!t.office_closed,
     closedBy: nameById[t.closed_by] || '', closedAt: tsIn(t.closed_at),
+    // Cancelled and withdrawn are different facts and are kept apart. A cancelled job
+    // happened — it was called off — and stays visible as such. A withdrawn ticket was a
+    // mistake being taken back, and disappears from the working lists while its row and
+    // its trail stay behind, because the person who raised it is owed an explanation.
+    cancelledAt: tsIn(t.cancelled_at), cancelledBy: nameById[t.cancelled_by] || '',
+    cancelReason: t.cancel_reason || '',
+    deletedAt: tsIn(t.deleted_at), deletedBy: nameById[t.deleted_by] || '',
+    deleteReason: t.delete_reason || '',
     approvedBy: nameById[t.approved_by] || '', approvedAt: tsIn(t.approved_at),
     geo: (t.geo_open || t.geo_last)
       ? { open: t.geo_open || null, last: t.geo_last || null, pingedAt: tsIn(t.geo_pinged_at) }
@@ -2991,6 +3057,10 @@ function rowTicket(t, idByName, idByClient, idByJob) {
     base_location: t.baseLocation || '', customer_rep: t.customerRep || '',
     office_closed: !!t.officeClosed,
     closed_by: idByName[t.closedBy] || null, closed_at: tsOut(t.closedAt),
+    cancelled_at: tsOut(t.cancelledAt), cancelled_by: idByName[t.cancelledBy] || null,
+    cancel_reason: t.cancelReason || null,
+    deleted_at: tsOut(t.deletedAt), deleted_by: idByName[t.deletedBy] || null,
+    delete_reason: t.deleteReason || null,
     approved_by: idByName[t.approvedBy] || null, approved_at: tsOut(t.approvedAt),
     geo_open: (t.geo || {}).open || null, geo_last: (t.geo || {}).last || null,
     geo_pinged_at: tsOut((t.geo || {}).pingedAt),
@@ -5413,6 +5483,52 @@ class Component extends DCLogic {
   // Deliberately NOT the same question as "can you see this ticket". Seeing a job and
   // being answerable for its paperwork are different things, and answering both with one
   // check is how the second quietly becomes the first.
+  // ── Unwinding a ticket ──────────────────────────────────────────────────
+  //
+  // Three things that were missing, all reported from use. A technician who opened a
+  // ticket and then had the job called off had no honest way to close it — "Job Done"
+  // would be a lie about work nobody did. The office could not close a job somebody left
+  // open behind a dead phone. And a ticket raised against the wrong customer stayed in
+  // the record as though it were real.
+  //
+  // These four mirror enforce_ticket_update_rules() in migration 0034. The database is
+  // the authority and refuses the same cases; these exist so a refusal is a control that
+  // is not there, with a sentence saying why, rather than an error after the press.
+
+  // Withdrawn tickets are filtered out of the working lists, never removed. A hard delete
+  // would take the audit trail with it — audit_log cascades on the ticket — and who
+  // withdrew a ticket and why is the one thing everybody needs to be able to read.
+  liveTickets(list) { return (list || []).filter((t) => !t.deletedAt); }
+  withdrawnTickets(list) { return (list || []).filter((t) => !!t.deletedAt); }
+
+  canCancel(t) {
+    if (!t || t.deletedAt) return false;
+    // Only a job that never got closed. Once it is done or approved, unwinding it is the
+    // office's to do, not the technician's — there is a client sheet in play by then.
+    if (t.status !== 'logging') return false;
+    if (!this.hasPermission('ticket.cancel_own')) return false;
+    const me = this.state.session || {};
+    const role = this.state.actingAs ? 'tech' : this.state.role;
+    if (role === 'mgr' || role === 'admin') return true;
+    return holderOf(t) === me.name || t.tech === me.name;
+  }
+  cancelBlockedReason(t) {
+    if (!t || t.status === 'logging') return '';
+    if (t.status === 'cancelled') return 'This job was already cancelled.';
+    return 'The job is closed. Ask the office to withdraw it.';
+  }
+  // No canCloseAny here on purpose. The office closing a job the technician left open
+  // was already built — `mgrCanClose` and the `officeClose` dialog — complete with the
+  // completeness gate that stops a job being closed while required fields are empty. A
+  // second one would have been the same feature with a different name and a weaker gate.
+  // What was missing was that it answered to nobody: it checked the role and not the
+  // capability, so it could not be granted or withheld per person like everything else.
+  // `ticket.close_any` now gates the existing control.
+  canWithdraw(t) {
+    return !!t && !t.deletedAt && t.status !== 'logging' && this.hasPermission('ticket.withdraw');
+  }
+  canRestore(t) { return !!t && !!t.deletedAt && this.hasPermission('ticket.restore'); }
+
   canAttachTo(t) {
     if (!t || t.status !== 'approved') return false;
     if (!this.hasPermission('attachment.add')) return false;
@@ -6310,12 +6426,28 @@ class Component extends DCLogic {
     const t = this.ticket();
     const view = t ? this.ticketView(t) : {};
     const unsynced = D.tickets.filter(x => !x.synced);
+    // Every list somebody works from reads LIVE; three things deliberately do not.
+    //
+    // The activity feed and the audit flags stay on D.tickets, because the whole promise
+    // of a withdrawal is that the person who raised the ticket can see it happened and
+    // read the reason. Filtering there would hide the one entry that matters.
+    //
+    // The ticket-number checks stay on D.tickets too: a number printed on a withdrawn
+    // ticket is still spoken for. A client may be holding paper carrying it, and handing
+    // it to a second job because the first was withdrawn is how two sheets end up with
+    // one number on them.
+    //
+    // `unsynced` above stays whole as well — a withdrawal is itself a change that has to
+    // reach the office, so it must not vanish from the queue on its way there.
+    const LIVE = this.liveTickets(D.tickets);
     const myName = (S.session && S.session.name) || '';
     const myEmail = (S.session && S.session.email) || '';
     // Everyone who has held a ticket keeps it in their list — the person who opened
     // it can still see how the job they started finished, they just cannot write to
     // it once they have handed it on.
-    const myTickets = D.tickets.filter(x => inCrew(x, myName, myEmail));
+    const myTickets = LIVE.filter(x => inCrew(x, myName, myEmail));
+    // His own withdrawn ones, so the reason is somewhere he can read it.
+    const myWithdrawn = this.withdrawnTickets(D.tickets).filter(x => inCrew(x, myName, myEmail));
     // "Sync" means one thing to a technician: getting finished work off this device and
     // in front of the office. A job still being logged is not finished work — it may
     // still travel to the office in the background so the live panel and the emergency
@@ -6435,8 +6567,9 @@ class Component extends DCLogic {
     // out — and the office still has to be able to get the paperwork moving. So the
     // office may do it early, and the ticket says plainly that it did.
     const numberingForced = !numberingBlock && !!t && t.status === 'logging';
-    const approved = D.tickets.filter(x => x.status === 'approved');
-    const awaiting = D.tickets.filter(x => x.status === 'done' && x.synced);
+    const withdrawnAll = this.withdrawnTickets(D.tickets);
+    const approved = LIVE.filter(x => x.status === 'approved');
+    const awaiting = LIVE.filter(x => x.status === 'done' && x.synced);
 
     // One list feeds the preview table and the bundle button, so what is on screen is
     // exactly what downloads — the slider cannot mean one thing in the table and another
@@ -6503,7 +6636,7 @@ class Component extends DCLogic {
     const bandedTickets = (list) => list.slice().reverse().sort((a, b) => bandOf(a) - bandOf(b));
 
     const inboxPage = pageOf(bandedTickets(
-      D.tickets.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))));
+      LIVE.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))));
     const myPage = pageOf(bandedTickets(myTickets.filter(matchesQuery)));
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
@@ -6553,12 +6686,28 @@ class Component extends DCLogic {
       this.setState({ itemSearch: '' }); // Clear search after adding
       this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.', 'edit');
     };
+    // A charge line typed from nothing.
+    //
+    // The office raises tickets for customers who have no price list at all — a first job
+    // for a new client — and until now the only way onto the charge table was to pick a
+    // code from a list that did not exist. Every cell in the row is already an input when
+    // the ticket is editable, so an empty row is a usable one; nothing else is needed.
+    // Deliberately not reordered on the way in: a hand-typed line has no rank to sort by,
+    // and the person adding it is looking at the bottom of the table.
+    const addBlankItem = () => {
+      if (locked || !t) return;
+      this.mutate(d => {
+        const x = d.tickets.find(y => y.id === t.id);
+        (x.items = x.items || []).push({ code: '', desc: '', qty: 1, uom: '', cost: 0, ov: {} });
+      });
+      this.log('Charge line added by hand.', 'edit');
+    };
     // Behavioral suggestion: up to 3 items charged most often on this client's other
     // tickets that aren't already on this one — lets the Ops Manager one-click the items
     // they reach for on nearly every job instead of searching/scrolling the price list.
     const usageCounts = {};
     if (curClient) {
-      D.tickets.filter(x => x.customer === curClient.name).forEach(x => (x.items || []).forEach(it => {
+      LIVE.filter(x => x.customer === curClient.name).forEach(x => (x.items || []).forEach(it => {
         if (it.kind === 'percent') return;
         usageCounts[it.code] = (usageCounts[it.code] || 0) + 1;
       }));
@@ -6676,6 +6825,65 @@ class Component extends DCLogic {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
+      },
+      // ── Unwinding a ticket ────────────────────────────────────────────────
+      //
+      // All four ask a question and take a reason, because all four are the kind of thing
+      // somebody will be asked about later. The reason is not optional decoration: it is
+      // what the audit line says, and an audit line reading "withdrawn" with no why is
+      // the same as no audit line.
+      cancelJob: {
+        title: 'Cancel this job?',
+        body: 'The ticket stays in the record as cancelled, with your reason on it, and stops counting as work in progress. You cannot undo this yourself — only the office can reopen a cancelled job.',
+        okLabel: 'Yes, cancel the job', cancelLabel: 'Keep it open', hasCancel: true,
+        needsReason: true, reasonHint: 'Why was the job called off? — recorded in the audit trail',
+        okBg: 'var(--danger)', okFg: 'var(--on-accent-strong)',
+        confirm: () => {
+          if (!t) { this.setState({ dialog: null }); return; }
+          const why = (S.reasonText || '').trim();
+          const me = (S.session || {}).name || '';
+          this.patchTicket({
+            status: 'cancelled', cancelledAt: iso(new Date()), cancelledBy: me,
+            cancelReason: why, synced: false,
+          });
+          this.log('Job cancelled by ' + (me || 'the technician')
+            + (why ? ' — ' + why : '.'), 'lifecycle');
+          this.setState({ dialog: null, reasonText: '' });
+        },
+      },
+      withdrawTicket: {
+        title: 'Withdraw this ticket?',
+        body: 'It leaves every working list and stops being counted. Nothing is erased: the ticket, its job log and its whole trail stay, and the technician who raised it sees that you withdrew it and why. You can restore it.',
+        okLabel: 'Withdraw it', cancelLabel: 'Keep it', hasCancel: true,
+        needsReason: true, reasonHint: 'Why is this ticket being withdrawn? — recorded in the audit trail',
+        okBg: 'var(--danger)', okFg: 'var(--on-accent-strong)',
+        confirm: () => {
+          if (!t) { this.setState({ dialog: null }); return; }
+          const why = (S.reasonText || '').trim();
+          const me = (S.session || {}).name || '';
+          // Logged before the withdrawal lands, so the line is written while the ticket is
+          // still an ordinary editable row.
+          this.log('Ticket withdrawn by ' + (me || 'the office')
+            + (why ? ' — ' + why : '.'), 'lifecycle');
+          this.patchTicket({
+            deletedAt: iso(new Date()), deletedBy: me, deleteReason: why, synced: false,
+          });
+          // The ticket has just left every list this screen could return to, so the screen
+          // goes back rather than sitting on a row nothing points at any more.
+          this.setState({ dialog: null, reasonText: '', activeId: null, mgrScreen: 'inbox' });
+        },
+      },
+      restoreTicket: {
+        title: 'Restore this ticket?',
+        body: 'It returns to the lists at the status it held when it was withdrawn, and the restore is recorded like everything else.',
+        okLabel: 'Restore it', cancelLabel: 'Leave it withdrawn', hasCancel: true,
+        confirm: () => {
+          if (!t) { this.setState({ dialog: null }); return; }
+          const me = (S.session || {}).name || '';
+          this.patchTicket({ deletedAt: '', deletedBy: '', deleteReason: '', synced: false });
+          this.log('Ticket restored by ' + (me || 'the office') + '.', 'lifecycle');
+          this.setState({ dialog: null });
+        },
       },
       // An invented number reaches a client's invoice, so it takes a deliberate press.
       // Discard is red because it throws the typing away; Confirm is the accent because
@@ -7143,7 +7351,7 @@ class Component extends DCLogic {
         return techs.map(u => {
           // Crew membership, not the opener's name — a handed-over job is still that
           // technician's open job and still their device reporting a position.
-          const mine = D.tickets.filter(x => inCrew(x, u.name, u.email));
+          const mine = LIVE.filter(x => inCrew(x, u.name, u.email));
           const stamps = mine.map(x => x.syncedAt).filter(Boolean).map(s => new Date(s).getTime());
           const lastAt = stamps.length ? Math.max.apply(null, stamps) : null;
           const open = mine.filter(x => x.status === 'logging');
@@ -7721,7 +7929,25 @@ class Component extends DCLogic {
       mgrCanHandOver: !readOnly && !!t && t.status !== 'approved',
       // Closing on the technician's behalf needs everything closing normally would
       // produce. It is not a way to tidy the inbox — the closed sheet is the document.
-      mgrCanClose: !readOnly && !!t && t.status === 'logging',
+      mgrCanClose: !readOnly && !!t && t.status === 'logging' && this.hasPermission('ticket.close_any'),
+      // Unwinding a ticket. Three controls, each shown only where it is legal, because a
+      // control that appears and then refuses teaches people to distrust the screen.
+      showCancelJob: this.canCancel(t),
+      askCancelJob: () => this.setState({ dialog: 'cancelJob', reasonText: '' }),
+      showWithdraw: this.canWithdraw(t),
+      askWithdraw: () => this.setState({ dialog: 'withdrawTicket', reasonText: '' }),
+      showRestore: this.canRestore(t),
+      askRestore: () => this.setState({ dialog: 'restoreTicket' }),
+      isWithdrawn: !!(t && t.deletedAt),
+      withdrawnLine: t && t.deletedAt
+        ? ('Withdrawn by ' + (t.deletedBy || 'the office') + ' on ' + F.stamp(t.deletedAt))
+        : '',
+      withdrawnWhy: (t && t.deleteReason) || 'No reason was recorded.',
+      isCancelled: !!(t && t.status === 'cancelled' && !t.deletedAt),
+      cancelledLine: t && t.cancelledAt
+        ? ('Cancelled by ' + (t.cancelledBy || 'the technician') + ' on ' + F.stamp(t.cancelledAt))
+        : 'Cancelled.',
+      cancelledWhy: (t && t.cancelReason) || 'No reason was recorded.',
       mgrCloseDisabled: !closeReady,
       mgrCloseOpacity: closeReady ? 1 : 0.45,
       mgrCloseNote: closeReady
@@ -7871,13 +8097,24 @@ class Component extends DCLogic {
       mgrStats: [
         { label: 'Awaiting review', value: String(awaiting.length), color: 'var(--accent)' },
         { label: 'Approved', value: String(approved.length), color: 'var(--ink-strong)' },
-        { label: 'Still in the field', value: String(D.tickets.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
+        { label: 'Still in the field', value: String(LIVE.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
         { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)' },
       ],
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
         actionLabel: x.status === 'approved' ? 'View' : 'Review',
         review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
       })),
+      // Withdrawn tickets, kept where the office can find them and put them back. Not in
+      // the table above: they are not work, and folding them in would make "awaiting
+      // review" wrong by inspection.
+      withdrawnRows: withdrawnAll.map(x => Object.assign(this.ticketView(x), {
+        why: x.deleteReason || 'No reason was recorded.',
+        who: 'Withdrawn by ' + (x.deletedBy || 'the office') + ' · ' + F.stamp(x.deletedAt),
+        open: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+      })),
+      hasWithdrawn: withdrawnAll.length > 0,
+      withdrawnHeading: withdrawnAll.length === 1
+        ? '1 withdrawn ticket' : withdrawnAll.length + ' withdrawn tickets',
       inboxHasMore: inboxPage.hasMore,
       inboxMoreLabel: inboxPage.moreLabel,
       inboxCountLabel: inboxPage.countLabel,
@@ -8139,6 +8376,11 @@ class Component extends DCLogic {
         }
       },
       priceOptions: [], // Dropdown no longer used, but keeping for backward compatibility
+      addBlankItem: addBlankItem,
+      // Said out loud rather than left as an empty dropdown. A search box that returns
+      // nothing looks broken; a line saying this customer has no price list yet, beside a
+      // button that does not need one, does not.
+      priceListEmpty: !curClient || !(curClient.items || []).length,
       pickItem: '',
       addItem: () => {},
       // Behavioral suggestion: the up-to-3 items charged most often on this client's
@@ -8560,7 +8802,7 @@ class Component extends DCLogic {
       founderStats: [
         { label: 'Approved jobs', value: String(approved.length) },
         { label: 'Approved value', value: this.totalByCurrency(approved) },
-        { label: 'Active in field', value: String(D.tickets.filter(x => x.status === 'logging').length) },
+        { label: 'Active in field', value: String(LIVE.filter(x => x.status === 'logging').length) },
         { label: 'Awaiting manager', value: String(awaiting.length) },
       ],
       founderCount: S.founderCount,
@@ -8619,15 +8861,15 @@ class Component extends DCLogic {
       // currently in D.tickets — this prototype has one shared local data store rather
       // than a live multi-device feed, so it's honest to call it "refreshes
       // automatically," not a push subscription.
-      liveTickets: D.tickets.filter(x => x.status === 'logging' && x.synced).slice().reverse().map(x => {
+      liveTickets: LIVE.filter(x => x.status === 'logging' && x.synced).slice().reverse().map(x => {
         const lastEvent = (x.events || [])[x.events.length - 1];
         return Object.assign(this.ticketView(x), {
           lastLogText: lastEvent ? lastEvent.text : 'No log lines yet.',
           lastLogTime: lastEvent ? F.stamp(lastEvent.ts) : '—',
         });
       }),
-      hasLiveTickets: D.tickets.some(x => x.status === 'logging' && x.synced),
-      noLiveTickets: !D.tickets.some(x => x.status === 'logging' && x.synced),
+      hasLiveTickets: LIVE.some(x => x.status === 'logging' && x.synced),
+      noLiveTickets: !LIVE.some(x => x.status === 'logging' && x.synced),
 
       hasToast: !!S.toast,
       toastText: (S.toast || {}).text || '',
@@ -8640,6 +8882,7 @@ class Component extends DCLogic {
       dialog: Object.assign({
         title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true,
         needsReason: false, needsPerson: false,
+        reasonHint: 'Reason — recorded in the audit trail',
         okBg: 'var(--accent)', okFg: 'var(--on-accent)',
         cancelFg: 'var(--ink)', cancelBorder: 'rgba(var(--ink-rgb),0.3)',
         confirm: () => this.setState({ dialog: null }),
