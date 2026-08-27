@@ -419,6 +419,21 @@ Example: Two Observers, different access
 
 ---
 
+### Decided 2026-08-27
+
+- **Admin is a master key.** The Admin role holds every capability in the app by default,
+  including the ones that read as the office's rather than the owner's — `attachment.add`
+  among them. Confirmed by the user after the question was raised twice. Per-person
+  revokes still work on top; the default is "everything".
+- **Withdrawn tickets are purged after three months** (§ HANDOFF S23), but their numbers
+  never come back. The retention rule frees storage, not identifiers.
+- **Branch: `claude/makaman-app`.** Confirmed by the user. The session prompt's
+  `claude/job-log-timestamps-locked-8m5mz0` is not used and CONSTRAINTS forbids it.
+- **No Google Fonts, at all, in any scenario** — user's instruction while opening Tier 6.
+  Not "vendor Inter instead"; the answer to a typeface that would need a CDN is a
+  different typeface. Barlow and Barlow Condensed are already self-hosted in
+  `app/vendor/fonts/` and stay.
+
 ## 6. BLIND SPOTS & RISKS
 
 | ID | Risk | Severity | Mitigation Phase |

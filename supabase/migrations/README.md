@@ -49,6 +49,8 @@ select statements[1] from supabase_migrations.schema_migrations where version = 
 | 39 | `0033_parked_waha_rows_return_under_suffixed_codes` | one file, same name. Data, not schema. The ten rows parked 2026-08-20 return with `-1` appended so they cannot collide with Waha's liner hangers. Landed as `MKN-100-7xx-1`, not `MKN100-7xx-1`: `trg_price_list_items_normalise` rewrites the prefix on insert. |
 | 40 | `0034_tickets_can_be_cancelled_and_withdrawn` | one file, same name. Adds `cancelled` to the status check and the soft-delete columns, and extends `enforce_ticket_update_rules()` — extended, not a second trigger, because two BEFORE UPDATE triggers fire in alphabetical name order. |
 | 41 | `0035_capabilities_for_cancelling_and_withdrawing` | one file, same name. Registers the four capability keys. Required: `hasPermission()` treats a hydrated map as final, so a key only the client knows reads as false for every real user. |
+| 42 | `0036_withdrawn_tickets_are_purged_after_three_months` | one file, same name. Retention rule plus the `purged_tickets` tombstone and a trigger that refuses to reissue a purged number — a client's paper does not expire when the row does. Nightly pg_cron job. |
+| 43 | `0037_trigger_function_is_not_an_api_endpoint` | one file, same name. Revokes EXECUTE on 0036's trigger function, which PostgREST had exposed at `/rest/v1/rpc/`. A BEFORE trigger does not need the caller to hold EXECUTE; verified by driving an update afterwards. |
 
 The row data loaded by #14–#18 is **not** in this directory. It lives in
 `supabase/makaman_price_lists_final.sql`, which is the runnable copy of exactly what was
