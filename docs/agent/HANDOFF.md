@@ -803,13 +803,19 @@ Cheap, blocks nothing, and every day it runs adds bad data.
 - **Why batched:** three separate migrations is three deploys for one schema change.
 - **Do 0002 first** — before anything forces a rebuild from files alone.
 
-### Tier 5 — every remaining feature that adds a screen
-- Notifications: table, RLS, Realtime channel, bell with unread badge (P1.6–P1.7).
-- Notes / Observer follow-ups: `ticket_notes`, add, acknowledge, audit (P2.6).
-- Signed-document attachment: PDF upload to Storage, outstanding-tasks list (P2.10).
-- Drag-and-drop item reordering — handlers exist in the app, persistence does not (P2.0).
-- **Depends on:** Tier 2 (engine proven), Tier 4 (`order_index` for reordering).
-- **Blocks:** Tier 6. **These are the only items left that create new surfaces.**
+### Tier 5 — every remaining feature that adds a screen — **DONE (2026-08-27)**
+- ~~Notifications~~ — built as a projection of the audit trail rather than a table.
+- ~~Notes / Observer follow-ups~~ — `ticket_notes`, raise and answer, both audited.
+- ~~Signed-document attachment~~ — private bucket, RLS, expiring signed URLs.
+- ~~Drag-and-drop item reordering~~.
+- Closed on the way out, each at its registered tier rather than carried: **S9** (OneDrive /
+  Drive dropped — the Connect step was a mock reporting a connection that did not exist),
+  **S10** (an oversized ticket's workbook now balances), **S11** (sync conflicts flagged, not
+  overwritten), **S16** (notes and attachments reach the technician's screen), **S19** (the
+  job log and audit trail stopped erasing each other), **S21** (found by the closing stub
+  sweep — the office was told every technician was online).
+- **No open register rows against this tier.** Full sweep: 40 suites, all green.
+- **Blocks:** Tier 6. **These were the only items left that create new surfaces.**
 
 ### Tier 6 — the CSS responsive theme v2
 `reference/makaman-responsive-theme-v2.css` — the design pass. See §5 for what it brings.
