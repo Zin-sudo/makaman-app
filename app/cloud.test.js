@@ -13,180 +13,9 @@ const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
 const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${n}${extra ? '   ' + extra : ''}`); };
 
-const TECH = '11111111-1111-4111-8111-111111111111';
-const OPS = '22222222-2222-4222-8222-222222222222';
-const CLIENT = '33333333-3333-4333-8333-333333333333';
-const TICKET = '44444444-4444-4444-8444-444444444444';
-const JOB = '55555555-5555-4555-8555-555555555555';
-
-// The rows the fake starts with. Deliberately a job in progress with two log lines and
-// a crew of one — the shape a technician's phone actually holds.
-const DB = {
-  profiles: [
-    { id: TECH, email: 'yousef@makaman.ly', full_name: 'Yousef Al-Harbi', role: 'technician', status: 'active' },
-    { id: OPS, email: 'omar@makaman.ly', full_name: 'Omar Al-Saleh', role: 'ops_manager', status: 'active' },
-  ],
-  clients: [{ id: CLIENT, name: 'Kuwait Oil Group', currency: 'USD' }],
-  price_list_items: [
-    { id: 'p1', client_id: CLIENT, item_number: 'MKN-1801', description: 'Pick-up with tools travelling to wells', uom: 'Km', unit_cost: 3.9, unit_cost_additional: null, currency: 'USD', has_valid_code: true },
-  ],
-  job_types: [{ id: JOB, name: 'RBP FOR CEMENT JOB' }],
-  ticket_numbering: [{ id: 'n1', prefix: '', label: 'Special Tools', next_number: 1883, floor: 1883 }],
-  org_defaults: [{ id: true, base_location: 'Ahmadi Base', customer_rep: 'Workover Office' }],
-  asset_questions: [
-    { id: 'q1', key: 'reclaimed', label: 'Tools allocated reclaimed or back-to-base?', tone: 'warning', multi: false, presets: ['Yes', 'Not yet', 'Handed over to replacement'], sort_order: 0 },
-  ],
-  numbering_claim: [{ id: true, holder_id: OPS, since: '2026-08-01T00:00:00.000Z' }],
-  user_settings: [{ user_id: TECH, theme: 'dark', accent: 'red', timezone: 'Africa/Tripoli', hour12: false, share_location: true }],
-  tickets: [{
-    id: TICKET, technician_id: TECH, holder_id: TECH, client_id: CLIENT, job_type_id: JOB,
-    customer: 'Kuwait Oil Group', field_name: 'Burgan North', well_no: 'BG-214', rig_name: 'WS-11',
-    arrival_at: '2026-08-19T06:20:00.000Z', start_job_at: '2026-08-19T06:48:00.000Z', end_job_at: null,
-    status: 'logging', synced: false, synced_at: null, ticket_number: null, mileage_one_way: null,
-    currency: 'USD', base_location: 'Ahmadi Base', customer_rep: 'Workover Office',
-    office_closed: false, closed_by: null, closed_at: null, approved_by: null, approved_at: null,
-    geo_open: null, geo_last: null, geo_pinged_at: null, asset_check: null,
-  }],
-  ticket_lines: [
-    { id: 'l1', ticket_id: TICKET, logged_at: '2026-08-19T06:48:00.000Z', text: 'On location, JSA completed with rig supervisor.', edited_by: null, edited_at: null },
-    { id: 'l2', ticket_id: TICKET, logged_at: '2026-08-19T08:05:00.000Z', text: 'Rigging up combination string.', edited_by: null, edited_at: null },
-  ],
-  ticket_items: [],
-  ticket_assets: [],
-  ticket_crew: [{ ticket_id: TICKET, profile_id: TECH, position: 0 }],
-  audit_log: [],
-};
-
-// A fake client good enough for what the app asks of it: select-all, select-eq-single,
-// upsert, insert, delete-eq. Every write is appended to window.__writes so the test can
-// assert on how much traffic a change produced, not merely on its effect.
-const STUB = (db) => `
-window.__writes = [];
-window.__db = ${JSON.stringify(db)};
-window.__offline = false;
-window.supabase = {
-  createClient: function () {
-    var db = window.__db;
-    function fail() { return Promise.resolve({ data: null, error: { message: 'network down' } }); }
-    function q(table) {
-      var rows = db[table] || (db[table] = []);
-      var api = {
-        select: function () {
-          var filtered = rows.slice();
-          var chain = {
-            eq: function (col, val) { filtered = filtered.filter(function (r) { return r[col] === val; }); return chain; },
-            // The app orders and limits the export_runs lookup. Both are called
-            // synchronously while the Promise.all array is being built, so a missing one
-            // is not a failed query — it throws before a single request is made, and
-            // hydrate() never runs. That is what left this whole suite reading seeded
-            // defaults while printing PASS.
-            order: function (col, opts) {
-              var asc = !(opts && opts.ascending === false);
-              filtered = filtered.slice().sort(function (a, b) {
-                var x = a[col], y = b[col];
-                if (x === y) return 0;
-                return (x > y ? 1 : -1) * (asc ? 1 : -1);
-              });
-              return chain;
-            },
-            limit: function (n) { filtered = filtered.slice(0, n); return chain; },
-            single: function () {
-              if (window.__offline) return fail();
-              return Promise.resolve(filtered.length
-                ? { data: filtered[0], error: null }
-                : { data: null, error: { message: 'no rows' } });
-            },
-            then: function (ok, no) {
-              return (window.__offline ? fail() : Promise.resolve({ data: filtered, error: null })).then(ok, no);
-            },
-          };
-              // Anything the app calls that this stub has not learned yet is named out loud.
-          // Twice now a method was added to hydrate() -- rpc, then order/limit -- and the
-          // stub answered undefined, which threw somewhere unhelpful and left the suite
-          // looking half-alive. A stub that cannot keep up should say so.
-          return new Proxy(chain, {
-            get: function (target, prop) {
-              if (prop in target || typeof prop === 'symbol') return target[prop];
-              throw new Error('cloud.test.js stub has no .' + String(prop) + '() — the app has grown a call this fake client does not implement');
-            },
-          });
-        },
-        upsert: function (row, opts) {
-          if (window.__offline) return fail();
-          window.__writes.push({ table: table, action: 'upsert', n: 1 });
-          var key = (opts && opts.onConflict) || (table === 'user_settings' ? 'user_id' : 'id');
-          var at = -1;
-          for (var i = 0; i < rows.length; i++) if (rows[i][key] === row[key]) { at = i; break; }
-          if (at >= 0) rows[at] = Object.assign({}, rows[at], row); else rows.push(row);
-          return Promise.resolve({ data: [row], error: null });
-        },
-        insert: function (rs) {
-          if (window.__offline) return fail();
-          window.__writes.push({ table: table, action: 'insert', n: rs.length });
-          rs.forEach(function (r) { rows.push(r); });
-          return Promise.resolve({ data: rs, error: null });
-        },
-        delete: function () {
-          return { eq: function (col, val) {
-            if (window.__offline) return fail();
-            window.__writes.push({ table: table, action: 'delete', n: 1 });
-            db[table] = rows.filter(function (r) { return r[col] !== val; });
-            return Promise.resolve({ data: null, error: null });
-          } };
-        },
-      };
-      return api;
-    }
-    return {
-      // Postgres functions. The app calls c.rpc('my_permissions') as part of hydration
-      // (P1.8, the permission registry). Without this the call was undefined(...),
-      // which threw inside the Promise.all that loads EVERY table — so nothing landed in
-      // state, and the assertions before the crash went on "passing" against seeded
-      // defaults rather than database values. A stub has to keep up with what the app
-      // asks of it, or it stops testing and starts reassuring.
-      rpc: function () {
-        if (window.__offline) return fail();
-        // my_permissions() is declared "returns table (permission_id, granted, source)",
-        // so supabase-js hands back an ARRAY of rows — hydrate() reduces over it. An
-        // object here is truthy, so the "|| []" guard does not catch it and the reduce
-        // throws, taking the whole Promise.all down with it. Empty is the honest answer
-        // for a person with no explicit exceptions: hasPermission() then falls back to
-        // the role defaults, which is what this suite is about. permissions.test.js
-        // covers the registry itself.
-        return Promise.resolve({ data: [], error: null });
-      },
-      auth: {
-        signInWithPassword: function (c) {
-          if (window.__offline) return fail();
-          var p = db.profiles.filter(function (r) { return r.email === c.email; })[0];
-          return Promise.resolve(p
-            ? { data: { user: { id: p.id } }, error: null }
-            : { error: { message: 'Invalid login credentials' } });
-        },
-        signOut: function () { return Promise.resolve({ error: null }); },
-        signUp: function () { return Promise.resolve({ data: {}, error: null }); },
-      },
-      from: q,
-    };
-  },
-};`;
-
-// The stub is a template literal injected into the page, so a stray backtick inside it
-// silently truncates the whole thing. When that happened the page had no window.supabase,
-// hydrate() answered "No server configured", state stayed at its seeded defaults, and this
-// suite went on printing PASS against them — which is how it looked half-alive for two
-// sessions. Parsing it here turns that into one loud line before a browser is even opened.
-(function assertStubParses() {
-  const out = STUB(DB);
-  if (/`/.test(out)) {
-    console.error('  FATAL  the injected stub contains a backtick, which truncates it');
-    process.exit(1);
-  }
-  try { new Function(out); } catch (e) {
-    console.error('  FATAL  the injected stub does not parse: ' + e.message);
-    process.exit(1);
-  }
-})();
+const { TECH, OPS, CLIENT, TICKET, JOB, makeDB, STUB, assertStubParses } = require('./cloudstub.js');
+const DB = makeDB();
+assertStubParses(DB);
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
@@ -299,8 +128,12 @@ window.supabase = {
   const w = await writes(p);
   check('the ticket reached the database with the last value typed',
     await p.evaluate(([id]) => (window.__db.tickets.find(r => r.id === id) || {}).rig_name, [TICKET]) === 'RIG-9');
+  // Counted by table rather than by action name. The header moved from upsert to a
+  // version-guarded update (S11) and this assertion went red while the behaviour it names
+  // was unchanged — a check pinned to a mechanism stops testing the claim the moment the
+  // mechanism moves.
   check('a day of edits did not become a day of requests',
-    w.filter(x => x.table === 'tickets' && x.action === 'upsert').length === 1,
+    w.filter(x => x.table === 'tickets').length === 1,
     w.filter(x => x.table === 'tickets').length + ' ticket writes');
 
   // ── children are replaced, not duplicated, on replay ─────────────────────

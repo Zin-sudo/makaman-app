@@ -2759,6 +2759,7 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
     // technician down a hole still sees that the signed sheet came back. The bytes
     // themselves never enter the replica: they would not fit (B-19.1), and they are only
     // ever reachable through a signed URL minted at the moment somebody asks.
+    version: Number(t.version) || 1,
     attachments: (k.attachments || []).map((a) => ({
       id: a.id, path: a.path, filename: a.filename || '', mime: a.mime || '',
       bytes: Number(a.bytes) || 0,
@@ -2793,9 +2794,17 @@ function rowTicket(t, idByName, idByClient, idByJob) {
     geo_open: (t.geo || {}).open || null, geo_last: (t.geo || {}).last || null,
     geo_pinged_at: tsOut((t.geo || {}).pingedAt),
     asset_check: t.assetCheck || null,
-    updated_at: new Date().toISOString(),
+    // S11. The version this edit was made against. Sent so the update can be conditioned
+    // on it, never written — the trigger sets it, and a client that could set its own
+    // version could overwrite anything by claiming to be current.
+    version: Number(t.version) || 1,
   };
 }
+// updated_at deliberately absent. The trigger stamps it on every update and the column
+// defaults to now() on insert, so the client setting it was at best redundant — and at
+// worst the reason every ticket looked changed on every render: diffOps compares two
+// calls to this function, and a fresh timestamp inside it meant the two never matched.
+// Adding a job-log line was rewriting the ticket header along with it.
 // Children are replaced wholesale rather than diffed row by row. They have no stable
 // identity in the app — an event is its position in a list — so a diff would have to
 // invent one, and inventing one makes inserting a line in the middle look like every
@@ -3012,7 +3021,49 @@ function outboxPush(ops) {
 
 // Sending one op. Three shapes cover everything the app does: upsert a row, replace a
 // ticket's children, delete a row.
+// How a successful guarded write tells the replica what version the row is on now.
+//
+// Without this the second edit to any ticket would conflict with the first: the server
+// moves to v+1 while the device still believes v, and the background drain does not
+// re-hydrate. The component fills this in; it is a hook rather than a call so this module
+// stays free of the component, as the rest of the queue is.
+const VERSION_ECHO = { apply: null };
+function echoVersion(id, version) {
+  if (VERSION_ECHO.apply && version) { try { VERSION_ECHO.apply(id, version); } catch (e) { /* never fail a send over this */ } }
+}
+
 function outboxSend(c, op) {
+  // S11 / B8. A ticket header is written only if nobody has touched it since this edit
+  // was made. The condition is the version, and an edit made against a version that has
+  // since moved matches no row at all — so nothing is overwritten, and the app can tell
+  // "taken" from "somebody got there first" instead of assuming the first.
+  if (op.action === 'upsert_ticket') {
+    const row = Object.assign({}, op.row);
+    const base = Number(row.version) || 1;
+    delete row.version;
+    return c.from('tickets').update(row).eq('id', row.id).eq('version', base).select('id,version')
+      .then((r) => {
+        if (r.error) throw r.error;
+        if (r.data && r.data.length) { echoVersion(row.id, r.data[0].version); return; }
+        // No row matched. Two very different reasons, and guessing between them is how a
+        // new ticket would get thrown away as a conflict: either the ticket does not
+        // exist on the server yet (raised on this device, still its first upload), or it
+        // does and somebody has changed it since.
+        return c.from('tickets').select('id').eq('id', row.id).then((cur) => {
+          if (cur.error) throw cur.error;
+          if (cur.data && cur.data.length) {
+            const clash = new Error('MK_STALE');
+            // Terminal: retrying cannot help. The version will never go back.
+            clash.mkTerminal = true;
+            throw clash;
+          }
+          return c.from('tickets').insert(row).then((ins) => {
+            if (ins.error) throw ins.error;
+            echoVersion(row.id, 1);
+          });
+        });
+      });
+  }
   if (op.action === 'upsert') return c.from(op.table).upsert(op.row).then((r) => { if (r.error) throw r.error; });
   if (op.action === 'delete') {
     return c.from(op.table).delete().eq(op.by || 'id', op.id).then((r) => { if (r.error) throw r.error; });
@@ -3061,8 +3112,11 @@ function outboxDrain() {
         // not waiting on anything. Left at the head it stops every later write from ever
         // being sent, which is how one refused row silently froze the whole device.
         // After OUTBOX_TRIES attempts the op is set aside so the queue can move again.
+        // A conflict is terminal by nature — the version it was made against will never
+        // come back — so it is set aside on the first refusal rather than after five
+        // attempts that cannot succeed and five more chances to look like a flaky network.
         q[n].tries = (q[n].tries || 0) + 1;
-        if (q[n].tries < OUTBOX_TRIES) return Promise.resolve();
+        if (!(err && err.mkTerminal) && q[n].tries < OUTBOX_TRIES) return Promise.resolve();
         done = n + 1;
         outboxSetAside(q[n], err);
         return step(n + 1);
@@ -3098,6 +3152,9 @@ function outboxSetAside(op, why) {
 // Postgres speaks in constraint names. The office speaks in tickets.
 function refusalText(err) {
   const raw = (err && (err.message || err.details || err.hint)) || '';
+  if (/MK_STALE/.test(raw)) {
+    return 'Someone in the office changed this job while you were out of signal, so your version of it was not saved over theirs. Open the ticket to see where it stands now and make the change again if it is still needed.';
+  }
   if (/ticket_number|duplicate key/i.test(raw)) {
     return 'That ticket number is already used on another job. Two devices can reach for the same number while one is out of signal — give this job the next free number and sync again.';
   }
@@ -3141,7 +3198,10 @@ function diffOps(before, after) {
     // rewrite the job log, and adding a log line must not rewrite the header.
     const head = (x) => rowTicket(x, idByName, idByClient, idByJob);
     if (!was || !same(head(was), head(t))) {
-      ops.push({ key: 'tickets:' + t.id, table: 'tickets', action: 'upsert', row: head(t) });
+      // upsert_ticket, not upsert: a ticket header is the one row two people edit at the
+      // same time, so it goes through the version guard rather than blindly overwriting
+      // whatever is there (S11).
+      ops.push({ key: 'tickets:' + t.id, table: 'tickets', action: 'upsert_ticket', row: head(t) });
     }
     const kidsNow = rowsChildren(t, idByName);
     const kidsWas = was ? rowsChildren(was, idByName) : null;
@@ -3799,6 +3859,28 @@ class Component extends DCLogic {
       // 'all' | 'lifecycle' | 'edit' — which slice of the Activity feed is showing.
       activityKind: 'all',
     }, this.load());
+    // S11. What the queue calls when a guarded ticket write is taken, so the replica
+    // learns the row's new version. Without it the SECOND edit to any ticket would be
+    // refused as a conflict with the first: the server moves on, the background drain
+    // does not re-hydrate, and the device would go on sending a version that is a step
+    // behind for ever.
+    VERSION_ECHO.apply = (id, version) => this.adoptVersion(id, version);
+  }
+
+  // Deliberately not through mutate(). mutate() diffs the result and queues what changed,
+  // which would turn "the server told us the version" into an edit to send back to the
+  // server — a loop, and one that would conflict with itself. This writes the number and
+  // stops.
+  adoptVersion(id, version) {
+    const cur = this.state.data;
+    const t = (cur.tickets || []).find((x) => x.id === id);
+    if (!t || t.version === version) return;
+    const data = JSON.parse(JSON.stringify(cur));
+    const row = data.tickets.find((x) => x.id === id);
+    if (!row) return;
+    row.version = version;
+    this.persist(data);
+    this.setState({ data: data });
   }
 
   load() {
