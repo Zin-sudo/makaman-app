@@ -2734,8 +2734,12 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
       : null,
     assetCheck: t.asset_check || null,
     crew: (k.crew || []).map((c) => ({ name: nameById[c.profile_id] || '', email: emailById[c.profile_id] || '' })),
+    // The row's own id, carried rather than re-minted. S19: without it a job log had no
+    // identity beyond its position in a list, which is why it could only be synced by
+    // deleting every line and re-inserting them — and why two people writing to one job
+    // meant whoever synced second erased the other.
     events: (k.lines || []).map((l) => ({
-      ts: tsIn(l.logged_at), text: l.text,
+      id: l.id, ts: tsIn(l.logged_at), text: l.text,
       editedBy: nameById[l.edited_by] || '', editedAt: tsIn(l.edited_at),
     })),
     items: (k.items || []).map((i) => ({
@@ -2745,7 +2749,7 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
     })),
     assets: (k.assets || []).map((a) => ({ item: a.item, qty: a.qty, note: a.note })),
     audit: (k.audit || []).map((a) => ({
-      ts: tsIn(a.changed_at), text: a.text || '', kind: a.kind,
+      id: a.id, ts: tsIn(a.changed_at), text: a.text || '', kind: a.kind,
       by: nameById[a.changed_by] || '', field: a.field || '',
       from: a.old_value || '', to: a.new_value || '',
     })),
@@ -2813,8 +2817,9 @@ function rowTicket(t, idByName, idByClient, idByJob) {
 // a replay after a failed drain must not double anything.
 function rowsChildren(t, idByName) {
   return {
+    // Their own ids, not fresh ones. stampChildIds guarantees every entry has one.
     ticket_lines: (t.events || []).map((e) => ({
-      id: uuid(), ticket_id: t.id, logged_at: tsOut(e.ts) || new Date().toISOString(),
+      id: e.id || uuid(), ticket_id: t.id, logged_at: tsOut(e.ts) || new Date().toISOString(),
       text: e.text || '', edited_by: idByName[e.editedBy] || null, edited_at: tsOut(e.editedAt),
     })),
     ticket_items: (t.items || []).map((i, n) => ({
@@ -2832,7 +2837,7 @@ function rowsChildren(t, idByName) {
       ticket_id: t.id, profile_id: idByName[c.name] || null, position: n,
     })).filter((r) => r.profile_id),
     audit_log: (t.audit || []).map((a) => ({
-      id: uuid(), ticket_id: t.id, changed_at: tsOut(a.ts) || new Date().toISOString(),
+      id: a.id || uuid(), ticket_id: t.id, changed_at: tsOut(a.ts) || new Date().toISOString(),
       changed_by: idByName[a.by] || idByName[t.tech] || null,
       text: a.text || '', kind: a.kind || 'lifecycle',
       field: a.field || null, old_value: a.from || null, new_value: a.to || null,
@@ -3180,7 +3185,21 @@ function outboxSetAsideLatest() {
 // replica the way it always has, and the difference is read off afterwards. The
 // alternative — every mutation site declaring which rows it touched — is the same
 // information written by hand in ninety places, and wrong in a few of them.
-const CHILD_TABLES = ['ticket_lines', 'ticket_items', 'ticket_assets', 'ticket_crew', 'audit_log'];
+// Replaced wholesale on sync. ticket_lines and audit_log are deliberately NOT here any
+// more — see diffOps.
+const CHILD_TABLES = ['ticket_items', 'ticket_assets', 'ticket_crew'];
+
+// Anything written before rows carried their own identity gets one now, once, and keeps
+// it. Minting an id at diff time instead would mint a different one on every render, which
+// is the exact problem the ids exist to solve.
+function stampChildIds(data) {
+  let changed = false;
+  (data.tickets || []).forEach((t) => {
+    (t.events || []).forEach((e) => { if (!e.id) { e.id = uuid(); changed = true; } });
+    (t.audit || []).forEach((a) => { if (!a.id) { a.id = uuid(); changed = true; } });
+  });
+  return changed;
+}
 function diffOps(before, after) {
   const ops = [];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -3205,12 +3224,46 @@ function diffOps(before, after) {
     }
     const kidsNow = rowsChildren(t, idByName);
     const kidsWas = was ? rowsChildren(was, idByName) : null;
-    // Ids are regenerated on every call, so they cannot take part in the comparison —
-    // strip them, or every ticket looks changed every time.
+    // Items, assets and crew are still replaced wholesale. They have no identity in the
+    // app beyond their position — an item IS its row in the charge table — and they are
+    // built as a set by one person rather than appended to by two, so replacement is
+    // what they actually are. Ids are re-minted on every call for these, so they cannot
+    // take part in the comparison.
     const bare = (rows) => rows.map((r) => { const o = Object.assign({}, r); delete o.id; return o; });
     CHILD_TABLES.forEach((tbl) => {
       if (kidsWas && same(bare(kidsWas[tbl]), bare(kidsNow[tbl]))) return;
       ops.push({ key: tbl + ':' + t.id, table: tbl, action: 'replace', ticketId: t.id, rows: kidsNow[tbl] });
+    });
+
+    // S19. The job log and the audit trail are the two things two people write to at the
+    // same time, and `replace` deletes every row for the ticket before re-inserting the
+    // sender's list — so a technician syncing a job the office had also written on erased
+    // what the office wrote. For the audit trail that is destruction of the record CLAUD.md
+    // calls legally required, by a device that was merely out of coverage.
+    //
+    // Both now move row by row, keyed by the row's own id, exactly as ticket_notes does.
+    // Nobody's line can delete anybody else's, and the coalescer still collapses repeated
+    // edits to one write per row.
+    const byId = (rows) => { const m = {}; rows.forEach((r) => { if (r.id) m[r.id] = r; }); return m; };
+    const lineWas = kidsWas ? byId(kidsWas.ticket_lines) : {};
+    kidsNow.ticket_lines.forEach((r) => {
+      if (kidsWas && lineWas[r.id] && same(lineWas[r.id], r)) return;
+      ops.push({ key: 'ticket_lines:' + r.id, table: 'ticket_lines', action: 'upsert', row: r });
+    });
+    // A line deleted on the device is deleted on the server. Named individually, so
+    // removing one log line cannot take somebody else's with it.
+    if (kidsWas) {
+      const lineNow = byId(kidsNow.ticket_lines);
+      Object.keys(lineWas).forEach((id) => {
+        if (!lineNow[id]) ops.push({ key: 'ticket_lines:del:' + id, table: 'ticket_lines', action: 'delete', id: id });
+      });
+    }
+    // The audit trail is append-only by nature, so there is deliberately no delete here.
+    // An entry that has been recorded is not something a later sync gets to withdraw.
+    const auditWas = kidsWas ? byId(kidsWas.audit_log) : {};
+    kidsNow.audit_log.forEach((r) => {
+      if (kidsWas && auditWas[r.id] && same(auditWas[r.id], r)) return;
+      ops.push({ key: 'audit_log:' + r.id, table: 'audit_log', action: 'upsert', row: r });
     });
   });
   (before.tickets || []).forEach((t) => {
@@ -3896,6 +3949,10 @@ class Component extends DCLogic {
         const cached = localStorage.getItem(CACHE_K);
         if (cached) data = Object.assign(data, JSON.parse(cached));
       } catch (e) { /* first run on this device */ }
+      // S19. Once, for anything cached before rows carried their own identity. Assigning
+      // at diff time instead would assign a different id on every render, which is the
+      // problem the ids exist to remove.
+      stampChildIds(data);
       let sess = null;
       try { const r = localStorage.getItem(SK); if (r) sess = JSON.parse(r); } catch (e) { /* none */ }
       return sess ? { data: data, session: sess, role: sess.roleKey } : { data: data };
@@ -3915,6 +3972,7 @@ class Component extends DCLogic {
         data.settings = settings;
       }
     } catch (e) { /* first run */ }
+    stampChildIds(data);
     let session = null;
     try {
       const rawS = localStorage.getItem(SK);
@@ -4195,6 +4253,12 @@ class Component extends DCLogic {
     const before = this.state.data;
     const data = JSON.parse(JSON.stringify(before));
     fn(data);
+    // Before the diff, never after. A job-log line or audit entry that reaches diffOps
+    // without an id gets a fresh one on every call — which is the exact behaviour the ids
+    // were added to remove, and it would show up as an edited line inserting a second row
+    // rather than rewriting the first. Stamping on load alone left the window between one
+    // load and the next; stamping here closes it.
+    stampChildIds(data);
     this.persist(data);
     this.setState({ data: data });
     // The replica is already updated and on screen; the database finds out afterwards.
@@ -4222,6 +4286,10 @@ class Component extends DCLogic {
         // undefined.
         const merged = Object.assign(seed(), data);
         merged.settings = Object.assign({}, seed().settings, data.settings || {});
+        // Belt and braces: the database's own rows always have ids, so this is a no-op in
+        // practice. It costs one pass and removes the possibility of a row reaching the
+        // diff without identity.
+        stampChildIds(merged);
         this.persist(merged);
         this.setState({ data: merged });
       })
@@ -4541,7 +4609,7 @@ class Component extends DCLogic {
     const by = (this.state.session && this.state.session.name) || '';
     this.mutate(d => {
       const t = d.tickets.find(x => x.id === ticketId);
-      if (t) (t.audit = t.audit || []).push({ ts: iso(new Date()), text: text, kind: kind || 'lifecycle', by: by });
+      if (t) (t.audit = t.audit || []).push({ id: uuid(), ts: iso(new Date()), text: text, kind: kind || 'lifecycle', by: by });
     });
   }
   client(name) { return this.state.data.clients.find(c => c.name === name); }
@@ -7118,7 +7186,7 @@ class Component extends DCLogic {
         const now = iso(new Date());
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
-          x.events.push({ ts: now, text: text });
+          x.events.push({ id: uuid(), ts: now, text: text });
           if (!x.start) { x.start = now; (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'First log line — Start Job date recorded.' }); }
           if (x.status === 'done') x.status = 'logging';
         });

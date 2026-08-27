@@ -144,6 +144,63 @@ assertStubParses(DB);
   check('and nothing extra was set aside for it', (await setAside(p)).length === 1,
     JSON.stringify((await setAside(p)).length));
 
+  // ── S19. Two people writing to one job no longer erase each other ───────────────────
+  // The children used to sync by `replace`: delete every row for the ticket, insert the
+  // sender's list. So a technician syncing a job the office had also written on wiped what
+  // the office wrote — and for the audit trail that is destruction of the record CLAUD.md
+  // calls legally required, by a device that was merely out of coverage.
+  {
+    const p4 = await open();
+    await login(p4, 'yousef@makaman.ly');
+    const before = await p4.evaluate(([id]) => ({
+      lines: window.__db.ticket_lines.filter(r => r.ticket_id === id).length,
+      audit: window.__db.audit_log.filter(r => r.ticket_id === id).length,
+    }), [TICKET]);
+
+    await p4.evaluate(() => { window.__offline = true; });
+    await p4.evaluate(([id]) => window.__mkApp.mutate(d => {
+      const t = d.tickets.find(x => x.id === id);
+      t.events.push({ ts: new Date().toISOString(), text: 'FIELD LINE — written with no signal' });
+    }), [TICKET]);
+    await p4.waitForTimeout(800);
+
+    // The office writes to the same job while he is out of coverage.
+    await p4.evaluate(([id, ops]) => {
+      window.__db.ticket_lines.push({ id: 'office-line-1', ticket_id: id,
+        logged_at: new Date().toISOString(), text: 'OFFICE LINE', edited_by: null, edited_at: null });
+      window.__db.audit_log.push({ id: 'office-audit-1', ticket_id: id,
+        changed_at: new Date().toISOString(), changed_by: ops, text: 'OFFICE AUDIT ENTRY', kind: 'lifecycle' });
+    }, [TICKET, OPS]);
+
+    await p4.evaluate(() => { window.__offline = false; });
+    await p4.evaluate(() => window.dispatchEvent(new Event('online')));
+    await p4.waitForTimeout(2200);
+
+    const rows = await p4.evaluate(([id]) => ({
+      lines: window.__db.ticket_lines.filter(r => r.ticket_id === id).map(r => r.text),
+      audit: window.__db.audit_log.filter(r => r.ticket_id === id).map(r => r.text),
+    }), [TICKET]);
+    check('the technician\'s line reaches the database', rows.lines.indexOf('FIELD LINE — written with no signal') >= 0,
+      JSON.stringify(rows.lines));
+    check('and the office\'s line is still there — nobody\'s sync deletes anybody\'s log',
+      rows.lines.indexOf('OFFICE LINE') >= 0, JSON.stringify(rows.lines));
+    check('the audit entry the office made survives the field device syncing',
+      rows.audit.indexOf('OFFICE AUDIT ENTRY') >= 0, JSON.stringify(rows.audit));
+    check('and the lines that were already there were not re-inserted as duplicates',
+      rows.lines.length === before.lines + 2, rows.lines.length + ' lines, started with ' + before.lines);
+
+    // Deleting one line deletes one line.
+    await p4.evaluate(([id]) => window.__mkApp.mutate(d => {
+      const t = d.tickets.find(x => x.id === id);
+      const i = t.events.findIndex(e => /FIELD LINE/.test(e.text));
+      t.events.splice(i, 1);
+    }), [TICKET]);
+    await p4.waitForTimeout(1600);
+    const left = await p4.evaluate(([id]) => window.__db.ticket_lines.filter(r => r.ticket_id === id).map(r => r.text), [TICKET]);
+    check('removing one log line removes exactly that one', left.indexOf('FIELD LINE — written with no signal') < 0
+      && left.indexOf('OFFICE LINE') >= 0 && left.length === before.lines + 1, JSON.stringify(left));
+  }
+
   await browser.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
