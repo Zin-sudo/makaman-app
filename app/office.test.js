@@ -103,6 +103,64 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   check('no admin tab strip', !(/Price lists/i.test(body) && /Numbering & job types/i.test(body) && /Users & customers/i.test(body)));
   await p.close();
 
+  // ---- the presence badge reports the TECHNICIAN, not whoever is looking ----
+  // It used to print this.state.online — the viewer's own connectivity — as "Online"
+  // beside somebody else's job, so the office saw a green dot on every in-progress ticket
+  // on the board whatever the field was doing. The office uses this to decide whether it
+  // can raise someone; a badge that always says yes is worse than none.
+  p = await signIn(browser, 'omar@makaman.ly');
+  const seen = await p.evaluate(() => {
+    const app = window.__mkApp;
+    const live = (app.state.data.tickets || []).filter(t => t.status === 'logging');
+    const t = live[0];
+    // Strip every trace of contact from one live ticket, with the office plainly online.
+    app.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.geo = {}; x.syncedAt = ''; });
+    app.setState({ online: true });
+    const cold = app.ticketView(app.state.data.tickets.find(y => y.id === t.id));
+    // Now say the technician was in touch a moment ago.
+    app.mutate(d => {
+      const x = d.tickets.find(y => y.id === t.id);
+      x.geo = { last: { ts: new Date().toISOString(), lat: 1, lon: 1 } };
+    });
+    const warm = app.ticketView(app.state.data.tickets.find(y => y.id === t.id));
+    // And a long time ago.
+    app.mutate(d => {
+      const x = d.tickets.find(y => y.id === t.id);
+      x.geo = { last: { ts: new Date(Date.now() - 5 * 3600 * 1000).toISOString(), lat: 1, lon: 1 } };
+    });
+    const stale = app.ticketView(app.state.data.tickets.find(y => y.id === t.id));
+    return { cold: cold.presenceLabel, warm: warm.presenceLabel, stale: stale.presenceLabel,
+             coldDot: cold.presenceDot, warmDot: warm.presenceDot };
+  });
+  check('a technician nobody has heard from is not reported as online to the office',
+    seen.cold === 'Not heard from', seen.cold);
+  check('and the dot is not green while the office is the only one connected',
+    !/success/.test(seen.coldDot), seen.coldDot);
+  check('a recent fix reads as contact, not as a claim about right now',
+    seen.warm === 'In contact' && /success/.test(seen.warmDot), seen.warm + ' / ' + seen.warmDot);
+  check('an old fix says when, rather than going on claiming contact',
+    /^Last heard /.test(seen.stale), seen.stale);
+  await p.close();
+
+  // On his own job, the technician's own live flag IS the fact.
+  p = await signIn(browser, 'yousef@makaman.ly');
+  const own = await p.evaluate(() => {
+    const app = window.__mkApp;
+    const me = (app.state.session || {}).name;
+    const t = (app.state.data.tickets || []).find(x => x.status === 'logging'
+      && (x.crew || [{ name: x.tech }]).some(c => (c.name || c) === me));
+    if (!t) return null;
+    app.setState({ online: true });
+    const up = app.ticketView(t).presenceLabel;
+    app.setState({ online: false });
+    const down = app.ticketView(t).presenceLabel;
+    return { up: up, down: down };
+  });
+  check('on his own job the technician still sees his own live signal',
+    own && own.up === 'Online' && own.down === 'No signal',
+    own ? own.up + ' / ' + own.down : 'no live ticket of his own');
+  await p.close();
+
   console.log(`\n${pass} passed, ${fail} failed`);
   await browser.close();
   process.exit(fail ? 1 : 0);

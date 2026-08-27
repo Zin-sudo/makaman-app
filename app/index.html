@@ -4901,11 +4901,26 @@ class Component extends DCLogic {
     const chip = this.statusChip(t);
     const card = this.cardTreatment(t);
     const F = this.fmt();
-    // In-progress presence badge — only meaningful while a ticket is still being logged
-    // in the field (not yet marked Job Done). This prototype models one shared device
-    // connectivity flag (the header's Online/No signal toggle) rather than per-technician
-    // live presence, so every in-progress ticket currently reflects that same flag.
+    // Presence, on a job still being logged in the field.
+    //
+    // This used to read this.state.online — the VIEWER'S own connectivity — and print it
+    // as "Online" beside somebody else's job. So the office saw a green dot against every
+    // in-progress ticket on the board, which said nothing about whether the technician was
+    // reachable and everything about whether the office was. The office uses this to
+    // decide whether it can raise someone; a badge that always says yes is worse than no
+    // badge at all.
+    //
+    // Two audiences, two different true answers. On my own job my live flag IS the fact.
+    // On somebody else's, the only thing this device knows is when they were last in
+    // contact — the newest of their position fixes and their last sync — so that is what
+    // it says, in those words. Nothing here ever claims to know that another person is
+    // online right now, because nothing here can.
     const showPresence = t.status === 'logging';
+    const mine = inCrew(t, (this.state.session || {}).name, (this.state.session || {}).email);
+    const contactTs = [((t.geo || {}).last || {}).ts, ((t.geo || {}).open || {}).ts, t.syncedAt]
+      .filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0] || '';
+    const FRESH_MS = 15 * 60 * 1000;
+    const fresh = !!contactTs && (Date.now() - new Date(contactTs).getTime()) < FRESH_MS;
     const online = !!this.state.online;
     return Object.assign({
       id: t.id, customer: t.customer, tech: t.tech, well: t.well, jobType: t.jobType || '—',
@@ -4927,8 +4942,12 @@ class Component extends DCLogic {
       mileage: t.mileage === 0 ? '0' : (t.mileage || ''),
       ticketNo: t.ticketNo || '',
       presenceShow: showPresence,
-      presenceDot: online ? 'var(--success)' : 'var(--ink-ghost)',
-      presenceLabel: online ? 'Online' : 'Offline',
+      presenceDot: (mine ? online : fresh) ? 'var(--success)' : 'var(--ink-ghost)',
+      presenceLabel: mine
+        ? (online ? 'Online' : 'No signal')
+        : (contactTs
+          ? (fresh ? 'In contact' : 'Last heard ' + F.stamp(contactTs))
+          : 'Not heard from'),
     }, chip, card, this.geoView(t));
   }
   // The two positions as the office reads them. Gated on role here rather than in the
