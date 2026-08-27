@@ -429,7 +429,21 @@
     from { opacity:0; transform:translateX(-50%) translateY(-14px); }
     to   { opacity:1; transform:translateX(-50%) translateY(0); }
   }
-  @media (prefers-reduced-motion: reduce) { .mk-toast { animation:none; } }
+  /* Reduced motion, honoured across the whole app rather than on one element.
+     This used to cover the toast alone, while three `pulse 2s infinite` declarations
+     ran regardless — and one of those sits inside a repeating row, so it was one
+     permanently animating dot per live ticket, not three in total. Somebody who has
+     asked their phone to stop moving things has usually asked for a reason.
+     Iteration count rather than `animation:none`: the pulse dots carry meaning, so they
+     should settle at their final keyframe and stay visible, not vanish. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration:0.01ms !important;
+      animation-iteration-count:1 !important;
+      transition-duration:0.01ms !important;
+      scroll-behavior:auto !important;
+    }
+  }
 
   /* A wide table on a phone is a table you read by dragging it sideways, losing the
      row you were on. Below 640px these become one card per row: the column headings
@@ -494,6 +508,39 @@
     outline-offset:2px;
   }
   /* A ticket card: coloured rule down the leading edge, per status. */
+  /* A press you can feel through a glove.
+     The only confirmation a technician gets that a tap registered is what the screen
+     does — he cannot feel the glass through nitrile, and in sun he may not see a colour
+     change. Four percent for a tenth of a second is enough, costs nothing, and runs no
+     animation loop. Adapted from the reference guide's fixed values to this app's
+     tokens and markup rather than copied: no new colours, no new radii, no library. */
+  button { transition:transform 0.1s ease; }
+  button:active { transform:scale(0.96); }
+  /* Two exceptions, both because scaling one piece of a joined row opens a gap.
+     A disabled control must not pretend it did something either. */
+  button:disabled:active { transform:none; }
+  .mk-seg button:active { transform:none; }
+
+  /* The bottom bar. The active tab's icon lifts and grows a little; the label behind it
+     comes up to full strength. The reference guide lifts by 5px, which would collide
+     with this bar's 9px top padding — 2px reads the same at this size and clips nothing.
+     The two bars share their BUTTONS, not their containers. `.mk-bottom-nav` is not a
+     neutral name — it carries max-width:760px and left:50%/translateX(-50%) for the
+     technician's centred column — so putting it on the office's full-width pinned bar
+     squeezed it to 760px and re-centred it. `.mk-nav-item` on the buttons is all that
+     was ever needed, and it is all that is shared. */
+  .mk-nav-item { transition:color 0.18s ease; }
+  .mk-nav-item svg {
+    transition:transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .mk-nav-item span { opacity:0.85; transition:opacity 0.18s ease; }
+  .mk-nav-on svg { transform:translateY(-2px) scale(1.06); }
+  .mk-nav-on span { opacity:1; }
+  /* The bar is four flush buttons, so the whole-button squish would show gaps at the
+     seams. The icon takes the press instead. */
+  .mk-nav-item:active { transform:none; }
+  .mk-nav-item:active svg { transform:translateY(-2px) scale(0.94); }
+
   /* S12. This class declared a 3px status stripe that never rendered: every card also
      carried an inline `border:1px solid`, and an inline shorthand beats a class rule, so
      the coloured edge came out as a hairline indistinguishable from the ordinary border.
@@ -723,7 +770,7 @@
 
         <div style="margin-bottom:28px">
           <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">Appearance</div>
-          <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22);margin-bottom:16px">
+          <div class="mk-seg" style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22);margin-bottom:16px">
             <sc-for list="{{ themeOptions }}" as="o" hint-placeholder-count="3">
               <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
@@ -736,7 +783,7 @@
           <div style="padding:10px 12px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:12px;font-size:13px">
             All times are <strong>Libya time (UTC+2)</strong> on every device.
           </div>
-          <div style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22)">
+          <div class="mk-seg" style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22)">
             <sc-for list="{{ timeFormatOptions }}" as="o" hint-placeholder-count="2">
               <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
             </sc-for>
@@ -1282,7 +1329,7 @@
 
           <div class="mk-bottom-nav" style="display:flex;flex:none;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface)">
             <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
-              <button onClick="{{ n.pick }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
+              <button onClick="{{ n.pick }}" class="{{ n.cls }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
                 {{ n.glyph }}
                 <span style="font-size:10px;letter-spacing:0.03em;font-weight:{{ n.weight }}">{{ n.label }}</span>
               </button>
@@ -2662,7 +2709,7 @@
   <sc-if value="{{ showDeskNav }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface);padding-bottom:env(safe-area-inset-bottom)">
       <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
-        <button onClick="{{ n.pick }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
+        <button onClick="{{ n.pick }}" class="{{ n.cls }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
           {{ n.glyph }}
           <span style="font-size:10px;letter-spacing:0.03em;font-weight:{{ n.weight }}">{{ n.label }}</span>
         </button>
@@ -7346,6 +7393,9 @@ class Component extends DCLogic {
         return {
           label: x.label,
           glyph: icon(x.key, 21),
+          // Carried as a class rather than styled inline, so the active state is one CSS
+          // rule that both bars read instead of a transform repeated in two places.
+          cls: on ? 'mk-nav-item mk-nav-on' : 'mk-nav-item',
           color: on ? 'var(--accent-deep)' : 'var(--ink-faint)',
           weight: on ? '600' : '500',
           // Returning to Tickets lands on the list, not on whatever detail screen was
