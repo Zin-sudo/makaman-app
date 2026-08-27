@@ -91,7 +91,14 @@
     --ground:#f2f2f3; --surface:#ffffff; --field:#e9e9ea; --bezel:#1d1f20;
     --ink:#1d1f20; --ink-dim:#4a4a4d; --ink-faint:#5d5d60; --ink-ghost:#98989b;
     --ink-rgb:29,31,32;
-    --on-accent:#f2f2f3; --on-accent-strong:#ffffff;
+    /* Text on a saturated ground, and the two themes need OPPOSITE inks — which is the
+       point, not an inconsistency. The light accent is a mid-slate blue and carries white
+       at 5.20; the dark accent is a bright blue and carries white at only 3.65, where
+       near-black gives 5.30. One ink for both was tried and was wrong in exactly one
+       theme, which is how the palette was already built and why it has two values.
+       --on-accent-strong is white in both because it belongs to --brand, a deep red where
+       white is 5.08 either way. */
+    --on-accent:#ffffff; --on-accent-strong:#ffffff;
     /* Measured. #5980a6 carried white text at 4.15:1 as a filled button ground — under
        threshold, on + New Job Ticket, which is the first thing a technician presses. One
        step deeper reaches 5.20 and reads the same at a glance. */
@@ -138,7 +145,7 @@
     /* White on #0a84ff is 3.65:1. A bright accent on a dark ground takes dark type, not
        light; #00121f is 5.20 and still reads as "black" beside the blue. --on-accent-strong
        stays white for the red brand and danger grounds, which are dark enough for it. */
-    --on-accent:#00121f; --on-accent-strong:#ffffff;
+    --on-accent:#001018; --on-accent-strong:#ffffff;
     --accent:#0a84ff; --accent-deep:#4da2ff; --accent-ink:#8fc8ff;
     --accent-rgb:10,132,255; --accent-deep-rgb:77,162,255;
     --accent-wash:rgba(10,132,255,0.16); --accent-wash-2:rgba(10,132,255,0.10); --accent-wash-3:rgba(10,132,255,0.22);
@@ -152,7 +159,7 @@
     --chip-ok-bg:rgba(48,209,88,0.18); --chip-ok-fg:#30d158;
     --danger:#ff453a; --danger-deep:#ff6961; --danger-rgb:255,69,58;
     /* White on #ff453a is 3.41:1; near-black is 5.57. */
-    --on-danger:#00121f;
+    --on-danger:#001018;
     --warning:#ff9f0a; --warning-ink:#ffcf70; --warning-deep:#ffbf4d; --warning-rgb:255,159,10;
     --success:#30d158; --success-rgb:48,209,88; --success-ink:#30d158;
     --hue-teal:#40c8e0; --hue-indigo:#bf5af2; --hue-clay:#ff9f0a;
@@ -337,6 +344,21 @@
      is always answerable without scrolling back to the top. Sits below the dialog
      and settings layers (z-index 50) and below the bottom bar. */
   .mk-appbar { position:sticky; top:0; z-index:30; }
+  /* The bar could not shrink, so on a 320px phone it pushed the page sideways — the
+     office bar carries a name and a role the technician's does not, and at 320 the two
+     together ran 55px past the edge. Pre-existing: the baseline overflows at 375, and
+     widening the notification bell for gloved thumbs took it to 383.
+     A flex item will not shrink below its content unless it is told it may, which is what
+     min-width:0 does; the name then takes the ellipsis rather than the layout taking the
+     hit. The role label goes at the narrowest sizes: it is the least load-bearing thing
+     in the bar, and it is repeated on the screen below. */
+  .mk-appbar > * { min-width:0; }
+  .mk-nav-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mk-nav-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media (max-width: 380px) {
+    .mk-appbar { gap:10px; padding-inline:12px; }
+    .mk-nav-role { display:none; }
+  }
 
   /* An A4 sheet is a client document that will be printed on white paper. It is the one
      part of the app that must not follow the theme. The backgrounds here were already
@@ -508,6 +530,18 @@
     outline-offset:2px;
   }
   /* A ticket card: coloured rule down the leading edge, per status. */
+  /* A minimum every control can be hit at.
+     Measured across every screen and every error state at 430px, 160 controls came in
+     under 36px on their short edge — back buttons at 30, the notification bell at 27,
+     the toast's dismiss at 24. All of them clear the WCAG 2.2 AA floor of 24px, so this
+     is not a compliance fix; it is that this app is operated in nitrile gloves on a
+     phone propped against a wellhead, and a 27px target is a target you miss.
+     40px rather than the 44 the platform guidelines ask for: 44 pushed the segmented
+     controls and the table action buttons into a taller row than the content needed,
+     and a bar that grows to fit its buttons is its own kind of wrong. */
+  button { min-height:40px; }
+  .back-btn { min-height:40px; padding:6px 14px; }
+
   /* A press you can feel through a glove.
      The only confirmation a technician gets that a tap registered is what the screen
      does — he cannot feel the glass through nitrile, and in sun he may not see a colour
@@ -601,7 +635,7 @@
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
-          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Request account</button>
+          <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Request account</button>
           <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
         </div>
       </sc-if>
@@ -668,8 +702,8 @@
       <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px;text-align:center">
         <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 12px">Waiting for approval</h2>
         <p style="font-size:14px;color:var(--ink-dim);line-height:1.5;margin:0 0 20px">Signed in as {{ sessionName }}. An Ops Manager or Admin still needs to approve your account.</p>
-        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Check again</button>
-        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
+        <button onClick="{{ pendingCheckAgain }}" style="width:100%;padding:11px;margin-bottom:10px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Check again</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-danger);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
   </sc-if>
@@ -698,7 +732,7 @@
       <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning-ink);border:1px solid var(--warning);white-space:nowrap">{{ swapBackLabel }}</button>
     </sc-if>
     <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:13px">
-      <button onClick="{{ toggleNotifications }}" title="{{ notifyTitle }}" style="position:relative;flex:none;padding:5px 8px;margin-inline-end:4px;cursor:pointer;background:transparent;border:1px solid rgba(var(--on-navbar-rgb),0.22);color:inherit;line-height:1">
+      <button onClick="{{ toggleNotifications }}" title="{{ notifyTitle }}" style="position:relative;flex:none;min-width:40px;padding:5px 10px;margin-inline-end:4px;cursor:pointer;background:transparent;border:1px solid rgba(var(--on-navbar-rgb),0.22);color:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">
         <span style="font-size:15px">{{ notifyGlyph }}</span>
         <sc-if value="{{ notifyAny }}" hint-placeholder-val="{{ false }}">
           <span style="position:absolute;top:-6px;inset-inline-end:-6px;min-width:17px;height:17px;padding:0 4px;font-size:10px;font-weight:700;line-height:17px;text-align:center;background:var(--danger);color:var(--on-danger);border-radius:9px">{{ notifyCount }}</span>
@@ -844,12 +878,12 @@
             <sc-if value="{{ pwDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Password changed. It applies the next time you sign in.</div>
             </sc-if>
-            <button onClick="{{ doChangePassword }}" disabled="{{ pwBusy }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent);opacity:{{ pwBusyDim }}">{{ changePwLabel }}</button>
+            <button onClick="{{ doChangePassword }}" disabled="{{ pwBusy }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ pwBusyDim }}">{{ changePwLabel }}</button>
           </div>
         </div>
 
         <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:var(--ink-faint);margin:2px 0 10px">BUILD {{ buildStamp }}</div>
-        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
+        <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-danger);border:1px solid var(--danger)">Log out</button>
       </div>
     </div>
   </sc-if>
@@ -1042,7 +1076,7 @@
                   <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
                     <div style="width:74px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:var(--ink-faint)">{{ e.timeLine }}</span></div>
                     <textarea dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
-                    <button onClick="{{ e.remove }}" title="Delete line" style="width:26px;flex:none;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                    <button onClick="{{ e.remove }}" title="Delete line" style="min-width:40px;flex:none;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
                   </div>
                 </sc-for>
               </div>
@@ -1535,7 +1569,7 @@
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
                         <div style="display:flex;gap:6px;align-items:center">
@@ -1570,7 +1604,7 @@
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
-            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Create account</button>
           </div>
         </div>
       </sc-if>
@@ -1701,7 +1735,7 @@
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                         <sc-if value="{{ it.showRemove }}" hint-placeholder-val="{{ true }}">
-                          <button onClick="{{ it.remove }}" title="Remove line" style="width:22px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                          <button onClick="{{ it.remove }}" title="Remove line" style="min-width:40px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
                         </sc-if>
                       </td>
                     </tr>
@@ -1752,7 +1786,7 @@
                     <input dir="auto" value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
                     <input dir="auto" value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
                     <input dir="auto" value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                    <button onClick="{{ a.remove }}" title="Remove" style="width:24px;flex:none;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                    <button onClick="{{ a.remove }}" title="Remove" style="min-width:40px;flex:none;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
                   </div>
                 </sc-for>
                 <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
@@ -2182,7 +2216,7 @@
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><button onClick="{{ p.remove }}" style="width:22px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><button onClick="{{ p.remove }}" style="min-width:40px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button></td>
                 </tr>
               </sc-for>
             </tbody>
@@ -2263,7 +2297,7 @@
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Approve → Technician</button>
+                        <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
                       <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
                         <div style="display:flex;gap:6px;align-items:center">
@@ -2316,7 +2350,7 @@
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Account created — they can log in now.</div>
             </sc-if>
-            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Create account</button>
+            <button onClick="{{ createTechnician }}" style="width:100%;padding:10px;margin-top:6px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Create account</button>
           </div>
         </div>
       </sc-if>
@@ -2721,7 +2755,7 @@
   <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
     <div class="mk-toast" style="background:{{ toastBg }};border-color:{{ toastBorder }};color:{{ toastFg }}">
       <div style="flex:1;min-width:0;font-size:13px;line-height:1.4">{{ toastText }}</div>
-      <button onClick="{{ dismissToast }}" title="Dismiss" style="flex:none;width:24px;height:24px;font-size:16px;line-height:1;background:none;border:0;cursor:pointer;color:inherit;opacity:0.7">×</button>
+      <button onClick="{{ dismissToast }}" title="Dismiss" style="flex:none;width:40px;height:40px;font-size:18px;line-height:1;background:none;border:0;cursor:pointer;color:inherit;opacity:0.7">×</button>
     </div>
   </sc-if>
 
@@ -6956,7 +6990,7 @@ class Component extends DCLogic {
         body: 'The ticket stays in the record as cancelled, with your reason on it, and stops counting as work in progress. You cannot undo this yourself — only the office can reopen a cancelled job.',
         okLabel: 'Yes, cancel the job', cancelLabel: 'Keep it open', hasCancel: true,
         needsReason: true, reasonHint: 'Why was the job called off? — recorded in the audit trail',
-        okBg: 'var(--danger)', okFg: 'var(--on-accent-strong)',
+        okBg: 'var(--danger)', okFg: 'var(--on-danger)',
         confirm: () => {
           if (!t) { this.setState({ dialog: null }); return; }
           const why = (S.reasonText || '').trim();
@@ -6975,7 +7009,7 @@ class Component extends DCLogic {
         body: 'It leaves every working list and stops being counted. Nothing is erased: the ticket, its job log and its whole trail stay, and the technician who raised it sees that you withdrew it and why. You can restore it.',
         okLabel: 'Withdraw it', cancelLabel: 'Keep it', hasCancel: true,
         needsReason: true, reasonHint: 'Why is this ticket being withdrawn? — recorded in the audit trail',
-        okBg: 'var(--danger)', okFg: 'var(--on-accent-strong)',
+        okBg: 'var(--danger)', okFg: 'var(--on-danger)',
         confirm: () => {
           if (!t) { this.setState({ dialog: null }); return; }
           const why = (S.reasonText || '').trim();
