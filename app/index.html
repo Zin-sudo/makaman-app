@@ -462,7 +462,8 @@
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
           <button onClick="{{ doLogin }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ loginLabel }}</button>
-          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
+          <div style="text-align:center;font-size:13px;margin-top:14px"><a onClick="{{ goToForgot }}" style="cursor:pointer;color:rgba(var(--ink-rgb),0.7)">Forgot your password?</a></div>
+          <div style="text-align:center;font-size:13px;margin-top:10px;color:rgba(var(--ink-rgb),0.6)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
           <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin-top:16px">BUILD {{ buildStamp }}</div>
         </div>
       </sc-if>
@@ -483,6 +484,48 @@
           </sc-if>
           <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent)">Request account</button>
           <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ authIsForgot }}" hint-placeholder-val="{{ false }}">
+        <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Reset your password</h2>
+          <p style="font-size:13px;color:rgba(var(--ink-rgb),0.65);line-height:1.5;margin:0 0 16px">We'll mail you a link. Open it on this device and you can set a new password straight away.</p>
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
+          </sc-if>
+          <button onClick="{{ doForgot }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ forgotLabel }}</button>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)"><a onClick="{{ goToLogin }}" style="cursor:pointer">Back to login</a></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ authForgotSent }}" hint-placeholder-val="{{ false }}">
+        <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14);text-align:center">
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Check your mail</h2>
+          <!-- Worded so it says the same thing whether or not the address belongs to
+               anybody. Confirming which addresses are real is how somebody learns who
+               works here, which is the same reason a wrong password and an unknown
+               email give the same answer on the login screen. -->
+          <p style="font-size:14px;color:rgba(var(--ink-rgb),0.7);line-height:1.5;margin:0 0 20px">If {{ forgotSentTo }} has an account, a reset link is on its way. It expires, so use it soon — and open it on the device you want to sign in on.</p>
+          <button onClick="{{ goToLogin }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Back to login</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ authIsRecover }}" hint-placeholder-val="{{ false }}">
+        <div style="width:100%;max-width:360px;padding:26px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.14)">
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Choose a new password</h2>
+          <p style="font-size:13px;color:rgba(var(--ink-rgb),0.65);line-height:1.5;margin:0 0 16px">{{ passwordRule }}</p>
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">New password</div>
+          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Confirm new password</div>
+          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ pwError }}</div>
+          </sc-if>
+          <button onClick="{{ doRecover }}" disabled="{{ pwBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ pwBusyDim }}">{{ recoverLabel }}</button>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:rgba(var(--ink-rgb),0.6)"><a onClick="{{ goToLogin }}" style="cursor:pointer">Back to login</a></div>
         </div>
       </sc-if>
 
@@ -660,6 +703,31 @@
             </div>
           </div>
         </sc-if>
+
+        <!-- Changing your own password, from inside the app.
+             This exists because the dashboard's reset mail dropped people on the login
+             screen with nothing to type a new password into, so the seeded Admin
+             password — which went through a chat transcript and has to be treated as
+             public — could not actually be rotated. The same control serves everyone:
+             a technician who thinks somebody watched him type it should not have to ask
+             the office to fix that. -->
+        <div style="margin-bottom:28px">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:10px">Password</div>
+          <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
+            <div style="font-size:12px;color:rgba(var(--ink-rgb),0.6);line-height:1.45;margin-bottom:12px">{{ passwordRule }} Your password is never sent anywhere to be checked — only a fragment of its fingerprint is.</div>
+            <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">New password</div>
+            <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:rgba(var(--ink-rgb),0.55);margin-bottom:4px">Confirm new password</div>
+            <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
+            <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ pwError }}</div>
+            </sc-if>
+            <sc-if value="{{ pwDone }}" hint-placeholder-val="{{ false }}">
+              <div style="font-size:13px;color:var(--success);margin-bottom:10px">Password changed. It applies the next time you sign in.</div>
+            </sc-if>
+            <button onClick="{{ doChangePassword }}" disabled="{{ pwBusy }}" style="width:100%;padding:11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent-strong);border:1px solid var(--accent);opacity:{{ pwBusyDim }}">{{ changePwLabel }}</button>
+          </div>
+        </div>
 
         <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:rgba(var(--ink-rgb),0.35);margin:2px 0 10px">BUILD {{ buildStamp }}</div>
         <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-accent-strong);border:1px solid var(--danger)">Log out</button>
@@ -2552,6 +2620,93 @@ function sb() {
   return _sb;
 }
 
+// ── Passwords ───────────────────────────────────────────────────────────────
+//
+// Supabase's own leaked-password protection is a paid feature on this project's plan, so
+// the check is done here instead. It is the same check against the same corpus — Have I
+// Been Pwned — with one difference worth stating plainly: this one lives in the client,
+// so it protects the people using the app rather than the API underneath it. Anyone
+// driving the REST API directly bypasses it. Nobody outside this app has a reason to,
+// and the server still enforces its own minimum length underneath.
+//
+// The password never leaves the device. Only the first five hex characters of its SHA-1
+// are sent; the service answers with every suffix it holds under that prefix — around
+// eight hundred of them — and the comparison happens here. That is the k-anonymity
+// protocol the service is built around, and sending the password itself, or its full
+// hash, would be worse than not checking at all.
+const PASSWORD_MIN = 8;
+const PWNED_RANGE = 'https://api.pwnedpasswords.com/range/';
+
+function sha1Hex(text) {
+  const c = (typeof crypto !== 'undefined' && crypto.subtle) ? crypto.subtle : null;
+  // Absent on an insecure origin. The app is served over HTTPS and localhost, both of
+  // which are secure contexts, so this is the "somebody opened the file:// copy" case.
+  if (!c) return Promise.reject(new Error('MK_NO_CRYPTO'));
+  return c.digest('SHA-1', new TextEncoder().encode(text)).then((buf) => {
+    const out = [];
+    new Uint8Array(buf).forEach((b) => { out.push(b.toString(16).padStart(2, '0')); });
+    return out.join('').toUpperCase();
+  });
+}
+
+// Resolves { checked, count } and never rejects. A breach service that cannot be reached
+// must not be able to stop somebody setting a password: the failure mode of "cannot
+// check" is "allow it, and do not pretend it was checked" — not "locked out at a well
+// site because an API in another country is down".
+//
+// No custom request headers on purpose. The padding header would earn a CORS preflight,
+// and a second round trip that can fail is a second way for this to become a blocker.
+function pwnedCount(pass) {
+  return sha1Hex(pass).then((hash) => {
+    const head = hash.slice(0, 5);
+    const tail = hash.slice(5);
+    return fetch(PWNED_RANGE + head)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error('MK_PWNED_HTTP'))))
+      .then((body) => {
+        let n = 0;
+        String(body).split('\n').forEach((line) => {
+          const parts = line.trim().split(':');
+          if (parts[0] === tail) n = parseInt(parts[1], 10) || 0;
+        });
+        return { checked: true, count: n };
+      });
+  }).catch(() => ({ checked: false, count: 0 }));
+}
+
+// The rules that need no network. Returns a sentence, or '' when there is no problem.
+function passwordProblem(pass, confirm) {
+  if (!pass) return 'Choose a password.';
+  if (pass.length < PASSWORD_MIN) return 'Password must be at least ' + PASSWORD_MIN + ' characters.';
+  if (confirm !== undefined && pass !== confirm) return 'Passwords do not match.';
+  return '';
+}
+
+// The whole gate, in the order that costs least: local rules first, then the breach
+// check, which is the only part that touches the network.
+function vetPassword(pass, confirm) {
+  const local = passwordProblem(pass, confirm);
+  if (local) return Promise.resolve(local);
+  return pwnedCount(pass).then((r) => {
+    if (r.checked && r.count > 0) {
+      return 'That password has appeared in a known data breach '
+        + r.count.toLocaleString('en-US') + ' times. Choose a different one.';
+    }
+    return '';
+  });
+}
+
+// A recovery link lands here as a URL fragment. This is read at module load, before the
+// Supabase client is ever built, because creating that client parses the fragment and
+// then clears it — read it afterwards and there is nothing left to find. That was the
+// whole defect: the app never looked, so a password-reset mail dropped the person on the
+// login screen with no way to set anything.
+const RECOVERY_LINK = (function () {
+  try {
+    const h = (typeof location !== 'undefined' && location.hash) || '';
+    return /(^|[#&])type=recovery(&|$)/.test(h);
+  } catch (e) { return false; }
+})();
+
 // The database speaks technician / ops_manager / admin / founder; the app has always
 // spoken tech / mgr / admin / founder. Translated in one place rather than in every
 // comparison, so neither vocabulary leaks into the other.
@@ -3946,8 +4101,13 @@ class Component extends DCLogic {
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
       // Device-local position, never persisted and never synced. See selfGeoTick.
       selfFix: null, selfFixFailed: false,
-      session: null, authScreen: 'login', authEmail: '', authPassword: '',
-      authFullName: '', authConfirm: '', authError: '', signupDone: false,
+      // A recovery link is not a login screen. Someone arriving from a reset mail has
+      // already proved they hold the mailbox; what they need is a field to type a new
+      // password into, and before this they were shown the login form instead — with no
+      // way to reach one.
+      session: null, authScreen: RECOVERY_LINK ? 'recover' : 'login', authEmail: '', authPassword: '',
+      authFullName: '', authConfirm: '', authError: '', signupDone: false, forgotDone: false,
+      pwNew: '', pwConfirm: '', pwError: '', pwBusy: false, pwDone: false,
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
       editDraft: {}, dragStartIndex: undefined, dragOverIndex: undefined,
       disableUserEmail: null, disableUserName: null, disableUserRestore: false,
@@ -4055,9 +4215,17 @@ class Component extends DCLogic {
         // Supabase reports a wrong password and an unknown email identically, on purpose:
         // telling them apart is how an attacker enumerates who works here.
         if (res.error) throw new Error('Email or password is not correct.');
-        const uid = res.data.user.id;
-        return client.from('profiles').select('email, full_name, role, status').eq('id', uid).single();
-      })
+        return this.sessionFromProfile(res.data.user.id);
+      });
+  }
+
+  // The half of signing in that is about who you are rather than whether you knew the
+  // password. Split out because recovery needs exactly this and nothing else: somebody
+  // arriving on a reset link has already proved possession of the mailbox, so the
+  // password check has happened — what is left is looking up who that is.
+  sessionFromProfile(uid) {
+    const client = sb();
+    return client.from('profiles').select('email, full_name, role, status').eq('id', uid).single()
       .then(res => {
         if (res.error || !res.data) throw new Error('Signed in, but this account has no profile yet. Ask an admin.');
         const p = res.data;
@@ -4075,6 +4243,57 @@ class Component extends DCLogic {
           status: p.status,
         };
       });
+  }
+
+  // Ask the server to send a recovery mail. The link it contains comes back to this same
+  // page — there is only one page — carrying type=recovery in the fragment, which
+  // RECOVERY_LINK picks up on the next load.
+  //
+  // The answer is deliberately the same whether or not the address belongs to anybody.
+  // Telling a stranger which addresses are real is how you learn who works here, and
+  // that is the same reason a wrong password and an unknown email read alike above.
+  sendRecovery(email) {
+    // USE_CLOUD, not just "is there a client". A build pinned to authMode 'local' has a
+    // usable Supabase client sitting there — the URL and key are in config.js — and
+    // reaching for it here would have this screen quietly mail a real person from a
+    // build whose whole contract is that it never touches the server.
+    const client = USE_CLOUD ? sb() : null;
+    if (!client) {
+      return Promise.reject(new Error('This build has no server, so it cannot send mail. Ask an admin to set your password.'));
+    }
+    const back = location.origin + location.pathname;
+    return client.auth.resetPasswordForEmail(email, { redirectTo: back })
+      .then(() => true)
+      .catch(() => true);
+  }
+
+  // Set a new password for whoever is currently authenticated — either a person who
+  // arrived on a recovery link, or one already signed in and changing it from Settings.
+  // Both are the same call, because to Supabase they are the same fact: this session may
+  // change its own password.
+  setNewPassword(pass) {
+    if (!USE_CLOUD) return this.setNewPasswordLocal(pass);
+    const client = sb();
+    if (!client) return Promise.reject(new Error('This build has no server configured.'));
+    return client.auth.updateUser({ password: pass }).then((res) => {
+      if (res.error) throw new Error(res.error.message || 'Could not change the password.');
+      return res.data.user.id;
+    });
+  }
+
+  // The demo store's version. It exists so the behaviour tests can drive the screens
+  // without a network, the same reason signInLocal exists — and so a build with no
+  // backend does not offer a control that cannot work.
+  setNewPasswordLocal(pass) {
+    const me = (this.state.session || {}).email || '';
+    let found = false;
+    this.mutate((d) => {
+      (d.users || []).forEach((u) => {
+        if ((u.email || '').toLowerCase() === me.toLowerCase()) { u.password = pass; found = true; }
+      });
+    });
+    if (!found) return Promise.reject(new Error('No account is signed in.'));
+    return Promise.resolve(me);
   }
 
   signUpCloud(name, email, pass) {
@@ -6625,12 +6844,69 @@ class Component extends DCLogic {
       const pass = S.authPassword || '';
       const confirm = S.authConfirm || '';
       if (!name || !email || !pass || !confirm) { this.setState({ authError: 'Fill in every field.' }); return; }
-      if (pass.length < 8) { this.setState({ authError: 'Password must be at least 8 characters.' }); return; }
-      if (pass !== confirm) { this.setState({ authError: 'Passwords do not match.' }); return; }
       this.setState({ authBusy: true, authError: '' });
-      this.runLatest('auth', () => this.signUp(name, email, pass)
-        .then(() => this.setState({ signupDone: true, authError: '', authBusy: false }))
+      // The breach check runs before the account is created, not after: a password that
+      // is already public should never reach the server at all.
+      this.runLatest('auth', () => vetPassword(pass, confirm)
+        .then((problem) => {
+          if (problem) { this.setState({ authError: problem, authBusy: false }); return null; }
+          return this.signUp(name, email, pass)
+            .then(() => this.setState({ signupDone: true, authError: '', authBusy: false }));
+        })
         .catch(err => this.setState({ authError: err.message || 'Could not create the account.', authBusy: false })));
+    };
+
+    // ── Forgotten password ────────────────────────────────────────────────────
+    const doForgot = () => {
+      const email = (S.authEmail || '').trim().toLowerCase();
+      if (!email) { this.setState({ authError: 'Enter the email you sign in with.' }); return; }
+      this.setState({ authBusy: true, authError: '' });
+      this.runLatest('auth', () => this.sendRecovery(email)
+        .then(() => this.setState({ forgotDone: true, authBusy: false, authError: '' }))
+        .catch(err => this.setState({ authError: err.message || 'Could not send the mail.', authBusy: false })));
+    };
+
+    // Arriving on a recovery link: set the password, then finish the sign-in properly.
+    // Supabase already holds a session for this person at this point, so the only thing
+    // missing is our own — which is why this ends in sessionFromProfile rather than
+    // sending them back to the login screen to type the password they just chose.
+    const doRecover = () => {
+      const pass = S.pwNew || '';
+      const confirm = S.pwConfirm || '';
+      this.setState({ pwBusy: true, pwError: '' });
+      this.runLatest('auth', () => vetPassword(pass, confirm)
+        .then((problem) => {
+          if (problem) { this.setState({ pwError: problem, pwBusy: false }); return null; }
+          return this.setNewPassword(pass).then((uid) => this.sessionFromProfile(uid))
+            .then((session) => {
+              this.persistSession(session);
+              this.setState({
+                session: session, role: session.roleKey, actingAs: null,
+                pwNew: '', pwConfirm: '', pwError: '', pwBusy: false, authScreen: 'login',
+              });
+              this.refresh();
+            });
+        })
+        .catch(err => this.setState({
+          pwError: err.message || 'Could not set the password. The link may have expired — ask for a new one.',
+          pwBusy: false,
+        })));
+    };
+
+    // Changing it while signed in. Same call underneath; a different screen because the
+    // person is already in and the outcome is a confirmation, not a sign-in.
+    const doChangePassword = () => {
+      const pass = S.pwNew || '';
+      const confirm = S.pwConfirm || '';
+      this.setState({ pwBusy: true, pwError: '', pwDone: false });
+      this.runLatest('pw', () => vetPassword(pass, confirm)
+        .then((problem) => {
+          if (problem) { this.setState({ pwError: problem, pwBusy: false }); return null; }
+          return this.setNewPassword(pass).then(() => {
+            this.setState({ pwNew: '', pwConfirm: '', pwError: '', pwBusy: false, pwDone: true });
+          });
+        })
+        .catch(err => this.setState({ pwError: err.message || 'Could not change the password.', pwBusy: false })));
     };
     const doLogout = () => {
       // Clear the local session first. If the network call fails there is no way back to
@@ -6680,6 +6956,25 @@ class Component extends DCLogic {
       loggedOut: !S.session,
       authIsLogin: S.authScreen === 'login' && !S.signupDone,
       authIsSignup: S.authScreen === 'signup' && !S.signupDone,
+      // Four screens share the logged-out shell now, and exactly one shows at a time.
+      authIsForgot: S.authScreen === 'forgot' && !S.forgotDone,
+      authForgotSent: S.authScreen === 'forgot' && !!S.forgotDone,
+      authIsRecover: S.authScreen === 'recover',
+      goToForgot: () => this.setState({ authScreen: 'forgot', authError: '', forgotDone: false }),
+      doForgot: doForgot,
+      doRecover: doRecover,
+      doChangePassword: doChangePassword,
+      pwNew: S.pwNew || '',
+      pwConfirm: S.pwConfirm || '',
+      pwError: S.pwError || '',
+      pwBusy: !!S.pwBusy,
+      pwBusyDim: S.pwBusy ? 0.6 : 1,
+      pwDone: !!S.pwDone,
+      recoverLabel: S.pwBusy ? 'Saving…' : 'Set password and sign in',
+      changePwLabel: S.pwBusy ? 'Saving…' : 'Change password',
+      forgotLabel: S.authBusy ? 'Sending…' : 'Send me a reset link',
+      forgotSentTo: (S.authEmail || '').trim().toLowerCase(),
+      passwordRule: 'At least ' + PASSWORD_MIN + ' characters, and not one that has turned up in a known data breach.',
       signupDone: S.signupDone,
       buildStamp: BUILD,
       authError: S.authError,
@@ -8378,6 +8673,8 @@ class Component extends DCLogic {
         authPassword: e => this.setState({ authPassword: e.target.value, authError: '' }),
         authFullName: e => this.setState({ authFullName: e.target.value, authError: '' }),
         authConfirm: e => this.setState({ authConfirm: e.target.value, authError: '' }),
+        pwNew: e => this.setState({ pwNew: e.target.value, pwError: '', pwDone: false }),
+        pwConfirm: e => this.setState({ pwConfirm: e.target.value, pwError: '', pwDone: false }),
         newTechName: e => this.setState({ newTechName: e.target.value, newTechError: '', newTechDone: false }),
         newTechEmail: e => this.setState({ newTechEmail: e.target.value, newTechError: '', newTechDone: false }),
         newTechPassword: e => this.setState({ newTechPassword: e.target.value, newTechError: '', newTechDone: false }),
