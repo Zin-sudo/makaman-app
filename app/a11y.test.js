@@ -33,7 +33,14 @@ const CASES = [
 const PROBE = () => {
   const lum=([r,g,b])=>{const f=c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
     return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b)};
-  const parse=s=>{const n=(s.match(/[\d.]+/g)||[]).map(Number);return{rgb:n.slice(0,3),a:n.length>3?n[3]:1}};
+  // color-mix() computes to `color(srgb 1 1 1 / 0.72)` — channels 0-1, not 0-255. Read
+  // naively that is near-black, so a white glass bar measures 1.49:1 against dark text
+  // while looking perfectly legible on screen. A guard that cannot read a colour syntax
+  // the app might use does not fail loudly; it invents numbers and gets believed.
+  const parse=s=>{const n=(s.match(/[\d.]+/g)||[]).map(Number);
+    if(/^color\(/.test(s)) return {rgb:(/srgb/.test(s)?n.slice(0,3).map(v=>v*255):n.slice(0,3)),
+                                   a:n.length>3?n[3]:1};
+    return{rgb:n.slice(0,3),a:n.length>3?n[3]:1}};
   const over=(f,b)=>f.rgb.map((c,i)=>c*f.a+b.rgb[i]*(1-f.a));
   const ratio=(a,b)=>{const[x,y]=[lum(a),lum(b)].sort((m,n)=>n-m);return (x+0.05)/(y+0.05)};
   const ground=el=>{const L=[];let n=el;
