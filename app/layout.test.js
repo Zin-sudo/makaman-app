@@ -138,6 +138,72 @@ const boxes = (p) => p.evaluate(() => {
     await p.close();
   }
 
+  // ── Nobody could read the quiet text ────────────────────────────────────
+  //
+  // 265 inline text colours were written as raw alpha over the ink colour. In the light
+  // theme anything under 0.62 falls below 4.5:1, so 224 of them failed — every label,
+  // hint and caption, on every screen, on a phone used outdoors in Libya.
+  //
+  // This sweeps the visible text of a screen and composites each colour over the ground
+  // behind it. That compositing is the whole point: the first pass at measuring this read
+  // rgba(245,245,247,0.35), discarded the 0.35, and reported 16:1 for text that was
+  // actually at 3.08 — a wrong measurement, which is worse than none because it gets
+  // believed.
+  {
+    const p = await signIn(browser, 'yousef@makaman.ly', 430, 900);
+    for (const theme of ['dark', 'light']) {
+      await p.evaluate((t) => window.__mkApp.updateSettings({ theme: t }), theme);
+      await p.waitForTimeout(400);
+      const bad = await p.evaluate(() => {
+        const lum = ([r, g, b]) => {
+          const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+          return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+        };
+        const parse = (s) => { const n = (s.match(/[\d.]+/g) || []).map(Number); return { rgb: n.slice(0, 3), a: n.length > 3 ? n[3] : 1 }; };
+        const over = (fg, bg) => fg.rgb.map((c, i) => c * fg.a + bg.rgb[i] * (1 - fg.a));
+        const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+        // Walks up compositing every translucent layer, not stopping at the first one
+        // that happens to be non-transparent. A status chip's background is
+        // rgba(48,209,88,0.18) — treating that as opaque green measured a ticket number
+        // at 1.89:1 when the eye receives it over the card beneath. Same class of error
+        // as ignoring a text colour's alpha, one level further down.
+        const groundOf = (el) => {
+          const layers = [];
+          let n = el;
+          while (n) {
+            const c = parse(getComputedStyle(n).backgroundColor);
+            if (c.a > 0) { layers.push(c); if (c.a >= 1) break; }
+            n = n.parentElement;
+          }
+          if (!layers.length || layers[layers.length - 1].a < 1) layers.push({ rgb: [0, 0, 0], a: 1 });
+          // Bottom upwards, each painted over what is already there.
+          let out = layers[layers.length - 1].rgb;
+          for (let i = layers.length - 2; i >= 0; i--) out = over(layers[i], { rgb: out, a: 1 });
+          return { rgb: out, a: 1 };
+        };
+        const out = [];
+        document.querySelectorAll('div, span, button, a, label, td, th, h1, h2, h3, p').forEach((el) => {
+          // Only elements holding their own text, and only text you can actually see.
+          const own = Array.from(el.childNodes).filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim()).join(' ');
+          if (!own) return;
+          const r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) return;
+          const cs = getComputedStyle(el);
+          if (cs.visibility === 'hidden' || cs.opacity === '0') return;
+          const px = parseFloat(cs.fontSize);
+          const weight = parseInt(cs.fontWeight, 10) || 400;
+          const need = (px >= 24 || (px >= 18.66 && weight >= 700)) ? 3 : 4.5;
+          const v = ratio(over(parse(cs.color), groundOf(el)), groundOf(el).rgb);
+          if (v < need) out.push(own.slice(0, 34) + ' — ' + v.toFixed(2) + ' needs ' + need);
+        });
+        return out;
+      });
+      check(`${theme}: every piece of text on the ticket list meets 4.5:1`,
+        bad.length === 0, bad.slice(0, 4).join(' | ') || 'all pass');
+    }
+    await p.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   await browser.close();
   process.exit(fail ? 1 : 0);
