@@ -839,7 +839,16 @@ Cheap, blocks nothing, and every day it runs adds bad data.
   `--mk-border-focus` is used with a fallback in some places and without one in others.
 
 ### Tier 7 — after the PWA is entirely finished
-- Field test: 2–3 technicians at real well sites, three days.
+- Field test: 2–3 technicians at real well sites, three days. **Launched 2026-08-27 — the
+  pack is `docs/FIELD-TEST.md`**: pre-flight checklist, the three days with the scenarios
+  that must be exercised, the six-field incident line, and go/no-go criteria fixed *before*
+  the data arrives. Ordered ahead of Tier 6 on the user's instruction (2026-08-27), which
+  costs nothing: the design pass restyles screens the field test only uses.
+- **The build stamp was the blocker nobody had noticed.** `BUILD` still read
+  `night-shift.2 · 20 Aug 2026` after a week of shipping, so `DEPLOY.md`'s one instrument
+  for "which code is this phone running" could not tell today's build from the 20 Aug one.
+  Now `field-test.1 · 27 Aug 2026`, and check 0.8 of the pack reads it aloud. Bump it
+  again before any future test.
 - Go/no-go.
 - **"Apper" skill — last. Explicitly after the PWA is complete**, per the user
   (2026-08-26). It is a meta-deliverable built *from* how this project was worked, so it is
@@ -865,7 +874,7 @@ The "recommended time" is not advice. It is the gate.
 | # | What is incomplete | Where | Close in | Blocked on |
 |---|---|---|---|---|
 | ~~S1~~ | ~~`cloud.test.js` hydration lands nothing~~ — **closed 2026-08-26. 30/30, and the vacuous passes are now real.** Three faults stacked: the stub had no `rpc` (permission-registry drift), then returned an object where `my_permissions()` is declared `returns table` so hydrate reduced over a non-array, and finally a backtick in one of my own comments truncated the injected template literal. A guard now parses the stub before a browser opens. | `app/cloud.test.js` | ~~before Tier 5~~ | — |
-| S2 | Waha price-list conflicts (10 rows) parked in `backup.price_list_conflicts_20260820`. Never invent codes, average prices, or drop rows. | database | Tier 3 | **user** |
+| S2 | Waha price-list conflicts (10 rows) parked in `backup.price_list_conflicts_20260820`. Never invent codes, average prices, or drop rows. **Diagnosed 2026-08-27 — it is two questions, not ten.** The parked codes read `MKN100-7xx`; the live Waha list is `MKN-100-7xx`, and those numbers are already taken by liner hangers at 59,800–80,000 USD, so the collision was real and parking was right. Nine of the ten are civil works (cellar cleaning, sand berms, dig-out crew, 4x4 with driver) that live **in the Zueitina list as `MKN-0840`–`MKN-0848` at identical prices** — so nothing is lost, and the only question is whether Waha buys them and under which Waha code. The tenth, `MKN100-406` DEFOAMER - POWDER @ 57.00/LBS, exists nowhere live under any client (Waha's `MKN-100-406` is Insulated Box; its liquid defoamer is `MKN-100-505`), so it needs one real code. | database | Tier 3 | **user** |
 | S3 | Seeded Admin password appeared in a chat transcript and is unrotated. | Supabase dashboard | Tier 3 | **user** |
 | S4 | Supabase leaked-password protection is OFF. | Supabase dashboard | Tier 3 | **user** |
 | S5 | Stray `service_role_key` placeholder row in the `makaman-libya` vault. | wrong project | Tier 3 | **user** |
