@@ -426,10 +426,17 @@
        does exactly that. A keyframe setting translateY alone would silently drop the
        -50% and throw the toast half its own width off to the right. Auto margins on a
        fixed element leave transform free for motion. */
+    /* Fits the message. It used to be a flat 520px whatever it had to say, so "Saved."
+       arrived in a box built for three lines and most of it was empty. width:max-content
+       makes it as wide as the sentence wants to be; max-width caps it at the old figure
+       so a long message still wraps to two or three lines instead of running off the
+       side of a phone. */
     position:fixed; top:68px; inset-inline:0; margin-inline:auto;
-    z-index:45; width:min(520px, calc(100vw - 24px));
-    display:flex; align-items:flex-start; gap:10px;
-    padding:11px 12px; border:1px solid; box-shadow:0 6px 20px rgba(0,0,0,0.28);
+    z-index:45; width:max-content; max-width:min(520px, calc(100vw - 24px));
+    /* Centred rather than top-aligned: with the box now hugging its text, a one-line
+       message beside a 40px button looked pinned to the ceiling of its own toast. */
+    display:flex; align-items:center; gap:10px;
+    padding:6px 8px 6px 14px; border:1px solid; box-shadow:0 6px 20px rgba(0,0,0,0.28);
     animation:bounce-bottom 0.9s both;
     /* Softer than the page it lands on, so it reads as something laid over the screen
        rather than another card in it. */
@@ -9516,51 +9523,73 @@ class Component extends DCLogic {
 
 // ── The press ─────────────────────────────────────────────────────────────
 //
-// shake-top is a single-shot animation with `both`, so once the class is on an element it
-// stays on its last frame and will never play again. It therefore has to come off, which
-// is what the animationend half of this does.
+// Driven from the Web Animations API rather than by adding a class, and the reason is a
+// defect that only showed up under measurement: one press produced THREE animation
+// starts. The bell carries wobble-hor-top when there is unread work, and shake-top was
+// being added to the same element — so removing the shake class at the end re-resolved
+// the element's whole animation list and restarted the wobble. Pressing the bell made it
+// wobble again, half a second after the press, for no reason a person could see. The
+// class also survived a re-render, so a stale one could replay on its own.
 //
-// Delegated on the document rather than bound per button, because the runtime rebuilds
-// the tree on every render — a listener attached to a button is a listener attached to an
-// element that will not exist in a moment. Capture phase, so it still fires for handlers
-// that stop propagation.
+// el.animate() has neither problem. It runs exactly once, touches nothing else on the
+// element, cleans itself up, and cannot be left behind on a node the runtime rebuilds.
+// Same keyframes, same curve, same 0.8s — only the trigger mechanism differs.
 //
-// Three exclusions, each for a reason rather than for tidiness:
-//   · .mk-seg — segmented buttons sit flush inside one bordered box, and rotating one of
-//     them opens a wedge at the seam with its neighbour.
-//   · .mk-sheet — the printed client document does not move, ever.
-//   · .mk-switch — the thumb sliding IS the feedback; a switch that also shakes reads as
-//     two separate things having happened.
+// pointerdown, not click: a click fires after the button is released, so the shake began
+// once the interaction was already over. Starting on the press makes the movement part
+// of the press instead of a reaction to it.
 (function () {
   if (typeof document === 'undefined') return;
-  var SKIP = '.mk-seg, .mk-sheet, .mk-switch';
   // Icon buttons only (user, 2026-08-28). The shake rotates 4 degrees about the top edge,
-  // and how far a corner travels is a function of how wide the element is: on a 40px bell
-  // it is under 2px and reads as a nudge, on a full-width primary button it is closer to
-  // 14px and reads as the layout breaking. So the rule is width, measured at the moment
-  // of the press rather than guessed from a list of selectors that would need updating
-  // every time a screen gains a control.
-  //
-  // 88px is drawn from the app's own furniture rather than picked: the icon buttons are
-  // 40-44px square, the smallest labelled buttons ("Approve -> Technician", the segmented
-  // options) are comfortably past 100px, and 88 sits in the gap with nothing near it.
-  var SHAKE_MAX_WIDTH = 88;
-  document.addEventListener('click', function (e) {
+  // so how far a corner travels is a function of width: under 2px on a 40px bell, over
+  // 10px on a full-width primary button, where it reads as the layout breaking rather
+  // than as feedback. 88px is drawn from the app's own furniture — icon buttons are
+  // 40-44px, the smallest labelled buttons are past 100px, nothing sits near the line.
+  var SKIP = '.mk-seg, .mk-sheet, .mk-switch';
+  var MAX_WIDTH = 88;
+  var FRAMES = [
+    { transform: 'rotate(0deg)', offset: 0 },
+    { transform: 'rotate(2deg)', offset: 0.1 },
+    { transform: 'rotate(-4deg)', offset: 0.2 },
+    { transform: 'rotate(4deg)', offset: 0.3 },
+    { transform: 'rotate(-4deg)', offset: 0.4 },
+    { transform: 'rotate(4deg)', offset: 0.5 },
+    { transform: 'rotate(-4deg)', offset: 0.6 },
+    { transform: 'rotate(4deg)', offset: 0.7 },
+    { transform: 'rotate(-2deg)', offset: 0.8 },
+    { transform: 'rotate(2deg)', offset: 0.9 },
+    { transform: 'rotate(0deg)', offset: 1 }
+  ];
+  document.addEventListener('pointerdown', function (e) {
     var el = e.target;
     if (!el || !el.closest) return;
     var b = el.closest('button');
     if (!b || b.disabled || b.closest(SKIP)) return;
-    if (b.getBoundingClientRect().width > SHAKE_MAX_WIDTH) return;
-    b.classList.remove('shake-top');
-    // Forcing a reflow between removing and adding is what lets the same button shake
-    // twice in a row; without it the browser coalesces the two changes and sees nothing.
-    void b.offsetWidth;
-    b.classList.add('shake-top');
-  }, true);
-  document.addEventListener('animationend', function (e) {
-    if (e.animationName === 'shake-top' && e.target && e.target.classList) {
-      e.target.classList.remove('shake-top');
-    }
+    if (b.getBoundingClientRect().width > MAX_WIDTH) return;
+    if (!b.animate) return;
+    // Somebody who has asked their phone to stop moving things has asked for a reason.
+    // The CSS block honours that for the class-driven animations; this is the same
+    // promise kept for the one that is no longer a class.
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    } catch (err) { /* a browser without matchMedia still gets the animation */ }
+    // A second press mid-shake should restart it, not run two at once.
+    (b.getAnimations ? b.getAnimations() : []).forEach(function (a) {
+      if (a.__mkShake) a.cancel();
+    });
+    var anim = b.animate(FRAMES, {
+      duration: 800,
+      easing: 'cubic-bezier(0.455, 0.03, 0.515, 0.955)',
+      // transform-origin belongs to the element, not the keyframes, so it is set for the
+      // life of the animation and put back afterwards.
+      fill: 'none'
+    });
+    anim.__mkShake = true;
+    var prevOrigin = b.style.transformOrigin;
+    b.style.transformOrigin = '50% 0';
+    var restore = function () { b.style.transformOrigin = prevOrigin; };
+    anim.addEventListener('finish', restore);
+    anim.addEventListener('cancel', restore);
   }, true);
 })();
 

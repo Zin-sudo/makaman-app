@@ -5,6 +5,12 @@
 // full-width primary button it is over 10px and reads as the layout breaking. So the rule
 // is width, and this proves the split falls where it was meant to rather than that a
 // number was written down.
+//
+// It is driven by the Web Animations API rather than a class, so "did it shake" is asked
+// of the element's running animations. That is not an implementation detail leaking into
+// the test: a class was tried first and produced three animation starts for one press,
+// because removing it re-resolved the element's animation list and restarted the bell's
+// wobble. Counting animations is the only way to see that.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
@@ -35,9 +41,9 @@ const press = (p, pick) => p.evaluate(async (sel) => {
         .sort((a, c) => c.getBoundingClientRect().width - a.getBoundingClientRect().width)[0];
   if (!b) return { found: false };
   const w = Math.round(b.getBoundingClientRect().width);
-  b.click();
+  b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   await new Promise(r => setTimeout(r, 70));
-  const shook = b.classList.contains('shake-top') && getComputedStyle(b).animationName === 'shake-top';
+  const shook = (b.getAnimations ? b.getAnimations() : []).some(a => a.__mkShake);
   return { found: true, width: w, shook: shook, label: (b.innerText || b.title || '').trim().slice(0, 22) };
 }, pick);
 
@@ -85,9 +91,9 @@ const press = (p, pick) => p.evaluate(async (sel) => {
         const b = btns[idx];
         if (!b) return null;
         const w = Math.round(b.getBoundingClientRect().width);
-        b.click();
+        b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
         await new Promise(r => setTimeout(r, 70));
-        return { w: w, shook: b.classList.contains('shake-top'),
+        return { w: w, shook: (b.getAnimations ? b.getAnimations() : []).some(a => a.__mkShake),
                  label: (b.innerText || b.title || '').trim().slice(0, 18) };
       }, n);
       if (r && r.w > 0) out.push(r);
@@ -112,6 +118,85 @@ const press = (p, pick) => p.evaluate(async (sel) => {
       sw.width + 'px');
     check('but is excluded anyway — its thumb is already the feedback', !sw.shook,
       JSON.stringify(sw));
+    await ctx.close();
+  }
+
+  // ── One shake per press, and nothing left behind ─────────────────────────
+  //
+  // The defect this guards against was found by measuring, not by reading: with the shake
+  // driven by a class, one press on the bell produced three animation starts. Removing
+  // the class at the end re-resolved the element's animation list, which restarted the
+  // wobble it was already carrying — so the bell moved again half a second after the
+  // press, for no reason a person could see.
+  {
+    const { ctx, p } = await boot(b, 'omar@makaman.ly', 1180);
+    const r = await p.evaluate(async () => {
+      const bell = document.querySelector('.mk-bell');
+      const starts = [];
+      bell.addEventListener('animationstart', (e) => starts.push(e.animationName), true);
+      const before = (bell.getAnimations() || []).map(a => a.__mkShake ? 'shake' : 'other');
+      bell.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 40));
+      const during = (bell.getAnimations() || []).map(a => a.__mkShake ? 'shake' : 'other');
+      bell.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      bell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 1200));
+      return {
+        before: before, during: during,
+        after: (bell.getAnimations() || []).map(a => a.__mkShake ? 'shake' : 'other'),
+        cssRestarts: starts,
+        cls: bell.className,
+        transform: getComputedStyle(bell).transform,
+      };
+    });
+    check('exactly one shake starts on the press',
+      r.during.filter(x => x === 'shake').length === 1, JSON.stringify(r.during));
+    check('and it is gone once it has run', r.after.every(x => x !== 'shake'),
+      JSON.stringify(r.after));
+    check('the press does not restart the bell\'s own wobble',
+      r.cssRestarts.length === 0, JSON.stringify(r.cssRestarts));
+    check('no class is left on the element', !/shake-top/.test(r.cls), r.cls);
+    check('and the button is not left sitting askew',
+      r.transform === 'none' || r.transform === 'matrix(1, 0, 0, 1, 0, 0)', r.transform);
+    await ctx.close();
+  }
+
+  // ── A toast is the size of what it has to say ────────────────────────────
+  {
+    const { ctx, p } = await boot(b, 'omar@makaman.ly', 412);
+    const size = (text) => p.evaluate(async (t) => {
+      window.__mkApp.setState({ toast: null });
+      await new Promise(r => setTimeout(r, 250));
+      window.__mkApp.setState({ toast: { text: t, kind: 'ok' } });
+      await new Promise(r => setTimeout(r, 1100));
+      const el = document.querySelector('.mk-toast');
+      if (!el) return null;
+      const r0 = el.getBoundingClientRect();
+      const txt = el.querySelector('div');
+      return {
+        w: Math.round(r0.width), h: Math.round(r0.height),
+        lines: Math.round(txt.getBoundingClientRect().height / parseFloat(getComputedStyle(txt).lineHeight)),
+        centred: Math.abs(r0.left - (innerWidth - r0.right)) < 2,
+        overflows: r0.left < 0 || r0.right > innerWidth,
+      };
+    }, text);
+
+    const short = await size('Saved.');
+    const medium = await size('Ticket synchronised with the office.');
+    const long = await size('Kuwait Oil Group was already approved in the office. Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.');
+
+    check('a one-word message gets a small box, not a full-width one',
+      short.lines === 1 && short.w < 160, JSON.stringify(short));
+    check('a one-line sentence still fits on one line',
+      medium.lines === 1, JSON.stringify(medium));
+    check('and it is wider than the short one — the box tracks the text',
+      medium.w > short.w, short.w + ' -> ' + medium.w);
+    check('a long message wraps rather than running off the phone',
+      long.lines > 1 && !long.overflows, JSON.stringify(long));
+    check('and is capped, not unbounded', long.w <= 412 - 24, long.w + 'px');
+    check('all three stay centred', short.centred && medium.centred && long.centred);
+    check('a one-line toast is not as tall as a wrapped one',
+      short.h < long.h, short.h + ' vs ' + long.h);
     await ctx.close();
   }
 
