@@ -1,0 +1,350 @@
+================================================================================
+MAKAMAN LIBYA — PRICE LIST REVIEW
+Items needing a decision before the price lists go live
+================================================================================
+
+Prepared for:  Operations Manager
+Prepared by:   Admin / system
+Date:          28 August 2026
+Source:        Makaman Job Tickets database (all six price lists as loaded)
+Total rows:    2,610 across 5 customers
+
+
+WHY YOU ARE READING THIS
+--------------------------------------------------------------------------------
+All six price lists are loaded and the app is reading them. Nothing here is
+missing data. What follows is a list of rows where the *source spreadsheets*
+disagree with themselves, or where a value landed in the wrong column during the
+import. Each one needs a human who knows the contracts to say which is right.
+
+They are ordered by how much money is at risk, not by how many rows are
+involved. Section 1 and Section 2 are the ones that can cause a wrong invoice.
+
+Everything is edited from: Admin page -> Price Lists -> pick the customer.
+
+Three rules the system will not enforce for you:
+  * Do not invent an item number. If a code is wrong, we need the real one from
+    the signed contract, not a new one.
+  * Do not average two prices to settle a disagreement. Pick the correct one.
+  * Do not delete a row to make a problem go away. Tell us and we will park it.
+
+
+AT A GLANCE
+--------------------------------------------------------------------------------
+  Section 1   4 items    Price is missing from the app but exists in the source
+  Section 2  61 items    Same description, two different prices, same customer
+  Section 3  10 items    Item number not yet confirmed (marked with "-1")
+  Section 4   1 item     Price is zero
+  Section 5   8 pairs    Same item listed twice under two codes
+  Section 6 110 items    No price at all — confirm these are "quote separately"
+  Section 7  ~1,000      Unit of measurement blank or wrong (cosmetic, bulk job)
+
+
+================================================================================
+SECTION 1 — PRICE IN THE WRONG COLUMN                            *** URGENT ***
+================================================================================
+Four Waha items show no price in the app, but a number that looks exactly like a
+price is sitting in the "unit of measurement" field instead. If that number is
+the price, these four items are currently unbillable in the system.
+
+  CUSTOMER: Waha Oil Company
+
+  Item number      Description                        Number found   Price shown
+  --------------   --------------------------------   ------------   -----------
+  MKN-100-368      Impregnated Core Heads                   53,942       (none)
+  MKN-100-369      Thermo Stable Diamond Core (TSP)         54,987       (none)
+  MKN-100-370      PDC Core Heads                           41,000       (none)
+  MKN-100-371      Natural Diamond Core Heads               45,000       (none)
+
+  DECISION NEEDED: Is each number above the unit cost for that item?
+    - If YES: we move it into the price field and set the correct unit.
+    - If NO:  tell us what it is, and what the real price should be.
+
+
+================================================================================
+SECTION 2 — SAME DESCRIPTION, TWO DIFFERENT PRICES               *** URGENT ***
+================================================================================
+In each case below, one customer's list has two (or more) lines that READ
+IDENTICALLY but charge different amounts. A technician picking from a dropdown
+cannot tell them apart. He will pick the first one he sees.
+
+The three worst are almost certainly a wording problem rather than a pricing
+problem: in the source spreadsheet the heading "Power Tong Footage Charges" sits
+on its own row, and the lines underneath inherited only the size. So one line is
+a per-foot footage charge and the other is a per-job running charge, but both
+just say "Casing (5" to 13-3/8")".
+
+  DECISION NEEDED for each: confirm both prices are correct, and give us the
+  wording that tells them apart. We will rewrite the descriptions so the two
+  lines can never be confused again.
+
+--- The dangerous three (price differs by 800x or more) ---
+
+  Sirte Oil Company (SOC)      Casing (5" to 13-3/8")
+      MKN-100-582 = 6,336.00 LYD     MKN-100-592 = 4.00 LYD
+
+  Waha Oil Company             Casing (5" to 13-3/8")
+      MKN-100-582 = 1,750.00 USD     MKN-100-592 = 2.10 USD
+
+  Zueitina Oil Company         Casing (5" to 13-3/8")
+      MKN-0716 = 1,750.00 USD        MKN-0726 = 2.10 USD
+
+  (Related, same cause — these already carry the "Footage Charges" wording and
+   look correct, listed so you can confirm the pattern:
+     Waha     MKN-100-590 Tubing/Singles 0.85   MKN-100-591 Tubing/Triples 1.50
+              MKN-100-593 Casing 16"-20"  3.00
+     Zueitina MKN-0724 0.85   MKN-0725 1.50   MKN-0727 3.00 )
+
+--- Large gaps (10x to 20x) ---
+
+  Waha        Workshop services and personnel package operating cost
+                 MKN-100-740 = 22,869.00      MKN-100-739 = 1,247.40
+  Zueitina    Workshop services and personnel package operating cost
+                 MKN-0873 = 22,869.00         MKN-0872 = 1,247.40
+
+  HOO         4 3/4" Slim Hole ... Ultra Hi Temp. (450F)
+                 MKN-1990 = 4,467.00          MKN-2006 = 447.00
+  HOO         5 1/2" Slim Hole ... Ultra Hi Temp. (450F)
+                 MKN-1991 = 5,790.00          MKN-2007 = 579.00
+  Zueitina    4 3/4" Slim Hole ... Ultra Hi Temp. (450F)
+                 MKN-0194 = 4,467.00          MKN-0210 = 447.00
+  Zueitina    5 1/2" Slim Hole ... Ultra Hi Temp. (450F)
+                 MKN-0195 = 5,790.00          MKN-0211 = 579.00
+
+  NOTE: 4,467 / 447 and 5,790 / 579 are exact factors of ten. Please check
+  whether one of each pair is a decimal-point error in the original sheet.
+
+--- Moderate gaps (2x to 5x) ---
+
+  Waha        Sodium Chloride           MKN-100-520 = 9.00    MKN-100-540 = 2.00
+  Zueitina    Sodium Chloride           MKN-0654 = 9.00       MKN-0674 = 2.00
+  Waha        Minimum charge / day      MKN-100-691 = 15,312.50  MKN-100-694 = 4,922.00
+  Zueitina    Minimum charge / day      MKN-0821 = 15,312.50     MKN-0824 = 4,922.00
+  Waha        Instrument charge / stand by day
+                 MKN-100-686 = 1,750.00  MKN-100-689 = 1,750.00  MKN-100-692 = 657.00
+  Zueitina    Instrument charge / stand by day
+                 MKN-0816 = 1,750.00     MKN-0819 = 1,750.00     MKN-0822 = 657.00
+  HOO         Rotary safety, J-type safety, magnets & fishing jars 6-5/8" and smaller
+                 MKN-100-051 = 690.00     MKN-100-050 = 280.00
+  Zueitina    Rotary safety - drill pipe and tubing 6-5/8" conn. and smaller
+                 MKN-0271 = 690.00        MKN-0270 = 280.00
+  Waha        Instrument charge / operating day
+                 MKN-100-690 = 6,125.00   MKN-100-693 = 2,625.00
+  Zueitina    Instrument charge / operating day
+                 MKN-0820 = 6,125.00      MKN-0823 = 2,625.00
+  HOO         4 1/2" conn.   MKN-101-0191 = 85.00   MKN-100-0185 = 40.00
+  HOO         2 7/8" conn.   MKN-100-0189 = 70.00   MKN-100-0183 = 35.00
+  HOO         3 1/2" conn.   MKN-100-0190 = 70.00   MKN-100-0184 = 35.00
+  Waha        Clay Stabilizer   MKN-100-576 = 84.00   MKN-100-574 = 43.00
+  Zueitina    Clay Stabilizer   MKN-0710 = 84.00      MKN-0708 = 43.00
+  SOC         Clay Stabilizer   MKN-100-576 = 192.00  MKN-100-574 = 101.00
+
+--- Smaller gaps (under 2x) — likely tiered pricing, please confirm ---
+
+  AGOCO       Each 1,000 ft. or fraction between 5,000 ft. and 15,000 ft., add:
+                 ST-6613 = 75.00   ST-6611 = 60.00   ST-6609 = 40.00
+  AGOCO       Each 1,000 ft. or fraction between 5,000 ft. and 15,000 ft, add:
+                 ST-6634 = 70.00  ST-6624 = 70.00  ST-6622 = 50.00
+                 ST-6632 = 50.00  ST-6630 = 40.00  ST-6620 = 40.00
+              (note: the two AGOCO lines above differ only by a full stop after
+               "ft" — they are probably meant to be one item)
+  HOO         7 5/8" conn.        MKN-101-0193 = 130.00   MKN-100-0187 = 85.00
+  AGOCO       Additional time, each additional consecutive 8-hour or fraction.
+                 ST-6617 = 1,100.00       ST-6626 = 800.00
+  HOO         Additional time, each additional consecutive 8-hour or fraction
+                 MKN-1825 = 1,100.00      MKN-1835 = 800.00
+  Zueitina    Additional time, each additional consecutive 8-hour or fraction
+                 MKN-0025 = 1,100.00      MKN-0035 = 800.00
+  HOO         Mills — Cement, Junk, Bladed & Packer/Pilot thru 20"OD
+                 MKN-100-071 = 460.00     MKN-100-067 = 350.00
+  HOO         Mills — ... thru 24"OD    MKN-100-072 = 650.00  MKN-100-068 = 510.00
+  HOO         Mills — ... thru 26"OD    MKN-100-073 = 670.00  MKN-100-069 = 510.00
+  HOO         Mills — ... thru 15"OD    MKN-100-070 = 420.00  MKN-100-066 = 350.00
+  HOO         Pipe - Washover - Extension  MKN-100-0110 = 350.00  MKN-100-0109 = 260.00
+  Zueitina    Pipe - Washover - Extension  MKN-0331 = 350.00      MKN-0330 = 260.00
+  Waha        13 3/8", BTC L-80 48-72 ppf     MKN-100-630 = 9,950.00  MKN-100-617 = 7,900.00
+  Zueitina    13 3/8", BTC L-80 48-72 ppf     MKN-0766 = 9,950.00     MKN-0753 = 7,900.00
+  Waha        13 3/8", 8-RD STC K-55 48-72 ppf  MKN-100-628 = 9,800.00  MKN-100-615 = 7,900.00
+  Waha        13 3/8", BTC K-55 48-72 ppf       MKN-100-629 = 9,800.00  MKN-100-616 = 7,900.00
+  Waha        9 5/8", BTC L-80 32.5-53.5 ppf    MKN-100-627 = 7,950.00  MKN-100-614 = 6,800.00
+  Zueitina    13 3/8", 8-RD STC K-55 48-72 ppf  MKN-0764 = 9,800.00     MKN-0751 = 7,900.00
+  Zueitina    13 3/8", BTC K-55 48-72 ppf       MKN-0765 = 9,800.00     MKN-0752 = 7,900.00
+  Zueitina    9 5/8", BTC L-80 32.5-53.5 ppf    MKN-0763 = 7,950.00     MKN-0750 = 6,800.00
+  AGOCO       Unsuccessful run.       ST-6628 = 1,300.00    ST-6616 = 1,100.00
+  HOO         Unsuccessful run        MKN-1837 = 1,300.00   MKN-1827 = 1,100.00
+  Zueitina    Unsuccessful run        MKN-0037 = 1,300.00   MKN-0027 = 1,100.00
+  HOO         Size thru 7" : first day        MKN-1818 = 2,200.00  MKN-1828 = 1,900.00
+  HOO         Size thru 7" : after first day  MKN-1819 = 850.00    MKN-1829 = 800.00
+  HOO         Size thru 9 5/8" : first day    MKN-1820 = 2,900.00  MKN-1830 = 2,700.00
+  HOO         Size thru 9 5/8" : after first day MKN-1831 = 1,000.00 MKN-1821 = 950.00
+  HOO         Size 13 3/8" : first day        MKN-1822 = 5,000.00  MKN-1832 = 4,500.00
+  HOO         Size 13 3/8" : after first day  MKN-1833 = 1,200.00  MKN-1823 = 1,100.00
+  AGOCO       All sizes, below 15,000 ft. per 100 ft. or fraction: add
+                 ST-6614 = 75.00   ST-6635 = 70.00   ST-6625 = 70.00
+  HOO         All sizes above 15,000 ft. per 100 ft. or fraction: add
+                 MKN-1824 = 75.00       MKN-1834 = 70.00
+  Zueitina    All sizes above 15,000 ft. per 100 ft. or fraction: add
+                 MKN-0024 = 75.00       MKN-0034 = 70.00
+  Waha        7", BTC L-80 20-32 ppf   MKN-100-625 = 5,970.00  MKN-100-612 = 5,670.00
+  Zueitina    7", BTC L-80 20-32 ppf   MKN-0761 = 5,970.00     MKN-0748 = 5,670.00
+  Waha        Acid Mixture             MKN-100-551 = 83.00     MKN-100-553 = 79.00
+  Zueitina    Acid Mixture             MKN-0685 = 83.00        MKN-0687 = 79.00
+
+
+================================================================================
+SECTION 3 — ITEM NUMBERS NOT YET CONFIRMED
+================================================================================
+These ten Waha items are live and correctly priced, but their item numbers end
+in "-1" because the code from the source sheet clashed with a completely
+different item.
+
+The clash: their original codes (MKN100-710 to MKN100-718) normalise onto Waha's
+LINER HANGER range, where MKN-100-710 is a 5"x7" liner hanger at 68,200 USD.
+Merging them would have put "cellar cleaning" and an eighty-thousand-dollar
+liner hanger on the same item number. The "-1" keeps them apart.
+
+Nine of the ten already exist word-for-word in the Zueitina list at exactly the
+same price, which is why we are confident the work and the price are real — only
+the Waha code was ever in doubt.
+
+  CUSTOMER: Waha Oil Company
+
+  Current code       Description                                  Price   Same item in Zueitina
+  ----------------   ------------------------------------------   -----   ---------------------
+  MKN-100-406-1      DEFOAMER - POWDER (per LBS)                  57.00   none — see note
+  MKN-100-710-1      Cellar Cleaning, Well Head gratings and
+                     surface painting                         23,740.50   MKN-0840 @ 23,740.50
+  MKN-100-711-1      Sand berm with Gate and Well sign,
+                     height 2m wide 3m, per linear meter          76.42   MKN-0841 @ 76.42
+  MKN-100-712-1      Aluminum Scaffolding maximum 5 m length    6,625.50   MKN-0842 @ 6,625.50
+  MKN-100-713-1      Well Pad 8m by 8m depth 50 cm             25,200.00   MKN-0843 @ 25,200.00
+  MKN-100-714-1      Fill and remove sand from well site if
+                     more than 20 cm and max 60 cm                 1.92   MKN-0844 @ 1.92
+  MKN-100-715-1      Remove old sand berm and level the place     26.57   MKN-0845 @ 26.57
+  MKN-100-716-1      Wellhead dig-out team of 4 people           199.50   MKN-0846 @ 199.50
+  MKN-100-717-1      4x4 Car with Driver                        136.50   MKN-0847 @ 136.50
+  MKN-100-718-1      Dig-out Engineer with gas monitor devices  294.00   MKN-0848 @ 294.00
+
+  NOTE on MKN-100-406-1 (DEFOAMER - POWDER, 57.00/LBS): this one exists nowhere
+  else, under any customer. It needs the most attention of the ten.
+
+  DECISION NEEDED: give us the correct Waha item number for each. Once you do,
+  we remove the "-1" and the flag clears.
+  Also: nine of these ten have no unit of measurement recorded at all.
+
+
+================================================================================
+SECTION 4 — PRICED AT ZERO
+================================================================================
+  CUSTOMER: Harouge Oil Operations (HOO)
+
+  MKN-100-064   Mills — Cement, Junk, Bladed & Packer/Pilot Types ALL Sizes
+                Unit cost: 0.00     Unit of measurement: "0"
+
+  Both fields look like import damage rather than a real free-of-charge item.
+  DECISION NEEDED: the real price and unit, or confirm the row should be removed.
+
+
+================================================================================
+SECTION 5 — THE SAME ITEM LISTED TWICE
+================================================================================
+Same customer, same wording, same price, two different item numbers. Harmless to
+bill, but the technician sees the item twice in his dropdown.
+
+  HOO         6 5/8" conn.                     MKN-100-0186 / MKN-100-0192   85.00
+  SOC         Inhibitor Intensifier            MKN-100-563 / MKN-100-564    221.00
+  Waha        Foam Stabilization               MKN-100-377 / MKN-100-379     85.00
+  Waha        Resin Stabilization              MKN-100-374 / MKN-100-376     85.00
+  Waha        Inhibitor Intensifier            MKN-100-563 / MKN-100-564     89.00
+  Zueitina    Inhibitor Intensifier            MKN-0697 / MKN-0698           89.00
+  Waha        For stabilizers redress charge,
+              as per machine shop + 20%        MKN-100-277 / MKN-100-282   (no price)
+  Zueitina    For stabilizers redress charge,
+              as per machine shop + 20%        MKN-0498 / MKN-0503         (no price)
+
+  DECISION NEEDED: for each pair, which code do we keep? We will not delete the
+  other one without your word.
+
+
+================================================================================
+SECTION 6 — ITEMS WITH NO PRICE AT ALL
+================================================================================
+110 items carry no price. The system allows this deliberately, for work that is
+quoted per job. We need confirmation that every one of these is genuinely
+"quote separately" and not a gap in the sheet.
+
+Sirte is the one to look at first: 72 of its 372 items have no price, which is
+nearly one line in five.
+
+  Sirte Oil Company (SOC) — 72 items
+    MKN-100-0142, MKN-100-0143, MKN-100-0144, MKN-100-0145, MKN-100-219,
+    MKN-100-221, MKN-100-228, MKN-1801, MKN-1802, MKN-1803, MKN-1804, MKN-1805,
+    MKN-1807, MKN-1808, MKN-1809, MKN-1810, MKN-1811, MKN-1812, MKN-1813,
+    MKN-1817, MKN-1818, MKN-1819, MKN-1820, MKN-1821, MKN-1822, MKN-1823,
+    MKN-1826, MKN-1828, MKN-1829, MKN-1830, MKN-1831, MKN-1832, MKN-1833,
+    MKN-1839, MKN-1840, MKN-1841, MKN-1842, MKN-1843, MKN-1844, MKN-1845,
+    MKN-1846, MKN-1847, MKN-1848, MKN-2020-01, MKN-2020-06, MKN-2020-07,
+    MKN-300, MKN-301, MKN-302, MKN-303, MKN-304, MKN-305, MKN-306, MKN-307,
+    MKN-308, MKN-309, MKN-310, MKN-311, MKN-312, MKN-313, MKN-314, MKN-315,
+    MKN-316, MKN-317, MKN-318, MKN-319, MKN-320, MKN-321, MKN-322, MKN-323,
+    MKN-324, MKN-325
+
+  AGOCO — 16 items
+    ST-6606, ST-6607, ST-6640, ST-6641, ST-6642, ST-6643, ST-6644, ST-6644-01,
+    ST-6644-02, ST-6644-03, ST-6644-04, ST-6644-05, ST-6644-06, ST-6644-07,
+    ST-6644-08, ST-6649
+
+  Waha Oil Company — 10 items
+    MKN-100-221, MKN-100-231, MKN-100-277, MKN-100-282, MKN-100-291,
+    MKN-100-368, MKN-100-369, MKN-100-370, MKN-100-371, MKN-100-704
+    (the last four are the Section 1 core heads)
+
+  Zueitina Oil Company — 10 items
+    MKN-0006, MKN-0165, MKN-0166, MKN-0298, MKN-0442, MKN-0452, MKN-0498,
+    MKN-0503, MKN-0512, MKN-0834
+
+  Harouge Oil Operations (HOO) — 2 items
+    MKN-1806, MKN-1963
+
+
+================================================================================
+SECTION 7 — UNIT OF MEASUREMENT CLEAN-UP (bulk, low urgency)
+================================================================================
+This does not affect what anyone is charged. It affects how the printed ticket
+reads to the customer.
+
+  a) No unit recorded at all — 862 items:
+       Zueitina  322 of 883      HOO       224 of 421
+       Waha      169 of 689      SOC        84 of 372
+       AGOCO      63 of 245
+
+  b) A number where the unit should be — 177 items.
+     In 164 of those the number is simply a copy of the item's own price, so
+     nothing is lost; the field just needs clearing. The remaining 13 are listed
+     in Section 1 and in the footage-charge group in Section 2.
+
+  DECISION NEEDED: nothing immediately. When you have time, tell us the standard
+  units you want (Day, Job, Km, Ft, LBS, Each, ...) and we can set most of these
+  in bulk rather than one at a time.
+
+
+================================================================================
+WHAT WE NEED BACK
+================================================================================
+In priority order. Sections 1 to 4 are the ones that can produce a wrong invoice.
+
+  1. Section 1 — are those four numbers the prices? (4 answers)
+  2. Section 2 — for each pair, which price is right and what wording separates
+     them? Start with the three "Casing (5" to 13-3/8")" rows. (61 answers)
+  3. Section 3 — the correct Waha item numbers. (10 answers)
+  4. Section 4 — the real price for MKN-100-064. (1 answer)
+  5. Section 5 — which code to keep in each pair. (8 answers)
+  6. Section 6 — confirm the 110 unpriced items are "quote separately", starting
+     with Sirte's 72.
+  7. Section 7 — the standard unit list, whenever convenient.
+
+You can mark this document up and send it back, or make the changes yourself in
+Admin -> Price Lists. Every change is recorded with your name and the time, so
+we can always see what was decided and by whom.
+
+================================================================================
