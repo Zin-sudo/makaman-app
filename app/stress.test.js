@@ -236,6 +236,40 @@ const freeStorage = (p) => p.evaluate(() => {
       JSON.stringify(closed));
     check('and that reason names the person who closed it',
       /already closed in the office by Omar Al-Saleh/.test(closed.reason), closed.reason);
+
+    // ── S24: he cancelled it on a dead connection, the office had already closed it ──
+    //
+    // The old wording — "already closed in the office" — is true and answers a question
+    // he did not ask. What he did was call the job off; what he needs to know is that
+    // his cancellation was overruled and the job stands as worked. Without that sentence
+    // the cancellation simply disappears and nothing anywhere explains it.
+    const cancelledLate = await clashFor('cancelled', 'Omar Al-Saleh');
+    check('a cancellation overruled by the office is discarded like any stale copy',
+      cancelledLate.discarded && !cancelledLate.uploaded, JSON.stringify(cancelledLate));
+    check('and he is told his cancellation did not get there first',
+      /before your cancellation reached them/.test(cancelledLate.reason), cancelledLate.reason);
+    check('and told plainly where that leaves the job',
+      /the job stands as worked/.test(cancelledLate.reason), cancelledLate.reason);
+    check('it names who closed it, so he knows who to ask',
+      /Omar Al-Saleh/.test(cancelledLate.reason), cancelledLate.reason);
+
+    // The same collision against a job the office had already approved.
+    const cancelledVsApproved = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const t = (app.state.data.tickets || []).filter(x => x.tech === 'Yousef Al-Harbi')[0];
+      app.mutate(d => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.status = 'cancelled'; x.synced = false; x.officeClosed = false; x.audit = [];
+      });
+      // The office's copy is approved; his says cancelled. settled() reads the shared
+      // record in the demo store, so this is the approved case rather than the closed one.
+      return new Promise(r => setTimeout(() => {
+        app.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.status = 'cancelled'; });
+        r(null);
+      }, 200));
+    });
+    check('the cancelled-vs-closed case did not break the plain closed case',
+      /already closed in the office by Omar Al-Saleh/.test(closed.reason), closed.reason);
     check('the technician is told which of the two it was',
       await p.evaluate(() => document.querySelector('script[type="text/x-dc"]').textContent
         .indexOf('already approved in the office') >= 0));

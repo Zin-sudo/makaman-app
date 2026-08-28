@@ -693,7 +693,7 @@
 
       <sc-if value="{{ authIsSignup }}" hint-placeholder-val="{{ false }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Request an account</h2>
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Full name</div>
           <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
@@ -702,6 +702,17 @@
           <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Confirm password</div>
           <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
+          <!-- What you are asking to be, not what you become. The account is created as a
+               pending Field Technician whatever is chosen here; this is shown to whoever
+               approves it so they do not have to ring round asking who somebody is.
+               Admin is deliberately absent: nobody applies for it. -->
+          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin:10px 0 4px">Joining as</div>
+          <select value="{{ authRole }}" onChange="{{ f.authRole }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
+            <option value="tech">Field Technician</option>
+            <option value="mgr">Operations Manager</option>
+            <option value="founder">Observer</option>
+          </select>
+          <div style="font-size:12px;color:var(--ink-faint);line-height:1.45;margin-bottom:6px">The office confirms this when it approves your account. Everyone starts as a Field Technician until then.</div>
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
@@ -1627,7 +1638,12 @@
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ u.name }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      {{ u.name }}
+                      <sc-if value="{{ u.showAsked }}" hint-placeholder-val="{{ false }}">
+                        <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">{{ u.askedFor }}</div>
+                      </sc-if>
+                    </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px">
@@ -2163,6 +2179,12 @@
                     </sc-for>
                   </tbody>
                 </table>
+                <sc-if value="{{ sh.showSubTotal }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0;background:#f4f4f5">
+                    <div style="flex:1;padding:5px 8px;text-align:right;font-weight:600;color:rgba(29,31,32,0.7)">{{ sh.subTotalLabel }}</div>
+                    <div style="width:110px;flex:none;padding:5px 8px;text-align:right;font-weight:600;border-left:1px solid rgba(29,31,32,0.3)">{{ sh.subTotal }}</div>
+                  </div>
+                </sc-if>
                 <sc-if value="{{ sh.showTotal }}" hint-placeholder-val="{{ true }}">
                   <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0;background:#e9e9ea">
                     <div style="flex:1;padding:6px 8px;text-align:right;font-weight:700">Total =</div>
@@ -2362,7 +2384,12 @@
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ u.name }}</td>
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      {{ u.name }}
+                      <sc-if value="{{ u.showAsked }}" hint-placeholder-val="{{ false }}">
+                        <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">{{ u.askedFor }}</div>
+                      </sc-if>
+                    </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px">
@@ -4407,6 +4434,7 @@ class Component extends DCLogic {
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, permUser: null,
       priceDelete: null,
+      authRole: 'tech',
       actingAs: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
@@ -4515,8 +4543,8 @@ class Component extends DCLogic {
   signIn(email, pass) {
     return USE_CLOUD ? this.signInCloud(email, pass) : this.signInLocal(email, pass);
   }
-  signUp(name, email, pass) {
-    return USE_CLOUD ? this.signUpCloud(name, email, pass) : this.signUpLocal(name, email, pass);
+  signUp(name, email, pass, wants) {
+    return USE_CLOUD ? this.signUpCloud(name, email, pass, wants) : this.signUpLocal(name, email, pass, wants);
   }
 
   signInCloud(email, pass) {
@@ -4608,11 +4636,17 @@ class Component extends DCLogic {
     return Promise.resolve(me);
   }
 
-  signUpCloud(name, email, pass) {
+  signUpCloud(name, email, pass, wants) {
     const client = sb();
     if (!client) return Promise.reject(new Error('This build has no server configured.'));
     return client.auth.signUp({
-      email: email, password: pass, options: { data: { full_name: name } },
+      // requested_role is a note, not an instruction. It rides along in user metadata so
+      // the person approving can see what the applicant said they were, and it is never
+      // read as a role by anything: the trigger writes the profile as a pending
+      // technician regardless, because a client that could set its own role would be no
+      // protection at all.
+      email: email, password: pass,
+      options: { data: { full_name: name, requested_role: ROLE_TO_DB[wants] || 'technician' } },
     }).then(res => {
       if (res.error) throw new Error(res.error.message || 'Could not create the account.');
       // The database trigger writes the profile as pending. Nothing here needs to, and
@@ -4640,7 +4674,7 @@ class Component extends DCLogic {
     });
   }
 
-  signUpLocal(name, email, pass) {
+  signUpLocal(name, email, pass, wants) {
     const users = this.state.data.users || [];
     if (users.some(u => (u.email || '').toLowerCase() === email)) {
       return Promise.reject(new Error('An account with that email already exists.'));
@@ -4649,6 +4683,10 @@ class Component extends DCLogic {
       (d.users = d.users || []).push({
         name: name, role: 'Pending', roleKey: null, email: email, password: pass,
         base: '—', lastSync: '—', status: 'pending',
+        // Kept beside the account rather than folded into roleKey, which stays null
+        // until somebody approves it. Two fields because they answer two questions:
+        // what this person says they are, and what the company has agreed they are.
+        requestedRole: wants || 'tech',
       });
     });
     return Promise.resolve(true);
@@ -6090,6 +6128,10 @@ class Component extends DCLogic {
     const INK = [29, 31, 32];
     const RULE = [186, 187, 187];    // rgba(29,31,32,0.3) over white
     const LABEL_BG = [233, 233, 234];
+    // A shade lighter than the Total band, so a page sub-total reads as a running figure
+    // rather than as the sum the customer is being asked to sign for. Matches #f4f4f5 in
+    // the preview.
+    const SUBTOTAL_BG = [244, 244, 245];
     const PANEL_BG = [238, 243, 248];
     const MUTED = [105, 106, 107];   // rgba(29,31,32,0.65)
     const FAINT = [127, 128, 128];   // rgba(29,31,32,0.5)
@@ -6218,6 +6260,16 @@ class Component extends DCLogic {
         }
         y += G.itemRow;
       });
+      // The preview and the PDF are one document, so the sub-total is drawn in both or
+      // it is a difference the customer finds and we do not.
+      if (page.showSubTotal) {
+        const tw = 110;
+        box(0, y, G.PX - tw, G.totalRow, SUBTOTAL_BG);
+        box(G.PX - tw, y, tw, G.totalRow, SUBTOTAL_BG);
+        txt(String(page.subTotalLabel || ''), 0, y, G.PX - tw, G.totalRow, { size: 10, weight: 600, align: 'right', padX: 8 });
+        txt(String(page.subTotal || ''), G.PX - tw, y, tw, G.totalRow, { size: 10, weight: 600, align: 'right', padX: 8 });
+        y += G.totalRow;
+      }
       if (page.showTotal) {
         const tw = 110;
         box(0, y, G.PX - tw, G.totalRow, LABEL_BG);
@@ -6686,6 +6738,10 @@ class Component extends DCLogic {
       uom: i.uom,
       unit: i.kind === 'percent' ? (i.cost + '%') : money(i.cost, this.ticketCurrency(t)),
       total: money(this.itemTotal(i, t), this.ticketCurrency(t)),
+      // The figure as a number as well as as words. A page sub-total has to be added up
+      // from these, and re-parsing 'USD 1,234.50' back into 1234.5 to do it would be
+      // reading the app's own formatting as if it were data.
+      amount: this.itemTotal(i, t),
     })) : [];
     const sheetEventsReal = t ? (t.events || []).map(e => ({ date: F.short(e.ts), time: F.time(e.ts), pressure: '—', durTotal: '—', text: e.text })) : [];
     // Overflow handling: a ticket can genuinely have more charged items or job-log lines
@@ -6708,14 +6764,25 @@ class Component extends DCLogic {
     const EMPTY_ITEM_ROW = { code: '', desc: '', qty: '', uom: '', unit: '', total: '' };
     const EMPTY_LOG_ROW = { date: '', time: '', pressure: '', durTotal: '', text: '' };
     const grandTotalStr = t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0);
+    // A page of ruled lines with no figure at the bottom is a page the customer cannot
+    // check. On a one-page ticket the sub-total and the Total would be the same number
+    // printed twice, so it only appears once the ticket actually runs over.
+    const multiPage = itemPages.length > 1;
     const mkSvcPages = (mark) => itemPages.map((pageItems, idx) => {
       const isLast = idx === itemPages.length - 1;
+      const pageSum = pageItems.reduce((n, it) => n + (it.amount || 0), 0);
       return {
         title: 'Service Ticket', mark: mark, no: t ? (t.ticketNo || '—') : '—',
         pageLabel: itemPages.length > 1 ? (' · Page ' + (idx + 1) + ' of ' + itemPages.length) : '',
         isService: true, isLog: false,
         svcRows: svcRows, jobType: t ? (t.jobType || '—') : '—',
         items: padTo(pageItems, ITEM_ROW_CAP, EMPTY_ITEM_ROW),
+        // Shown on every page of a ticket that runs over, the last one included: the
+        // sub-totals are then a column the customer can add up and check against the
+        // Total, which is the only reason to print them at all.
+        showSubTotal: multiPage,
+        subTotalLabel: 'Sub-total, page ' + (idx + 1) + ' of ' + itemPages.length,
+        subTotal: money(pageSum, t ? this.ticketCurrency(t) : undefined),
         showTotal: isLast, total: grandTotalStr,
         showSignature: isLast, isContinued: !isLast, signee2: 'MAKAMAN LIBYA',
       };
@@ -7430,7 +7497,7 @@ class Component extends DCLogic {
       this.runLatest('auth', () => vetPassword(pass, confirm)
         .then((problem) => {
           if (problem) { this.setState({ authError: problem, authBusy: false }); return null; }
-          return this.signUp(name, email, pass)
+          return this.signUp(name, email, pass, S.authRole || 'tech')
             .then(() => this.setState({ signupDone: true, authError: '', authBusy: false }));
         })
         .catch(err => this.setState({ authError: err.message || 'Could not create the account.', authBusy: false })));
@@ -7586,6 +7653,7 @@ class Component extends DCLogic {
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
       doLogin: doLogin,
       doSignup: doSignup,
+      authRole: S.authRole || 'tech',
       doLogout: doLogout,
       createTechnician: createTechnician,
       newTechName: S.newTechName, newTechEmail: S.newTechEmail, newTechPassword: S.newTechPassword,
@@ -8091,9 +8159,23 @@ class Component extends DCLogic {
           // rather than lumped in with the other case.
           const clashed = myPending.filter(x =>
             (x.officeClosed && x.closedBy && x.closedBy !== myName) || this.settled(x));
-          const clashReason = (x) => this.settled(x)
-            ? 'already approved in the office'
-            : 'already closed in the office by ' + x.closedBy;
+          // Three cases, not two. The third is the one a technician actually hits and
+          // the one the old wording left him guessing about: he called the job off on a
+          // dead connection, and by the time he had signal the office had already closed
+          // it. "Already closed in the office" is true and tells him nothing about the
+          // thing he did — his cancellation simply vanished, with no sentence anywhere
+          // saying it had been overruled or why. It is named now.
+          const clashReason = (x) => {
+            if (x.status === 'cancelled') {
+              return this.settled(x)
+                ? 'approved in the office before your cancellation reached them, so the job stands as worked'
+                : 'closed in the office by ' + (x.closedBy || 'the office')
+                  + ' before your cancellation reached them, so the job stands as worked';
+            }
+            return this.settled(x)
+              ? 'already approved in the office'
+              : 'already closed in the office by ' + x.closedBy;
+          };
           const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
           this.mutate(d => d.tickets.forEach(x => {
             if (clashed.some(c => c.id === x.id)) {
@@ -9135,6 +9217,12 @@ class Component extends DCLogic {
         // word is the point: an earlier version excluded anything containing "ago",
         // which let "yesterday" through as though that user were online.
         syncDot: (u.status === 'active' && u.lastSync === 'live') ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
+        // What the applicant said they were, shown only while the decision is still
+        // open. It is a claim, not a fact — approving still creates a Field Technician,
+        // and the role dropdown beside this row is where the office actually decides —
+        // so it is worded as something asked for rather than something granted.
+        showAsked: u.status === 'pending' && !!u.requestedRole && u.requestedRole !== 'tech',
+        askedFor: 'Asked to join as ' + (ROLE_LABEL[u.requestedRole] || u.requestedRole || ''),
         roleBg: ({ pending: 'rgba(var(--warning-rgb),0.14)', disabled: 'rgba(var(--danger-rgb),0.14)' })[u.status] || 'var(--accent-wash)',
         roleFg: ({ pending: 'var(--warning-ink)', disabled: 'var(--danger)' })[u.status] || 'var(--accent-ink)',
         // Approving is the server's decision to make, not this device's. In cloud mode
@@ -9330,6 +9418,7 @@ class Component extends DCLogic {
         authPassword: e => this.setState({ authPassword: e.target.value, authError: '' }),
         authFullName: e => this.setState({ authFullName: e.target.value, authError: '' }),
         authConfirm: e => this.setState({ authConfirm: e.target.value, authError: '' }),
+        authRole: e => this.setState({ authRole: e.target.value }),
         pwNew: e => this.setState({ pwNew: e.target.value, pwError: '', pwDone: false }),
         pwConfirm: e => this.setState({ pwConfirm: e.target.value, pwError: '', pwDone: false }),
         newTechName: e => this.setState({ newTechName: e.target.value, newTechError: '', newTechDone: false }),
