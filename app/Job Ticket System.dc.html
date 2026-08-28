@@ -2266,7 +2266,10 @@
             </select>
           </div>
           <div style="font-size:12px;color:var(--ink-faint);padding-bottom:9px">{{ adminPriceNote }}</div>
-          <button onClick="{{ addPriceRow }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add item</button>
+          <sc-if value="{{ priceReadOnly }}" hint-placeholder-val="{{ false }}">
+            <div class="mk-note" style="width:100%;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">You can read this price list but not change it. Ask an Admin for the "Correct a priced line" capability.</div>
+          </sc-if>
+          <button onClick="{{ addPriceRow }}" disabled="{{ priceReadOnly }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add item</button>
         </div>
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -2286,7 +2289,11 @@
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><button onClick="{{ p.remove }}" style="min-width:40px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button></td>
+                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <sc-if value="{{ canDeletePrices }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ p.remove }}" title="Remove this line" style="min-width:40px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                    </sc-if>
+                  </td>
                 </tr>
               </sc-for>
             </tbody>
@@ -3029,17 +3036,23 @@ const PERMISSION_DEFAULTS = (function () {
     [['mgr', 'admin', 'founder'],
       ['ticket.view_all', 'report.all_technicians', 'activity.view_all', 'location.view_team',
         'export.master']],
+    // Correcting a priced line moved from admin-only to the office (migration 0038).
+    // The instruction was that the admin and the ops manager walk the price lists item by
+    // item; the ops manager could not open the screen at all, so he could be handed a list
+    // of corrections and make none of them. Removing a line stayed a separate capability:
+    // an office that should fix a wrong price does not necessarily need to delete the row.
     [['mgr', 'admin'],
       ['ticket.edit_closed', 'ticket.charge_items', 'ticket.reorder_items',
         'ticket.assign_number', 'ticket.approve', 'ticket.force_number',
         'ticket.approve_on_behalf', 'ticket.reopen', 'numbering.hold', 'numbering.transfer',
-        'user.approve_signup', 'user.create', 'pricelist.view', 'client.manage',
+        'user.approve_signup', 'user.create', 'client.manage',
+        'pricelist.view', 'pricelist.edit', 'pricelist.delete',
         // Seeing every ticket's activity and seeing the edit trail are different
         // capabilities: the Observer holds the first and not the second.
         'activity.view_edits', 'user.act_as_technician']],
     [['admin'],
       ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.disable',
-        'user.manage_permissions', 'pricelist.edit', 'jobtype.manage']],
+        'user.manage_permissions', 'jobtype.manage']],
   ];
   const out = {};
   groups.forEach(([roles, keys]) => keys.forEach((k) => { out[k] = roles; }));
@@ -4388,6 +4401,7 @@ class Component extends DCLogic {
     super(props);
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, permUser: null,
+      priceDelete: null,
       actingAs: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
@@ -5173,6 +5187,21 @@ class Component extends DCLogic {
       if (t) (t.audit = t.audit || []).push({ id: uuid(), ts: iso(new Date()), text: text, kind: kind || 'lifecycle', by: by });
     });
   }
+  // The same idea as logOn, for the thing that has no ticket to hang off.
+  //
+  // A price list is not a ticket, so its history cannot live in a ticket's audit array —
+  // but "who changed this price, and when" is exactly the question somebody asks after an
+  // invoice is queried, and until now the answer was nowhere. Entries land in the same
+  // activity feed as everything else so there is one place to look, not two.
+  logPrice(clientName, text, kind) {
+    const by = (this.state.session && this.state.session.name) || '';
+    this.mutate(d => {
+      (d.priceAudit = d.priceAudit || []).push({
+        id: uuid(), ts: iso(new Date()), text: text, kind: kind || 'edit',
+        by: by, client: clientName,
+      });
+    });
+  }
   client(name) { return this.state.data.clients.find(c => c.name === name); }
   // The currency a ticket is priced in. Read off the ticket first: like the unit prices
   // themselves, it is frozen onto the ticket when the job is raised, so re-negotiating a
@@ -5632,6 +5661,22 @@ class Component extends DCLogic {
           ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
           : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
       }))), [])
+      // Price-list history has no ticket to hang off, so it is concatenated here rather
+      // than being a second feed on a second screen. A deletion is 'lifecycle' because
+      // the row is gone and everyone entitled to the feed should see that; a corrected
+      // figure is 'edit', which is the same line the ticket trail draws.
+      .concat((D.priceAudit || []).map((a) => ({
+        ts: a.ts,
+        by: a.by || '',
+        kind: a.kind === 'lifecycle' ? 'lifecycle' : 'edit',
+        text: a.text,
+        stamp: F.stamp(a.ts),
+        where: 'Price list · ' + (a.client || ''),
+        edge: 'var(--success)',
+        open: () => this.hasPermission('pricelist.view')
+          ? this.setState({ adminTab: 'price', adminClient: a.client, roleTab: 'tickets' })
+          : null,
+      })))
       .filter((a) => deep || a.kind === 'lifecycle')
       .sort((a, b) => new Date(b.ts) - new Date(a.ts));
   }
@@ -7044,6 +7089,44 @@ class Component extends DCLogic {
         // job in progress; the finished sheet is new content and has to be uploaded.
         confirm: () => { this.patchTicket({ status: 'done', end: iso(new Date()), synced: false }); this.log('Marked Job Done on device.', 'lifecycle'); this.setState({ dialog: null }); },
       },
+      // Deleting a priced line. The only destructive action in this app with no way back:
+      // a ticket can be withdrawn and restored, an item removed from a price list is
+      // simply gone. So the question names the line — its number, its wording and its
+      // price — and the audit entry keeps all three, which is the nearest thing to an
+      // undo that exists here.
+      deletePriceRow: {
+        title: 'Remove this line from the price list?',
+        body: (() => {
+          const d = S.priceDelete || {};
+          const price = (d.cost === '' || d.cost === undefined) ? 'no price' : String(d.cost);
+          return (d.code || '(no code)') + ' — ' + (d.desc || '(no description)')
+            + ' at ' + price + (d.uom ? ' per ' + d.uom : '')
+            + '. It disappears from ' + (d.client || 'this customer') + "'s list for good; there is no"
+            + ' restore. Tickets already raised keep the price they were approved at.';
+        })(),
+        okLabel: 'Yes, remove it', cancelLabel: 'Keep it', hasCancel: true,
+        okBg: 'var(--danger)', okFg: 'var(--on-danger)',
+        confirm: () => {
+          const d = S.priceDelete;
+          if (!d || !this.hasPermission('pricelist.delete')) { this.setState({ dialog: null, priceDelete: null }); return; }
+          const price = (d.cost === '' || d.cost === undefined) ? 'no price' : String(d.cost);
+          this.mutate(x => {
+            const c = x.clients.find(y => y.name === d.client);
+            // Matched by content as well as position: the list can have been re-sorted
+            // or edited between opening the dialog and confirming it, and deleting
+            // whatever now sits at index 3 is how the wrong line gets removed.
+            if (!c) return;
+            const at = c.items[d.index];
+            const same = at && at.code === d.code && at.desc === d.desc;
+            const idx = same ? d.index : c.items.findIndex(it => it.code === d.code && it.desc === d.desc);
+            if (idx >= 0) c.items.splice(idx, 1);
+          });
+          this.logPrice(d.client, 'Line removed: ' + (d.code || '(no code)') + ' — '
+            + (d.desc || '(no description)') + ' at ' + price + (d.uom ? ' per ' + d.uom : ''), 'lifecycle');
+          this.toast('price-removed', 'Line removed from ' + d.client + "'s price list.", 'ok');
+          this.setState({ dialog: null, priceDelete: null });
+        },
+      },
       reopenTech: {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
@@ -7473,7 +7556,12 @@ class Component extends DCLogic {
       // thing you open from Account, not the meaning of a tab on the bottom bar.
       showMgrPage: ((S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab)
         || (S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen === 'review'),
-      showAdminPage: S.role === 'admin' && S.roleTab === 'tickets' && !!S.adminTab,
+      // The Admin tools page is Admin's, with one exception: the price lists, which the
+      // ops manager now reaches through the same screen. It is a single tool page keyed
+      // by adminTab with its own back button, so arriving on 'price' shows the price
+      // tool and nothing else — there is no tab strip to wander off down.
+      showAdminPage: S.roleTab === 'tickets' && !!S.adminTab
+        && (S.role === 'admin' || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))),
       showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review',
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
@@ -7638,10 +7726,16 @@ class Component extends DCLogic {
           ];
         }
         if (S.role === 'mgr') {
-          return [
+          const mine = [
             tile('Team', (D.users || []).length + ' users · approve signups', 'people', 'var(--accent-wash)', 'var(--accent)', () => this.setState({ mgrScreen: 'team', roleTab: 'tickets' })),
-            settings,
           ];
+          if (this.hasPermission('pricelist.view')) {
+            mine.push(tile('Price Lists', list.length + ' priced items · ' + D.clients.length + ' customers',
+              'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)',
+              () => this.setState({ adminTab: 'price', roleTab: 'tickets' })));
+          }
+          mine.push(settings);
+          return mine;
         }
         return [settings];
       })(),
@@ -8907,18 +9001,46 @@ class Component extends DCLogic {
       },
       adminClient: S.adminClient,
       adminPriceNote: list.length + ' items · changes apply to new ticket lines only',
+      canEditPrices: this.hasPermission('pricelist.edit'),
+      priceReadOnly: !this.hasPermission('pricelist.edit'),
+      canDeletePrices: this.hasPermission('pricelist.delete'),
       priceRows: list.map((p, i) => {
+        // Every field change is recorded with its old and new value. The audit line is
+        // the point: an item number corrected during the price-list review, or a unit
+        // cost moved, is exactly what somebody queries three months later against an
+        // invoice, and "the price is 84" answers a different question from "who made it
+        // 84, and what was it before".
+        const LABEL = { code: 'Item number', desc: 'Description', uom: 'Unit', cost: 'Unit cost' };
         const setField = k => ev => {
+          if (!this.hasPermission('pricelist.edit')) return;
           const v = ev.target.value;
-          this.mutate(d => { const c = d.clients.find(x => x.name === S.adminClient); c.items[i][k] = k === 'cost' ? (v === '' ? '' : Number(v)) : v; });
+          const before = p[k];
+          const after = k === 'cost' ? (v === '' ? '' : Number(v)) : v;
+          if (String(before) === String(after)) return;
+          this.mutate(d => { const c = d.clients.find(x => x.name === S.adminClient); c.items[i][k] = after; });
+          this.logPrice(S.adminClient, LABEL[k] + ' on ' + (p.code || '(no code)') + ' changed from "'
+            + (before === '' || before === undefined ? '—' : before) + '" to "'
+            + (after === '' ? '—' : after) + '"', 'edit');
         };
         return {
           code: p.code, desc: p.desc, uom: p.uom, cost: p.cost,
           onCode: setField('code'), onDesc: setField('desc'), onUom: setField('uom'), onCost: setField('cost'),
-          remove: () => this.mutate(d => { const c = d.clients.find(x => x.name === S.adminClient); c.items.splice(i, 1); }),
+          // Nothing is spliced here. A price line has no withdrawn state to come back
+          // from — unlike a ticket, deleting one is final — so the × asks first, and it
+          // asks with the line's own number and price in the question rather than a
+          // generic "are you sure", because the row you meant and the row above it look
+          // identical once the dialog covers the table.
+          remove: () => this.setState({
+            dialog: 'deletePriceRow',
+            priceDelete: { client: S.adminClient, index: i, code: p.code, desc: p.desc, cost: p.cost, uom: p.uom },
+          }),
         };
       }),
-      addPriceRow: () => this.mutate(d => { const c = d.clients.find(x => x.name === S.adminClient); c.items.push({ code: 'MKN-', desc: 'New item', uom: 'Day', cost: 0 }); }),
+      addPriceRow: () => {
+        if (!this.hasPermission('pricelist.edit')) return;
+        this.mutate(d => { const c = d.clients.find(x => x.name === S.adminClient); c.items.push({ code: 'MKN-', desc: 'New item', uom: 'Day', cost: 0 }); });
+        this.logPrice(S.adminClient, 'A blank line was added to the price list', 'edit');
+      },
       seriesRows: D.series.map((s, i) => ({
         label: s.label, prefix: s.prefix || '(none)', last: s.last, next: s.prefix + (s.last + 1),
         onLast: ev => { const v = Number(ev.target.value) || 0; this.mutate(d => { d.series[i].last = v; }); },
