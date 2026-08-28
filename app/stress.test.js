@@ -188,26 +188,57 @@ const freeStorage = (p) => p.evaluate(() => {
     await ctx.close();
   }
 
-  // ── A ticket the office approved while the technician was offline ──
+  // ── A ticket the office settled while the technician was offline ──
+  //
+  // This used to be checked by grepping the source for `x.status === 'approved'`, which
+  // passed for the right reason once and then failed the moment the same rule was
+  // expressed differently — the guard now asks `settled(x)`, which catches approved and
+  // both post-approval states rather than only the first. Grepping the implementation
+  // tests the spelling; what matters is that a stale field copy of a settled ticket is
+  // held back and the technician is told why. So drive it.
   {
     const ctx = await b.newContext();
     const p = await signIn(ctx, 'yousef@makaman.ly');
-    const r = await p.evaluate(() => {
+    // Set the office's copy to a settled state, leave the field copy unsynced, then run
+    // the sync the technician would run and read what it did.
+    const clashFor = (status, closedBy) => p.evaluate(([st, by]) => {
       const app = window.__mkApp;
-      const src = document.querySelector('script[type="text/x-dc"]').textContent;
-      // The guard used to ask only whether the office had CLOSED the job, so a ticket
-      // approved in the meantime was not a clash and the stale field copy uploaded
-      // straight over a signed-off sheet.
-      const guard = src.slice(src.indexOf('const clashed = myPending.filter'), src.indexOf('const clashReason'));
-      return {
-        catchesApproved: /x\.status === 'approved'/.test(guard),
-        catchesClosed: /x\.officeClosed/.test(guard),
-        namesReason: /already approved in the office/.test(src),
-      };
-    });
-    check('an approved ticket counts as settled, like a closed one', r.catchesApproved);
-    check('and the closed case still does', r.catchesClosed);
-    check('the technician is told which of the two it was', r.namesReason);
+      const t = (app.state.data.tickets || []).filter(x => x.tech === 'Yousef Al-Harbi')[0];
+      if (!t) return Promise.resolve({ error: 'no fixture' });
+      app.mutate(d => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.status = st; x.synced = false;
+        x.officeClosed = !!by; x.closedBy = by || '';
+        x.audit = [];
+      });
+      return new Promise(r => setTimeout(() => {
+        app.renderVals().sync();
+        setTimeout(() => {
+          const x = (app.state.data.tickets || []).find(y => y.id === t.id);
+          r({
+            discarded: (x.audit || []).some(a => /Field copy discarded on sync/.test(a.text)),
+            reason: ((x.audit || []).find(a => /discarded/.test(a.text)) || {}).text || '',
+            uploaded: (x.audit || []).some(a => /Uploaded from field device/.test(a.text)),
+          });
+        }, 900);
+      }, 400));
+    }, [status, closedBy]);
+
+    for (const st of ['approved', 'sent_client', 'sent_finance']) {
+      const res = await clashFor(st, '');
+      check('a stale copy of a ticket at ' + st + ' is discarded, not uploaded over',
+        res.discarded && !res.uploaded, JSON.stringify(res));
+      check('  and the technician is told it was settled in the office',
+        /already approved in the office/.test(res.reason), res.reason);
+    }
+    const closed = await clashFor('done', 'Omar Al-Saleh');
+    check('one the office merely closed is discarded too', closed.discarded && !closed.uploaded,
+      JSON.stringify(closed));
+    check('and that reason names the person who closed it',
+      /already closed in the office by Omar Al-Saleh/.test(closed.reason), closed.reason);
+    check('the technician is told which of the two it was',
+      await p.evaluate(() => document.querySelector('script[type="text/x-dc"]').textContent
+        .indexOf('already approved in the office') >= 0));
     await ctx.close();
   }
 

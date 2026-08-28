@@ -2992,6 +2992,11 @@ const RECOVERY_LINK = (function () {
 // The database speaks technician / ops_manager / admin / founder; the app has always
 // spoken tech / mgr / admin / founder. Translated in one place rather than in every
 // comparison, so neither vocabulary leaks into the other.
+// The settled chain, in order. Rank is position: a ticket only ever moves forward along
+// it, which the database enforces too (migration 0039) so an offline phone cannot un-send
+// paperwork that has already gone.
+const SETTLED_STATES = ['approved', 'sent_client', 'sent_finance'];
+const SETTLED_RANK = (st) => SETTLED_STATES.indexOf(st);
 const ROLE_FROM_DB = { technician: 'tech', ops_manager: 'mgr', admin: 'admin', founder: 'founder' };
 const ROLE_TO_DB = { tech: 'technician', mgr: 'ops_manager', admin: 'admin', founder: 'founder' };
 const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
@@ -5474,7 +5479,19 @@ class Component extends DCLogic {
   // These were previously assigned the other way round (blue for waiting, grey for
   // in-progress), which left the one state nobody needs to act on wearing the loudest
   // colour and the active work looking inert.
+  // Approval is not the end of the job any more.
+  //
+  // The sheets go out to the client, the signed and stamped copies come back, and finance
+  // gets them. Those two later states are still "approved" as far as almost every rule in
+  // this app is concerned — the ticket is sealed to the technician, locked for editing,
+  // counted in reports, and open for its signed paperwork. Only the act of approving
+  // itself cares about the exact word, so everything else asks `settled()` instead, and
+  // there is one list here rather than an `|| status === 'sent_client'` on twenty lines,
+  // each of which would be a place to forget the third one.
+  settled(t) { return !!t && SETTLED_STATES.indexOf(t.status) >= 0; }
   statusChip(t) {
+    if (t.status === 'sent_finance') return { statusLabel: 'SENT TO FINANCE', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
+    if (t.status === 'sent_client') return { statusLabel: 'SENT TO CLIENT', chipBg: 'rgba(var(--success-rgb),0.16)', chipFg: 'var(--success-ink)' };
     if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
     if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'rgba(var(--warning-rgb),0.16)', chipFg: 'var(--warning-deep)' };
     return { statusLabel: 'IN PROGRESS', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
@@ -5483,6 +5500,8 @@ class Component extends DCLogic {
   // and an icon tile — so a ticket is identifiable from its shape before any text is
   // read. Merged into ticketView() so every list that renders a ticket picks it up.
   cardTreatment(t) {
+    if (t.status === 'sent_finance') return { edge: 'var(--accent)', tileBg: 'var(--accent-wash)', tileFg: 'var(--accent)', tileIcon: icon('check') };
+    if (t.status === 'sent_client') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
     if (t.status === 'approved') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
     if (t.status === 'done') return { edge: 'var(--warning)', tileBg: 'rgba(var(--warning-rgb),0.16)', tileFg: 'var(--warning-ink)', tileIcon: icon('clock') };
     return { edge: 'var(--accent)', tileBg: 'var(--accent-wash)', tileFg: 'var(--accent)', tileIcon: icon('rig') };
@@ -5527,7 +5546,7 @@ class Component extends DCLogic {
       noLabel: t.ticketNo || '— unassigned —',
       value: money(this.ticketTotal(t), this.ticketCurrency(t)),
       currency: this.ticketCurrency(t),
-      isApproved: t.status === 'approved',
+      isApproved: this.settled(t),
       yearFolder: String(new Date(t.arrival).getFullYear()),
       mileage: t.mileage === 0 ? '0' : (t.mileage || ''),
       ticketNo: t.ticketNo || '',
@@ -5797,8 +5816,35 @@ class Component extends DCLogic {
   }
   canRestore(t) { return !!t && !!t.deletedAt && this.hasPermission('ticket.restore'); }
 
+  // Forward along the settled chain, and only ever forward.
+  //
+  // Neither of these is a button. Downloading the sheets IS sending them to the client,
+  // and receiving the signed copies IS what finance is waiting for — asking somebody to
+  // also remember to set a dropdown afterwards is asking for a status field that lies.
+  // Rank rather than equality, so a ticket already at finance is not dragged back by a
+  // second download of the same sheets, and so the order cannot be got wrong by calling
+  // these in the wrong sequence. The database enforces the same rule (migration 0039);
+  // this is here so the app does not have to be told no.
+  advanceTo(ticketId, next, note) {
+    const t = (this.state.data.tickets || []).find((x) => x.id === ticketId);
+    if (!t) return;
+    if (SETTLED_RANK(t.status) < 0) return;
+    if (SETTLED_RANK(next) <= SETTLED_RANK(t.status)) return;
+    const stampKey = next === 'sent_client' ? 'sentClientAt' : 'sentFinanceAt';
+    this.mutate((d) => {
+      const x = (d.tickets || []).find((y) => y.id === ticketId);
+      if (!x) return;
+      x.status = next;
+      x[stampKey] = iso(new Date());
+      // The office's copy has to learn about this, so it goes back in the queue like any
+      // other change rather than sitting on the device as a local truth.
+      x.synced = false;
+    });
+    this.logOn(ticketId, note, 'lifecycle');
+  }
+
   canAttachTo(t) {
-    if (!t || t.status !== 'approved') return false;
+    if (!this.settled(t)) return false;
     if (!this.hasPermission('attachment.add')) return false;
     const role = this.state.actingAs ? 'tech' : this.state.role;
     if (role === 'mgr' || role === 'admin') return true;
@@ -5822,7 +5868,7 @@ class Component extends DCLogic {
   }
   // Approved, and still waiting on at least one of the two. This is what "pending" means.
   awaitingDocs(list) {
-    return (list || []).filter((t) => t.status === 'approved' && this.signedDocsMissing(t).length);
+    return (list || []).filter((t) => this.settled(t) && this.signedDocsMissing(t).length);
   }
   attachFile(ticketId, file, docKind) {
     if (!ticketId || !file || !this.hasPermission('attachment.add')) return Promise.resolve();
@@ -5830,7 +5876,7 @@ class Component extends DCLogic {
     // The rule the database will apply anyway, applied here so the refusal is a sentence
     // rather than a 403.
     if (!this.canAttachTo(t)) {
-      this.toast('attach', t && t.status !== 'approved'
+      this.toast('attach', !this.settled(t)
         ? 'Signed paperwork is collected once the office has approved this job.'
         : 'Only the technician who did this job, or the office, can send its signed paperwork.', 'warn');
       return Promise.resolve();
@@ -5889,6 +5935,11 @@ class Component extends DCLogic {
         // this is also what tells the office a signed sheet arrived — no second wiring.
         const label = (SIGNED_DOCS.find((d) => d.key === docKind) || {}).label || 'document';
         this.logOn(ticketId, (who || 'Someone') + ' sent back the ' + label + ' — ' + name + ' (' + fileSize(file.size) + ')', 'lifecycle');
+        // Signed and stamped paperwork is what finance is waiting for, so its arrival is
+        // the transition. From approved as well as from sent_client: the office can be
+        // handed a signed sheet by hand without anyone having downloaded a PDF first.
+        this.advanceTo(ticketId, 'sent_finance',
+          'Signed ' + label + ' received — sent to finance (digital).');
         return this.refresh();
       })
       .then(() => { this.setState({ attachBusy: false }); this.toast('attach', name + ' attached.', 'ok'); })
@@ -6498,6 +6549,11 @@ class Component extends DCLogic {
       zip.file(no + '-COPY.pdf', this.pdfFromPages(SH.svcCopy.concat(SH.logCopy)).output('blob'));
       return zip.generateAsync({ type: 'blob' }).then(blob => {
         this.saveBlob(blob, 'Makaman-' + no + '.zip');
+        // The sheets are out. Whoever pulled them — the technician on site or the office —
+        // this is the moment the client's copy leaves the building.
+        const who = (this.state.session && this.state.session.name) || 'Someone';
+        this.advanceTo(ticket.id, 'sent_client',
+          who + ' downloaded the final sheets — sent to the client.');
         return no;
       });
     });
@@ -6836,7 +6892,7 @@ class Component extends DCLogic {
     // office may do it early, and the ticket says plainly that it did.
     const numberingForced = !numberingBlock && !!t && t.status === 'logging';
     const withdrawnAll = this.withdrawnTickets(D.tickets);
-    const approved = LIVE.filter(x => x.status === 'approved');
+    const approved = LIVE.filter(x => this.settled(x));
     const awaiting = LIVE.filter(x => x.status === 'done' && x.synced);
 
     // One list feeds the preview table and the bundle button, so what is on screen is
@@ -6903,8 +6959,18 @@ class Component extends DCLogic {
     const bandOf = (x) => (TICKET_BAND[x.status] === undefined ? 3 : TICKET_BAND[x.status]);
     const bandedTickets = (list) => list.slice().reverse().sort((a, b) => bandOf(a) - bandOf(b));
 
+    // "Has the office ever received this?", not "is it up to date right now".
+    //
+    // The filter used to be `x.synced` alone, which was fine while a synced ticket only
+    // ever went un-synced by being edited in the field. It stopped being fine when the
+    // ticket started moving after approval: downloading the final sheets marks the row
+    // unsynced so the change travels, and the ticket promptly disappeared out of the
+    // office's own inbox — the one screen that most needed to show it had moved. A ticket
+    // the office has a copy of belongs in the inbox whether or not the latest local
+    // change has been pushed back yet.
+    const everReached = (x) => x.synced || !!x.syncedAt;
     const inboxPage = pageOf(bandedTickets(
-      LIVE.filter(x => x.synced && (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))));
+      LIVE.filter(x => everReached(x) && (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))));
     const myPage = pageOf(bandedTickets(myTickets.filter(matchesQuery)));
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
@@ -6919,7 +6985,7 @@ class Component extends DCLogic {
     // read-only-ness is folded into the same flag that seals an approved ticket, so every
     // field, item row, drag handle and remove button it already governs is covered.
     const readOnly = !this.hasPermission('ticket.log') && !this.hasPermission('ticket.edit_closed');
-    const locked = readOnly || !!(t && t.status === 'approved');
+    const locked = readOnly || this.settled(t);
 
     // Sheet ordering rank for a charged line. Transportation is the standing first line
     // on a ticket (MKN-1801 is the travel line — the same code addItemByCode already
@@ -7913,7 +7979,7 @@ class Component extends DCLogic {
       attachLocked: !!t && !this.canAttachTo(t),
       attachLockedNote: (() => {
         if (!t || this.canAttachTo(t)) return '';
-        if (t.status !== 'approved') return 'The client signs and stamps these once the office approves the job. Nothing to send back yet.';
+        if (!this.settled(t)) return 'The client signs and stamps these once the office approves the job. Nothing to send back yet.';
         if (!this.hasPermission('attachment.add')) return 'Your account does not send signed paperwork back.';
         return 'Only the technician who did this job, or the office, can send its signed paperwork.';
       })(),
@@ -7931,12 +7997,12 @@ class Component extends DCLogic {
       // What the panel says about itself at a glance: complete, or what is still owed.
       attachSummary: (() => {
         if (!t) return '';
-        if (t.status !== 'approved') return 'After approval';
+        if (!this.settled(t)) return 'After approval';
         const missing = this.signedDocsMissing(t);
         if (!missing.length) return 'Both received';
         return 'Awaiting ' + missing.length + ' of ' + SIGNED_DOCS.length;
       })(),
-      attachSummaryColor: (t && t.status === 'approved' && !this.signedDocsMissing(t).length)
+      attachSummaryColor: (this.settled(t) && !this.signedDocsMissing(t).length)
         ? 'var(--success-ink)' : 'var(--ink-faint)',
       // One block per expected document rather than one undifferentiated pile. It is the
       // only shape that shows what is MISSING, which is the question this panel exists to
@@ -8024,8 +8090,8 @@ class Component extends DCLogic {
           // (§2d), so it is settled in exactly the same way, and the reason is named
           // rather than lumped in with the other case.
           const clashed = myPending.filter(x =>
-            (x.officeClosed && x.closedBy && x.closedBy !== myName) || x.status === 'approved');
-          const clashReason = (x) => x.status === 'approved'
+            (x.officeClosed && x.closedBy && x.closedBy !== myName) || this.settled(x));
+          const clashReason = (x) => this.settled(x)
             ? 'already approved in the office'
             : 'already closed in the office by ' + x.closedBy;
           const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
@@ -8246,7 +8312,7 @@ class Component extends DCLogic {
         ? ('Answered by ' + (t.assetCheck.by || 'the technician') + ' · ' + F.stamp(t.assetCheck.at))
         : '',
 
-      mgrCanHandOver: !readOnly && !!t && t.status !== 'approved',
+      mgrCanHandOver: !readOnly && !!t && !this.settled(t),
       // Closing on the technician's behalf needs everything closing normally would
       // produce. It is not a way to tidy the inbox — the closed sheet is the document.
       mgrCanClose: !readOnly && !!t && t.status === 'logging' && this.hasPermission('ticket.close_any'),
@@ -8280,8 +8346,8 @@ class Component extends DCLogic {
       // While a job is merely awaiting review it is still the technician's to correct,
       // even though he closed it himself. Once the office has closed it or approved it,
       // it is not — corrections go through the Ops Manager from there.
-      techSealed: !!t && (t.status === 'approved' || !!t.officeClosed),
-      techSealedNote: t && t.status === 'approved'
+      techSealed: !!t && (this.settled(t) || !!t.officeClosed),
+      techSealedNote: this.settled(t)
         ? 'Approved and sealed. Ask the operations manager to make any correction.'
         : (t && t.officeClosed ? 'Closed in the office by ' + (t.closedBy || 'the operations manager') + '. Ask them to make any correction.' : ''),
       doneLabel: t && t.status !== 'logging' ? 'Reopen for corrections' : 'Job done',
@@ -8393,8 +8459,8 @@ class Component extends DCLogic {
       },
 
       askJobDone: () => {
-        if (t && (t.status === 'approved' || t.officeClosed)) {
-          this.toast('tech-sealed', t.status === 'approved'
+        if (t && (this.settled(t) || t.officeClosed)) {
+          this.toast('tech-sealed', this.settled(t)
             ? 'This ticket is approved and sealed. Ask the operations manager to make any correction.'
             : 'The operations manager closed this job. Ask them to make any correction.', 'warn');
           return;
@@ -8421,7 +8487,7 @@ class Component extends DCLogic {
         { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)' },
       ],
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
-        actionLabel: x.status === 'approved' ? 'View' : 'Review',
+        actionLabel: this.settled(x) ? 'View' : 'Review',
         review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
       })),
       // Withdrawn tickets, kept where the office can find them and put them back. Not in
@@ -8594,7 +8660,7 @@ class Component extends DCLogic {
       // Forced approval: the technician never closed this himself, the office did. Worth
       // saying at the moment of approval rather than only in the trail, because it is the
       // last point at which somebody can decide to phone him instead.
-      approvalForced: !!t && !!t.officeClosed && t.status !== 'approved',
+      approvalForced: !!t && !!t.officeClosed && !this.settled(t),
       approvalForcedText: t ? ('Closed in the office by ' + (t.closedBy || 'the operations manager')
         + ', not by ' + (t.holder || t.tech || 'the technician')
         + '. Approving now approves on their behalf; they are notified and can see who did it.') : '',
@@ -8796,11 +8862,11 @@ class Component extends DCLogic {
         : 'This ticket is approved and frozen. Reopen it to change anything.',
       grandTotal: t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0),
       checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? 'var(--accent-deep)' : 'var(--ink-faint)' })),
-      approveDisabled: readOnly || !canApprove || (t && t.status === 'approved'),
-      approveOpacity: (readOnly || !canApprove || (t && t.status === 'approved')) ? 0.45 : 1,
-      approveLabel: readOnly ? 'Read-only — Observer' : (t && t.status === 'approved' ? 'Approved' : 'Approve ticket'),
+      approveDisabled: readOnly || !canApprove || this.settled(t),
+      approveOpacity: (readOnly || !canApprove || this.settled(t)) ? 0.45 : 1,
+      approveLabel: readOnly ? 'Read-only — Observer' : (this.settled(t) ? 'Approved' : 'Approve ticket'),
       approve: () => {
-        if (readOnly || !canApprove || !t || t.status === 'approved') return;
+        if (readOnly || !canApprove || !t || this.settled(t)) return;
         const who = (S.session && S.session.name) || 'Ops Manager';
         const when = iso(new Date());
         const total = money(this.ticketTotal(t), this.ticketCurrency(t));
