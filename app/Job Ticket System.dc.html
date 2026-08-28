@@ -134,9 +134,15 @@
        labels, hairline rules, a printed form at the end of it — and the 12-20px radii
        the reference theme asks for belong to a softer identity than this one. Dialling
        the whole app up or back to square is these three values. */
-    /* 8px on anything you type into or read a value out of — the user's pick, and one
-       value so a field, a read-only value box and the arrival stamp cannot drift apart. */
-    --radius-sm:8px; --radius:6px; --radius-lg:10px;
+    /* Two radii, and one rule for deciding between them: 8px for anything that IS the
+       page — fields, buttons, cards, panels, chips, any box carrying information — and
+       12px for anything that drops in ON TOP of the page and then leaves, which is the
+       toast, the pending-sync bar and the stripe notices.
+       There used to be three values (4/6/10) applied by feel, which is why a field, the
+       card behind it and the chip beside it were all subtly different. One value for the
+       page means they cannot drift apart again. */
+    --radius:8px;
+    --radius-notice:12px;
   }
   /* Night Shift — the palette from the reference screenshots. Near-black ground, one
      lifted card surface, and saturated hues that carry meaning rather than decoration. */
@@ -174,6 +180,24 @@
   :root[data-mkn-theme="light"] { color-scheme: light; }
 </style>
 <style>
+/* ══ CASCADE ORDER ══
+   Two layers, and the order is the whole point.
+
+   `sheet` is declared FIRST and `app` second. For NORMAL declarations a later layer wins,
+   so the app can style anything the sheet block does not claim. For IMPORTANT
+   declarations the order reverses — an earlier layer wins — so every `!important` in the
+   sheet layer beats anything the app layer can say about the same property, with any
+   selector, important or not. That is the seal: not "no rule happens to reach in", but
+   "no rule can".
+
+   What still outranks it, and must: an inline style on one of the sheet's own elements,
+   which is how each cell states its padding, its borders and its ink. That is why the
+   sheet layer pins only properties the sheet's markup never sets inline, and why the one
+   declaration that has to yield — `color:inherit` — sits outside both layers as a normal
+   declaration instead. */
+@layer sheet, app;
+
+@layer app {
   body { margin:0; background:var(--ground); color:var(--ink); font-family:"Barlow","Noto Sans Arabic",system-ui,sans-serif; font-size:15px; line-height:1.55; }
   /* Wordmark: makaman-logo-full.png has "Makaman" baked in as flat black — invisible on
      the dark theme's near-black surfaces. The icon mark (red rings + black dot, ringed
@@ -362,59 +386,6 @@
     .mk-nav-role { display:none; }
   }
 
-  /* An A4 sheet is a client document that will be printed on white paper. It is the one
-     part of the app that must not follow the theme. The backgrounds here were already
-     hardcoded, but the value cells set no colour at all, so they inherited
-     body { color: var(--ink) } — which is near-white in the dark theme. White text on a
-     white sheet: the labels showed and the data did not.
-     Colour, font and the ink of everything inside are pinned here, so no descendant can
-     pick the theme back up. */
-  .mk-sheet {
-    width:100%; max-width:640px; aspect-ratio:210/297;
-    overflow-y:auto; padding:18px;
-    display:flex; flex-direction:column;
-    background:#ffffff;
-    color:#1d1f20;
-    border:1px solid rgba(29,31,32,0.3);
-    box-shadow:0 3px 10px rgba(43,43,45,0.16);
-    color-scheme:light;
-    /* ── The lock ──
-       This sheet is the document the customer signs, and it must look the same after any
-       future restyling of the app around it. Its own colours and boxes are already
-       written as literals rather than theme tokens, and its layout is inline, which an
-       external rule cannot override. What was still reaching in was *inheritance*: the
-       sheet took its font family, size, line-height and weight from `body`, so a change
-       to the app's base typography would silently reflow a client document.
-       Every inherited property the sheet's contents depend on is therefore restated
-       here, and box-sizing is restated on the subtree so a change to the global reset
-       cannot move a border either. Nothing outside this block should be able to alter
-       what prints. `mk-sheet.test.js` proves it by rendering the sheet with the app's
-       own stylesheets disabled and checking the geometry does not shift. */
-    font-family:'Barlow','Noto Sans Arabic',system-ui,sans-serif;
-    font-size:12px;
-    line-height:1.45;
-    font-weight:400;
-    font-style:normal;
-    letter-spacing:normal;
-    word-spacing:normal;
-    text-transform:none;
-    text-indent:0;
-    text-align:left;
-    direction:ltr;
-    box-sizing:border-box;
-  }
-  .mk-sheet *, .mk-sheet *::before, .mk-sheet *::after { box-sizing:border-box; }
-  /* Corners, stated rather than assumed.
-     The lock above restates every INHERITED property the sheet's contents depend on —
-     but border-radius is not inherited, so it was never in scope, and the seal held only
-     because no rule happened to reach in. That is luck, not a seal. This is a client
-     document printed on paper: its boxes are square, and a future restyle of the app
-     around it must not be able to round them. */
-  .mk-sheet, .mk-sheet * { border-radius:0 !important; }
-  .mk-sheet * { color:inherit; }
-  /* Cells that deliberately carry their own muted or accent ink keep it. */
-  .mk-sheet [style*="color:rgba(29,31,32"],
-  .mk-sheet [style*="color:#1d2d3d"] { color:revert; }
 
   /* One live job. The presence badge used to sit in its own flex:none column beside a
      hard 230px who-column, which on a phone added up to more than the card was wide and
@@ -455,6 +426,9 @@
     display:flex; align-items:flex-start; gap:10px;
     padding:11px 12px; border:1px solid; box-shadow:0 6px 20px rgba(0,0,0,0.28);
     animation:mk-drop 220ms ease-out;
+    /* Softer than the page it lands on, so it reads as something laid over the screen
+       rather than another card in it. */
+    border-radius:var(--radius-notice);
   }
   @keyframes mk-drop {
     from { opacity:0; transform:translateX(-50%) translateY(-14px); }
@@ -518,14 +492,19 @@
   .mk-auth-card {
     background:var(--surface);
     border:1px solid rgba(var(--ink-rgb),0.14);
-    border-radius:var(--radius-lg);
+    border-radius:var(--radius);
   }
-  /* Scoped to the signed-out screens rather than applied to every button in the app: the
-     segmented controls in Settings are buttons sitting flush inside a bordered box, and
-     rounding each one would open gaps at their corners. Buttons get their shape per
-     screen, where the result can be looked at. */
-  .mk-auth-card button { border-radius:var(--radius-sm); }
-  .mk-tech-actions button { border-radius:var(--radius-sm); }
+  /* Every button in the app, in one place — SYNC in the app bar, the log-line controls,
+     the Account tiles, the tech actions, the signed-out screens. This used to be scoped
+     to two screens on the grounds that buttons should be shaped where the result could
+     be looked at; the result of that was most of the app's buttons staying square next
+     to 8px fields. One value, one exception, stated below.
+     The exception is the segmented controls in Settings: those are buttons sitting flush
+     against each other inside a single bordered box, and rounding each one individually
+     opens gaps at the seams. The box is the control, so the box carries the shape. */
+  button { border-radius:var(--radius); }
+  .mk-seg { border-radius:var(--radius); overflow:hidden; }
+  .mk-seg button { border-radius:0; }
   /* Every text field in the app, in one place. These were square while the cards around
      them were not, and had no focus state at all beyond the browser's default outline —
      which several browsers draw invisibly against a dark ground. A technician wearing
@@ -535,7 +514,7 @@
      but they sit in the same column as the inputs, and a square box between two rounded
      ones reads as a mistake. */
   input, select, textarea, .mk-readonly {
-    border-radius:var(--radius-sm);
+    border-radius:var(--radius);
   }
   input:focus-visible, select:focus-visible, textarea:focus-visible,
   button:focus-visible, a:focus-visible {
@@ -601,9 +580,87 @@
   }
   /* The shared shapes. Kept few and named for what they are, so the tokens above have
      somewhere real to land instead of being decoration in :root. */
-  .mk-panel { border-radius:var(--radius-lg); }
-  .mk-soft  { border-radius:var(--radius); }
-  .mk-chip  { border-radius:var(--radius-sm); }
+  .mk-panel { border-radius:var(--radius); }
+
+  /* The pending-sync bar: 12px like the toast, because it is the same kind of thing —
+     a notice that appears because something happened and leaves once it is dealt with.
+     The SYNC button inside it takes the page radius, not the bar's: it is a control, and
+     controls are 8px wherever they appear. */
+  .mk-banner { border-radius:var(--radius-notice); }
+
+  /* Inline notices — the ones with a coloured bar down the left edge. Same 12px as the
+     toast: they are notices, and they appear because something happened.
+     The stripe is why they cannot go further than that. It is a 3px left border, and a
+     border follows the corner arc, so past about a quarter of the box's height it stops
+     reading as a bar and starts reading as a crescent tapering to nothing at both ends.
+     A class, not a match on the style attribute: the runtime re-serialises inline styles
+     to their canonical form, so `[style*="border-left:3px solid"]` never matches the
+     `border-left: 3px solid` the browser actually holds. */
+  .mk-note { border-radius:var(--radius-notice); }
+  .mk-soft, .mk-chip { border-radius:var(--radius); }
+}
+
+/* ══ THE A4 SHEETS ══
+   Do not move these rules into @layer app, and do not add sheet rules there.
+
+   An A4 sheet is a client document that will be printed on white paper. It is the one
+   part of the app that must not follow the theme, must not follow a restyle, and must
+   look in a year exactly as it looks today. Its backgrounds and boxes were always
+   hardcoded and its layout is inline — but what still reached in was INHERITANCE: the
+   sheet took font family, size, line-height and weight from `body`, and its value cells
+   set no colour at all, so they inherited `body { color: var(--ink) }`, which is
+   near-white in the dark theme. White text on a white sheet — the labels showed and the
+   data did not.
+   So every inherited property the sheet's contents depend on is restated here, and every
+   one of them carries !important from the earlier layer. Adding a property to this block
+   is how you extend the seal; that is the only place it needs to be done.
+   `mksheet.test.js` proves it from the other side — it renders the sheets with the app's
+   stylesheets switched off and checks that no band moves — and `shape.test.js` adds a
+   rule that tries to round every element on the page and checks the sheets stay square. */
+@layer sheet {
+  .mk-sheet {
+    width:100% !important; max-width:640px !important; aspect-ratio:210/297 !important;
+    overflow-y:auto !important; padding:18px !important;
+    display:flex !important; flex-direction:column !important;
+    background:#ffffff !important;
+    color:#1d1f20 !important;
+    border:1px solid rgba(29,31,32,0.3) !important;
+    box-shadow:0 3px 10px rgba(43,43,45,0.16) !important;
+    color-scheme:light !important;
+    font-family:'Barlow','Noto Sans Arabic',system-ui,sans-serif !important;
+    font-size:12px !important;
+    line-height:1.45 !important;
+    font-weight:400 !important;
+    font-style:normal !important;
+    letter-spacing:normal !important;
+    word-spacing:normal !important;
+    text-transform:none !important;
+    text-indent:0 !important;
+    text-align:left !important;
+    direction:ltr !important;
+    box-sizing:border-box !important;
+  }
+  /* The subtree. Only properties the sheet's own markup never sets inline appear here —
+     box-sizing so a change to the global reset cannot move a border, and border-radius
+     because it is not inherited, so it was never covered by the restatement above and
+     the sheets stayed square purely because no rule had happened to round them. */
+  .mk-sheet *, .mk-sheet *::before, .mk-sheet *::after {
+    box-sizing:border-box !important;
+    border-radius:0 !important;
+  }
+  .mk-sheet { border-radius:0 !important; }
+}
+
+/* Outside both layers, and NOT important, which is the difference that matters: 168 of
+   the sheet's cells declare their own muted or accent ink inline, and an inline style
+   beats a normal declaration but loses to an important one. Normal-and-unlayered is
+   therefore the strongest this can be while still letting those cells keep their colour —
+   it outranks every normal rule in the app layer, and yields to the sheet's own markup.
+   No exemption list is needed for the same reason. Two used to sit here matching on the
+   style attribute; the runtime re-serialises inline styles to the canonical
+   `color: rgba(29, 31, 32, ...)` form, with spaces, so they matched 0 of the sheet's
+   1,454 elements and had been doing nothing since the day they were written. */
+.mk-sheet * { color:inherit; }
 </style>
 </helmet>
 
@@ -923,7 +980,7 @@
           </div>
 
           <sc-if value="{{ showBanner }}" hint-placeholder-val="{{ true }}">
-            <div style="display:flex;align-items:center;gap:10px;margin:6px 14px 0;padding:9px 11px;background:{{ bannerBg }};border:1px solid {{ bannerBorder }}">
+            <div class="mk-banner" style="display:flex;align-items:center;gap:10px;margin:6px 14px 0;padding:9px 12px;background:{{ bannerBg }};border:1px solid {{ bannerBorder }}">
               <span style="width:8px;height:8px;flex:none;background:{{ bannerDot }};animation:pulse 2s infinite"></span>
               <div style="flex:1;font-size:12px;line-height:1.35;color:var(--ink-strong)">{{ bannerText }}</div>
               <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;border:1px solid var(--accent);background:{{ syncBg }};color:{{ syncFg }};opacity:{{ syncOpacity }}">SYNC</button>
@@ -1048,10 +1105,10 @@
                    and a withdrawal a person can only discover by noticing the ticket has
                    gone is not a record of anything. -->
               <sc-if value="{{ isWithdrawn }}" hint-placeholder-val="{{ false }}">
-                <div style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>The office withdrew this ticket.</strong> {{ withdrawnLine }}. {{ withdrawnWhy }}</div>
+                <div class="mk-note" style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>The office withdrew this ticket.</strong> {{ withdrawnLine }}. {{ withdrawnWhy }}</div>
               </sc-if>
               <sc-if value="{{ isCancelled }}" hint-placeholder-val="{{ false }}">
-                <div style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
+                <div class="mk-note" style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
               </sc-if>
               <div style="display:flex;align-items:flex-start;gap:8px">
                 <div style="flex:1">
@@ -1094,7 +1151,7 @@
                 </sc-for>
               </div>
               <sc-if value="{{ notHolder }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-top:12px;padding:10px 12px;background:var(--accent-wash);border-left:3px solid var(--accent);font-size:12px;line-height:1.45;color:var(--accent-ink)">{{ holderName }} has this job now. You can read it, but only they can add to the log.</div>
+                <div class="mk-note" style="margin-top:12px;padding:10px 12px;background:var(--accent-wash);border-left:3px solid var(--accent);font-size:12px;line-height:1.45;color:var(--accent-ink)">{{ holderName }} has this job now. You can read it, but only they can add to the log.</div>
               </sc-if>
               <sc-if value="{{ isHolder }}" hint-placeholder-val="{{ true }}">
               <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
@@ -1143,7 +1200,7 @@
                 </sc-if>
 
                 <sc-if value="{{ techSealed }}" hint-placeholder-val="{{ false }}">
-                  <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ techSealedNote }}</div>
+                  <div class="mk-note" style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ techSealedNote }}</div>
                 </sc-if>
                 <button onClick="{{ askJobDone }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">{{ doneLabel }}</button>
                 <sc-if value="{{ canHandOver }}" hint-placeholder-val="{{ true }}">
@@ -1205,7 +1262,7 @@
                   </div>
                   <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
                   <sc-if value="{{ attachLocked }}" hint-placeholder-val="{{ false }}">
-                    <div style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ attachLockedNote }}</div>
+                    <div class="mk-note" style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ attachLockedNote }}</div>
                   </sc-if>
                   <sc-for list="{{ attachDocRows }}" as="d" hint-placeholder-count="2">
                     <div style="display:flex;gap:10px;padding:11px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
@@ -1516,7 +1573,7 @@
               </sc-for>
             </datalist>
             <sc-if value="{{ mgrNewIsNewCustomer }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex;gap:8px;align-items:baseline;margin-top:7px;padding:9px 11px;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);font-size:12px;line-height:1.45;color:var(--ink)">
+              <div class="mk-note" style="display:flex;gap:8px;align-items:baseline;margin-top:7px;padding:9px 11px;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);font-size:12px;line-height:1.45;color:var(--ink)">
                 <span style="flex:none">New</span>
                 <span>Not on the customer list — it will be added. Set up a price list for it before this ticket can charge anything.</span>
               </div>
@@ -1653,10 +1710,10 @@
                 </div>
               </div>
               <sc-if value="{{ numberingBlocked }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ numberingBlockText }}</div>
+                <div class="mk-note" style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ numberingBlockText }}</div>
               </sc-if>
               <sc-if value="{{ numberingForced }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Forced — job still running.</strong> {{ numberingForcedText }}</div>
+                <div class="mk-note" style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Forced — job still running.</strong> {{ numberingForcedText }}</div>
               </sc-if>
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
@@ -1700,7 +1757,7 @@
                   </sc-if>
                 </div>
                 <sc-if value="{{ priceListEmpty }}" hint-placeholder-val="{{ false }}">
-                  <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">There is no price list for this customer yet. Type the lines in by hand — item number, description, quantity, unit and unit cost.</div>
+                  <div class="mk-note" style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">There is no price list for this customer yet. Type the lines in by hand — item number, description, quantity, unit and unit cost.</div>
                 </sc-if>
                 <button onClick="{{ addBlankItem }}" style="margin-bottom:12px;padding:7px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--accent-deep);border:1px solid var(--accent)">+ Add a line by hand</button>
               </sc-if>
@@ -1713,7 +1770,7 @@
                 </div>
               </sc-if>
               <sc-if value="{{ ticketLocked }}" hint-placeholder-val="{{ false }}">
-                <div style="display:flex;gap:9px;align-items:baseline;margin-bottom:12px;padding:9px 11px;background:var(--accent-wash);border-left:3px solid var(--accent-deep);font-size:12px;color:var(--accent-ink)">
+                <div class="mk-note" style="display:flex;gap:9px;align-items:baseline;margin-bottom:12px;padding:9px 11px;background:var(--accent-wash);border-left:3px solid var(--accent-deep);font-size:12px;color:var(--accent-ink)">
                   <span style="flex:none">🔒</span><span>{{ lockedNote }}</span>
                 </div>
               </sc-if>
@@ -1865,13 +1922,13 @@
                 </sc-for>
               </div>
               <sc-if value="{{ isWithdrawn }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>This ticket has been withdrawn.</strong> {{ withdrawnLine }}. {{ withdrawnWhy }}</div>
+                <div class="mk-note" style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>This ticket has been withdrawn.</strong> {{ withdrawnLine }}. {{ withdrawnWhy }}</div>
               </sc-if>
               <sc-if value="{{ isCancelled }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
+                <div class="mk-note" style="margin-bottom:10px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
               </sc-if>
               <sc-if value="{{ approvalForced }}" hint-placeholder-val="{{ false }}">
-                <div style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Approving on the technician's behalf.</strong> {{ approvalForcedText }}</div>
+                <div class="mk-note" style="margin-bottom:10px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--danger-rgb),0.12);border-left:3px solid var(--danger);color:var(--ink)"><strong>Approving on the technician's behalf.</strong> {{ approvalForcedText }}</div>
               </sc-if>
               <button onClick="{{ approve }}" disabled="{{ approveDisabled }}" style="width:100%;min-height:44px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ approveOpacity }}">{{ approveLabel }}</button>
               <sc-if value="{{ showAssetAnswers }}" hint-placeholder-val="{{ false }}">
@@ -1951,7 +2008,7 @@
                 </div>
                 <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
                 <sc-if value="{{ attachLocked }}" hint-placeholder-val="{{ false }}">
-                  <div style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ attachLockedNote }}</div>
+                  <div class="mk-note" style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ attachLockedNote }}</div>
                 </sc-if>
                 <sc-for list="{{ attachDocRows }}" as="d" hint-placeholder-count="2">
                   <div style="display:flex;gap:10px;padding:11px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
@@ -2371,7 +2428,7 @@
       <sc-if value="{{ adminAssets }}" hint-placeholder-val="{{ false }}">
         <div style="max-width:720px">
           <sc-for list="{{ adminAssetRows }}" as="q" hint-placeholder-count="3">
-            <div style="border:1px solid rgba(var(--ink-rgb),0.16);border-left:3px solid {{ q.swatch }};padding:14px;margin-bottom:12px">
+            <div class="mk-note" style="border:1px solid rgba(var(--ink-rgb),0.16);border-left:3px solid {{ q.swatch }};padding:14px;margin-bottom:12px">
               <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
                 <input dir="auto" value="{{ q.label }}" onChange="{{ q.onLabel }}" style="flex:1;min-width:0;min-height:38px;padding:7px 10px;font-size:14px;font-weight:600;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 <button onClick="{{ q.removeQuestion }}" title="Remove question" style="width:28px;flex:none;font-size:16px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
@@ -2722,7 +2779,7 @@
             <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">{{ claimLastMove }}</div>
             <div style="font-size:12px;line-height:1.5;color:var(--ink-dim);margin-bottom:12px">One person allocates ticket numbers at a time. Whoever holds the claim numbers every job from the moment they receive it until they hand it on — that is what stops two managers issuing the same number onto two clients' sheets.</div>
             <sc-if value="{{ claimAdminOverride }}" hint-placeholder-val="{{ false }}">
-              <div style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ claimAdminOverrideText }}</div>
+              <div class="mk-note" style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ claimAdminOverrideText }}</div>
             </sc-if>
             <sc-if value="{{ claimCanTransfer }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ claimTransfer }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">{{ claimTransferLabel }}</button>
