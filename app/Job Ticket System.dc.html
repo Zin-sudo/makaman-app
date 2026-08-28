@@ -2575,6 +2575,26 @@
         </div>
       </sc-if>
 
+      <sc-if value="{{ adminCheck }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:760px">
+          <div class="mk-note" style="margin-bottom:14px;padding:10px 12px;font-size:12px;line-height:1.5;background:var(--accent-wash);border-left:3px solid var(--accent-deep);color:var(--accent-ink)">Read-only. Nothing here changes any data, so it is safe to run on the live system, and safe to run twice. It checks the things that can only be known from a browser — whether this build actually reaches the project, what the server says your capabilities are, and whether every price list arrived whole.</div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+            <button onClick="{{ runCheck }}" disabled="{{ checkBusy }}" style="padding:10px 18px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ checkOpacity }}">{{ checkLabel }}</button>
+            <sc-if value="{{ checkDone }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ copyCheck }}" style="padding:10px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.28)">Copy report</button>
+            </sc-if>
+            <div style="font-size:13px;color:{{ checkSummaryColor }}">{{ checkSummary }}</div>
+          </div>
+          <sc-for list="{{ checkRows }}" as="k" hint-placeholder-count="6">
+            <div style="display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px">
+              <span style="flex:none;width:16px;color:{{ k.mark }}">{{ k.glyph }}</span>
+              <span style="flex:none;min-width:190px;font-weight:600">{{ k.name }}</span>
+              <span style="flex:1;color:var(--ink-dim);word-break:break-word">{{ k.detail }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
@@ -6016,6 +6036,124 @@ class Component extends DCLogic {
   // the instant it starts moving, and a handler bound to the row would stop hearing about
   // it exactly when it matters. setPointerCapture would do the same job, but the capture
   // has to survive the runtime re-rendering the row under it, which it does not.
+  // Everything about this deploy that can only be known from a browser.
+  //
+  // The database side of going live can be checked from anywhere with SQL. What cannot is
+  // whether THIS build, on THIS device, actually talks to the project: the key, CORS, the
+  // auth round trip, what RLS hands back through PostgREST rather than through an
+  // impersonated SQL session, whether the storage links mint, whether the Edge Function
+  // is deployed. Somebody has to open it. This is so that somebody presses one button and
+  // pastes one block of text back, instead of working down a list and describing what
+  // they saw.
+  //
+  // Read-only. Nothing here writes, so it is safe to run against production at any time,
+  // and safe to run twice.
+  runSelfCheck() {
+    const out = [];
+    const add = (name, ok, detail) => { out.push({ name: name, ok: !!ok, detail: String(detail === undefined ? '' : detail) }); };
+    const c = sb();
+    const started = Date.now();
+
+    add('Build', true, BUILD);
+    add('Mode', USE_CLOUD, USE_CLOUD ? 'cloud' : 'LOCAL DEMO STORE — this build is not talking to Supabase at all');
+    try {
+      add('Project', !!CFG.supabaseUrl, CFG.supabaseUrl || '(none configured)');
+    } catch (e) { add('Project', false, 'config unreadable: ' + e.message); }
+    add('Service worker', typeof navigator !== 'undefined' && !!navigator.serviceWorker
+      && !!navigator.serviceWorker.controller, 'controller present');
+
+    if (!c || !USE_CLOUD) {
+      return Promise.resolve(out.concat([{ name: 'Everything below', ok: false,
+        detail: 'skipped — no Supabase client. Check config.js.' }]));
+    }
+
+    // Every check is wrapped, including the synchronous part of starting it. A diagnostic
+    // that throws is worse than no diagnostic — it turns "something is wrong" into a
+    // blank screen, which is the one answer that helps nobody. Whatever fails, the rest
+    // of the report still arrives and the failure is a line in it.
+    const step = (name, run, describe) => {
+      let started;
+      try { started = run(); } catch (e) { add(name, false, (e && e.message) || 'threw'); return Promise.resolve(); }
+      return Promise.resolve(started).then(
+        (r) => add(name, !r.error, r.error ? (r.error.message || 'failed') : describe(r)),
+        (e) => add(name, false, (e && e.message) || 'threw'));
+    };
+    const guard = (name, work) => {
+      try { return Promise.resolve(work()).catch((e) => add(name, false, (e && e.message) || 'threw')); }
+      catch (e) { add(name, false, (e && e.message) || 'threw'); return Promise.resolve(); }
+    };
+
+    return Promise.resolve()
+      // Can it reach the project at all?
+      .then(() => step('Reachable', () => c.from('clients').select('id').limit(1),
+        (r) => 'answered, ' + (r.data || []).length + ' row(s)'))
+      // Who does the server think this is? Not who the app thinks.
+      .then(() => (c.auth && typeof c.auth.getUser === 'function'
+        ? c.auth.getUser()
+        : Promise.resolve({ data: {} })).then(
+        (r) => {
+          const u = r && r.data && r.data.user;
+          add('Signed in (server)', !!u, u ? u.email + ' · ' + u.id : 'no Supabase session — the app may be on a stored local session');
+          return u;
+        },
+        (e) => { add('Signed in (server)', false, e.message); return null; }))
+      // The capability map, straight from the database function the gates read.
+      .then(() => step('Capabilities', () => c.rpc('my_permissions'),
+        (r) => (r.data ? Object.keys(r.data).length : 0) + ' capability keys resolved'))
+      // The one the field reported. Per customer, what the server holds against what this
+      // device actually received — which is the whole 2,610-row paging question.
+      .then(() => guard('Price lists complete', () => {
+        const local = (this.state.data.clients || []);
+        return Promise.all(local.map((cl) =>
+          c.from('price_list_items').select('id', { count: 'exact', head: true })            // cl.id IS the server's uuid — shapeClient carries it straight through.
+            .eq('client_id', cl.id)
+            // A count the server did not give is null, never a number. Subtracting an
+            // undefined from a length yields NaN, and "short by NaN" is exactly the kind
+            // of plausible-looking nonsense a diagnostic must never print — it reads as a
+            // finding when it is an absence of one.
+            .then((r) => ({ name: cl.name, server: (typeof r.count === 'number' ? r.count : null), got: (cl.items || []).length }),
+                  () => ({ name: cl.name, server: null, got: (cl.items || []).length }))
+        )).then((rows) => {
+          const bad = rows.filter((x) => x.server !== null && x.server !== x.got);
+          rows.forEach((x) => add('  ' + x.name, x.server === null || x.server === x.got,
+            x.server === null ? x.got + ' held, server count unavailable' : x.got + ' of ' + x.server));
+          const unknown = rows.filter((x) => x.server === null).length;
+          add('Price lists complete', bad.length === 0,
+            bad.length ? bad.map((x) => x.name + ' short by ' + (x.server - x.got)).join('; ')
+              : (unknown ? 'could not verify ' + unknown + ' of ' + rows.length + ' customers — server count unavailable'
+                         : rows.reduce((n, x) => n + x.got, 0) + ' items across ' + rows.length + ' customers'));
+        });
+      }))
+      // What RLS lets this person see, as PostgREST applies it.
+      .then(() => c.from('tickets').select('id', { count: 'exact', head: true }).then(
+        (r) => add('Tickets visible', !r.error, r.error ? r.error.message : r.count + ' ticket(s) under RLS'),
+        (e) => add('Tickets visible', false, e.message)))
+      // Storage, if there is anything to mint a link for.
+      .then(() => guard('Signed file links', () => {
+        const withFile = (this.state.data.tickets || [])
+          .reduce((f, t) => f || ((t.attachments || [])[0] || null), null);
+        if (!withFile || !withFile.path) { add('Signed file links', true, 'no attachment on this device to test'); return; }
+        return c.storage.from('attachments').createSignedUrl(withFile.path, 60).then(
+          (r) => add('Signed file links', !r.error && !!(r.data || {}).signedUrl,
+            r.error ? r.error.message : 'minted, expires in 60s'),
+          (e) => add('Signed file links', false, e.message));
+      }))
+      // The Edge Function. An unauthenticated shape must be refused, not accepted.
+      .then(() => guard('Edge function', () => {
+        const base = CFG.supabaseUrl;
+        if (!base) return;
+        return fetch(base + '/functions/v1/admin-actions', { method: 'POST',
+          headers: { 'content-type': 'application/json' }, body: '{}' })
+          .then((r) => add('Edge function', r.status >= 400 && r.status < 500,
+            'deployed, refuses an unauthenticated call with ' + r.status),
+                (e) => add('Edge function', false, 'unreachable: ' + e.message));
+      }))
+      .then(() => {
+        add('Elapsed', true, (Date.now() - started) + ' ms');
+        return out;
+      });
+  }
+
   startItemDrag(ev, ticketId, from) {
     if (typeof document === 'undefined') return;
     // Stops the press turning into a text selection or a page scroll on the way.
@@ -8057,6 +8195,7 @@ class Component extends DCLogic {
             tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
             tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
+            tile('Self-check', 'Is this build really talking to the server?', 'system', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('check')),
             settings,
           ];
         }
@@ -9255,7 +9394,7 @@ class Component extends DCLogic {
       // showing rather than repeating the whole menu above it.
       adminToolTitle: { price: 'Price Lists', numbers: 'Numbering & Job Types',
         people: 'Users & Customers', system: 'System', assets: 'Closing Questions',
-        perms: 'Permissions' }[S.adminTab] || 'Admin',
+        perms: 'Permissions', check: 'Self-check' }[S.adminTab] || 'Admin',
       adminToolHint: {
         price: 'Priced items per customer — changes apply to new ticket lines only.',
         assets: 'What a technician is asked about allocated tools when they close a job.',
@@ -9263,8 +9402,46 @@ class Component extends DCLogic {
         people: 'Accounts, roles and the customer register.',
         system: 'Charging rules and the danger zone.',
         perms: 'What each person may do. A role sets the default; a tick here overrides it for one person.',
+        check: 'What only a browser can tell you: whether this build really reaches the project, and whether everything arrived.',
       }[S.adminTab] || '',
       backToAccount: () => this.setState({ roleTab: 'account', adminTab: null }),
+      adminCheck: S.adminTab === 'check',
+      checkBusy: !!S.checkBusy,
+      checkOpacity: S.checkBusy ? 0.5 : 1,
+      checkLabel: S.checkBusy ? 'Checking…' : ((S.checkRows || []).length ? 'Run again' : 'Run checks'),
+      checkDone: (S.checkRows || []).length > 0,
+      checkRows: (S.checkRows || []).map((k) => ({
+        name: k.name, detail: k.detail,
+        glyph: k.ok ? '\u2713' : '\u2717',
+        mark: k.ok ? 'var(--success)' : 'var(--danger)',
+      })),
+      checkSummary: (() => {
+        const rows = S.checkRows || [];
+        if (!rows.length) return '';
+        const bad = rows.filter((k) => !k.ok).length;
+        return bad ? bad + ' problem' + (bad === 1 ? '' : 's') + ' found' : 'all ' + rows.length + ' checks passed';
+      })(),
+      checkSummaryColor: (S.checkRows || []).some((k) => !k.ok) ? 'var(--danger)' : 'var(--success-ink)',
+      runCheck: () => {
+        if (S.checkBusy) return;
+        this.setState({ checkBusy: true, checkRows: [] });
+        this.runSelfCheck()
+          .then((rows) => this.setState({ checkRows: rows, checkBusy: false }))
+          .catch((err) => this.setState({ checkBusy: false, checkRows: [
+            { name: 'Self-check', ok: false, detail: (err && err.message) || 'threw' }] }));
+      },
+      copyCheck: () => {
+        const rows = S.checkRows || [];
+        const text = ['Makaman self-check — ' + new Date().toISOString()]
+          .concat(rows.map((k) => (k.ok ? '[ok]  ' : '[FAIL] ') + k.name + ': ' + k.detail))
+          .join('\n');
+        const done = () => this.toast('selfcheck', 'Report copied — paste it back.', 'ok');
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, () => this.setState({ checkFallback: text }));
+          } else { this.setState({ checkFallback: text }); }
+        } catch (e) { this.setState({ checkFallback: text }); }
+      },
       adminPrice: S.adminTab === 'price', adminNumbers: S.adminTab === 'numbers',
       adminPeople: S.adminTab === 'people', adminSystem: S.adminTab === 'system',
       adminAssets: S.adminTab === 'assets', adminPerms: S.adminTab === 'perms',

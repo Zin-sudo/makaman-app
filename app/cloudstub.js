@@ -90,8 +90,10 @@ window.supabase = {
     function q(table) {
       var rows = db[table] || (db[table] = []);
       var api = {
-        select: function () {
+        select: function (cols, opts) {
           var filtered = rows.slice();
+          var wantCount = !!(opts && opts.count);
+          var head = !!(opts && opts.head);
           var chain = {
             eq: function (col, val) { filtered = filtered.filter(function (r) { return r[col] === val; }); return chain; },
             // The app orders and limits the export_runs lookup. Both are called
@@ -130,7 +132,13 @@ window.supabase = {
                 : { data: null, error: { message: 'no rows' } });
             },
             then: function (ok, no) {
-              return (window.__offline ? fail() : Promise.resolve({ data: filtered, error: null })).then(ok, no);
+              // head:true asks for the tally and no rows. The self-check compares that
+              // tally against what the device holds, so a stub that ignored it would
+              // hand the app undefined and let it report a shortfall of NaN.
+              var body = wantCount
+                ? { data: head ? null : filtered, count: filtered.length, error: null }
+                : { data: filtered, error: null };
+              return (window.__offline ? fail() : Promise.resolve(body)).then(ok, no);
             },
           };
               // Anything the app calls that this stub has not learned yet is named out loud.
@@ -223,11 +231,21 @@ window.supabase = {
         signInWithPassword: function (c) {
           if (window.__offline) return fail();
           var p = db.profiles.filter(function (r) { return r.email === c.email; })[0];
+          if (p) window.__stubUser = p.id;
           return Promise.resolve(p
             ? { data: { user: { id: p.id } }, error: null }
             : { error: { message: 'Invalid login credentials' } });
         },
         signOut: function () { return Promise.resolve({ error: null }); },
+        // Who the SERVER says is signed in, which is the question the self-check asks and
+        // a different question from who the app believes. Remembers whoever last signed
+        // in, so a report can be checked against the account that produced it.
+        getUser: function () {
+          var p = window.__stubUser
+            ? db.profiles.filter(function (r) { return r.id === window.__stubUser; })[0]
+            : null;
+          return Promise.resolve({ data: { user: p ? { id: p.id, email: p.email } : null }, error: null });
+        },
         signUp: function () { return Promise.resolve({ data: {}, error: null }); },
       },
       storage: {
