@@ -134,7 +134,9 @@
        labels, hairline rules, a printed form at the end of it — and the 12-20px radii
        the reference theme asks for belong to a softer identity than this one. Dialling
        the whole app up or back to square is these three values. */
-    --radius-sm:4px; --radius:6px; --radius-lg:10px;
+    /* 8px on anything you type into or read a value out of — the user's pick, and one
+       value so a field, a read-only value box and the arrival stamp cannot drift apart. */
+    --radius-sm:8px; --radius:6px; --radius-lg:10px;
   }
   /* Night Shift — the palette from the reference screenshots. Near-black ground, one
      lifted card surface, and saturated hues that carry meaning rather than decoration. */
@@ -402,6 +404,13 @@
     box-sizing:border-box;
   }
   .mk-sheet *, .mk-sheet *::before, .mk-sheet *::after { box-sizing:border-box; }
+  /* Corners, stated rather than assumed.
+     The lock above restates every INHERITED property the sheet's contents depend on —
+     but border-radius is not inherited, so it was never in scope, and the seal held only
+     because no rule happened to reach in. That is luck, not a seal. This is a client
+     document printed on paper: its boxes are square, and a future restyle of the app
+     around it must not be able to round them. */
+  .mk-sheet, .mk-sheet * { border-radius:0 !important; }
   .mk-sheet * { color:inherit; }
   /* Cells that deliberately carry their own muted or accent ink keep it. */
   .mk-sheet [style*="color:rgba(29,31,32"],
@@ -521,7 +530,11 @@
      them were not, and had no focus state at all beyond the browser's default outline —
      which several browsers draw invisibly against a dark ground. A technician wearing
      gloves, tapping between fields on a phone in the sun, needs to see where he is. */
-  input, select, textarea {
+  /* Anything that reads as a field takes the field's shape, whether it is one or not.
+     The technician's name and the stamped arrival are divs — you cannot type in them —
+     but they sit in the same column as the inputs, and a square box between two rounded
+     ones reads as a mistake. */
+  input, select, textarea, .mk-readonly {
     border-radius:var(--radius-sm);
   }
   input:focus-visible, select:focus-visible, textarea:focus-visible,
@@ -980,14 +993,14 @@
             <sc-if value="{{ techNew }}" hint-placeholder-val="{{ true }}">
               <button onClick="{{ backToList }}" class="back-btn">‹ Cancel</button>
               <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0 0 12px">New Job Ticket</h2>
-              <div style="padding:11px 12px;border:1px solid var(--accent);background:var(--accent-wash);margin-bottom:16px">
+              <div class="mk-readonly" style="padding:11px 12px;border:1px solid var(--accent);background:var(--accent-wash);margin-bottom:16px">
                 <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--accent-deep)">Arrival to location — stamped</div>
                 <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;color:var(--ink-strong)">{{ draftArrival }}</div>
               </div>
               <div style="display:flex;flex-direction:column;gap:13px">
                 <div>
                   <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Technician</label>
-                  <div style="width:100%;min-height:46px;padding:12px 11px;font-size:15px;background:rgba(var(--ink-rgb),0.06);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink-dim)">{{ d.tech }}</div>
+                  <div class="mk-readonly" style="width:100%;min-height:46px;padding:12px 11px;font-size:15px;background:rgba(var(--ink-rgb),0.06);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink-dim)">{{ d.tech }}</div>
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
