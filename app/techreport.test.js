@@ -35,7 +35,7 @@ async function signIn(ctx, email, fresh) {
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(400);
   await p.evaluate(() => {
-    const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px');
+    const t = document.querySelector('.mk-switch');
     if (t) { t.click(); t.click(); }
   });
   await p.waitForTimeout(500);

@@ -42,8 +42,7 @@ const forcePersist = async (p) => {
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(400);
   await p.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('button'));
-    const t = btns.find(b => b.style.width === '42px');
+    const t = document.querySelector('.mk-switch');
     if (t) { t.click(); t.click(); }
   });
   await p.waitForTimeout(400);

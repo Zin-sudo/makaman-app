@@ -32,7 +32,7 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   let p = await signIn(ctx, 'yousef@makaman.ly', true);
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(400);
-  await p.evaluate(() => { const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px'); if (t) { t.click(); t.click(); } });
+  await p.evaluate(() => { const t = document.querySelector('.mk-switch'); if (t) { t.click(); t.click(); } });
   await p.waitForTimeout(500);
   await p.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));

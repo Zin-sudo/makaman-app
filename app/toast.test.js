@@ -79,7 +79,7 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   await tab(p, 'Account');
   const knob = () => p.locator('button').filter({ hasText: '' }).nth(0);
   const flip = async () => {
-    await p.evaluate(() => { const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px'); t.click(); });
+    await p.evaluate(() => { const t = document.querySelector('.mk-switch'); t.click(); });
     await p.waitForTimeout(350);
   };
   await flip(); // on -> off

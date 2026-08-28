@@ -30,7 +30,7 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await setup.getByRole('button', { name: /^Account$/i }).last().click();
   await setup.waitForTimeout(400);
   await setup.evaluate(() => {
-    const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px');
+    const t = document.querySelector('.mk-switch');
     if (t) { t.click(); t.click(); }
   });
   await setup.waitForTimeout(500);
@@ -131,7 +131,7 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await hi.nth(0).fill('yousef@makaman.ly'); await hi.nth(1).fill('makaman2026');
   await h.getByRole('button', { name: /log in/i }).click(); await h.waitForTimeout(900);
   await h.getByRole('button', { name: /^Account$/i }).last().click(); await h.waitForTimeout(400);
-  await h.evaluate(() => { const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px'); if (t) { t.click(); t.click(); } });
+  await h.evaluate(() => { const t = document.querySelector('.mk-switch'); if (t) { t.click(); t.click(); } });
   await h.waitForTimeout(500);
   await h.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));

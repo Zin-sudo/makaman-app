@@ -32,7 +32,7 @@ async function signIn(ctx, email) {
 }
 // By its title, never its position — the first button in the app bar is the role swap,
 // and an early version of this test swapped the user's role instead of opening a panel.
-const bell = (p) => p.locator('.mk-appbar button[title]').filter({ hasText: '◉' }).first();
+const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
 
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });

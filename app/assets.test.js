@@ -39,7 +39,7 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   const seeder = await signIn(ctx, 'yousef@makaman.ly');
   await seeder.getByRole('button', { name: /^Account$/i }).last().click();
   await seeder.waitForTimeout(400);
-  await seeder.evaluate(() => { const t = Array.from(document.querySelectorAll('button')).find(x => x.style.width === '42px'); if (t) { t.click(); t.click(); } });
+  await seeder.evaluate(() => { const t = document.querySelector('.mk-switch'); if (t) { t.click(); t.click(); } });
   await seeder.waitForTimeout(500);
   await seeder.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));
