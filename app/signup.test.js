@@ -29,31 +29,31 @@ async function fresh(b) {
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 
-  // ── The field exists, and offers the right things ────────────────────────
+  // ── There is no role to ask for, and that is deliberate ──────────────────
+  //
+  // A "joining as" selector was built and then removed (user, 2026-08-28): everyone signs
+  // up as a Field Technician and the office promotes afterwards. The suite guards the
+  // removal rather than dropping the case, because the selector's whole point was that it
+  // could not grant anything — and a control that looks like it decides something it does
+  // not is worse than no control.
   {
     const { ctx, p } = await fresh(b);
     await p.getByText(/Sign up/i).first().click();
     await p.waitForTimeout(600);
-    const opts = await p.evaluate(() => {
-      const sel = document.querySelector('select');
-      return sel ? Array.from(sel.options).map(o => o.value + ':' + o.text) : null;
-    });
-    check('the signup card asks what you are joining as', !!opts, JSON.stringify(opts));
-    check('it offers technician, ops manager and observer',
-      JSON.stringify(opts) === JSON.stringify(['tech:Field Technician', 'mgr:Operations Manager', 'founder:Observer']),
-      JSON.stringify(opts));
-    check('and does not offer Admin — nobody applies for that',
-      !opts.some(o => /admin/i.test(o)));
-    check('Field Technician is what it starts on',
-      await p.evaluate(() => document.querySelector('select').value) === 'tech');
-    check('the card no longer promises a technician account in its heading',
-      /Request an account/i.test(await p.evaluate(() => document.body.innerText)));
-    check('and says plainly that the office confirms it',
-      /office confirms this when it approves/i.test(await p.evaluate(() => document.body.innerText)));
+    check('the signup card offers no role to choose',
+      await p.evaluate(() => document.querySelectorAll('select').length) === 0);
+    check('it says plainly what the account will be',
+      /Sign up as Field Technician/i.test(await p.evaluate(() => document.body.innerText)));
+    check('and that the office changes it afterwards if needed',
+      /office will change it after approving you/i.test(await p.evaluate(() => document.body.innerText)));
+    check('it asks for a name, an email and a password twice',
+      JSON.stringify(await p.evaluate(() =>
+        Array.from(document.querySelectorAll('input')).map(x => x.type)))
+        === JSON.stringify(['text', 'email', 'password', 'password']));
     await ctx.close();
   }
 
-  // ── Asking for Ops Manager does not make you one ─────────────────────────
+  // ── Signing up creates a pending technician, and nothing more ────────────
   {
     const { ctx, p } = await fresh(b);
     await p.getByText(/Sign up/i).first().click();
@@ -63,7 +63,6 @@ async function fresh(b) {
     await i.nth(1).fill('nabil@makaman.ly');
     await i.nth(2).fill('sabratha-rig-77');
     await i.nth(3).fill('sabratha-rig-77');
-    await p.locator('select').selectOption('mgr');
     await p.getByRole('button', { name: /Request account/i }).click();
     await p.waitForTimeout(1200);
 
@@ -73,9 +72,10 @@ async function fresh(b) {
     });
     check('the account is created', !!made, JSON.stringify(made));
     check('it is pending, not active', made.status === 'pending', made.status);
-    check('it holds NO role — asking is not being granted',
+    check('it holds NO role until somebody grants one',
       made.roleKey === null || made.roleKey === undefined, JSON.stringify(made.roleKey));
-    check('but what was asked for is kept', made.requested === 'mgr', made.requested);
+    check('and it records the only thing anyone can sign up as',
+      made.requested === 'tech', String(made.requested));
     await ctx.close();
   }
 
@@ -89,7 +89,6 @@ async function fresh(b) {
     await i.nth(1).fill('nabil@makaman.ly');
     await i.nth(2).fill('sabratha-rig-77');
     await i.nth(3).fill('sabratha-rig-77');
-    await p.locator('select').selectOption('mgr');
     await p.getByRole('button', { name: /Request account/i }).click();
     await p.waitForTimeout(1200);
 
@@ -103,10 +102,10 @@ async function fresh(b) {
     await p.evaluate(() => window.__mkApp.setState({ mgrScreen: 'team', roleTab: 'tickets' }));
     await p.waitForTimeout(900);
     const seen = await p.evaluate(() => document.body.innerText);
-    check('the approver is told what the applicant asked for',
-      /Asked to join as Operations Manager/i.test(seen),
-      (seen.match(/Asked to join as[^\n]*/) || ['(nothing)'])[0]);
-    check('and the row still shows the account as Pending', /Pending/i.test(seen));
+    check('the row shows the account as Pending', /Pending/i.test(seen));
+    check('and claims no role on their behalf',
+      !/Asked to join as/i.test(seen),
+      (seen.match(/Asked to join as[^\n]*/) || ['(nothing, as intended)'])[0]);
 
     // Approving still makes a technician — the request did not decide anything.
     // The control reads "Approve -> Technician", which already says what it does.
@@ -119,7 +118,7 @@ async function fresh(b) {
     check('approving activates the account', after.status === 'active', after.status);
     check('as a Field Technician, whatever was asked for',
       after.roleKey === 'tech', after.roleKey);
-    check('and the request line goes once it is no longer a question',
+    check('and stays a technician until the office says otherwise',
       !/Asked to join as/i.test(await p.evaluate(() => document.body.innerText)));
     await ctx.close();
   }

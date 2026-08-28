@@ -35,7 +35,13 @@ const tab = async (p, name) => {
   // ---- Technician ----
   let p = await signIn(browser, 'yousef@makaman.ly', 430, 950);
   let body = await tab(p, 'Account');
-  check('tech Account shows profile', /Name/.test(body) && /yousef@makaman\.ly/.test(body) && /Ahmadi Base/.test(body));
+  // "Ahmadi Base" was a literal in the display shaper, not a place — every profile in the
+  // company read the same hardcoded string. It is real data now, with two bases and a
+  // default that follows the role, so the assertion checks the technician sees the one he
+  // actually works out of rather than a string that was the same for everybody.
+  check('tech Account shows profile', /Name/.test(body) && /yousef@makaman\.ly/.test(body)
+    && /MKN Operations Base/.test(body),
+    (body.match(/MKN [A-Za-z ]+/) || ['no base shown'])[0]);
   check('tech Account surfaces the location toggle', /Share my position/.test(body));
   body = await tab(p, 'Sync');
   check('tech Sync is about this device', !/Field devices/.test(body));

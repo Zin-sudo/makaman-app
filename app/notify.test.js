@@ -38,16 +38,37 @@ const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 
   // ── The count is the list ──
+  //
+  // The unread set is built AFTER signing in, deliberately. Signing in for the first time
+  // now stamps `notificationsReadAt`, because an account created this week opening the app
+  // to 38 notifications about jobs that finished before it existed is not a notification
+  // system, it is a backlog. So "what is unread" can only mean "what happened since you
+  // arrived", and a test that leans on the company's history being unread is testing the
+  // bug. These four entries are written by somebody else, after sign-in — which is the
+  // only thing that has ever legitimately produced a badge.
   {
     const ctx = await b.newContext();
     const p = await signIn(ctx, 'omar@makaman.ly');
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      const t = app.state.data.tickets[0];
+      app.mutate((d) => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.audit = x.audit || [];
+        for (let i = 1; i <= 4; i++) {
+          x.audit.push({ ts: new Date(Date.now() + i * 1000).toISOString(), kind: 'lifecycle',
+            by: 'Someone Else', text: 'A job stage moved, number ' + i + '.' });
+        }
+      });
+    });
+    await p.waitForTimeout(400);
     const n = await p.evaluate(() => ({
       unread: window.__mkApp.unreadEntries().length,
       activity: window.__mkApp.activityEntries().length,
       badge: (Array.from(document.querySelectorAll('.mk-appbar button span'))
         .map(s => s.textContent.trim()).filter(t => /^\d+$/.test(t))[0]) || null,
     }));
-    check('there is something unread to show', n.unread > 0, n.unread + ' of ' + n.activity);
+    check('there is something unread to show', n.unread === 4, n.unread + ' of ' + n.activity);
     check('the badge shows exactly that number', String(n.unread) === n.badge,
       'badge ' + n.badge + ' vs ' + n.unread);
 
@@ -84,6 +105,28 @@ const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
     await ctx.close();
   }
 
+  // ── Signing in for the first time is not news ──
+  //
+  // The reported fault, kept as a rule: a real Ops Manager created this week opened the
+  // app to 38 unread notifications, every one of them about a job that was over before
+  // his account existed. Arriving marks everything before you as read.
+  {
+    const ctx = await b.newContext();
+    const p = await signIn(ctx, 'omar@makaman.ly');
+    const r = await p.evaluate(() => ({
+      unread: window.__mkApp.unreadEntries().length,
+      history: window.__mkApp.activityEntries().length,
+      mark: ((window.__mkApp.state.data || {}).settings || {}).notificationsReadAt || '',
+      badge: (Array.from(document.querySelectorAll('.mk-appbar button span'))
+        .map(s => s.textContent.trim()).filter(t => /^\d+$/.test(t))[0]) || null,
+    }));
+    check('there IS a history behind the new account', r.history > 0, r.history + ' entries');
+    check('and none of it arrives as unread', r.unread === 0, r.unread + ' unread');
+    check('because arriving sets the mark', /^\d{4}-/.test(r.mark), r.mark);
+    check('so the bell carries no number', r.badge === null, 'badge ' + r.badge);
+    await ctx.close();
+  }
+
   // ── Nobody is told what they did themselves ──
   {
     const ctx = await b.newContext();
@@ -115,6 +158,19 @@ const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
   {
     const ctx = await b.newContext();
     const p = await signIn(ctx, 'omar@makaman.ly');
+    // Something to read, first — otherwise this asserts that zero stays zero.
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      const t = app.state.data.tickets[0];
+      app.mutate((d) => {
+        const x = d.tickets.find(y => y.id === t.id);
+        (x.audit = x.audit || []).push({ ts: new Date(Date.now() + 1000).toISOString(),
+          kind: 'lifecycle', by: 'Someone Else', text: 'A job stage moved.' });
+      });
+    });
+    await p.waitForTimeout(300);
+    const unreadFirst = await p.evaluate(() => window.__mkApp.unreadEntries().length);
+    check('there is something to mark read', unreadFirst > 0, String(unreadFirst));
     await bell(p).click();
     await p.waitForTimeout(400);
     const before = await p.evaluate(() => window.__mkApp.activityEntries().length);
@@ -157,8 +213,13 @@ const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
       const t = app.state.data.tickets[0];
       app.mutate((d) => {
         const x = d.tickets.find(y => y.id === t.id);
-        (x.audit = x.audit || []).push({ ts: new Date().toISOString(), kind: 'edit',
+        x.audit = x.audit || [];
+        // One of each, both by somebody else and both after this session began — so the
+        // filter has a real choice to make rather than an empty list to agree with.
+        x.audit.push({ ts: new Date(Date.now() + 1000).toISOString(), kind: 'edit',
           by: 'Omar Al-Saleh', text: 'Changed a price after approval.' });
+        x.audit.push({ ts: new Date(Date.now() + 2000).toISOString(), kind: 'lifecycle',
+          by: 'Omar Al-Saleh', text: 'Ticket approved.' });
       });
       return {
         deep: app.hasPermission('activity.view_edits'),
@@ -170,7 +231,8 @@ const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
     check('and is not notified about an edit', !r.sawTheEdit,
       'kinds seen: ' + r.unreadKinds.join(','));
     check('while still being notified about job stages',
-      r.unreadKinds.every(k => k === 'lifecycle'), r.unreadKinds.join(','));
+      r.unreadKinds.length > 0 && r.unreadKinds.every(k => k === 'lifecycle'),
+      r.unreadKinds.join(',') || 'nothing at all');
     await ctx.close();
   }
 

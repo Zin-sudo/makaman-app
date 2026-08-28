@@ -28,11 +28,21 @@ async function boot(b, email) {
   await p.waitForTimeout(1500);
   return { ctx, p };
 }
+// The screen now opens on a prompt rather than on whichever customer happened to be
+// first — "here is Waha's price list" was the wrong answer to give somebody who came to
+// look at Zueitina's. So picking one is part of getting to the table.
 const openPrices = async (p) => {
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(600);
   await p.getByText(/^Price Lists$/i).first().click();
   await p.waitForTimeout(800);
+  const sel = p.locator('select').first();
+  const first = await p.evaluate(() => {
+    const s = document.querySelector('select');
+    const opt = Array.from(s.options).find(o => o.value);
+    return opt ? opt.value : '';
+  });
+  if (first) { await sel.selectOption(first); await p.waitForTimeout(700); }
 };
 // Read live state, not localStorage: the store is only written after an interaction, so
 // a fresh screen reads as an empty price list when it is nothing of the kind.

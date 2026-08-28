@@ -773,7 +773,7 @@
 
       <sc-if value="{{ authIsSignup }}" hint-placeholder-val="{{ false }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Request an account</h2>
+          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Full name</div>
           <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
@@ -782,17 +782,7 @@
           <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Confirm password</div>
           <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
-          <!-- What you are asking to be, not what you become. The account is created as a
-               pending Field Technician whatever is chosen here; this is shown to whoever
-               approves it so they do not have to ring round asking who somebody is.
-               Admin is deliberately absent: nobody applies for it. -->
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin:10px 0 4px">Joining as</div>
-          <select value="{{ authRole }}" onChange="{{ f.authRole }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
-            <option value="tech">Field Technician</option>
-            <option value="mgr">Operations Manager</option>
-            <option value="founder">Observer</option>
-          </select>
-          <div style="font-size:12px;color:var(--ink-faint);line-height:1.45;margin-bottom:6px">The office confirms this when it approves your account. Everyone starts as a Field Technician until then.</div>
+          <div class="mk-note" style="margin:12px 0 4px;padding:9px 11px;font-size:12px;line-height:1.45;background:var(--accent-wash);border-left:3px solid var(--accent-deep);color:var(--accent-ink)">Accounts are created as Field Technician. If you should be an Operations Manager or an Observer, the office will change it after approving you.</div>
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
           </sc-if>
@@ -878,7 +868,7 @@
       <div class="mk-nav-title" style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
     <sc-if value="{{ showBarFix }}" hint-placeholder-val="{{ true }}">
-      <div class="mk-nav-fix" onPointerDown="{{ holdCopyStart }}" onPointerUp="{{ holdCopyCancel }}" onPointerLeave="{{ holdCopyCancel }}" onPointerCancel="{{ holdCopyCancel }}" onContextMenu="{{ swallowMenu }}" title="{{ barFixHint }}" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">
+      <div class="mk-nav-fix" onClick="{{ barFixRetry }}" onPointerDown="{{ holdCopyStart }}" onPointerUp="{{ holdCopyCancel }}" onPointerLeave="{{ holdCopyCancel }}" onPointerCancel="{{ holdCopyCancel }}" onContextMenu="{{ swallowMenu }}" title="{{ barFixHint }}" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;opacity:{{ barFixDim }}">
         <span class="mk-nav-fix-label" style="opacity:0.55;text-transform:uppercase;font-size:10px;letter-spacing:0.06em">Position</span>
         <span style="font-weight:600">{{ barFixText }}</span>
       </div>
@@ -1749,6 +1739,12 @@
                           <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
                             <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
                           </sc-if>
+                          <sc-if value="{{ u.canSetPassword }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.setPassword }}" title="Give this account a new password and tell them what it is" style="padding:5px 8px;font-size:11px;color:var(--ink-dim);background:none;border:1px solid rgba(var(--ink-rgb),0.3);cursor:pointer">Set password</button>
+                          </sc-if>
+                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.remove }}" title="Delete this account for good — only possible if they have never done any work" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.4);cursor:pointer">Delete</button>
+                          </sc-if>
                         </div>
                       </sc-if>
                     </td>
@@ -1778,6 +1774,19 @@
 
       <sc-if value="{{ mgrReview }}" hint-placeholder-val="{{ true }}">
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
+        <!-- Save changes.
+             The edits are already on the device — every field writes straight through, so
+             a dying battery costs nothing. What this adds is the two things the office
+             asked for: a control that says the work is IN and has gone up to the server,
+             and a state you can see at a glance. It is inert until something actually
+             differs from the ticket as it was opened, so a screen with nothing to save
+             cannot be mistaken for one that has been saved. -->
+        <sc-if value="{{ showReviewSave }}" hint-placeholder-val="{{ true }}">
+          <div class="mk-savebar" style="display:flex;align-items:center;gap:12px;margin:-4px 0 14px">
+            <button onClick="{{ saveReview }}" disabled="{{ reviewSaveOff }}" class="mk-save-btn" style="padding:9px 18px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:{{ reviewSaveCursor }};background:{{ reviewSaveBg }};color:{{ reviewSaveFg }};border:1px solid {{ reviewSaveBorder }};opacity:{{ reviewSaveDim }}">{{ reviewSaveLabel }}</button>
+            <span style="font-size:12px;color:{{ reviewSaveNoteFg }}">{{ reviewSaveNote }}</span>
+          </div>
+        </sc-if>
         <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:18px">
           <div>
             <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">{{ cur.customer }} <span style="color:var(--ink-faint)">· {{ cur.well }}</span></h2>
@@ -2369,6 +2378,7 @@
           <div style="width:280px;max-width:100%">
             <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Customer price list</label>
             <select value="{{ adminClient }}" onChange="{{ f.adminClient }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+              <option value="">Select customer to show price list…</option>
               <sc-for list="{{ clientNames }}" as="c" hint-placeholder-count="3">
                 <option value="{{ c.name }}">{{ c.name }}</option>
               </sc-for>
@@ -2380,6 +2390,10 @@
           </sc-if>
           <button onClick="{{ addPriceRow }}" disabled="{{ priceReadOnly }}" style="margin-left:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add item</button>
         </div>
+        <sc-if value="{{ noPriceClient }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:26px 14px;text-align:center;font-size:13px;color:var(--ink-faint);border:1px solid rgba(var(--ink-rgb),0.16)">Choose a customer above to see their priced items.</div>
+        </sc-if>
+        <sc-if value="{{ hasPriceClient }}" hint-placeholder-val="{{ true }}">
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead>
@@ -2408,6 +2422,7 @@
             </tbody>
           </table>
         </div>
+        </sc-if>
       </sc-if>
 
       <sc-if value="{{ adminNumbers }}" hint-placeholder-val="{{ false }}">
@@ -2500,6 +2515,12 @@
                           </select>
                           <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
                             <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
+                          </sc-if>
+                          <sc-if value="{{ u.canSetPassword }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.setPassword }}" title="Give this account a new password and tell them what it is" style="padding:5px 8px;font-size:11px;color:var(--ink-dim);background:none;border:1px solid rgba(var(--ink-rgb),0.3);cursor:pointer">Set password</button>
+                          </sc-if>
+                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
+                            <button onClick="{{ u.remove }}" title="Delete this account for good — only possible if they have never done any work" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.4);cursor:pointer">Delete</button>
                           </sc-if>
                         </div>
                       </sc-if>
@@ -2986,7 +3007,17 @@
         <sc-if value="{{ dialog.needsReason }}" hint-placeholder-val="{{ false }}">
           <textarea dir="auto" value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="{{ dialog.reasonHint }}" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
         </sc-if>
-        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:6px">
+        <sc-if value="{{ dialog.needsPassword }}" hint-placeholder-val="{{ false }}">
+          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" placeholder="New password — at least 8 characters" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" placeholder="Confirm it" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+          <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:var(--danger)">{{ pwError }}</div>
+          </sc-if>
+        </sc-if>
+        <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:6px">
+          <sc-if value="{{ dialog.hasThird }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ dialog.third }}" style="margin-right:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid var(--danger)">{{ dialog.thirdLabel }}</button>
+          </sc-if>
           <sc-if value="{{ dialog.hasCancel }}" hint-placeholder-val="{{ true }}">
             <button onClick="{{ dialog.cancel }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:{{ dialog.cancelFg }};border:1px solid {{ dialog.cancelBorder }}">{{ dialog.cancelLabel }}</button>
           </sc-if>
@@ -3131,6 +3162,12 @@ const RECOVERY_LINK = (function () {
 // paperwork that has already gone.
 const SETTLED_STATES = ['approved', 'sent_client', 'sent_finance'];
 const SETTLED_RANK = (st) => SETTLED_STATES.indexOf(st);
+// The two places the company works out of. Constrained in the database as well, so a
+// second spelling of the same yard cannot split a report that groups by it.
+const BASES = ['MKN Operations Base', 'MKN Headquarters'];
+// The field and the office that dispatches it work out of Operations; the admin and the
+// observer sit at Headquarters. A default, not a rule — anybody can be posted elsewhere.
+const DEFAULT_BASE_FOR = { tech: BASES[0], mgr: BASES[0], admin: BASES[1], founder: BASES[1] };
 const ROLE_FROM_DB = { technician: 'tech', ops_manager: 'mgr', admin: 'admin', founder: 'founder' };
 const ROLE_TO_DB = { tech: 'technician', mgr: 'ops_manager', admin: 'admin', founder: 'founder' };
 const ROLE_LABEL = { tech: 'Field Technician', mgr: 'Operations Manager', admin: 'Admin', founder: 'Observer' };
@@ -3321,7 +3358,11 @@ function shapeUser(p) {
   const key = ROLE_FROM_DB[p.role] || 'tech';
   return {
     id: p.id, name: p.full_name || p.email, email: p.email, roleKey: key,
-    role: ROLE_LABEL[key], base: 'Ahmadi Base', lastSync: '', status: p.status,
+    // Read from the profile. This was the literal 'Ahmadi Base' for every person in the
+    // company — a testing value that had quietly become the answer the Team screen gave
+    // about everybody, with no way to correct it because there was nothing behind it.
+    role: ROLE_LABEL[key], base: p.base || DEFAULT_BASE_FOR[key] || BASES[0],
+    lastSync: '', status: p.status,
   };
 }
 function shapeClient(c, items) {
@@ -3687,6 +3728,50 @@ function hydrate() {
 //
 // A failed op stays queued and is retried on the next drain. It does not block the ops
 // behind it from being tried, but it does keep its place, so nothing overtakes it.
+// Tickets already stranded on a device by the id bug.
+//
+// Fixing the generator only helps tickets raised from now on. A phone that has been in
+// use holds tickets keyed 'k1787942370246', and every attempt to upload one is refused
+// for the same reason for ever — the work is on the device, invisible to the office, and
+// nothing about the screen says so. So on load, any ticket whose id is not a uuid is
+// given one, and the outbox entries that named the old id are dropped: they can only ever
+// fail, and the ticket is re-queued whole under its new id by the normal change tracking.
+//
+// Idempotent by construction — a ticket that already has a uuid is not touched — so this
+// can ship permanently rather than as a one-off nobody remembers to remove.
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function repairTicketIds(data) {
+  if (!data || !Array.isArray(data.tickets)) return { fixed: 0, ids: {} };
+  // Cloud only. The demo store keys its seeded tickets 't1', 't2', 't3' — those are not
+  // uuids and do not need to be: nothing sends them anywhere. Running the repair against
+  // them rewrote the fixtures on every load and, worse, cleared the record of refused
+  // changes as if the problem had been dealt with. A behaviour suite caught it.
+  if (!USE_CLOUD) return { fixed: 0, ids: {} };
+  const ids = {};
+  data.tickets.forEach((t) => {
+    if (!t || !t.id || IS_UUID.test(String(t.id))) return;
+    const was = String(t.id);
+    t.id = uuid();
+    ids[was] = t.id;
+    // Everything a ticket owns is nested inside it and travels with the new id. What is
+    // not nested is anything the app stored by ticket id elsewhere, so those move too.
+    (t.audit || []).forEach((a) => { if (a && !a.id) a.id = uuid(); });
+  });
+  const n = Object.keys(ids).length;
+  if (!n) return { fixed: 0, ids: ids };
+  // Anything queued against a dead id is unsendable. Dropping it is not data loss: the
+  // ticket itself is intact in the store and is re-queued under the new id on the next
+  // change-tracking pass, which is the only version the server can actually accept.
+  try {
+    const q = JSON.parse(localStorage.getItem(OUTBOX_K) || '[]')
+      .filter((op) => !Object.keys(ids).some((old) => String(op.key || '').indexOf(old) >= 0));
+    localStorage.setItem(OUTBOX_K, JSON.stringify(q));
+  } catch (e) { /* an unreadable outbox is already empty for our purposes */ }
+  // The refusals these produced are stale advice about a problem that no longer exists.
+  try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
+  return { fixed: n, ids: ids };
+}
+
 function outboxRead() {
   try { return JSON.parse(localStorage.getItem(OUTBOX_K) || '[]'); } catch (e) { return []; }
 }
@@ -3899,8 +3984,19 @@ function stampChildIds(data) {
 function diffOps(before, after) {
   const ops = [];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  const idByName = {}, idByClient = {}, idByJob = {};
-  (after.users || []).forEach((u) => { if (u.id) idByName[u.name] = u.id; });
+  // Two maps, because a display name is not an identity.
+  //
+  // idByName is keyed on what a person is called, and two people can be called the same
+  // thing — this database currently holds two active accounts both named "Tech1". One
+  // silently overwrites the other here, so whichever of them a name resolves to is a
+  // coin toss. An email cannot collide, so anything that knows one uses idByEmail and
+  // anything that only has a name falls back to idByName and takes its chances.
+  const idByName = {}, idByEmail = {}, idByClient = {}, idByJob = {};
+  (after.users || []).forEach((u) => {
+    if (!u.id) return;
+    idByName[u.name] = u.id;
+    if (u.email) idByEmail[String(u.email).toLowerCase()] = u.id;
+  });
   (after.clients || []).forEach((c) => { if (c.id) idByClient[c.name] = c.id; });
   Object.assign(idByJob, CLOUD_IDS.job);
 
@@ -4013,7 +4109,13 @@ function diffOps(before, after) {
   }
   if (!same(before.numbering, after.numbering)) {
     ops.push({ key: 'numbering_claim', table: 'numbering_claim', action: 'upsert', row: {
-      id: true, holder_id: idByName[(after.numbering || {}).holderName] || null,
+      // By email, not by name. This wrote null whenever the claim holder's display name
+      // did not match a profile's full_name exactly — which is how a real Ops Manager was
+      // handed the numbering claim by an admin and then found "nobody holds the claim"
+      // when he signed in. The claim already carried holderEmail; it was simply not used.
+      id: true,
+      holder_id: idByEmail[String((after.numbering || {}).holderEmail || '').toLowerCase()]
+        || idByName[(after.numbering || {}).holderName] || null,
       since: tsOut((after.numbering || {}).since) || new Date().toISOString() } });
   }
   if (!same(before.series, after.series)) {
@@ -4359,7 +4461,10 @@ const ASSET_TONES = {
 };
 const assetTone = (q) => ASSET_TONES[q.tone] || ASSET_TONES.accent;
 
-const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 60000;
+// The backstop, not the mechanism. Real syncing happens when the connection returns and
+// when somebody presses Sync; this only catches a device that never fired an 'online'
+// event. Fifteen minutes rather than one, because at one minute it WAS the mechanism.
+const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 900000;
 // How long a burst of edits is allowed to settle before the queue is sent. Long enough
 // that typing a field is one write rather than twenty; short enough that the office sees
 // a change while the technician is still looking at it.
@@ -4493,7 +4598,7 @@ function seed() {
     // formula. Pre-filled onto every new ticket, stays constant unless the Ops Manager
     // deliberately overrides it for that one ticket.
     orgDefaults: {
-      baseLocation: 'Ahmadi Base', customerRep: 'Workover Office',
+      baseLocation: BASES[0], customerRep: 'Workover Office',
     },
     clients: [
       { name: 'Kuwait Oil Group', currency: 'USD', fields: 'Burgan North, Raudhatain', rigs: 'WS-11, WS-14, RIG-208', items: priceList(1) },
@@ -4528,11 +4633,11 @@ function seed() {
       'RBP FOR WELLHEAD MAINTENANCE', 'COMBINATION FOR LOCATE LEAK',
     ],
     users: [
-      { name: 'Yousef Al-Harbi', role: 'Field Technician', roleKey: 'tech', email: 'yousef@makaman.ly', base: 'Ahmadi Base', lastSync: '2 h ago', status: 'active' },
-      { name: 'Mahmoud Zaki', role: 'Field Technician', roleKey: 'tech', email: 'mahmoud@makaman.ly', base: 'Ahmadi Base', lastSync: 'yesterday', status: 'active' },
-      { name: 'Omar Al-Saleh', role: 'Operations Manager', roleKey: 'mgr', email: 'omar@makaman.ly', base: 'Ahmadi Base', lastSync: 'live', status: 'active' },
-      { name: 'M. Lateri', role: 'Admin', roleKey: 'admin', email: 'lateri@makaman.ly', base: 'Ahmadi Base', lastSync: 'live', status: 'active' },
-      { name: 'R. Makaman', role: 'Observer', roleKey: 'founder', email: 'founder@makaman.ly', base: '—', lastSync: 'live', status: 'active' },
+      { name: 'Yousef Al-Harbi', role: 'Field Technician', roleKey: 'tech', email: 'yousef@makaman.ly', base: BASES[0], lastSync: '2 h ago', status: 'active' },
+      { name: 'Mahmoud Zaki', role: 'Field Technician', roleKey: 'tech', email: 'mahmoud@makaman.ly', base: BASES[0], lastSync: 'yesterday', status: 'active' },
+      { name: 'Omar Al-Saleh', role: 'Operations Manager', roleKey: 'mgr', email: 'omar@makaman.ly', base: BASES[0], lastSync: 'live', status: 'active' },
+      { name: 'M. Lateri', role: 'Admin', roleKey: 'admin', email: 'lateri@makaman.ly', base: BASES[1], lastSync: 'live', status: 'active' },
+      { name: 'R. Makaman', role: 'Observer', roleKey: 'founder', email: 'founder@makaman.ly', base: BASES[1], lastSync: 'live', status: 'active' },
     ],
     tickets: [
       {
@@ -4600,14 +4705,19 @@ class Component extends DCLogic {
     super(props);
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, permUser: null,
+      // See reviewContent: the ticket as it was found, so leaving can offer to put it back.
+      reviewSnap: null, reviewSaving: false,
       priceDelete: null,
-      authRole: 'tech',
       actingAs: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
-      adminClient: 'Kuwait Oil Group', newJobType: '', reasonText: '', dialog: null,
+      // No customer until one is picked. It used to open on whichever client happened to
+      // be first, which reads as "here is Waha's price list" to somebody who came to look
+      // at Zueitina's — and, while the paging bug was live, showed an empty table for a
+      // customer nobody had asked about.
+      adminClient: '', newJobType: '', reasonText: '', dialog: null,
       founderCount: 10, tick: 0, showSettings: false, lastAutoSyncAt: null,
       // Device-local position, never persisted and never synced. See selfGeoTick.
-      selfFix: null, selfFixFailed: false,
+      selfFix: null, selfFixFailed: false, selfFixWhy: '', selfFixSeeking: false,
       // A recovery link is not a login screen. Someone arriving from a reset mail has
       // already proved they hold the mailbox; what they need is a field to type a new
       // password into, and before this they were shown the login form instead — with no
@@ -4686,6 +4796,14 @@ class Component extends DCLogic {
         const settings = Object.assign({}, data.settings, saved.settings || {});
         data = Object.assign(data, saved);
         data.settings = settings;
+        // Before anything reads these tickets, give any that were keyed by the old
+        // 'k' + Date.now() generator a real uuid. Until this runs they are unsendable,
+        // and a device that has been in use since before the fix holds real work that
+        // has never left it.
+        const repair = repairTicketIds(data);
+        if (repair.fixed) {
+          data.__repairedTicketIds = repair.fixed;
+        }
       }
     } catch (e) { /* first run */ }
     stampChildIds(data);
@@ -4849,7 +4967,7 @@ class Component extends DCLogic {
     this.mutate(d => {
       (d.users = d.users || []).push({
         name: name, role: 'Pending', roleKey: null, email: email, password: pass,
-        base: '—', lastSync: '—', status: 'pending',
+        base: DEFAULT_BASE_FOR.tech, lastSync: '—', status: 'pending',
         // Kept beside the account rather than folded into roleKey, which stays null
         // until somebody approves it. Two fields because they answer two questions:
         // what this person says they are, and what the company has agreed they are.
@@ -4864,6 +4982,20 @@ class Component extends DCLogic {
       if (session) localStorage.setItem(SK, JSON.stringify(session));
       else localStorage.removeItem(SK);
     } catch (e) { /* quota */ }
+    // Somebody signing in for the first time has not missed anything.
+    //
+    // Unread is "after the mark you last read to", and a new account has no mark — so
+    // `since` fell back to zero and every audit entry in the company's history arrived as
+    // an unread notification. A real Ops Manager created this week opened the app to 38
+    // of them, all about jobs that were over before his account existed. The mark is set
+    // the first time he signs in, which is exactly when everything before it stops being
+    // news.
+    if (session) {
+      const settings = (this.state.data || {}).settings || {};
+      if (!settings.notificationsReadAt) {
+        this.updateSettings({ notificationsReadAt: iso(new Date()) });
+      }
+    }
   }
   // Saving the technician's work to the device.
   //
@@ -4951,6 +5083,12 @@ class Component extends DCLogic {
       else if (this.mq.addListener) this.mq.addListener(this.mqListener);
     }
     this.timer = setInterval(() => this.setState({ tick: Date.now() }), 30000);
+    // Once when the connection comes back, and whenever the person asks — not every
+    // minute for ever. A timer that fires regardless of whether anything changed turns
+    // the activity feed into a log of the app talking to itself. The heartbeat stays only
+    // as a long backstop for a device that never fires an 'online' event (a laptop waking
+    // from sleep on the same network is the case that needs it), and it is harmless now
+    // that an empty sync writes nothing.
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
     // Checks every minute whether an hourly pin is due; see geoTick.
     this.geoTimer = setInterval(() => { this.geoTick(); this.selfGeoTick(); }, GEO_TICK_MS);
@@ -4981,7 +5119,7 @@ class Component extends DCLogic {
       // Coming back is the moment everything queued while away goes out — and the moment
       // to find out what the office did in the meantime. Both go through the coalescer,
       // so a flapping connection cannot start a second round while the first is running.
-      if (up) this.refresh();
+      if (up) { this.refresh(); this.autoSync(); }
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('online', this.netListener);
@@ -5202,46 +5340,75 @@ class Component extends DCLogic {
   // not in it cannot reach the office by any path, cannot ride up with a ticket, and
   // cannot be queued in the outbox. Turning sharing off still means the office learns
   // nothing. It no longer means the technician learns nothing either.
-  selfGeoTick() {
+  //
+  // `force` is an explicit request from the technician — he tapped the readout, or he
+  // turned sharing on. It clears a refusal, ignores the freshness guard, and asks again.
+  // The rule against badgering is about the app asking unprompted; it was never meant to
+  // mean that a man who has decided he needs his position cannot ask for it.
+  selfGeoTick(force) {
     const S = this.state;
     // Technicians only. They are the ones who go out; an office desktop would just be
     // answering a permission prompt for a readout nobody there needs.
     if (!S.session || S.role !== 'tech') return;
-    if (this.selfGeoBusy || this.selfGeoDenied) return;
+    if (this.selfGeoBusy) return;
+    if (force) this.selfGeoDenied = false;
+    if (this.selfGeoDenied) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      if (!S.selfFix) this.setState({ selfFixFailed: true });
+      if (!S.selfFix) this.setState({ selfFixFailed: true, selfFixWhy: 'unsupported' });
       return;
     }
     const fix = S.selfFix;
     // Nothing to do while the last reading is still current. A safety readout does not
     // need to be fresher than the minute, and re-asking every tick would cost battery
     // for a number that has not moved.
-    if (fix && Date.now() - new Date(fix.ts).getTime() < SELF_GEO_INTERVAL_MS) return;
+    if (!force && fix && Date.now() - new Date(fix.ts).getTime() < SELF_GEO_INTERVAL_MS) return;
     this.selfGeoBusy = true;
+    if (force) this.setState({ selfFixSeeking: true });
     let settled = false;
-    const done = (f, failed) => {
+    const done = (f, why) => {
       if (settled) return;
       settled = true;
       this.selfGeoBusy = false;
-      if (f) this.setState({ selfFix: f, selfFixFailed: false });
-      else if (failed) this.setState({ selfFixFailed: true });
+      if (f) this.setState({ selfFix: f, selfFixFailed: false, selfFixWhy: '', selfFixSeeking: false });
+      else this.setState({ selfFixFailed: true, selfFixWhy: why || 'unavailable', selfFixSeeking: false });
+    };
+    const take = (pos) => {
+      const c = pos.coords || {};
+      done({ lat: c.latitude, lon: c.longitude, ts: iso(new Date(pos.timestamp || Date.now())) });
+    };
+    // Two attempts, and the second one is the whole point.
+    //
+    // A technician stood inside the base office reported NO GPS FIX and could not shift
+    // it. Nothing was blocked and nothing was off: `enableHighAccuracy: true` asks the
+    // phone for the GPS radio specifically, and a GPS radio under a metal roof does not
+    // get a lock — it runs the full fifteen seconds and returns TIMEOUT. The device knew
+    // roughly where it was the whole time, from wifi and cell towers, and was never
+    // asked. So a timeout or an unavailable position falls back to the coarse fix, which
+    // is accurate to a few hundred metres indoors and returns in about a second.
+    //
+    // For "was somebody at this well", a few hundred metres is the difference between a
+    // useful answer and none at all. Only a refusal is final: that one is an answer.
+    const fail = (err, isRetry) => {
+      const code = err && err.code;
+      if (code === 1) {
+        // A refusal stays refused for the session — retrying a denied permission every
+        // minute badgers the technician with prompts on some browsers and burns battery
+        // on all of them. Tapping the readout is what clears it, because that is him
+        // asking rather than us.
+        this.selfGeoDenied = true;
+        done(null, 'blocked');
+        return;
+      }
+      if (isRetry) { done(null, code === 3 ? 'timeout' : 'unavailable'); return; }
+      try {
+        navigator.geolocation.getCurrentPosition(take, (e2) => fail(e2, true),
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 600000 });
+      } catch (e) { done(null, 'unavailable'); }
     };
     try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const c = pos.coords || {};
-          done({ lat: c.latitude, lon: c.longitude, ts: iso(new Date(pos.timestamp || Date.now())) });
-        },
-        (err) => {
-          // A refusal is permanent for the session, for the same reason the office ping
-          // treats it that way: re-asking every minute badgers the technician with
-          // prompts and burns battery, and the answer will not have changed.
-          if (err && err.code === 1) this.selfGeoDenied = true;
-          done(null, true);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: SELF_GEO_INTERVAL_MS }
-      );
-    } catch (e) { done(null, true); }
+      navigator.geolocation.getCurrentPosition(take, (err) => fail(err, false),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: force ? 0 : SELF_GEO_INTERVAL_MS });
+    } catch (e) { done(null, 'unavailable'); }
   }
   // Press and hold the coordinates to copy them. The case this exists for is someone
   // lost who needs to send a position to whoever can come and get them: reading twelve
@@ -5356,17 +5523,29 @@ class Component extends DCLogic {
   // the same key as the manual button, because they do the same work — pressing Sync
   // while the background pass is running joins it rather than racing it.
   autoSync() { return this.runLatest('sync', () => this.autoSyncNow()); }
+  // What the background sync may touch, and what it must leave alone.
+  //
+  // A withdrawn ticket is frozen at the database — `enforce_ticket_update_rules` refuses
+  // every edit until it is restored. It was still being picked up here, marked synced
+  // locally, and written an audit line saying so; the push was then refused, the server
+  // stayed unsynced, the next refresh brought it back as pending, and it happened again.
+  // That loop wrote 38 identical "Auto-synced from field device" entries against one
+  // cancelled ticket over a day, and every one of them arrived as an unread notification
+  // for everybody. A sync that cannot succeed must not claim it did.
+  syncable(x) { return !!x && !x.synced && !x.deletedAt; }
   autoSyncNow() {
     const S = this.state;
     if (!S.online || !S.session) return;
-    const pending = (S.data.tickets || []).filter(x => !x.synced);
-    if (!pending.length) return;
+    const pending = (S.data.tickets || []).filter((x) => this.syncable(x));
+    // Nothing to send is not an event. The audit trail is what somebody reads to find out
+    // what happened to a job, and a line saying "nothing happened" pushes the lines that
+    // matter off the screen.
+    if (!pending.length) { this.setState({ lastAutoSyncAt: iso(new Date()) }); return; }
     const now = iso(new Date());
     this.mutate(d => d.tickets.forEach(x => {
-      if (!x.synced) {
-        x.synced = true; x.syncedAt = now;
-        (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: '', text: 'Auto-synced from field device (' + x.tech + ').' });
-      }
+      if (!this.syncable(x)) return;
+      x.synced = true; x.syncedAt = now;
+      (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: '', text: 'Auto-synced from field device (' + x.tech + ').' });
     }));
     this.setState({ lastAutoSyncAt: now });
   }
@@ -5374,6 +5553,98 @@ class Component extends DCLogic {
   patchTicket(patch) {
     const id = this.state.activeId;
     this.mutate(d => { const t = d.tickets.find(x => x.id === id); if (t) Object.assign(t, patch); });
+  }
+
+  // ── Save changes, and the question asked on the way out ──────────────────────────
+  //
+  // The review screen writes straight through: every keystroke lands in the store and is
+  // on the device before the finger leaves the key. That is deliberate and stays — this
+  // app has to survive a phone dying mid-sentence, and a form that holds an hour of work
+  // in memory waiting for a Save button is exactly the failure it is built to avoid.
+  //
+  // What was missing was not persistence. It was the two things a person editing a
+  // ticket expects: something that says the work is IN, and a question if they walk away
+  // from work they did not mean to keep. So the content is snapshotted when the ticket is
+  // opened, "changed" means it no longer matches that snapshot, Save re-takes the
+  // snapshot (and pushes, so the office server has it rather than only this browser), and
+  // leaving while it differs asks first — with Discard able to actually put it back,
+  // which is the only reason the snapshot is a copy rather than a flag.
+  //
+  // Only these four are content. Status, approval, sync stamps, notes and attachments are
+  // acts, not edits: none of them is something you would undo by leaving a screen.
+  reviewContent(t) {
+    if (!t) return null;
+    return JSON.stringify({
+      ticketNo: t.ticketNo === undefined ? '' : t.ticketNo,
+      mileage: t.mileage === undefined ? '' : t.mileage,
+      jobType: t.jobType === undefined ? '' : t.jobType,
+      items: (t.items || []).map((i) => ({
+        code: i.code, desc: i.desc, qty: i.qty, uom: i.uom, cost: i.cost,
+        kind: i.kind, pct: i.pct, ov: i.ov || {},
+      })),
+    });
+  }
+  // Every path onto the review screen goes through here, so there is exactly one place
+  // that can forget to take the snapshot.
+  openReview(id, extra) {
+    const t = (this.state.data.tickets || []).find((x) => x.id === id);
+    this.setState(Object.assign({
+      activeId: id, mgrScreen: 'review',
+      reviewSnap: { id: id, content: this.reviewContent(t), at: iso(new Date()) },
+    }, extra || {}));
+  }
+  reviewDirty() {
+    const S = this.state;
+    if (S.mgrScreen !== 'review' || !S.reviewSnap || S.reviewSnap.id !== S.activeId) return false;
+    const t = (S.data.tickets || []).find((x) => x.id === S.activeId);
+    if (!t) return false;
+    return this.reviewContent(t) !== S.reviewSnap.content;
+  }
+  saveReview() {
+    const S = this.state;
+    const t = (S.data.tickets || []).find((x) => x.id === S.activeId);
+    if (!t) return Promise.resolve();
+    this.setState({ reviewSnap: { id: t.id, content: this.reviewContent(t), at: iso(new Date()) } });
+    // The individual field changes are already in the trail, written on blur. One line
+    // for the save itself would be a second entry saying nothing the first four did not.
+    if (!USE_CLOUD) { this.toast('saved', 'Changes Saved', 'ok'); return Promise.resolve(); }
+    // Cloud: the edits are in the outbox already. Draining here is what makes the button
+    // honest — it says saved when the server has it, not when this browser does.
+    this.setState({ reviewSaving: true });
+    return outboxDrain()
+      .then(() => { this.setState({ reviewSaving: false }); this.toast('saved', 'Changes Saved', 'ok'); })
+      .catch(() => {
+        this.setState({ reviewSaving: false });
+        this.toast('saved', 'Changes are saved on this device. They will go up to the office when there is signal.', 'warn');
+      });
+  }
+  // Putting the ticket back the way it was found. Only the four content fields — see
+  // reviewContent — and the audit entries those edits wrote, because an entry reading
+  // "Mileage changed 40 → 90" is a lie once the 90 is gone. Nothing else in the trail is
+  // touched: an approval or a handover made during the same visit stands.
+  discardReview() {
+    const S = this.state;
+    const snap = S.reviewSnap;
+    if (!snap || !snap.content) { this.setState({ reviewSnap: null }); return; }
+    const was = JSON.parse(snap.content);
+    const since = snap.at || '';
+    this.mutate((d) => {
+      const t = (d.tickets || []).find((x) => x.id === snap.id);
+      if (!t) return;
+      t.ticketNo = was.ticketNo; t.mileage = was.mileage; t.jobType = was.jobType;
+      t.items = was.items.map((i) => Object.assign({}, i));
+      if (since) {
+        t.audit = (t.audit || []).filter((a) => !(a.kind === 'edit' && a.ts > since));
+      }
+    });
+    this.setState({ reviewSnap: null });
+    this.toast('saved', 'Changes Discarded', 'warn');
+  }
+  // Leaving the review screen. `go` is whatever the button would have done.
+  leaveReview(go) {
+    if (!this.reviewDirty()) { go(); return; }
+    this.pendingLeave = go;
+    this.setState({ dialog: 'unsavedReview' });
   }
   updateSettings(patch) {
     this.mutate(d => { d.settings = Object.assign({}, d.settings, patch); });
@@ -5881,9 +6152,9 @@ class Component extends DCLogic {
         stamp: F.stamp(a.ts),
         where: (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
         edge: this.cardTreatment(x).edge,
-        open: () => this.setState(S.role === 'tech'
-          ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
-          : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
+        open: () => (S.role === 'tech'
+          ? this.setState({ activeId: x.id, techScreen: 'log', roleTab: 'tickets' })
+          : this.openReview(x.id, { roleTab: 'tickets' })),
       }))), [])
       // Price-list history has no ticket to hang off, so it is concatenated here rather
       // than being a second feed on a second screen. A deletion is 'lifecycle' because
@@ -7504,6 +7775,14 @@ class Component extends DCLogic {
     // the holder passing it on deliberately.
     const adminOverridingClaim = this.hasPermission('numbering.override') && !this.holdsNumbering()
       && !!(D.numbering || {}).holderName;
+    // Read once, here, so the button and the leaving question can never disagree about
+    // whether there is anything to save.
+    const reviewDirty = this.reviewDirty();
+    const reviewSaving = !!S.reviewSaving;
+    // No Save control on a ticket nobody can change from this screen — an approved one,
+    // or one being read by someone without the capability. A disabled button on a
+    // read-only screen is a promise of an edit that is not on offer.
+    const reviewCanEdit = !locked;
     const commitTicketNo = fieldCommit('ticketNo', 'Ticket No.');
     const commitMileage = fieldCommit('mileage', 'Mileage');
     const commitJobType = fieldCommit('jobType', 'Job type');
@@ -7552,6 +7831,31 @@ class Component extends DCLogic {
           this.log('Job handed over by ' + (from || 'the previous technician') + ' to ' + to + '.', 'lifecycle');
           this.setState({ dialog: null, handoverTo: '' });
         },
+      },
+      // Walking away from an edited ticket.
+      //
+      // Three answers rather than two, because both of the obvious pair take something
+      // from you: Save keeps a change you may have made by leaning on a keyboard, Discard
+      // throws away ten minutes of pricing. Keep editing costs nothing and is what an
+      // accidental tap on the back button meant.
+      unsavedReview: {
+        title: 'Save your changes?',
+        body: 'This ticket has changes that have not been saved. Discarding puts it back the '
+          + 'way you found it — the ticket number, mileage, job type and every charged line.',
+        okLabel: 'Save & leave', cancelLabel: 'Keep editing', hasCancel: true,
+        hasThird: true, thirdLabel: 'Discard changes',
+        confirm: () => {
+          const go = this.pendingLeave; this.pendingLeave = null;
+          this.setState({ dialog: null });
+          this.saveReview().then(() => { if (go) go(); });
+        },
+        third: () => {
+          const go = this.pendingLeave; this.pendingLeave = null;
+          this.discardReview();
+          this.setState({ dialog: null });
+          if (go) go();
+        },
+        cancel: () => { this.pendingLeave = null; this.setState({ dialog: null }); },
       },
       done: {
         title: 'Mark job as done?', body: 'End Job will be stamped ' + F.stamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
@@ -7759,6 +8063,63 @@ class Component extends DCLogic {
         title: 'Number refused', body: 'That ticket number is already in use. Every ticket number must be unique.',
         okLabel: 'Change it', hasCancel: false, confirm: () => this.setState({ dialog: null }),
       },
+      // Deleting an account for good. The wall is worth having even though the server
+      // refuses anyone with work attached: the common case is a duplicate, and deleting
+      // the wrong one of two accounts with the same name is exactly the mistake this is
+      // meant to prevent — so the question carries the email, which is the thing that
+      // actually differs.
+      deleteUser: {
+        title: 'Delete this account?',
+        body: (S.targetUserName || 'This person') + ' — ' + (S.targetUserEmail || '')
+          + '. The account is removed for good. It only works if they have never raised, '
+          + 'worked or approved anything; if they have, the server refuses and tells you '
+          + 'what they hold. Use Disable for anyone who has worked.',
+        okLabel: 'Delete the account', cancelLabel: 'Keep it', hasCancel: true,
+        okBg: 'var(--danger)', okFg: 'var(--on-danger)',
+        confirm: () => {
+          const id = S.targetUserId, email = S.targetUserEmail, name = S.targetUserName;
+          this.setState({ dialog: null });
+          if (!USE_CLOUD) {
+            this.mutate(d => { d.users = (d.users || []).filter(x => x.email !== email); });
+            this.toast('delete:' + email, (name || email) + ' deleted.', 'ok');
+            return;
+          }
+          if (!id) { this.toast('delete:' + email, 'That account has not reached the server yet.', 'warn'); return; }
+          adminAction('delete_user', { userId: id })
+            .then(() => this.refresh())
+            .then(() => this.toast('delete:' + email, (name || email) + ' deleted.', 'ok'))
+            .catch(err => this.toast('delete:' + email, err.message, 'warn'));
+        },
+      },
+      // Giving somebody a password. Same local rules as changing your own — the length
+      // floor and the breach check both apply, because a password an admin picks in a
+      // hurry is exactly the one that turns up in a word list.
+      setUserPassword: {
+        title: 'Set a new password',
+        body: 'For ' + (S.targetUserName || 'this account') + ' — ' + (S.targetUserEmail || '')
+          + '. They are signed out everywhere and will need the new password. Tell them in '
+          + 'person or by a channel they can actually read.',
+        okLabel: 'Set it', cancelLabel: 'Cancel', hasCancel: true,
+        needsPassword: true,
+        confirm: () => {
+          const id = S.targetUserId, email = S.targetUserEmail, name = S.targetUserName;
+          const pass = S.pwNew || '', confirmPass = S.pwConfirm || '';
+          this.setState({ pwBusy: true });
+          vetPassword(pass, confirmPass).then((problem) => {
+            if (problem) { this.setState({ pwError: problem, pwBusy: false }); return; }
+            this.setState({ dialog: null, pwBusy: false, pwNew: '', pwConfirm: '', pwError: '' });
+            if (!USE_CLOUD) {
+              this.mutate(d => { const t = (d.users || []).find(x => x.email === email); if (t) t.password = pass; });
+              this.toast('setpw:' + email, 'Password set for ' + (name || email) + '.', 'ok');
+              return;
+            }
+            if (!id) { this.toast('setpw:' + email, 'That account has not reached the server yet.', 'warn'); return; }
+            adminAction('set_password', { userId: id, password: pass })
+              .then(() => this.toast('setpw:' + email, 'Password set for ' + (name || email) + '. They are signed out everywhere.', 'ok'))
+              .catch(err => this.toast('setpw:' + email, err.message, 'warn'));
+          });
+        },
+      },
       disableUser: {
         title: S.disableUserRestore ? 'Restore this account?' : 'Disable this account?',
         body: S.disableUserRestore
@@ -7836,7 +8197,7 @@ class Component extends DCLogic {
       this.runLatest('auth', () => vetPassword(pass, confirm)
         .then((problem) => {
           if (problem) { this.setState({ authError: problem, authBusy: false }); return null; }
-          return this.signUp(name, email, pass, S.authRole || 'tech')
+          return this.signUp(name, email, pass, 'tech')
             .then(() => this.setState({ signupDone: true, authError: '', authBusy: false }));
         })
         .catch(err => this.setState({ authError: err.message || 'Could not create the account.', authBusy: false })));
@@ -7921,7 +8282,7 @@ class Component extends DCLogic {
         this.mutate(d => {
           (d.users = d.users || []).push({
             name: name, role: 'Field Technician', roleKey: 'tech', email: email, password: pass,
-            base: '—', lastSync: '—', status: 'active',
+            base: DEFAULT_BASE_FOR.tech, lastSync: '—', status: 'active',
           });
         });
         this.setState({ newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: true });
@@ -7935,6 +8296,16 @@ class Component extends DCLogic {
         .then(() => this.setState({ newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: true, authBusy: false }))
         .catch(err => this.setState({ newTechError: err.message, newTechDone: false, authBusy: false }));
     };
+
+    // What the position readout says when it has nothing to show. Written out as a
+    // lookup rather than a chain of ternaries in the binding, because the runtime does
+    // not take ternaries inside {{ }} and because the three cases are genuinely
+    // different problems with three different answers.
+    let barFixText = 'NO GPS FIX · TAP TO RETRY';
+    if (S.selfFix) barFixText = geoText(S.selfFix);
+    else if (S.selfFixSeeking) barFixText = 'FINDING YOU…';
+    else if (S.selfFixWhy === 'blocked') barFixText = 'LOCATION BLOCKED · ALLOW IT IN YOUR BROWSER';
+    else if (S.selfFixWhy === 'unsupported') barFixText = 'THIS DEVICE HAS NO LOCATION';
 
     return {
       loggedIn: !!S.session && S.session.status === 'active',
@@ -7980,9 +8351,19 @@ class Component extends DCLogic {
       // is can send whatever is already on screen and be found from it, without having
       // to navigate anywhere first. Shown regardless of the sharing toggle — see
       // selfGeoTick for why that is not a leak.
-      showBarFix: S.role === 'tech' && !!S.session && !!(S.selfFix || S.selfFixFailed),
-      barFixText: S.selfFix ? geoText(S.selfFix) : 'NO GPS FIX',
-      barFixHint: S.selfFix ? 'Press and hold to copy' : '',
+      showBarFix: S.role === 'tech' && !!S.session && !!(S.selfFix || S.selfFixFailed || S.selfFixSeeking),
+      // Three different failures used to read the same four words. A technician at the
+      // base saw NO GPS FIX, turned the sharing toggle on and off — which governs what
+      // the OFFICE is told and has never had anything to do with whether his own phone
+      // can find him — and had no way of learning that. Each one now says what happened
+      // and what to do about it, and every one of them can be retried by tapping.
+      barFixText: barFixText,
+      barFixHint: S.selfFix ? 'Press and hold to copy'
+        : (S.selfFixWhy === 'blocked'
+          ? 'Location is blocked for this site in your browser settings. Allow it there, then tap here.'
+          : 'Tap to look for your position again'),
+      barFixRetry: () => { if (!S.selfFix) this.selfGeoTick(true); },
+      barFixDim: S.selfFix ? 1 : 0.72,
       holdCopyStart: () => this.holdCopyStart(),
       holdCopyCancel: () => this.holdCopyCancel(),
       // A long press on a phone otherwise raises the browser's own text-selection menu
@@ -7992,7 +8373,6 @@ class Component extends DCLogic {
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
       doLogin: doLogin,
       doSignup: doSignup,
-      authRole: S.authRole || 'tech',
       doLogout: doLogout,
       createTechnician: createTechnician,
       newTechName: S.newTechName, newTechEmail: S.newTechEmail, newTechPassword: S.newTechPassword,
@@ -8033,8 +8413,14 @@ class Component extends DCLogic {
       // ops manager now reaches through the same screen. It is a single tool page keyed
       // by adminTab with its own back button, so arriving on 'price' shows the price
       // tool and nothing else — there is no tab strip to wander off down.
+      // The Admin tools page is Admin's, with two exceptions. The price lists, which the
+      // ops manager reaches through the same screen. And the self-check, which belongs to
+      // everybody: it exists so that whoever hits a problem can run it and send the
+      // result to somebody who can act on it, and a diagnostic only the admin can run is
+      // a diagnostic that is never there when it is needed.
       showAdminPage: S.roleTab === 'tickets' && !!S.adminTab
-        && (S.role === 'admin' || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))),
+        && (S.role === 'admin' || S.adminTab === 'check'
+            || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))),
       showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review',
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
@@ -8067,7 +8453,7 @@ class Component extends DCLogic {
           // open when the tab was left. roleTab and mgrScreen/techScreen are separate,
           // so without this a manager who wandered off the print preview came back to
           // the print preview rather than the inbox.
-          pick: () => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null }),
+          pick: () => this.leaveReview(() => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null })),
         };
       }),
 
@@ -8186,6 +8572,12 @@ class Component extends DCLogic {
         });
         const settings = tile('Settings', 'Appearance, clock, storage', 'system',
           'rgba(var(--ink-rgb),0.08)', 'var(--ink-dim)', () => this.setState({ showSettings: true }));
+        // Offered to every role, including the technician. When something is wrong in the
+        // field, the useful thing is a report the office can read, not a description over
+        // the phone of what the screen looked like.
+        const selfCheck = tile('Self-check', 'Something not working? Run this and send the result.',
+          'system', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)',
+          () => this.setState({ adminTab: 'check', roleTab: 'tickets' }));
         if (S.role === 'admin') {
           const go = (t) => () => this.setState({ adminTab: t, roleTab: 'tickets' });
           return [
@@ -8195,7 +8587,7 @@ class Component extends DCLogic {
             tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
             tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
-            tile('Self-check', 'Is this build really talking to the server?', 'system', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('check')),
+            selfCheck,
             settings,
           ];
         }
@@ -8208,10 +8600,11 @@ class Component extends DCLogic {
               'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)',
               () => this.setState({ adminTab: 'price', roleTab: 'tickets' })));
           }
+          mine.push(selfCheck);
           mine.push(settings);
           return mine;
         }
-        return [settings];
+        return [selfCheck, settings];
       })(),
       // The signed-in user's own record, for the technician's Account tab. Identity
       // rather than statistics: their numbers belong on Tickets, where the tickets are.
@@ -8257,6 +8650,13 @@ class Component extends DCLogic {
       toggleShareLocation: () => {
         const next = !(D.settings || {}).shareLocation;
         this.updateSettings({ shareLocation: next });
+        // Turning it on is a deliberate act, so it is treated as one: any refusal
+        // recorded earlier in the session is cleared and the device is asked again,
+        // right now. This toggle governs what the OFFICE is told and never governed
+        // whether the phone could find you — but somebody who cannot see a position and
+        // reaches for the location switch is asking for exactly one thing, and giving
+        // him a setting change and no position was how NO GPS FIX became permanent.
+        if (next) { this.geoDenied = false; this.selfGeoTick(true); }
         // Only the switching-off direction says anything. Confirming a choice someone
         // just made, in the direction they wanted, is noise.
         if (!next) this.toast('geo-off', 'Location sharing is off. Your position will read "No Location Shared" — the office cannot reach you by coordinates if something goes wrong on site.', 'warn');
@@ -8369,9 +8769,9 @@ class Component extends DCLogic {
         noLabel: x.ticketNo || 'No number',
         customer: x.customer || '',
         missing: this.signedDocsMissing(x).join(' · '),
-        open: () => this.setState(S.role === 'tech'
-          ? { activeId: x.id, techScreen: 'log', roleTab: 'tickets' }
-          : { activeId: x.id, mgrScreen: 'review', roleTab: 'tickets' }),
+        open: () => (S.role === 'tech'
+          ? this.setState({ activeId: x.id, techScreen: 'log', roleTab: 'tickets' })
+          : this.openReview(x.id, { roleTab: 'tickets' })),
       })),
 
       // ── Signed paperwork on the open ticket ──
@@ -8567,7 +8967,15 @@ class Component extends DCLogic {
       createOpacity: (S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig) ? 1 : 0.45,
       createTicket: () => {
         const dr = S.draft; if (!dr) return;
-        const id = 'k' + Date.now();
+        // A real uuid, because tickets.id is a uuid column.
+        //
+        // This was 'k' + Date.now(). The demo store did not care, so every test passed
+        // and every ticket looked fine on the device — and then Postgres refused the
+        // upload with `invalid input syntax for type uuid: "k1787942370246"`. The ticket
+        // stayed on the phone that raised it and reached nobody: not the office, not the
+        // Ops Manager, not the archive. The database held exactly one ticket, seeded,
+        // while the app had been raising them for days.
+        const id = uuid();
         this.mutate(d => {
           const client = d.clients.find(c => c.name === dr.customer);
           // 20% desert/marine surcharge is standard on nearly every ticket — pre-added
@@ -8915,7 +9323,7 @@ class Component extends DCLogic {
       ],
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
         actionLabel: this.settled(x) ? 'View' : 'Review',
-        review: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+        review: () => this.openReview(x.id),
       })),
       // Withdrawn tickets, kept where the office can find them and put them back. Not in
       // the table above: they are not work, and folding them in would make "awaiting
@@ -8923,7 +9331,7 @@ class Component extends DCLogic {
       withdrawnRows: withdrawnAll.map(x => Object.assign(this.ticketView(x), {
         why: x.deleteReason || 'No reason was recorded.',
         who: 'Withdrawn by ' + (x.deletedBy || 'the office') + ' · ' + F.stamp(x.deletedAt),
-        open: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+        open: () => this.openReview(x.id),
       })),
       hasWithdrawn: withdrawnAll.length > 0,
       withdrawnHeading: withdrawnAll.length === 1
@@ -8943,7 +9351,27 @@ class Component extends DCLogic {
         Array.from(new Set(D.tickets.filter(x => x.synced).reduce((a, x) => a.concat(crewNames(x)), []).filter(Boolean)))
           .sort().map(n => ({ name: n, label: n }))),
       setTechFilter: e => this.setState({ techFilter: e.target.value }),
-      backToInbox: () => this.setState({ mgrScreen: 'inbox' }),
+      backToInbox: () => this.leaveReview(() => this.setState({ mgrScreen: 'inbox' })),
+
+      // ── The Save control ──
+      //
+      // Written out rather than composed in the markup because the runtime takes no
+      // ternaries inside {{ }}, and because the three states it has — nothing to save,
+      // something to save, saving — each want a different word as well as a different
+      // colour.
+      showReviewSave: reviewCanEdit,
+      reviewSaveLabel: reviewSaving ? 'Saving…' : 'Save changes',
+      reviewSaveOff: !reviewDirty || reviewSaving,
+      reviewSaveCursor: (!reviewDirty || reviewSaving) ? 'default' : 'pointer',
+      reviewSaveBg: reviewDirty ? 'var(--accent)' : 'transparent',
+      reviewSaveFg: reviewDirty ? 'var(--on-accent)' : 'var(--ink-faint)',
+      reviewSaveBorder: reviewDirty ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.22)',
+      reviewSaveDim: reviewSaving ? 0.6 : 1,
+      reviewSaveNote: reviewDirty
+        ? 'Unsaved changes on this ticket.'
+        : 'Everything on this ticket is saved.',
+      reviewSaveNoteFg: reviewDirty ? 'var(--warning-ink)' : 'var(--ink-faint)',
+      saveReview: () => this.saveReview(),
 
       // ── Office-raised tickets ──────────────────────────────────────────────
       // Work does not always start with a technician tapping New Job Ticket. A
@@ -8971,7 +9399,15 @@ class Component extends DCLogic {
         const dr = S.mgrDraft || {};
         const name = (dr.customer || '').trim();
         if (!name || !dr.tech) return;
-        const id = 'k' + Date.now();
+        // A real uuid, because tickets.id is a uuid column.
+        //
+        // This was 'k' + Date.now(). The demo store did not care, so every test passed
+        // and every ticket looked fine on the device — and then Postgres refused the
+        // upload with `invalid input syntax for type uuid: "k1787942370246"`. The ticket
+        // stayed on the phone that raised it and reached nobody: not the office, not the
+        // Ops Manager, not the archive. The database held exactly one ticket, seeded,
+        // while the app had been raising them for days.
+        const id = uuid();
         const now = iso(new Date());
         // Matched case- and space-insensitively so a difference of typing does not
         // create a second customer that looks identical in the list.
@@ -9528,7 +9964,9 @@ class Component extends DCLogic {
         this.toast('assets-reset', 'Closing questions put back to the defaults.', 'ok');
       },
       adminClient: S.adminClient,
-      adminPriceNote: list.length + ' items · changes apply to new ticket lines only',
+      hasPriceClient: !!S.adminClient,
+      noPriceClient: !S.adminClient,
+      adminPriceNote: S.adminClient ? (list.length + ' items · changes apply to new ticket lines only') : '',
       canEditPrices: this.hasPermission('pricelist.edit'),
       priceReadOnly: !this.hasPermission('pricelist.edit'),
       canDeletePrices: this.hasPermission('pricelist.delete'),
@@ -9597,10 +10035,10 @@ class Component extends DCLogic {
         // word is the point: an earlier version excluded anything containing "ago",
         // which let "yesterday" through as though that user were online.
         syncDot: (u.status === 'active' && u.lastSync === 'live') ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
-        // What the applicant said they were, shown only while the decision is still
-        // open. It is a claim, not a fact — approving still creates a Field Technician,
-        // and the role dropdown beside this row is where the office actually decides —
-        // so it is worded as something asked for rather than something granted.
+        // Signing up no longer asks what you want to be — everyone joins as a Field
+        // Technician and the office promotes from the dropdown beside this row. The
+        // binding stays so an account created before that change still shows what it
+        // asked for; nothing new sets it.
         showAsked: u.status === 'pending' && !!u.requestedRole && u.requestedRole !== 'tech',
         askedFor: 'Asked to join as ' + (ROLE_LABEL[u.requestedRole] || u.requestedRole || ''),
         roleBg: ({ pending: 'rgba(var(--warning-rgb),0.14)', disabled: 'rgba(var(--danger-rgb),0.14)' })[u.status] || 'var(--accent-wash)',
@@ -9662,6 +10100,24 @@ class Component extends DCLogic {
         disable: () => this.setState({
           dialog: 'disableUser', disableUserEmail: u.email, disableUserName: u.name,
           disableUserRestore: u.status === 'disabled',
+        }),
+        // Deleting an account, for the ones that were never used — a typo, a duplicate,
+        // a test login. The function refuses anybody who has worked and says what they
+        // hold instead, because the record of who did the job is the one thing this app
+        // exists to keep. Same two exemptions as Disable, re-checked server-side.
+        canDelete: this.hasPermission('user.disable')
+          && u.email !== MASTER_ADMIN_EMAIL
+          && u.email !== ((S.session || {}).email || ''),
+        remove: () => this.setState({
+          dialog: 'deleteUser', targetUserId: u.id, targetUserEmail: u.email, targetUserName: u.name,
+        }),
+        // Setting somebody's password, for when the reset mail cannot reach them — a
+        // technician whose company address does not arrive at a wellhead, or who cannot
+        // get into the mailbox at all.
+        canSetPassword: this.hasPermission('user.disable') && u.email !== MASTER_ADMIN_EMAIL,
+        setPassword: () => this.setState({
+          dialog: 'setUserPassword', targetUserId: u.id, targetUserEmail: u.email,
+          targetUserName: u.name, pwNew: '', pwConfirm: '', pwError: '',
         }),
         };
       }),
@@ -9731,7 +10187,7 @@ class Component extends DCLogic {
           .catch(() => this.toast('bundle-fail', 'Could not build the overview on this device.', 'warn')));
       },
       founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
-        open: () => this.setState({ activeId: x.id, mgrScreen: 'review' }),
+        open: () => this.openReview(x.id),
       })),
 
       // Live activity — the only view in the app that shows tickets still being logged
@@ -9763,7 +10219,8 @@ class Component extends DCLogic {
       hasDialog: !!S.dialog,
       dialog: Object.assign({
         title: '', body: '', okLabel: 'OK', cancelLabel: 'Cancel', hasCancel: true,
-        needsReason: false, needsPerson: false,
+        needsReason: false, needsPerson: false, hasThird: false, thirdLabel: '',
+        third: () => this.setState({ dialog: null }),
         reasonHint: 'Reason — recorded in the audit trail',
         okBg: 'var(--accent)', okFg: 'var(--on-accent)',
         cancelFg: 'var(--ink)', cancelBorder: 'var(--ink-faint)',
@@ -9798,7 +10255,6 @@ class Component extends DCLogic {
         authPassword: e => this.setState({ authPassword: e.target.value, authError: '' }),
         authFullName: e => this.setState({ authFullName: e.target.value, authError: '' }),
         authConfirm: e => this.setState({ authConfirm: e.target.value, authError: '' }),
-        authRole: e => this.setState({ authRole: e.target.value }),
         pwNew: e => this.setState({ pwNew: e.target.value, pwError: '', pwDone: false }),
         pwConfirm: e => this.setState({ pwConfirm: e.target.value, pwError: '', pwDone: false }),
         newTechName: e => this.setState({ newTechName: e.target.value, newTechError: '', newTechDone: false }),

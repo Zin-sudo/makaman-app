@@ -52,9 +52,39 @@ const openUsers = async (p) => {
     await openUsers(p);
 
     const text = await p.evaluate(() => document.body.innerText);
-    check('the Users screen offers Disable, not Delete',
-      /\bDISABLE\b/i.test(text) && !/\bDELETE\b/i.test(text),
+    // Both, now, and the distinction is the point rather than the absence of one.
+    //
+    // This used to assert Delete did NOT exist, because the foreign keys make deleting
+    // anyone who has worked either impossible (tickets, audit_log — NO ACTION) or
+    // quietly destructive (ticket_crew — CASCADE, which would erase who was on a job).
+    // Delete was asked for (user, 2026-08-28) and is now offered, with the server
+    // refusing anybody who has anything on the record and saying what they hold. So the
+    // rule to guard is no longer "there is no Delete" but "Delete cannot take work with
+    // it", which is checked against the live rule below rather than by hiding a button.
+    check('the Users screen offers Disable and Delete',
+      /\bDISABLE\b/i.test(text) && /\bDELETE\b/i.test(text),
       text.match(/\b(DISABLE|DELETE)\b/gi) ? text.match(/\b(DISABLE|DELETE)\b/gi).join(',') : 'neither');
+    check('and a way to set somebody a new password',
+      /SET PASSWORD/i.test(text));
+    // Deleting asks first, and the question carries the email — the common case is a
+    // duplicate, and two accounts with the same display name differ only by address.
+    const del = await p.evaluate(() => {
+      const b = Array.from(document.querySelectorAll('button')).find(x => /^delete$/i.test((x.innerText || '').trim()));
+      if (!b) return null;
+      b.click();
+      return new Promise(r => setTimeout(() => r(document.body.innerText), 400));
+    });
+    check('Delete asks before it deletes', del && /Delete this account\?/i.test(del));
+    check('and the question names the email, not just the person',
+      del && /@/.test((del.match(/Delete this account\?[\s\S]{0,220}/) || [''])[0]),
+      (del || '').match(/Delete this account\?[\s\S]{0,120}/) ? (del.match(/Delete this account\?[\s\S]{0,120}/))[0].replace(/\n/g, ' ') : 'no dialog');
+    check('and it says Disable is the option for somebody who has worked',
+      del && /Disable/i.test(del));
+    await p.evaluate(() => {
+      const b = Array.from(document.querySelectorAll('button')).find(x => /keep it/i.test(x.innerText || ''));
+      if (b) b.click();
+    });
+    await p.waitForTimeout(300);
 
     // The master admin is the account that can rescue every other one.
     const guards = await p.evaluate(() => {
