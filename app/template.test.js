@@ -76,20 +76,28 @@ async function office(ctx) {
         grand: cell(sheet1, 'F40'), logCustomer: cell(sheet3, 'B10'),
         expectTotal: app.ticketTotal(t), expectCustomer: t.customer, expectNo: t.ticketNo,
         overflow: out.overflow, bytes: out.blob.size,
+        hasCalcChain: !!c.files['xl/calcChain.xml'],
       };
     }, );
-    check('a workbook is produced', r.bytes > 100000, Math.round(r.bytes / 1024) + ' KB');
-    // calcChain is the one part that must go. It is Excel's cached dependency graph, and
-    // every formula it points at has just been replaced by a value — leaving a stale one
-    // behind is what makes a patched workbook open with a repair prompt. Excel rebuilds
-    // it from nothing. Anything else going missing is a real loss.
-    const dropped = r.missing.filter(n => n !== 'xl/calcChain.xml');
-    check('nothing is dropped from the template but the formula cache',
-      dropped.length === 0 && r.missing.indexOf('xl/calcChain.xml') >= 0,
-      dropped.length ? 'lost: ' + dropped.join(', ') : 'only calcChain, as intended');
+    // 20 KB, not 100. The threshold used to be 100 KB, which passed for the wrong reason:
+    // most of that weight was six price-list worksheets that had no business being in a
+    // document handed to a client. They were removed from the template itself, taking the
+    // file from 411 KB to 72 KB, so a size floor tuned to the old file would now fail on a
+    // correct workbook. It is still a floor worth having — a few hundred bytes would mean
+    // the template never loaded.
+    check('a workbook is produced', r.bytes > 20000, Math.round(r.bytes / 1024) + ' KB');
+    // Nothing may go missing on the way through. calcChain is the part that used to be
+    // deliberately dropped — Excel's cached dependency graph, pointing at formulas that
+    // have just been replaced by values, which is what makes a patched workbook open with
+    // a repair prompt. It is no longer in the template at all, so the rule is now simply
+    // that the output carries no calcChain and loses nothing else.
+    check('nothing is dropped from the template on the way through',
+      r.missing.length === 0, r.missing.length ? 'lost: ' + r.missing.join(', ') : 'nothing lost');
+    check('and no stale formula cache survives into the file',
+      !r.hasCalcChain, String(r.hasCalcChain));
     // Only the four ticket sheets and the content-type map may differ. Styles, the theme,
-    // the embedded logo, the print settings and all six price-list tabs must be untouched
-    // — that is what makes this the original sheet rather than a lookalike.
+    // the embedded logo and the print settings must be untouched — that is what makes
+    // this the customer's own sheet rather than a lookalike.
     const allowed = ['[Content_Types].xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml',
                      'xl/worksheets/sheet3.xml', 'xl/worksheets/sheet4.xml', 'xl/calcChain.xml'];
     const unexpected = r.changed.filter(n => allowed.indexOf(n) < 0);

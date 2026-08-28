@@ -109,6 +109,20 @@ window.supabase = {
               return chain;
             },
             limit: function (n) { filtered = filtered.slice(0, n); return chain; },
+            // Paging, and the cap that made paging necessary.
+            //
+            // PostgREST answers a plain select with at most db-max-rows -- 1,000 by
+            // default — and says nothing about the rows it withheld. The app read the
+            // first page as if it were the table, so customers whose price-list rows fell
+            // past the cut had no items at all. window.__maxRows lets a suite reproduce
+            // that exactly: set it, and this fake truncates every page the same way the
+            // real server does.
+            range: function (from, to) {
+              var cap = window.__maxRows || Infinity;
+              var want = Math.min(to - from + 1, cap);
+              filtered = filtered.slice(from, from + want);
+              return chain;
+            },
             single: function () {
               if (window.__offline) return fail();
               return Promise.resolve(filtered.length

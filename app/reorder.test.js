@@ -43,6 +43,28 @@ async function opsOnTicket(ctx) {
 }
 const codes = (p) => p.evaluate(() => (window.__mkApp.ticket().items || []).map(x => x.code));
 
+// A real pointer drag from the grip, the way a person does it.
+//
+// This used to be page.dragTo(), which drives Chromium's HTML5 drag-and-drop. It passed
+// for two months while the feature did not work for anybody: four of the seven cells are
+// inputs and swallow a drag, dataTransfer.setData() was never called so Firefox and
+// Safari refused to start one, and HTML5 drag does not exist on touch at all — on the
+// phone this PWA is built for it could never have worked. Driving the pointer is what a
+// person actually does, and it is the only thing that would have caught any of that.
+async function dragRow(p, from, to) {
+  const grip = p.locator('tr[data-mk-row="' + from + '"] [title="Drag to reorder"]');
+  const target = p.locator('tr[data-mk-row="' + to + '"]');
+  const a = await grip.boundingBox();
+  const bx = await target.boundingBox();
+  await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await p.mouse.down();
+  // More than one move: a single jump can be delivered before the listeners attach.
+  await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + 6, { steps: 3 });
+  await p.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2, { steps: 8 });
+  await p.mouse.up();
+  await p.waitForTimeout(400);
+}
+
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 
@@ -50,12 +72,15 @@ const codes = (p) => p.evaluate(() => (window.__mkApp.ticket().items || []).map(
   {
     const ctx = await b.newContext();
     const p = await opsOnTicket(ctx);
-    const rows = p.locator('tr[draggable="true"]');
-    check('the item rows are reachable as draggables', await rows.count() === 4,
-      (await rows.count()) + ' draggable rows');
+    const rows = p.locator('tr[data-mk-row]');
+    check('the item rows are reachable', await rows.count() === 4,
+      (await rows.count()) + ' rows');
+    check('and each carries a grip to grab',
+      await p.locator('[title="Drag to reorder"]').count() === 4,
+      (await p.locator('[title="Drag to reorder"]').count()) + ' grips');
 
     const before = await codes(p);
-    await rows.nth(0).dragTo(rows.nth(2));
+    await dragRow(p, 0, 2);
     await p.waitForTimeout(600);
     const after = await codes(p);
     check('dragging a line moves it', JSON.stringify(before) !== JSON.stringify(after),
@@ -94,7 +119,7 @@ const codes = (p) => p.evaluate(() => (window.__mkApp.ticket().items || []).map(
     const ctx = await b.newContext();
     const p = await opsOnTicket(ctx);
     const rows = p.locator('tr[draggable="true"]');
-    await rows.nth(3).dragTo(rows.nth(0));
+    await dragRow(p, 3, 0);
     await p.waitForTimeout(600);
     const order = await codes(p);
     const wire = await p.evaluate(() => {
@@ -138,6 +163,72 @@ const codes = (p) => p.evaluate(() => (window.__mkApp.ticket().items || []).map(
     check('the app asks the database\'s question, word for word',
       q === 'Tools allocated reclaimed or back-to-base?', JSON.stringify(q));
     check('and no longer the one that demanded both', !/and back to base/.test(q || ''));
+    await ctx.close();
+  }
+
+  // ── It works with a finger, which is the whole point ─────────────────────
+  //
+  // HTML5 drag-and-drop has no touch equivalent, so the previous implementation could
+  // never have worked on a phone whatever else was fixed. Pointer events are one API for
+  // mouse, pen and touch — so drive it as a touch pointer and check.
+  {
+    const ctx = await b.newContext({ hasTouch: true, isMobile: true, viewport: { width: 430, height: 940 } });
+    const p = await opsOnTicket(ctx);
+    const before = await codes(p);
+    const moved = await p.evaluate(async () => {
+      const grip = document.querySelector('tr[data-mk-row="0"] [title="Drag to reorder"]');
+      const rows = Array.from(document.querySelectorAll('tr[data-mk-row]'));
+      if (!grip || rows.length < 3) return 'no grip';
+      const a = grip.getBoundingClientRect(), t = rows[2].getBoundingClientRect();
+      const ev = (type, x, y) => new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerType: 'touch', clientX: x, clientY: y });
+      grip.dispatchEvent(ev('pointerdown', a.x + 8, a.y + 8));
+      await new Promise(r => setTimeout(r, 40));
+      document.dispatchEvent(ev('pointermove', a.x + 8, t.y + t.height / 2));
+      await new Promise(r => setTimeout(r, 40));
+      document.dispatchEvent(ev('pointerup', a.x + 8, t.y + t.height / 2));
+      await new Promise(r => setTimeout(r, 300));
+      return 'done';
+    });
+    const after = await codes(p);
+    check('a finger can move a line, not just a mouse', moved === 'done' && after[0] !== before[0],
+      before.join(',') + ' -> ' + after.join(','));
+    check('and it is the same move a mouse would have made',
+      after.join(',') === [before[1], before[2], before[0], before[3]].join(','),
+      after.join(','));
+    // The grip stops the page scrolling under the finger instead of moving the row.
+    check('the grip opts out of the browser\'s own touch gestures',
+      await p.evaluate(() => getComputedStyle(
+        document.querySelector('[title="Drag to reorder"]')).touchAction) === 'none');
+    await ctx.close();
+  }
+
+  // ── A sealed ticket has nothing to grab ──────────────────────────────────
+  {
+    const ctx = await b.newContext();
+    const p = await opsOnTicket(ctx);
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      app.mutate(d => { d.tickets.find(y => y.id === app.state.activeId).status = 'approved'; });
+    });
+    await p.waitForTimeout(700);
+    check('an approved ticket offers no grips at all',
+      await p.locator('[title="Drag to reorder"]').count() === 0,
+      (await p.locator('[title="Drag to reorder"]').count()) + ' grips');
+    await ctx.close();
+  }
+
+  // ── Moving a line is a content change, so it is recorded ─────────────────
+  {
+    const ctx = await b.newContext();
+    const p = await opsOnTicket(ctx);
+    await dragRow(p, 0, 2);
+    const trail = await p.evaluate(() => (window.__mkApp.ticket().audit || []).map(a => a.kind + ' :: ' + a.text));
+    check('the reorder is in the ticket trail',
+      trail.some(x => /Line reordered/.test(x)), JSON.stringify(trail.slice(-1)));
+    check('and says which line went where',
+      trail.some(x => /A-1 moved from position 1 to 3/.test(x)),
+      JSON.stringify(trail.filter(x => /reordered/.test(x))));
     await ctx.close();
   }
 

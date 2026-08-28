@@ -1874,6 +1874,7 @@
               <table class="mk-items" style="width:100%;border-collapse:collapse;font-size:13px">
                 <thead>
                   <tr>
+                    <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:26px"></th>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Item No.</th>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Description</th>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:74px">Qty</th>
@@ -1885,7 +1886,12 @@
                 </thead>
                 <tbody>
                   <sc-for list="{{ curItems }}" as="it" hint-placeholder-count="3">
-                    <tr draggable="{{ it.draggable }}" onDragStart="{{ it.onDragStart }}" onDragOver="{{ it.onDragOver }}" onDrop="{{ it.onDrop }}" onDragEnd="{{ it.onDragEnd }}" style="cursor:{{ it.dragCursor }};opacity:{{ it.dragOpacity }}">
+                    <tr data-mk-row="{{ it.rowIndex }}" style="opacity:{{ it.dragOpacity }};background:{{ it.dragBg }}">
+                      <td style="padding:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);width:26px">
+                        <sc-if value="{{ it.canReorder }}" hint-placeholder-val="{{ true }}">
+                          <div onPointerDown="{{ it.onGrip }}" title="Drag to reorder" style="display:flex;align-items:center;justify-content:center;width:26px;height:32px;cursor:grab;color:var(--ink-faint);touch-action:none;user-select:none;-webkit-user-select:none">{{ it.gripGlyph }}</div>
+                        </sc-if>
+                      </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                         <input dir="auto" value="{{ it.desc }}" onChange="{{ it.onDesc }}" onFocus="{{ it.onDescFocus }}" onBlur="{{ it.onDescBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
@@ -3469,7 +3475,61 @@ function rowsChildren(t, idByName) {
 function hydrate() {
   const c = sb();
   if (!c) return Promise.reject(new Error('No server configured.'));
-  const all = (table, cols) => c.from(table).select(cols || '*');
+  // Everything in the table, not the first page of it.
+  //
+  // This was `c.from(table).select('*')` and nothing else, which quietly asks PostgREST
+  // for as much as PostgREST feels like sending — 1,000 rows by default. The price lists
+  // hold 2,610, so the app was receiving the first thousand and building the whole store
+  // out of them. Rows are grouped onto their client by id (`by(priceItems, 'client_id')`),
+  // so a customer whose rows fell past the cut simply had no items at all: measured
+  // against the live database, a capped fetch delivers Waha 689/689, HOO 311/421, and
+  // AGOCO, Sirte and Zueitina zero of 245, 372 and 883.
+  //
+  // Worse than a fixed truncation, it drifts. An unordered select returns rows in heap
+  // order, and any UPDATE rewrites that row to the end of the heap — so correcting one
+  // price silently changes which items exist for everybody, which is why some Waha lines
+  // could be missing from search one day and present the next.
+  //
+  // Ordered as well as paged: a stable order is what makes the page boundaries mean
+  // anything. Without it two pages can overlap or skip rows entirely.
+  //
+  // Four of these tables have no `id` column — permissions is keyed on permission_id,
+  // and ticket_crew, user_permissions and user_settings on their own columns. Ordering
+  // every table by 'id' would not have truncated them, it would have failed the request
+  // outright and taken the whole sign-in down with it, so the key is named per table
+  // rather than assumed. (All four are small enough that a second page never comes; the
+  // order is there to make the request valid, not to make it correct.)
+  const PAGE = 1000;
+  const ORDER_KEY = {
+    permissions: 'permission_id',
+    ticket_crew: 'ticket_id',
+    user_permissions: 'user_id',
+    user_settings: 'user_id',
+  };
+  const all = (table, cols) => {
+    const rows = [];
+    const step = (from) => c.from(table).select(cols || '*')
+      .order(ORDER_KEY[table] || 'id', { ascending: true })
+      .range(from, from + PAGE - 1)
+      .then((res) => {
+        // Same {data, error} shape the callers already destructure, so a failure on page
+        // three still reports like a failure on page one.
+        if (res.error) return res;
+        const got = res.data || [];
+        rows.push.apply(rows, got);
+        // Advance by what actually arrived, and stop only on an empty page.
+        //
+        // The obvious version — advance by PAGE, stop when a page comes back short — is
+        // wrong whenever the server's own cap is smaller than the page being asked for.
+        // Request 1,000, be handed 250, conclude the table ended at 250. db-max-rows is
+        // configurable and nothing here gets to know it, so the first draft of this fix
+        // would have worked on this project and quietly failed on one configured
+        // differently. A test with the cap set to 250 caught it.
+        if (!got.length) return { data: rows, error: null };
+        return step(from + got.length);
+      });
+    return step(0);
+  };
   return Promise.all([
     all('profiles'), all('clients'), all('price_list_items'), all('job_types'),
     all('ticket_numbering'), all('org_defaults'), all('asset_questions'),
@@ -4117,6 +4177,8 @@ const ICON_D = {
   // set, so it does not read as a paste from another icon family. The clapper is a
   // separate short arc rather than a filled circle: at 18px a filled dot closes up.
   bell:     ['M18 16v-5a6 6 0 10-12 0v5l-1.5 2.5h15L18 16z', 'M10.5 21a2 2 0 003 0'],
+  // Six dots in two columns — the universal "this is the part you grab".
+  grip:     ['M9 6h.01', 'M9 12h.01', 'M9 18h.01', 'M15 6h.01', 'M15 12h.01', 'M15 18h.01'],
   numbering:['M6 3h9l4 4v14H6z', 'M15 3v4h4', 'M9 12h6', 'M9 16h6'],
   people:   ['M9 11a3 3 0 100-6 3 3 0 000 6z', 'M3 19a6 6 0 0112 0', 'M16 5.5a3 3 0 010 5.6', 'M18 19a6 6 0 00-3-5.2'],
   system:   ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M12 2v3', 'M12 19v3', 'M2 12h3', 'M19 12h3', 'M4.9 4.9l2.2 2.2', 'M16.9 16.9l2.2 2.2', 'M19.1 4.9l-2.2 2.2', 'M7.1 16.9l-2.2 2.2'],
@@ -5948,6 +6010,60 @@ class Component extends DCLogic {
   // second download of the same sheets, and so the order cannot be got wrong by calling
   // these in the wrong sequence. The database enforces the same rule (migration 0039);
   // this is here so the app does not have to be told no.
+  // Moving a charged line up or down the list.
+  //
+  // Document-level listeners rather than listeners on the row: the pointer leaves the row
+  // the instant it starts moving, and a handler bound to the row would stop hearing about
+  // it exactly when it matters. setPointerCapture would do the same job, but the capture
+  // has to survive the runtime re-rendering the row under it, which it does not.
+  startItemDrag(ev, ticketId, from) {
+    if (typeof document === 'undefined') return;
+    // Stops the press turning into a text selection or a page scroll on the way.
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const table = ev.target && ev.target.closest && ev.target.closest('table');
+    if (!table) return;
+    const rowAt = (y) => {
+      let found = null;
+      Array.prototype.forEach.call(table.querySelectorAll('tr[data-mk-row]'), (r) => {
+        const b = r.getBoundingClientRect();
+        // Half-way down decides, so a line settles where the pointer looks like it is
+        // rather than only once it has fully covered the row below.
+        if (y >= b.top && y <= b.bottom) found = Number(r.getAttribute('data-mk-row'));
+      });
+      return found;
+    };
+    this.setState({ dragStartIndex: from, dragOverIndex: from });
+    const move = (e) => {
+      const to = rowAt(e.clientY);
+      if (to !== null && to !== this.state.dragOverIndex) this.setState({ dragOverIndex: to });
+    };
+    const finish = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', finish);
+      document.removeEventListener('pointercancel', finish);
+      const start = this.state.dragStartIndex, to = this.state.dragOverIndex;
+      this.setState({ dragStartIndex: undefined, dragOverIndex: undefined });
+      if (start === undefined || to === undefined || to === start) return;
+      const t = (this.state.data.tickets || []).find((x) => x.id === ticketId);
+      const moved = t && (t.items || [])[start];
+      this.mutate((d) => {
+        const x = (d.tickets || []).find((y) => y.id === ticketId);
+        if (!x || !x.items) return;
+        const [item] = x.items.splice(start, 1);
+        x.items.splice(to, 0, item);
+      });
+      // The order of the lines is what the customer reads down, so moving one is a
+      // content change like any other and belongs in the trail.
+      if (moved) {
+        this.logOn(ticketId, 'Line reordered: ' + (moved.code || '(no code)')
+          + ' moved from position ' + (start + 1) + ' to ' + (to + 1) + '.', 'edit');
+      }
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', finish);
+    document.addEventListener('pointercancel', finish);
+  }
+
   advanceTo(ticketId, next, note) {
     const t = (this.state.data.tickets || []).find((x) => x.id === ticketId);
     if (!t) return;
@@ -8998,33 +9114,30 @@ class Component extends DCLogic {
               + ' — ' + it.desc + ' (' + (it.qty === '' ? '—' : it.qty) + ' × ' + money(it.cost, this.ticketCurrency(t)) + ').', 'edit');
             this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.items.splice(i, 1); });
           },
-          // Drag-and-drop support for reordering items
-          draggable: !locked,
-          dragCursor: !locked ? 'grab' : 'default',
-          dragOpacity: (S.dragOverIndex === i && S.dragStartIndex !== undefined && S.dragStartIndex !== i) ? 0.6 : 1,
-          onDragStart: (ev) => {
-            if (locked) return;
-            this.setState({ dragStartIndex: i });
-          },
-          onDragOver: (ev) => {
-            if (locked || S.dragStartIndex === undefined) return;
-            ev.preventDefault();
-            ev.dataTransfer.dropEffect = 'move';
-            this.setState({ dragOverIndex: i });
-          },
-          onDrop: (ev) => {
-            if (locked || S.dragStartIndex === undefined || S.dragStartIndex === i) return;
-            ev.preventDefault();
-            this.mutate(d => {
-              const x = d.tickets.find(y => y.id === t.id);
-              const [item] = x.items.splice(S.dragStartIndex, 1);
-              x.items.splice(i, 0, item);
-            });
-            this.setState({ dragStartIndex: undefined, dragOverIndex: undefined });
-          },
-          onDragEnd: () => {
-            this.setState({ dragStartIndex: undefined, dragOverIndex: undefined });
-          },
+          // Reordering, by pointer rather than by HTML5 drag-and-drop.
+          //
+          // The old version set draggable on the <tr> and never worked outside a test.
+          // Three separate reasons, each enough on its own:
+          //
+          //   · Four of the seven cells are <input>. A drag begun inside a focusable
+          //     input selects text; it does not move the row. Only the code cell was
+          //     grabbable, and nothing on the row said so.
+          //   · onDragStart never called dataTransfer.setData(). Chrome is lenient;
+          //     Firefox and Safari refuse to begin a drag at all without it.
+          //   · HTML5 drag-and-drop does not exist on touch. This is a PWA. On the phone
+          //     it was meant to run on, no amount of fixing the other two would have
+          //     helped.
+          //
+          // Pointer events have none of those problems, and the grip gives the row a
+          // place that is obviously for grabbing. touch-action:none on the grip is what
+          // stops the phone scrolling the page instead of moving the line.
+          rowIndex: i,
+          canReorder: !locked,
+          gripGlyph: icon('grip', 15),
+          dragOpacity: (S.dragStartIndex === i) ? 0.45 : 1,
+          dragBg: (S.dragOverIndex === i && S.dragStartIndex !== undefined && S.dragStartIndex !== i)
+            ? 'var(--accent-wash)' : 'transparent',
+          onGrip: (ev) => { if (!locked) this.startItemDrag(ev, t.id, i); },
         };
       }) : [],
       ticketLocked: locked,
