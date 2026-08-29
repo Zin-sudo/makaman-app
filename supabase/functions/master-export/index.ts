@@ -14,6 +14,14 @@ import * as XLSX from 'https://esm.sh/xlsx@0.18.5'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+// Built once, at module scope. Deno Deploy keeps the isolate warm between invocations, so
+// this survives to the next call along with its connection pool; rebuilding it per
+// request threw both away. Nothing about it is per-caller — who is asking is established
+// from their own token in callerIsAllowed().
+const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+})
+
 const OBJECT_PATH = 'master/makaman-approved-jobs.xlsx'
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 const NONCE_MAX_AGE_MS = 2 * 60 * 1000
@@ -72,12 +80,48 @@ async function callerIsAllowed(req: Request, db: ReturnType<typeof createClient>
 }
 
 Deno.serve(async (req) => {
+  // Answered before anything else is touched: no client, no auth, no database.
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+  const t0 = performance.now()
+  const at = (): number => Math.round(performance.now() - t0)
 
   const who = await callerIsAllowed(req, db)
+  const tAuth = at()
   if (!who.ok) return json({ error: who.why }, 401)
+
+  // Nothing has changed since the last good run — hand back the file that already exists.
+  //
+  // This function is on a schedule, and the schedule does not know whether anybody
+  // approved anything. Most runs rebuild an identical workbook: read every row, lay out
+  // a sheet, serialise it, and upload it over a byte-identical predecessor. The
+  // expensive half of that is skipped when the newest approval is older than the last
+  // successful run.
+  //
+  // Compared against approved_at rather than a row count, because a count is unchanged by
+  // a ticket being re-approved after a correction — which is exactly the case this file
+  // exists to pick up. Two cheap reads decide it, and either one being unavailable falls
+  // through to a rebuild: the wrong answer here is a stale file finance is trusting, so
+  // the doubt is always resolved by doing the work.
+  const [{ data: lastRun }, { data: newest }] = await Promise.all([
+    db.from('export_runs').select('finished_at, object_path, row_count')
+      .eq('kind', 'master').eq('status', 'ok')
+      .order('finished_at', { ascending: false }).limit(1).maybeSingle(),
+    db.from('tickets').select('approved_at')
+      .not('approved_at', 'is', null)
+      .order('approved_at', { ascending: false }).limit(1).maybeSingle(),
+  ])
+  const force = new URL(req.url).searchParams.get('force') === '1'
+  if (!force && lastRun?.finished_at && lastRun?.object_path) {
+    const lastAt = new Date(lastRun.finished_at as string).getTime()
+    const newestAt = newest?.approved_at ? new Date(newest.approved_at as string).getTime() : 0
+    if (newestAt && newestAt < lastAt) {
+      console.log(JSON.stringify({ fn: 'master-export', outcome: 'unchanged',
+        total_ms: at(), auth_ms: tAuth, by: who.why }))
+      return json({ ok: true, unchanged: true, rows: lastRun.row_count ?? null,
+        path: lastRun.object_path, by: who.why })
+    }
+  }
 
   // Claim the run first, so a failure leaves a record saying why the file is stale
   // instead of leaving the last success looking current.
@@ -113,17 +157,22 @@ Deno.serve(async (req) => {
       ? XLSX.utils.json_to_sheet(list, { header: HEADERS })
       : XLSX.utils.aoa_to_sheet([HEADERS])
 
-    // Widths from the content, so nothing opens as ####. Capped, because one long
-    // customer name should not push Total off the screen.
-    sheet['!cols'] = HEADERS.map((h) => {
-      let widest = h.length
-      for (const r of list) {
-        const v = (r as Record<string, unknown>)[h]
+    // Widths in one pass over the rows rather than one pass PER COLUMN.
+    //
+    // This was HEADERS.map() with a loop over every row inside it — twenty-one full
+    // sweeps of the export to measure twenty-one columns, when one sweep can measure all
+    // of them. Same output, same cap: nothing opens as ####, and one long customer name
+    // still cannot push Total off the screen.
+    const widest = HEADERS.map((h) => h.length)
+    for (const r of list) {
+      const row = r as Record<string, unknown>
+      for (let i = 0; i < HEADERS.length; i++) {
+        const v = row[HEADERS[i]]
         const n = v === null || v === undefined ? 0 : String(v).length
-        if (n > widest) widest = n
+        if (n > widest[i]) widest[i] = n
       }
-      return { wch: Math.min(Math.max(widest + 2, 10), 40) }
-    })
+    }
+    sheet['!cols'] = widest.map((w) => ({ wch: Math.min(Math.max(w + 2, 10), 40) }))
     sheet['!freeze'] = { xSplit: 0, ySplit: 1 }
 
     const book = XLSX.utils.book_new()
@@ -133,7 +182,15 @@ Deno.serve(async (req) => {
     const { error: upErr } = await db.storage.from('exports').upload(
       OBJECT_PATH,
       new Blob([buf], { type: XLSX_MIME }),
-      { contentType: XLSX_MIME, upsert: true },
+      // A minute, explicitly, rather than Supabase Storage's hour-long default.
+      //
+      // The review that prompted this asked for a LONG cache so repeat downloads would
+      // not hit the Edge Function. They never did — downloads go to Storage through a
+      // signed URL and this function is not in that path at all. What the default hour
+      // actually buys is finance opening a workbook that is up to an hour out of date
+      // immediately after somebody pressed Rebuild to fix it, which is the one thing
+      // this file must not do. Sixty seconds still absorbs a burst of downloads.
+      { contentType: XLSX_MIME, upsert: true, cacheControl: '60' },
     )
     if (upErr) return await fail(upErr.message)
 
@@ -144,6 +201,8 @@ Deno.serve(async (req) => {
       object_path: OBJECT_PATH,
     }).eq('id', run.id)
 
+    console.log(JSON.stringify({ fn: 'master-export', outcome: 'rebuilt',
+      rows: list.length, total_ms: at(), auth_ms: tAuth, by: who.why }))
     return json({ ok: true, rows: list.length, path: OBJECT_PATH, by: who.why })
   } catch (err) {
     return await fail(err instanceof Error ? err.message : String(err))

@@ -12,6 +12,74 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+// Built once, at module scope, not per request.
+//
+// Deno Deploy keeps an isolate warm between invocations, so anything at module scope
+// survives to the next call. Creating the client inside the handler rebuilt it — and the
+// object it hands back is a stateless REST wrapper with a connection pool behind it, so
+// rebuilding it threw away warm connections along with it. Nothing about it is per-caller:
+// the caller's identity is derived from their own JWT below, never from this client.
+const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+})
+
+// Identity, cached. Authority, never.
+//
+// Checking who is calling costs two round trips: one to the auth server to validate the
+// token, one to Postgres for their role. Only the first of those is cacheable, and the
+// distinction is the whole point of this being safe:
+//
+//   · WHO a token belongs to cannot change. A JWT is signed; the subject inside it is
+//     fixed for the life of the token. Asking the auth server the same question about the
+//     same string twice in one minute gets the same answer both times.
+//   · WHAT they are allowed to do changes all the time — a promotion, a withdrawal, an
+//     account disabled thirty seconds ago. That is read from `profiles` on EVERY request,
+//     cache or no cache, because a stale answer there is a security hole rather than a
+//     slow page.
+//
+// Keyed on a hash of the token, so the isolate is not left holding a pile of live
+// credentials in memory. Entries expire at 60 seconds or at the token's own expiry,
+// whichever comes first, and the map is swept rather than allowed to grow.
+const IDENTITY_TTL_MS = 60_000
+const identityCache = new Map<string, { id: string; email: string; until: number }>()
+
+async function tokenKey(jwt: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(jwt))
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+// The token's own expiry, read from the payload WITHOUT trusting it for anything else.
+// It is only ever used to shorten the cache lifetime, never to lengthen it and never to
+// decide who somebody is — the signature check that establishes that is done by the auth
+// server on the first call, which is exactly the call being cached.
+function tokenExpiryMs(jwt: string): number {
+  try {
+    const part = jwt.split('.')[1]
+    if (!part) return 0
+    const payload = atob(part.replace(/-/g, '+').replace(/_/g, '/'))
+    const exp = JSON.parse(payload).exp
+    return typeof exp === 'number' ? exp * 1000 : 0
+  } catch { return 0 }
+}
+async function identify(jwt: string): Promise<{ id: string; email: string } | null> {
+  const now = Date.now()
+  const key = await tokenKey(jwt)
+  const hit = identityCache.get(key)
+  if (hit && hit.until > now) return { id: hit.id, email: hit.email }
+
+  const { data, error } = await admin.auth.getUser(jwt)
+  if (error || !data?.user) { identityCache.delete(key); return null }
+
+  // Swept on write rather than on a timer: a timer keeps the isolate alive, and there is
+  // never enough in here to be worth more than a linear pass.
+  if (identityCache.size > 200) {
+    for (const [k, v] of identityCache) if (v.until <= now) identityCache.delete(k)
+  }
+  const exp = tokenExpiryMs(jwt)
+  const until = exp ? Math.min(now + IDENTITY_TTL_MS, exp) : now + IDENTITY_TTL_MS
+  identityCache.set(key, { id: data.user.id, email: data.user.email ?? '', until })
+  return { id: data.user.id, email: data.user.email ?? '' }
+}
+
 // The seeded first Admin. Permanently un-disableable, by design rather than by
 // convention: it is the account that can rescue every other one, and an office
 // that locks itself out has no way back in.
@@ -22,29 +90,52 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-}
-
 Deno.serve(async (req) => {
+  // The preflight answers before anything else is touched — no client, no auth, no
+  // database. A browser sends one of these ahead of every cross-origin POST, so it is
+  // half of all traffic here and none of it needs to know who is asking.
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  // Timing, so a claim about this being fast can be checked rather than believed. The
+  // header is for the browser (the app logs anything over a second); the log line is for
+  // the Logs Explorer, as JSON so it can be queried rather than grepped.
+  const t0 = performance.now()
+  const at = (): number => Math.round(performance.now() - t0)
+  let tAuth = 0, tRole = 0, action = ''
+  // Every exit goes through here, so the timing line cannot be forgotten on the one path
+  // that turns out to matter — and there are thirty-odd of them.
+  const json = (body: unknown, status = 200) => {
+    const total = at()
+    console.log(JSON.stringify({
+      fn: 'admin-actions', action: action || '(none)', status,
+      total_ms: total, auth_ms: tAuth, role_ms: tRole,
+      // A warm isolate answers identity from memory; a cold one pays the auth round trip.
+      // Which of the two happened is the single most useful thing in this line.
+      identity: tAuth && tAuth < 5 ? 'cached' : 'fetched',
+    }))
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Response-Time': total + 'ms' },
+    })
+  }
 
   const authHeader = req.headers.get('Authorization') ?? ''
   const jwt = authHeader.replace('Bearer ', '')
   if (!jwt) return json({ error: 'Missing Authorization header.' }, 401)
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
-
   // Re-derive the caller's identity from their own JWT — never trust the body.
-  const { data: callerUser, error: callerErr } = await admin.auth.getUser(jwt)
-  if (callerErr || !callerUser?.user) return json({ error: 'Invalid session.' }, 401)
-  const callerId = callerUser.user.id
+  const caller = await identify(jwt)
+  tAuth = at()
+  if (!caller) return json({ error: 'Invalid session.' }, 401)
+  const callerId = caller.id
 
+  // Read fresh every time. See identify(): identity is cached, authority is not.
   const { data: callerProfile, error: profileErr } = await admin
     .from('profiles')
     .select('role, status')
     .eq('id', callerId)
     .single()
+  tRole = at() - tAuth
   if (profileErr || !callerProfile) return json({ error: 'Caller profile not found.' }, 403)
 
   const isStaff = ['ops_manager', 'admin'].includes(callerProfile.role) && callerProfile.status === 'active'
@@ -56,7 +147,7 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'Invalid JSON body.' }, 400)
   }
-  const action = body.action as string
+  action = body.action as string
 
   try {
     if (action === 'approve_signup') {
@@ -198,20 +289,28 @@ Deno.serve(async (req) => {
 
       // Every place a person leaves a mark. Counted rather than assumed, so the message
       // can say which ones and the admin can go and look.
-      const held: string[] = []
-      const countIn = async (table: string, column: string, label: string) => {
-        const { count } = await admin.from(table).select('*', { count: 'exact', head: true }).eq(column, userId)
-        if (count && count > 0) held.push(`${count} ${label}`)
-      }
-      await countIn('tickets', 'technician_id', 'ticket(s) as the technician')
-      await countIn('tickets', 'holder_id', 'ticket(s) they hold')
-      await countIn('tickets', 'approved_by', 'ticket(s) they approved')
-      await countIn('tickets', 'closed_by', 'ticket(s) they closed')
-      await countIn('ticket_crew', 'profile_id', 'job(s) they were crewed on')
-      await countIn('audit_log', 'changed_by', 'audit entries')
-      await countIn('ticket_lines', 'edited_by', 'edited job-log line(s)')
-      await countIn('ticket_notes', 'raised_by', 'note(s) raised')
-      await countIn('ticket_attachments', 'uploaded_by', 'attachment(s)')
+      //
+      // All nine at once. They were nine sequential awaits — nine round trips before the
+      // admin learned whether one button had worked, and not one of them depended on the
+      // one before it. The order of the RESULTS still matters, because the refusal reads
+      // as a sentence, so they are declared in order and gathered in order; only the
+      // waiting is shared.
+      const PLACES: Array<[string, string, string]> = [
+        ['tickets', 'technician_id', 'ticket(s) as the technician'],
+        ['tickets', 'holder_id', 'ticket(s) they hold'],
+        ['tickets', 'approved_by', 'ticket(s) they approved'],
+        ['tickets', 'closed_by', 'ticket(s) they closed'],
+        ['ticket_crew', 'profile_id', 'job(s) they were crewed on'],
+        ['audit_log', 'changed_by', 'audit entries'],
+        ['ticket_lines', 'edited_by', 'edited job-log line(s)'],
+        ['ticket_notes', 'raised_by', 'note(s) raised'],
+        ['ticket_attachments', 'uploaded_by', 'attachment(s)'],
+      ]
+      const counted = await Promise.all(PLACES.map(([table, column, label]) =>
+        admin.from(table).select('*', { count: 'exact', head: true }).eq(column, userId)
+          .then(({ count }: { count: number | null }) =>
+            (count && count > 0) ? `${count} ${label}` : '')))
+      const held = counted.filter(Boolean)
 
       if (held.length) {
         return json({

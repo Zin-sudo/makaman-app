@@ -17,7 +17,10 @@ const SHELL = [
   './manifest.webmanifest',
   './vendor/react.production.min.js',
   './vendor/react-dom.production.min.js',
-  './vendor/babel.min.js',
+  // Babel is deliberately not shipped — the app has no .jsx/.tsx x-import, which is the
+  // runtime's only use for it, and precaching 3.0 MB per version bump over a field
+  // connection to stand ready for that is the most expensive nothing in this app.
+  // See the comment beside the script tags in index.html.
   './vendor/fonts.css',
   // Both load at boot, before support.js, so a cold start without signal must find them
   // in the cache or the app comes up with no idea who it trusts to sign anyone in.

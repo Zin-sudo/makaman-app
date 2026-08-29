@@ -74,6 +74,19 @@ const BASE_DB = {
 // upsert, insert, delete-eq. Every write is appended to window.__writes so the test can
 // assert on how much traffic a change produced, not merely on its effect.
 const STUB = (db) => `
+// Every request this fake answers. The app's latency is dominated by how many times it
+// goes to the server, not by how long each one takes locally, so that count is the thing
+// worth asserting on — and it is invisible unless something counts it.
+window.__rtt = 0;
+// Round trips are only half the story: what costs is how many of them are SEQUENTIAL.
+// Set this and every answer is delayed, so a suite can measure the critical path in
+// wall-clock rather than counting requests and guessing at the shape.
+window.__stubLatency = 0;
+window.__wire = function (body) {
+  var ms = window.__stubLatency || 0;
+  if (!ms) return Promise.resolve(body);
+  return new Promise(function (r) { setTimeout(function () { r(body); }, ms); });
+};
 window.__writes = [];
 window.__uploads = [];
 window.__removed = [];
@@ -94,6 +107,14 @@ window.supabase = {
           var filtered = rows.slice();
           var wantCount = !!(opts && opts.count);
           var head = !!(opts && opts.head);
+          // The count PostgREST returns is the size of the whole result set, BEFORE the
+          // range is applied — that is the entire point of asking for it alongside a
+          // page. This used to report the length AFTER the slice, which is the size of
+          // the PAGE, and a pager driven by that count would read one page here
+          // and stop, then read one page in production and stop. A fake that agrees with
+          // a bug is worse than no fake.
+          var ranged = false;
+          var preRangeCount = 0;
           var chain = {
             eq: function (col, val) { filtered = filtered.filter(function (r) { return r[col] === val; }); return chain; },
             // The app orders and limits the export_runs lookup. Both are called
@@ -122,23 +143,27 @@ window.supabase = {
             range: function (from, to) {
               var cap = window.__maxRows || Infinity;
               var want = Math.min(to - from + 1, cap);
+              if (!ranged) { ranged = true; preRangeCount = filtered.length; }
               filtered = filtered.slice(from, from + want);
               return chain;
             },
             single: function () {
+              window.__rtt++;
               if (window.__offline) return fail();
-              return Promise.resolve(filtered.length
+              return window.__wire(filtered.length
                 ? { data: filtered[0], error: null }
                 : { data: null, error: { message: 'no rows' } });
             },
             then: function (ok, no) {
+              window.__rtt++;
               // head:true asks for the tally and no rows. The self-check compares that
               // tally against what the device holds, so a stub that ignored it would
               // hand the app undefined and let it report a shortfall of NaN.
               var body = wantCount
-                ? { data: head ? null : filtered, count: filtered.length, error: null }
+                ? { data: head ? null : filtered,
+                    count: ranged ? preRangeCount : filtered.length, error: null }
                 : { data: filtered, error: null };
-              return (window.__offline ? fail() : Promise.resolve(body)).then(ok, no);
+              return (window.__offline ? fail() : window.__wire(body)).then(ok, no);
             },
           };
               // Anything the app calls that this stub has not learned yet is named out loud.
@@ -230,7 +255,14 @@ window.supabase = {
       auth: {
         signInWithPassword: function (c) {
           if (window.__offline) return fail();
-          var p = db.profiles.filter(function (r) { return r.email === c.email; })[0];
+          // Case-insensitively, because GoTrue is. The live project holds a profile
+          // spelled 'Lateri@makaman.ly' while the app sends what was typed in lower
+          // case, and a stub that compared exactly refused a sign-in the real server
+          // accepts — which is a fake inventing a bug rather than reproducing one.
+          var want = String(c.email || '').toLowerCase();
+          var p = db.profiles.filter(function (r) {
+            return String(r.email || '').toLowerCase() === want;
+          })[0];
           if (p) window.__stubUser = p.id;
           return Promise.resolve(p
             ? { data: { user: { id: p.id } }, error: null }
