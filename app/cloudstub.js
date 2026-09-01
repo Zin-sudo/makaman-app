@@ -92,10 +92,21 @@ window.__uploads = [];
 window.__removed = [];
 window.__signed = [];
 window.__db = ${JSON.stringify(db)};
-window.__offline = false;
+// Preset by an init script when a suite needs the app to boot with no signal at all.
+// Plain assignment overwrote that before the app had run a single line, so "start
+// offline" was impossible and any test of the boot path raced the first drain.
+window.__offline = window.__offline || false;
 // Fault knobs, so the failure paths can be driven rather than reasoned about.
 window.__failUpload = false;
 window.__failInsert = '';
+// What the fake server refuses WITH, when it refuses.
+//
+// A refusal is not one thing. The app now sorts them — a wrong type, a policy, a clashing
+// key, a dead connection all take different words and produce different codes in the
+// error log — and a fake that always says the same sentence can only ever test one of
+// those branches. So the sentence is the suite's to choose, and it uses the real ones
+// Postgres and PostgREST send.
+window.__failMessage = '';
 window.supabase = {
   createClient: function () {
     var db = window.__db;
@@ -204,6 +215,14 @@ window.supabase = {
         },
         upsert: function (row, opts) {
           if (window.__offline) return fail();
+          // Refusable too, and it has to be: upsert is the app's main write path — every
+          // ticket header, every audit entry and every job-log line goes out that way,
+          // and insert() is reached only for an attachment row. A fault knob that covers
+          // insert alone can only break the one path the app almost never takes.
+          if (window.__failInsert === table) {
+            return Promise.resolve({ data: null, error: {
+              message: window.__failMessage || 'row refused by the database' } });
+          }
           window.__writes.push({ table: table, action: 'upsert', n: 1 });
           var key = (opts && opts.onConflict) || (table === 'user_settings' ? 'user_id' : 'id');
           var at = -1;
@@ -213,7 +232,10 @@ window.supabase = {
         },
         insert: function (rs) {
           if (window.__offline) return fail();
-          if (window.__failInsert === table) return Promise.resolve({ data: null, error: { message: 'row refused by the database' } });
+          if (window.__failInsert === table) {
+            return Promise.resolve({ data: null, error: {
+              message: window.__failMessage || 'row refused by the database' } });
+          }
           // supabase-js takes a single row or an array. This took only an array, so the
           // app inserting one object hit rs.forEach === undefined — a TypeError thrown
           // inside the send, which looks exactly like the server refusing the write.

@@ -74,10 +74,14 @@ async function open(ctx, cfg) {
       // Every function the extracted set actually calls has to come with it. Miss one and
       // it is undefined in here, which is how a ReferenceError got mistaken for a quota
       // error and this suite went red for a reason that had nothing to do with the queue.
+      // outboxSetAside now writes the refusal to the error log as well as to the
+      // dead-letter — the same fact, once for the person and once for whoever has to fix
+      // it — so logError and the classifier it leans on come along too.
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
-                     'outboxSetAside', 'outboxDrain']
+                     'errorKind', 'logError', 'outboxSetAside', 'outboxDrain']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
+      const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
       localStorage.setItem(OUTBOX_K, JSON.stringify([
         { key: 'poison', table: 'profiles', action: 'upsert', row: { id: 'x' } },
         { key: 'good', table: 'clients', action: 'upsert', row: { id: 'y' } },
@@ -91,10 +95,11 @@ async function open(ctx, cfg) {
               : (goodSent++, { error: null })),
         }),
       };
-      const fn = new Function('OUTBOX_K', 'DEADLETTER_K', 'OUTBOX_TRIES', 'sb', `
+      const fn = new Function('OUTBOX_K', 'DEADLETTER_K', 'OUTBOX_TRIES', 'ERRLOG_K',
+                              'ERRLOG_MAX', 'sb', `
         ${parts}
         return outboxDrain;
-      `)(OUTBOX_K, DEADLETTER_K, 5, () => stub);
+      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, () => stub);
 
       const runs = [];
       for (let i = 0; i < 6; i++) runs.push(await fn());
@@ -103,9 +108,13 @@ async function open(ctx, cfg) {
         goodSent: goodSent,
         left: JSON.parse(localStorage.getItem(OUTBOX_K) || '[]').length,
         refused: JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]').map(d => d.op.table),
+        logged: JSON.parse(localStorage.getItem(ERRLOG_K) || '[]')
+          .map(e => e.code + ' on ' + (e.ctx || {}).table),
       };
     });
 
+    check('the refused op is written to the error log with a code',
+      out.logged.indexOf('MK-SYNC-RLS on profiles') >= 0, out.logged.join(' | '));
     check('the refused op holds its place while it is still worth retrying', out.runs[0] === 0,
       'first drain sent ' + out.runs[0]);
     check('the write behind it eventually gets through', out.goodSent === 1,

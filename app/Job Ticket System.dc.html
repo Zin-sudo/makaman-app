@@ -1541,6 +1541,27 @@
                   </button>
                 </sc-for>
               </div>
+              <!-- ══ ERROR LOG ══ -->
+              <!-- The same card as the desk screen below, because there are two Account
+                   screens — this one inside the phone frame, that one for the office —
+                   and a card in only one of them is invisible to whichever role does not
+                   use it. That is exactly how the first version of this shipped: it sat
+                   in the office's half, and the technician, who meets more of these
+                   failures than anybody, could not reach it. -->
+              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-top:12px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                  <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:{{ errBadgeBg }};color:{{ errBadgeFg }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">MD</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Error log</div>
+                    <div style="font-size:12px;color:{{ errTone }};margin-top:2px">{{ errState }}</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button onClick="{{ downloadErrors }}" disabled="{{ errEmpty }}" style="flex:1;min-width:130px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download .md</button>
+                  <button onClick="{{ askClearErrors }}" disabled="{{ errEmpty }}" style="min-width:100px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Clear</button>
+                </div>
+                <div style="font-size:11px;color:var(--ink-faint);margin-top:8px;line-height:1.45">Every refusal and failure this device has met, each with a code. Send it to the office at the end of the day — it carries no passwords, prices or customer details.</div>
+              </div>
               <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:18px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
               <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:var(--ink-faint);margin-top:14px">BUILD {{ buildStamp }}</div>
             </sc-if>
@@ -1714,7 +1735,7 @@
             <select value="{{ md.tech }}" onChange="{{ fm.tech }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
               <option value="">Select a technician…</option>
               <sc-for list="{{ techOptions }}" as="o" hint-placeholder-count="2">
-                <option value="{{ o.name }}">{{ o.name }}</option>
+                <option value="{{ o.name }}">{{ o.label }}</option>
               </sc-for>
             </select>
           </div>
@@ -1874,6 +1895,26 @@
                   <input dir="auto" value="{{ cur.mileage }}" onChange="{{ f.mileage }}" onFocus="{{ onMileageFocus }}" onBlur="{{ onMileageBlur }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:var(--ink-faint)">{{ mileageNote }}</div>
                 </div>
+                <!-- The customer, correctable from review.
+                     A technician opening a ticket picks the customer before he has done
+                     any of the work, on a phone, at the gate. Getting it wrong is easy
+                     and the consequence is not cosmetic: the customer decides which price
+                     list the charged lines come from, so a wrong one is a ticket priced
+                     against the wrong contract. It could be fixed by withdrawing the
+                     ticket and starting again, which is why nobody did.
+                     Office only, and only while the ticket is still open — see
+                     customerEditable. -->
+                <sc-if value="{{ customerEditable }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:260px">
+                    <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Customer</label>
+                    <select value="{{ cur.customer }}" onChange="{{ pickReviewCustomer }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+                      <sc-for list="{{ customerOptions }}" as="co" hint-placeholder-count="3">
+                        <option value="{{ co.name }}">{{ co.name }}</option>
+                      </sc-for>
+                    </select>
+                    <div style="font-size:11px;margin-top:5px;color:{{ customerNoteTone }}">{{ customerNote }}</div>
+                  </div>
+                </sc-if>
               </div>
             </div>
 
@@ -2997,6 +3038,28 @@
             </button>
           </sc-for>
         </div>
+        <!-- ══ ERROR LOG ══ -->
+        <!-- Under the account tiles, beside Self-check, because that is the one part of
+             this screen every role renders — the office and the technician have entirely
+             different Account pages above it, and the first version of this card sat in
+             the office's half where a technician could never see it. The two belong
+             together anyway: both are "something is wrong, get help", and the failures
+             most worth reading are the ones a technician hits at a wellhead, where he is
+             least able to stop and describe them. -->
+        <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:{{ errBadgeBg }};color:{{ errBadgeFg }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">MD</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Error log</div>
+              <div style="font-size:12px;color:{{ errTone }};margin-top:2px">{{ errState }}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button onClick="{{ downloadErrors }}" disabled="{{ errEmpty }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download .md</button>
+            <button onClick="{{ askClearErrors }}" disabled="{{ errEmpty }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Clear</button>
+          </div>
+          <div style="font-size:11px;color:var(--ink-faint);margin-top:8px;line-height:1.45">Every refusal and failure this device has met, each with a code. Download it at the end of a day's testing and send it on — it names the build, the account and what the server actually said. It carries no passwords, prices or customer details.</div>
+        </div>
         <button onClick="{{ doLogout }}" style="width:100%;min-height:46px;margin-top:20px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid rgba(var(--danger-rgb),0.4)">Log out</button>
         <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:var(--ink-faint);margin-top:14px">BUILD {{ buildStamp }}</div>
       </sc-if>
@@ -3342,7 +3405,8 @@ function adminAction(action, payload) {
       }
       if (r.data && r.data.error) throw new Error(r.data.error);
       return r.data;
-    });
+    })
+    .catch((e) => { logError('admin', e, { action: action }); throw e; });
   // Cleared on settle, either way. A failed call that stayed in the map would make the
   // button permanently dead — the one outcome worse than sending it twice.
   const done = () => { inFlight.delete(key); setBusy(-1); };
@@ -3388,6 +3452,101 @@ const CLOUD_IDS = { job: {}, me: null };
 const CACHE_K = 'makaman.cloud.v1';
 const OUTBOX_K = 'makaman.outbox.v1';
 const DEADLETTER_K = 'makaman.outbox.refused.v1';
+const ERRLOG_K = 'makaman.errorlog.v1';
+
+// ── The error log ────────────────────────────────────────────────────────────
+//
+// Every refusal and every failure this app meets, written down with a code, and
+// downloadable as one markdown file at the end of a day's testing.
+//
+// The reason it exists: a yellow banner reading "the server would not accept this change
+// from your account" is true and useless. It cannot say WHICH change, WHICH account rule,
+// or what the database actually said — and the person reading it is at a wellhead, not in
+// a debugger. Every fault in this project so far has cost a screenshot, a description,
+// and a round of guessing before anyone could look at the right line. The uuid primary
+// key took two reports to place.
+//
+// So each failure gets a stable code. The code is not a serial number — it is
+// AREA + KIND, both derived from facts rather than assigned by hand, so the same fault
+// always produces the same code and two different faults never share one:
+//
+//   MK-SYNC-TYPE   a queued change was refused because a value had the wrong type
+//   MK-FILE-RLS    uploading a file was refused by a row-level security policy
+//   MK-AUTH-NET    signing in could not reach the server
+//
+// Identical failures are counted rather than repeated, so a day of one broken button is
+// one entry saying x47 instead of forty-seven entries. The file names the build, the
+// account, the role and the exact server text, which is everything needed to go straight
+// to the line.
+const ERRLOG_MAX = 400;
+// What went wrong, from what the server or the browser actually said. Ordered most
+// specific first: 'permission denied for table x' contains neither 'network' nor
+// 'duplicate', but a message can easily contain two of the looser words.
+function errorKind(err) {
+  const raw = String((err && (err.message || err.details || err.hint || err.error)) || err || '');
+  if (/MK_STALE/.test(raw)) return 'STALE';
+  if (/invalid input syntax|invalid input value|out of range/i.test(raw)) return 'TYPE';
+  if (/duplicate key|already exists|unique constraint/i.test(raw)) return 'DUP';
+  if (/row-level security|permission denied|not allowed|violates/i.test(raw)) return 'RLS';
+  if (/JWT|invalid session|not authenticated|refresh token/i.test(raw)) return 'AUTH';
+  if (/quota|exceeded the storage|QuotaExceeded/i.test(raw)) return 'QUOTA';
+  if (/failed to fetch|network|offline|timeout|load failed/i.test(raw)) return 'NET';
+  if (/no rows|not found|404/i.test(raw)) return 'MISSING';
+  if (/foreign key|violates foreign/i.test(raw)) return 'LINK';
+  return 'UNKNOWN';
+}
+// One line in the log. `area` says which part of the app was working; `ctx` is whatever
+// makes the entry actionable — the table, the action, the ticket, the file.
+function logError(area, err, ctx) {
+  try {
+    const kind = errorKind(err);
+    const code = 'MK-' + String(area || 'APP').toUpperCase() + '-' + kind;
+    const raw = String((err && (err.message || err.details || err.hint || err.error)) || err || '')
+      .slice(0, 400);
+    const list = JSON.parse(localStorage.getItem(ERRLOG_K) || '[]');
+    // Grouped on everything that would make two entries the same fault. The context is
+    // part of the key, so the same code against two different tables stays two entries.
+    const key = code + '|' + raw + '|' + JSON.stringify(ctx || {});
+    const hit = list.find((e) => e.key === key);
+    const now = new Date().toISOString();
+    if (hit) { hit.n += 1; hit.last = now; }
+    else {
+      list.push({ key: key, code: code, kind: kind, area: String(area || 'APP').toUpperCase(),
+        raw: raw, ctx: ctx || {}, n: 1, first: now, last: now });
+    }
+    // Oldest first, so the cap drops history rather than the fault happening right now.
+    localStorage.setItem(ERRLOG_K, JSON.stringify(list.slice(-ERRLOG_MAX)));
+  } catch (e) { /* the log must never become the problem it exists to report */ }
+}
+// The code, said in words. Kept here rather than in the report so the two halves of a
+// code cannot drift apart from the thing that produces them.
+const ERROR_AREA = {
+  SYNC: 'Sending a change to the office',
+  ADMIN: 'A privileged action (accounts, roles, passwords)',
+  FILE: 'Uploading or opening an attachment',
+  AUTH: 'Signing in',
+  LOAD: 'Pulling everything down from the office',
+  STORE: 'Saving to this device',
+  APP: 'The app itself',
+};
+const ERROR_KIND = {
+  RLS: 'The database refused it under a row-level security policy — the signed-in account is not permitted to write that row.',
+  TYPE: 'A value had the wrong type or shape for its column.',
+  DUP: 'Something with that key already exists.',
+  STALE: 'Somebody else changed it first, so this version was not written over theirs.',
+  AUTH: 'The session was not accepted.',
+  QUOTA: 'The device is out of room.',
+  NET: 'The server could not be reached.',
+  MISSING: 'The row or file was not there.',
+  LINK: 'It pointed at something that does not exist.',
+  UNKNOWN: 'Not classified — read the server text below.',
+};
+function errorLogRead() {
+  try { return JSON.parse(localStorage.getItem(ERRLOG_K) || '[]'); } catch (e) { return []; }
+}
+function errorLogCount() {
+  return errorLogRead().reduce((n, e) => n + (e.n || 1), 0);
+}
 // Enough attempts to ride out a bad connection, few enough that a write the database
 // will never accept stops blocking the queue within one working session.
 const OUTBOX_TRIES = 5;
@@ -3869,18 +4028,53 @@ function repairTicketIds(data) {
     (t.audit || []).forEach((a) => { if (a && !a.id) a.id = uuid(); });
   });
   const n = Object.keys(ids).length;
-  if (!n) return { fixed: 0, ids: ids };
-  // Anything queued against a dead id is unsendable. Dropping it is not data loss: the
-  // ticket itself is intact in the store and is re-queued under the new id on the next
-  // change-tracking pass, which is the only version the server can actually accept.
+  // Purged whether or not a ticket was renamed here, which is the part that was missing.
+  //
+  // The old version built its list of dead ids from tickets it could still SEE, so an op
+  // queued against a ticket that has since gone — withdrawn, or replaced by the server's
+  // version on a hydrate — matched nothing and stayed for ever. That is the banner an Ops
+  // Manager was left staring at: "10 changes were refused ... invalid input syntax for
+  // type uuid: k1787950609277", every session, with no ticket by that name anywhere on
+  // the device and no way to clear it.
+  //
+  // The rule needs no ticket at all: tickets.id is a uuid column, so an op naming a
+  // ticket id that is not a uuid can never be accepted by any server, ever. It is not a
+  // pending change, it is a permanent error wearing a pending change's clothes.
+  const purged = purgeUnsendable();
+  return { fixed: n, ids: ids, purged: purged };
+}
+
+// Everything queued or set aside that the database could never take. Returns how many
+// were dropped, so a caller can say so rather than silently tidying up behind somebody.
+function purgeUnsendable() {
+  // Which ticket an op is about, wherever that is written on it.
+  const ticketOf = (op) => {
+    if (!op) return '';
+    const k = String(op.key || '');
+    if (k.indexOf('tickets:') === 0) return k.replace(/^tickets:(del:)?/, '');
+    const row = op.row || {};
+    if (row.ticket_id) return String(row.ticket_id);
+    if (op.table === 'tickets' && row.id) return String(row.id);
+    return '';
+  };
+  const dead = (op) => { const t = ticketOf(op); return !!t && !IS_UUID.test(t); };
+  let dropped = 0;
   try {
-    const q = JSON.parse(localStorage.getItem(OUTBOX_K) || '[]')
-      .filter((op) => !Object.keys(ids).some((old) => String(op.key || '').indexOf(old) >= 0));
-    localStorage.setItem(OUTBOX_K, JSON.stringify(q));
+    const q = JSON.parse(localStorage.getItem(OUTBOX_K) || '[]');
+    const keep = q.filter((op) => !dead(op));
+    dropped += q.length - keep.length;
+    if (keep.length !== q.length) localStorage.setItem(OUTBOX_K, JSON.stringify(keep));
   } catch (e) { /* an unreadable outbox is already empty for our purposes */ }
-  // The refusals these produced are stale advice about a problem that no longer exists.
-  try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
-  return { fixed: n, ids: ids };
+  try {
+    const pile = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
+    const keep = pile.filter((e) => !dead(e && e.op));
+    dropped += pile.length - keep.length;
+    if (keep.length !== pile.length) {
+      if (keep.length) localStorage.setItem(DEADLETTER_K, JSON.stringify(keep));
+      else localStorage.removeItem(DEADLETTER_K);
+    }
+  } catch (e) { /* nothing to do */ }
+  return dropped;
 }
 
 function outboxRead() {
@@ -4036,6 +4230,14 @@ function outboxSetAside(op, why) {
   // the drain reported success. A catch wide enough to hide a programming error is the
   // same failure this whole file exists to prevent: a record lost in silence.
   const reason = refusalText(why);
+  // The same refusal, twice over and for two different readers. The dead-letter is what
+  // the app shows the person now, in their words; the error log is what gets handed to
+  // somebody who can fix it, with the server's own words and a code.
+  logError('sync', why, {
+    table: op && op.table, action: op && op.action,
+    ticket: op && String(op.key || '').indexOf('tickets:') === 0
+      ? String(op.key).replace(/^tickets:(del:)?/, '') : undefined,
+  });
   try {
     const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
     // The reason is kept, not just the op. Without it the pile answers "something was
@@ -4898,6 +5100,21 @@ class Component extends DCLogic {
       // at diff time instead would assign a different id on every render, which is the
       // problem the ids exist to remove.
       stampChildIds(data);
+      // Ticket ids, repaired — HERE, which is the only place it can do anything.
+      //
+      // This call used to sit in the branch below, the one that runs when there is no
+      // server. repairTicketIds() opens by returning early unless USE_CLOUD, so the one
+      // branch that called it was the one branch where it did nothing: written for cloud
+      // mode, reachable only from demo mode, a no-op in both. It had never once run.
+      //
+      // That is why an Ops Manager was still being shown "invalid input syntax for type
+      // uuid: k1787950609277" every session weeks after the id generator was fixed — the
+      // repair meant to clear it was unreachable. Two correct halves that never met.
+      const repair = repairTicketIds(data);
+      if (repair.fixed) data.__repairedTicketIds = repair.fixed;
+      // Queued work no server could ever take, cleared on the way past. Counted so the
+      // person is told once rather than left wondering where a standing banner went.
+      if (repair.purged) data.__purgedUnsendable = repair.purged;
       let sess = null;
       try { const r = localStorage.getItem(SK); if (r) sess = JSON.parse(r); } catch (e) { /* none */ }
       return sess ? { data: data, session: sess, role: sess.roleKey } : { data: data };
@@ -4915,14 +5132,11 @@ class Component extends DCLogic {
         const settings = Object.assign({}, data.settings, saved.settings || {});
         data = Object.assign(data, saved);
         data.settings = settings;
-        // Before anything reads these tickets, give any that were keyed by the old
-        // 'k' + Date.now() generator a real uuid. Until this runs they are unsendable,
-        // and a device that has been in use since before the fix holds real work that
-        // has never left it.
-        const repair = repairTicketIds(data);
-        if (repair.fixed) {
-          data.__repairedTicketIds = repair.fixed;
-        }
+        // No repairTicketIds here. It is a cloud-mode repair and this is the demo store,
+        // whose tickets are keyed 't1', 't2', 't3' and are never sent anywhere — running
+        // it against them rewrote the fixtures on every load and cleared the record of
+        // refused changes as if the problem had been dealt with. It runs in the cloud
+        // branch above, where it belongs and where it can actually reach something.
       }
     } catch (e) { /* first run */ }
     stampChildIds(data);
@@ -5169,6 +5383,7 @@ class Component extends DCLogic {
     } catch (e) { return false; }
   }
   storageRefused() {
+    logError('store', new Error('localStorage refused the write (quota)'), { doing: 'persist' });
     // No byte count. It read "(0.0 MB to save)" on a small store, and a size is not
     // something a technician at a wellhead can act on anyway — what to DO is.
     const hint = USE_CLOUD
@@ -5195,6 +5410,47 @@ class Component extends DCLogic {
   }
   componentDidMount() {
     this.applyTheme();
+    // What the loader repaired on the way in.
+    //
+    // Both of these were set on the store and never read, so the app silently fixed
+    // things and left the person wondering. The second one matters most: a standing
+    // "10 changes were refused" banner disappearing with no explanation is its own kind
+    // of alarming, and the honest message is that those changes were never sendable.
+    const D = this.state.data || {};
+    if (D.__repairedTicketIds || D.__purgedUnsendable) {
+      const bits = [];
+      if (D.__repairedTicketIds) {
+        bits.push(D.__repairedTicketIds + ' ticket(s) raised before an app fix have been '
+          + 'given a proper id and will now sync.');
+      }
+      if (D.__purgedUnsendable) {
+        bits.push(D.__purgedUnsendable + ' queued change(s) were cleared: they named a '
+          + 'ticket the server could never accept, so they were never going to send. '
+          + 'Nothing on screen was lost.');
+      }
+      setTimeout(() => this.toast('repair', bits.join(' '), 'ok'), 800);
+      this.mutate((d) => { delete d.__repairedTicketIds; delete d.__purgedUnsendable; });
+    }
+    // The two failures nobody can describe.
+    //
+    // A crash inside a handler and a promise nobody caught both produce the same report
+    // from the field — "it just did nothing" — because neither shows a banner and both
+    // leave the screen looking fine. They are the entries most worth having in the file:
+    // the message and the line are in here and nowhere else.
+    //
+    // Registered on window rather than as a React error boundary because that is where
+    // both of these arrive, and because an error boundary catches only render errors —
+    // the ones that break a button's onClick would go past it.
+    this.onWindowError = (ev) => logError('app', (ev && (ev.error || ev.message)) || 'error', {
+      doing: 'crash',
+      at: ev && ev.filename ? String(ev.filename).split('/').pop() + ':' + ev.lineno : undefined,
+    });
+    this.onRejection = (ev) => logError('app', (ev && ev.reason) || 'unhandled rejection',
+      { doing: 'unhandled promise' });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('error', this.onWindowError);
+      window.addEventListener('unhandledrejection', this.onRejection);
+    }
     if (typeof matchMedia === 'function') {
       this.mq = matchMedia('(prefers-color-scheme: dark)');
       this.mqListener = () => this.applyTheme();
@@ -5249,6 +5505,10 @@ class Component extends DCLogic {
     }
   }
   componentWillUnmount() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('error', this.onWindowError);
+      window.removeEventListener('unhandledrejection', this.onRejection);
+    }
     clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
     if (this.toastTimer) clearTimeout(this.toastTimer);
     if (this.drainTimer) clearTimeout(this.drainTimer);
@@ -5323,6 +5583,7 @@ class Component extends DCLogic {
     if (!USE_CLOUD) return Promise.resolve();
     return this.runLatest('refresh', () => outboxDrain()
       .then(() => hydrate())
+      .catch((e) => { logError('load', e, { doing: 'hydrate' }); throw e; })
       .then((data) => {
         CLOUD_IDS.me = (((this.state.session || {}).email && (data.users || [])
           .find((u) => u.email === this.state.session.email)) || {}).id || null;
@@ -6740,6 +7001,7 @@ class Component extends DCLogic {
       .then(() => { this.setState({ attachBusy: false }); this.toast('attach', name + ' attached.', 'ok'); })
       .catch((err) => {
         this.setState({ attachBusy: false });
+        logError('file', err, { doing: 'upload', kind: docKind, ticket: ticketId, mime: mime, bytes: file.size });
         this.toast('attach', (err && err.message) || 'The file could not be attached.', 'warn');
       });
   }
@@ -6756,7 +7018,10 @@ class Component extends DCLogic {
         // passes through this app's memory.
         window.open(r.data.signedUrl, '_blank');
       })
-      .catch((err) => this.toast('attach', (err && err.message) || 'Could not get a link to the file.', 'warn'));
+      .catch((err) => {
+        logError('file', err, { doing: 'open', path: path });
+        this.toast('attach', (err && err.message) || 'Could not get a link to the file.', 'warn');
+      });
   }
   // Withdrawing one. The row goes first: if the object delete fails the row is already
   // gone and a retry is harmless, whereas deleting the bytes first and failing on the row
@@ -6845,6 +7110,82 @@ class Component extends DCLogic {
       img.src = 'uploads/makaman-logo-full.png';
     });
     return this._sheetLogoP;
+  }
+
+  // ── The error report ─────────────────────────────────────────────────────────────
+  //
+  // A day of testing, as one markdown file that can be handed straight to somebody who
+  // can fix it. Written for that reader: every entry leads with its code, says what the
+  // app was doing in plain words, and then gives the server's own sentence verbatim —
+  // because the app's paraphrase is what makes these hard to place, and the raw text is
+  // what names the table and the policy.
+  //
+  // What is deliberately NOT in here: no password, ever; no ticket contents, prices or
+  // customer names; no coordinates. The ticket is named by its id and number only. This
+  // file gets emailed and pasted around, so it carries what is needed to find a bug and
+  // nothing that would matter if it went astray.
+  errorReport() {
+    const S = this.state;
+    const entries = errorLogRead().slice().sort((a, b) => (b.n - a.n) || (a.first < b.first ? -1 : 1));
+    const total = entries.reduce((n, e) => n + (e.n || 1), 0);
+    const stamp = (iso) => { try { return F.stamp(iso); } catch (e) { return iso; } };
+    const L = [];
+    L.push('# Makaman Job Tickets — error log');
+    L.push('');
+    L.push('- **Build:** ' + BUILD);
+    L.push('- **Exported:** ' + stamp(new Date().toISOString()));
+    L.push('- **Signed in as:** ' + ((S.session || {}).email || 'nobody')
+      + ' · ' + ((S.session || {}).role || (S.session || {}).roleKey || 'unknown role'));
+    L.push('- **Mode:** ' + (USE_CLOUD ? 'cloud' : 'local demo store')
+      + ' · ' + (S.online ? 'online' : 'no signal at export'));
+    L.push('- **Device:** ' + (typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'));
+    L.push('- **Recorded:** ' + total + ' failure(s) in ' + entries.length + ' distinct kind(s)');
+    L.push('');
+    if (!entries.length) {
+      L.push('Nothing was refused or failed on this device since the log was last cleared.');
+      L.push('');
+      return L.join('\n');
+    }
+    L.push('## Summary');
+    L.push('');
+    L.push('| Code | Times | First | Last | Where |');
+    L.push('|---|---:|---|---|---|');
+    entries.forEach((e) => {
+      L.push('| `' + e.code + '` | ' + e.n + ' | ' + stamp(e.first) + ' | ' + stamp(e.last)
+        + ' | ' + (ERROR_AREA[e.area] || e.area) + ' |');
+    });
+    L.push('');
+    L.push('## Detail');
+    L.push('');
+    entries.forEach((e) => {
+      L.push('### `' + e.code + '` — ' + e.n + (e.n === 1 ? ' time' : ' times'));
+      L.push('');
+      L.push('- **What the app was doing:** ' + (ERROR_AREA[e.area] || e.area));
+      L.push('- **What went wrong:** ' + (ERROR_KIND[e.kind] || e.kind));
+      const c = e.ctx || {};
+      Object.keys(c).forEach((k) => {
+        if (c[k] === undefined || c[k] === null || c[k] === '') return;
+        L.push('- **' + k + ':** `' + String(c[k]) + '`');
+      });
+      L.push('- **First seen:** ' + stamp(e.first) + '  ·  **Last seen:** ' + stamp(e.last));
+      L.push('');
+      L.push('> ' + (e.raw || '(the failure carried no message)'));
+      L.push('');
+    });
+    L.push('---');
+    L.push('');
+    L.push('_Codes are AREA + KIND and are stable: the same fault always produces the same');
+    L.push('code. Quote one to point at a single failure._');
+    L.push('');
+    return L.join('\n');
+  }
+  downloadErrorReport() {
+    const md = this.errorReport();
+    const d = new Date();
+    const pad = (n) => (n < 10 ? '0' : '') + n;
+    const name = 'makaman-errors-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-'
+      + pad(d.getDate()) + '.md';
+    this.saveBlob(new Blob([md], { type: 'text/markdown;charset=utf-8' }), name);
   }
 
   // Hands the browser a file. Revoking on the next tick rather than immediately: Safari
@@ -7926,6 +8267,10 @@ class Component extends DCLogic {
     // the holder passing it on deliberately.
     const adminOverridingClaim = this.hasPermission('numbering.override') && !this.holdsNumbering()
       && !!(D.numbering || {}).holderName;
+    // Read from storage rather than state: nothing that writes to the log goes through
+    // setState, and it must not — a failure during a render that then triggers a render
+    // is a loop. One read per render is cheap and always current.
+    const errCount = errorLogCount();
     // Read once, here, so the button and the leaving question can never disagree about
     // whether there is anything to save.
     const reviewDirty = this.reviewDirty();
@@ -8007,6 +8352,18 @@ class Component extends DCLogic {
           if (go) go();
         },
         cancel: () => { this.pendingLeave = null; this.setState({ dialog: null }); },
+      },
+      clearErrors: {
+        title: 'Clear the error log?',
+        body: 'This is the only copy — nothing is kept on the server. Download the .md file '
+          + 'first if it has not been sent on yet.',
+        okLabel: 'Clear it', cancelLabel: 'Keep it', hasCancel: true,
+        okBg: 'var(--danger)', okFg: '#fff',
+        confirm: () => {
+          try { localStorage.removeItem(ERRLOG_K); } catch (e) { /* nothing to do */ }
+          this.setState({ dialog: null });
+          this.toast('errlog', 'Error log cleared.', 'ok');
+        },
       },
       done: {
         title: 'Mark job as done?', body: 'End Job will be stamped ' + F.stamp(iso(new Date())) + '. You can still reopen and correct the ticket afterwards.',
@@ -8349,7 +8706,10 @@ class Component extends DCLogic {
           // someone would be checking it.
           this.selfGeoTick();
         })
-        .catch(err => this.setState({ authError: err.message || 'Could not sign you in.', authBusy: false })));
+        .catch(err => {
+          logError('auth', err, { doing: 'sign in', email: email });
+          this.setState({ authError: err.message || 'Could not sign you in.', authBusy: false });
+        }));
     };
     const doSignup = () => {
       const name = (S.authFullName || '').trim();
@@ -9554,7 +9914,22 @@ class Component extends DCLogic {
       // being retyped as "Al Dhafra Energy" and quietly becoming a second customer
       // with its own empty price list.
       customerOptions: D.clients.map(c => ({ name: c.name })),
-      techOptions: this.activeTechnicians().map(u => ({ name: u.name })),
+      // Whoever will run the job — and the office is allowed to be that person.
+      //
+      // An Ops Manager or Admin raising a ticket for himself had to swap into the
+      // technician role first just to appear in his own dropdown, which is a detour
+      // around a rule nobody meant: the list is "who can run this job", and somebody in
+      // the office who is about to drive out is a legitimate answer. His own name is put
+      // first and marked, because picking yourself is a different decision from picking a
+      // colleague and should not be hunted for alphabetically.
+      techOptions: (() => {
+        const list = this.activeTechnicians().map(u => ({ name: u.name, label: u.name }));
+        const meName = (S.session || {}).name || '';
+        if (!meName || S.actingAs) return list;
+        if (S.role !== 'mgr' && S.role !== 'admin') return list;
+        if (list.some(o => o.name === meName)) return list;
+        return [{ name: meName, label: meName + ' (myself)' }].concat(list);
+      })(),
       mgrNewIsNewCustomer: (() => {
         const typed = ((S.mgrDraft || {}).customer || '').trim().toLowerCase();
         return !!typed && !D.clients.some(c => c.name.trim().toLowerCase() === typed);
@@ -9765,6 +10140,44 @@ class Component extends DCLogic {
         } };
       }),
       mileageNote: t && t.mileage ? 'Round trip charged: ' + (Number(t.mileage) * roundTrip) + ' km' : 'Charged as round trip (×' + roundTrip + ').',
+
+      // ── Correcting the customer ──
+      //
+      // Office only, and only while the ticket is still open. Not after approval: prices
+      // are frozen onto the lines at that moment (B3) and the customer is what they were
+      // frozen against, so changing it afterwards would leave a ticket whose lines belong
+      // to a contract it no longer names.
+      // `locked` is already readOnly-or-settled, and ticket.edit_closed is held by the
+      // Ops Manager and Admin and by nobody else — which is exactly the rule wanted here.
+      // An invented capability key would have been worse than useless: hasPermission
+      // treats a hydrated map as final, so a key with no row behind it is simply false
+      // for everyone and the control would never have appeared.
+      customerEditable: !!t && !locked && this.hasPermission('ticket.edit_closed'),
+      customerNote: (t && (t.items || []).length)
+        ? (t.items || []).length + ' charged line(s) were priced from the old list — check them.'
+        : 'Sets which price list the charged lines come from.',
+      customerNoteTone: (t && (t.items || []).length) ? 'var(--warning-ink)' : 'var(--ink-faint)',
+      pickReviewCustomer: (e) => {
+        const to = e.target.value;
+        const from = (t || {}).customer || '';
+        if (!t || !to || to === from) return;
+        this.patchTicket({ customer: to });
+        // Written down, because this is a change to what the job is FOR and the trail is
+        // the only place that answers "why is this priced against Waha". Recorded as an
+        // edit rather than a job stage: it is somebody correcting the paperwork.
+        this.log('Customer changed by ' + (myName || 'the office') + ': '
+          + (from || '(blank)') + ' → ' + to + '.', 'edit');
+        // The lines are NOT touched. They were chosen off the old customer's price list
+        // and may not exist on the new one at all; repricing them here would invent
+        // figures nobody agreed and dropping them would destroy the technician's work.
+        // Both are worse than saying so and letting the office look.
+        if ((t.items || []).length) {
+          this.toast('cust', 'Customer changed to ' + to + '. The ' + (t.items || []).length
+            + ' charged line(s) still carry the old price list — check each one before approving.', 'warn');
+        } else {
+          this.toast('cust', 'Customer changed to ' + to + '.', 'ok');
+        }
+      },
 
       // Live search results for item addition — shows matching items that can be clicked to add
       itemSearch: S.itemSearch || '',
@@ -10085,6 +10498,19 @@ class Component extends DCLogic {
         if (m.status === 'running') return 'Building now…';
         return (m.rows === 1 ? '1 approved job' : (m.rows || 0) + ' approved jobs') + ' · built ' + F.stamp(m.at);
       })(),
+      // ── Error log ──
+      // Counted rather than listed: the file is the place to read them, and a list of
+      // codes on the Account screen would be a worse copy of it.
+      errState: errCount
+        ? errCount + (errCount === 1 ? ' failure recorded on this device' : ' failures recorded on this device')
+        : 'Nothing has been refused or failed on this device.',
+      errTone: errCount ? 'var(--warning-ink)' : 'var(--ink-faint)',
+      errBadgeBg: errCount ? 'rgba(var(--warning-rgb),0.16)' : 'rgba(var(--ink-rgb),0.10)',
+      errBadgeFg: errCount ? 'var(--warning-ink)' : 'var(--ink-faint)',
+      errEmpty: !errCount,
+      downloadErrors: () => this.downloadErrorReport(),
+      askClearErrors: () => this.setState({ dialog: 'clearErrors' }),
+
       masterTone: (() => {
         const m = D.masterExport;
         if (!m) return 'var(--ink-faint)';
