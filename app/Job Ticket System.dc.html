@@ -9907,21 +9907,16 @@ class Component extends DCLogic {
       // chase list cannot disagree with the ticket it points at.
       awaitingDocsAny: awaitingDocs.length > 0,
       awaitingDocsCount: String(awaitingDocs.length),
-      // Two labels because there are two places, and the count is written once in each.
       // The strip already shows the figure in its badge, so its sentence must not say the
-      // number again — "16 · 16 approved jobs are still waiting" is what happens when one
-      // label is reused in a place that already counted.
+      // number again — "16 · 16 approved jobs are still waiting" is what happened when the
+      // desk's sentence, which counts, was reused in a place that had already counted.
       awaitingDocsPhrase: awaitingDocs.length === 1
         ? 'approved job still waiting on its signed paperwork'
         : 'approved jobs still waiting on their signed paperwork',
-      awaitingDocsLabel: awaitingDocs.length === 1
-        ? 'One approved job is still waiting on its signed paperwork.'
-        : awaitingDocs.length + ' approved jobs are still waiting on their signed paperwork.',
       // A filter, not a second list. The tickets are already on this screen; showing them
       // again above it was the bug. Tapping narrows what is below to exactly those jobs,
       // and tapping again puts everything back — so the way out is the way in.
       toggleAwaitingFilter: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
-      awaitingFilterOn: !!S.awaitingFilter,
       awaitingFilterAction: S.awaitingFilter ? 'Show all' : 'Show these',
       awaitingFilterEdge: S.awaitingFilter ? 'var(--warning-ink)' : 'var(--warning)',
       awaitingFilterBg: S.awaitingFilter
