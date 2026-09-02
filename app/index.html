@@ -1312,8 +1312,14 @@
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
                 <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
                   <!-- Proposed from the job log, never written without a tap. The objectives
-                       come out in the order they were mentioned, joined with &. -->
-                  <button onClick="{{ acceptObjective }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ objectiveSuggestion }}</button>
+                       come out in the order they were mentioned, joined with &. Usually one
+                       chip; two when the log says "pressure test", which is two different
+                       jobs in this company and not ours to choose between. -->
+                  <div style="display:flex;flex-wrap:wrap;gap:7px">
+                    <sc-for list="{{ objectiveSuggestions }}" as="sg" hint-placeholder-count="1">
+                      <button onClick="{{ sg.accept }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ sg.label }}</button>
+                    </sc-for>
+                  </div>
                 </sc-if>
                 <datalist id="jobtypes">
                   <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="4">
@@ -2083,8 +2089,14 @@
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
                 <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
                   <!-- Proposed from the job log, never written without a tap. The objectives
-                       come out in the order they were mentioned, joined with &. -->
-                  <button onClick="{{ acceptObjective }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ objectiveSuggestion }}</button>
+                       come out in the order they were mentioned, joined with &. Usually one
+                       chip; two when the log says "pressure test", which is two different
+                       jobs in this company and not ours to choose between. -->
+                  <div style="display:flex;flex-wrap:wrap;gap:7px">
+                    <sc-for list="{{ objectiveSuggestions }}" as="sg" hint-placeholder-count="1">
+                      <button onClick="{{ sg.accept }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ sg.label }}</button>
+                    </sc-for>
+                  </div>
                 </sc-if>
               </div>
               <div style="display:flex;flex-direction:column">
@@ -3371,16 +3383,35 @@ const DEFAULT_CUSTOMER_REP = 'Drilling/Workover Office';
 // tense — "rigged up, pressure TESTED lines to 3000 psi" — and a pattern anchored on the
 // bare noun matches the way a form asks the question rather than the way a technician
 // answers it. Found by a test case taken from the seeded log rather than invented.
+// Each phrase carries the objectives it could mean, not the one it does.
+//
+// "Pressure test" is genuinely ambiguous here and the job-types table proves it: PKR FOR
+// CSG TEST and PKR FOR PRESSURE TEST are two different jobs, and a technician writing
+// "P/T to 3000 psi" has told us which tool went in the hole and not which of those two he
+// was doing. Pinning it to CSG TEST — which is how this started — quietly made PKR FOR
+// PRESSURE TEST unreachable from the log forever, and the office would never know a guess
+// had been made on their behalf.
+//
+// So an ambiguous phrase offers BOTH and the office picks (user's decision, 2 Sep).
+// Nothing is guessed wrong, and the cost is one extra chip on the one phrase that needs
+// it — everything else still resolves to a single suggestion.
+//
+// The "between perfs" variant is its own job type, so the general pressure-test patterns
+// step aside for it with a lookahead rather than both matching the same words.
 const OBJECTIVE_PHRASES = [
-  { re: /\b(?:pressure|press\.?)\s*test(?:ed|ing)?\b|\bp\s*\/\s*t\b/i, name: 'CSG TEST' },
-  { re: /\b(?:casing|csg)\s*test(?:ed|ing)?\b/i, name: 'CSG TEST' },
-  { re: /\bcement(?:ing)?\s*job\b/i, name: 'CEMENT JOB' },
-  { re: /\bacid(?:izing|ising)?\s*(?:job|treatment)?\b/i, name: 'ACID JOB' },
-  { re: /\binjectivity\s*test(?:ed|ing)?\b/i, name: 'INJECTIVITY TEST' },
-  { re: /\bfrac(?:turing)?\s*job\b/i, name: 'FRAC JOB' },
-  { re: /\bcommunication\s*test(?:ed|ing)?\b/i, name: 'COMMUNICATION TEST' },
-  { re: /\b(?:locate\s*leak|leak\s*location)\b/i, name: 'LOCATE LEAK' },
-  { re: /\bwellhead\s*maintenance\b/i, name: 'WELLHEAD MAINTENANCE' },
+  { re: /\b(?:(?:pressure|press\.?)\s*test(?:ed|ing)?|p\s*\/\s*t)\s*between\s*perf\w*/i,
+    names: ['PRESSURE TEST BETWEEN PERFS'] },
+  { re: /\b(?:(?:pressure|press\.?)\s*test(?:ed|ing)?|p\s*\/\s*t)\b(?!\s*between\s*perf)/i,
+    names: ['CSG TEST', 'PRESSURE TEST'] },
+  { re: /\b(?:casing|csg)\s*test(?:ed|ing)?\b/i, names: ['CSG TEST'] },
+  { re: /\bcst\s*test(?:ed|ing)?\b/i, names: ['CST TEST'] },
+  { re: /\bcement(?:ing)?\s*job\b/i, names: ['CEMENT JOB'] },
+  { re: /\bacid(?:izing|ising)?\s*(?:job|treatment)?\b/i, names: ['ACID JOB'] },
+  { re: /\binjectivity\s*test(?:ed|ing)?\b/i, names: ['INJECTIVITY TEST'] },
+  { re: /\bfrac(?:turing)?\s*job\b/i, names: ['FRAC JOB'] },
+  { re: /\bcommunication\s*test(?:ed|ing)?\b/i, names: ['COMMUNICATION TEST'] },
+  { re: /\b(?:locate\s*leak|leak\s*location)\b/i, names: ['LOCATE LEAK'] },
+  { re: /\bwellhead\s*maintenance\b/i, names: ['WELLHEAD MAINTENANCE'] },
 ];
 
 // Split `PKR FOR CSG TEST & ACID JOB` back into its tool and its objectives, so a second
@@ -3401,28 +3432,55 @@ function splitJobType(jobType) {
 // Returns '' when there is nothing to add — no phrase found, or every phrase found is
 // already on the ticket — so the caller can show a chip or show nothing without a second
 // comparison.
-function suggestJobType(jobType, events) {
+function suggestJobTypes(jobType, events) {
   const found = [];
+  const seen = {};
   (events || []).forEach((e) => {
     const text = String((e && e.text) || '');
     // Where in the line each phrase first appears, so the objectives come out in the
     // order the technician wrote them rather than the order this list happens to be in.
     OBJECTIVE_PHRASES
-      .map((ph) => ({ name: ph.name, at: text.search(ph.re) }))
+      .map((ph) => ({ names: ph.names, at: text.search(ph.re) }))
       .filter((x) => x.at >= 0)
       .sort((a, b) => a.at - b.at)
-      .forEach((x) => { if (found.indexOf(x.name) < 0) found.push(x.name); });
+      .forEach((x) => {
+        const key = x.names.join('|');
+        if (seen[key]) return;
+        seen[key] = true;
+        found.push(x);
+      });
   });
-  if (!found.length) return '';
+  if (!found.length) return [];
 
   const cur = splitJobType(jobType);
-  const add = found.filter((n) => cur.objectives.indexOf(n) < 0);
-  if (!add.length) return '';
-  const all = cur.objectives.concat(add);
-  // No tool named yet — the technician has not said what went in the hole, and inventing
-  // one would be the part of this that cannot be guessed. The objectives alone are still
-  // worth offering; the office completes the front half.
-  return (cur.tool ? cur.tool + ' FOR ' : '') + all.join(' & ');
+  // One suggestion per reading of the ambiguous phrase, and only the first ambiguous match
+  // is expanded. Expanding every one would be a cross product — three ambiguous phrases
+  // would be eight chips — and a screen of near-identical options is not a choice, it is a
+  // puzzle. In practice there is exactly one ambiguous phrase in the table.
+  const ambiguous = found.filter((f) => f.names.length > 1)[0];
+  const readings = ambiguous ? ambiguous.names : [null];
+
+  const out = [];
+  readings.forEach((pick) => {
+    const objectives = [];
+    found.forEach((f) => {
+      const name = (f === ambiguous) ? pick : f.names[0];
+      if (objectives.indexOf(name) < 0) objectives.push(name);
+    });
+    const add = objectives.filter((n) => cur.objectives.indexOf(n) < 0);
+    if (!add.length) return;
+    const all = cur.objectives.concat(add);
+    // No tool named yet — the technician has not said what went in the hole, and inventing
+    // one would be the part of this that cannot be guessed. The objectives alone are still
+    // worth offering; the office completes the front half.
+    const whole = (cur.tool ? cur.tool + ' FOR ' : '') + all.join(' & ');
+    if (out.indexOf(whole) < 0) out.push(whole);
+  });
+  return out;
+}
+// The first reading, for callers that want one answer rather than the choice.
+function suggestJobType(jobType, events) {
+  return suggestJobTypes(jobType, events)[0] || '';
 }
 
 // Who may ask for an account.
@@ -4643,22 +4701,35 @@ function stampChildIds(data) {
   });
   return changed;
 }
-function diffOps(before, after) {
-  const ops = [];
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  // Two maps, because a display name is not an identity.
-  //
-  // idByName is keyed on what a person is called, and two people can be called the same
-  // thing — this database currently holds two active accounts both named "Tech1". One
-  // silently overwrites the other here, so whichever of them a name resolves to is a
-  // coin toss. An email cannot collide, so anything that knows one uses idByEmail and
-  // anything that only has a name falls back to idByName and takes its chances.
-  const idByName = {}, idByEmail = {}, idByClient = {}, idByJob = {};
-  (after.users || []).forEach((u) => {
+// Two maps, because a display name is not an identity.
+//
+// idByName is keyed on what a person is called, and two people can be called the same
+// thing — this database currently holds two active accounts both named "Tech1". One
+// silently overwrites the other here, so whichever of them a name resolves to is a
+// coin toss. An email cannot collide, so anything that knows one uses idByEmail and
+// anything that only has a name falls back to idByName and takes its chances.
+//
+// Pulled out of diffOps so a screen that is ABOUT to make a change nobody will see synced
+// (a numbering-claim handover, a "changed_by" resolution) can ask the same question diffOps
+// itself will ask a moment later, and refuse up front rather than mutate, toast success,
+// and silently fail to queue anything at all. A real handover was lost exactly this way —
+// the confirm dialog only checked "does this person have SOME email or id", which is not
+// the same question as "will the id this device actually holds for them resolve."
+function buildUserIndex(users) {
+  const idByName = {}, idByEmail = {};
+  (users || []).forEach((u) => {
     if (!u.id) return;
     idByName[u.name] = u.id;
     if (u.email) idByEmail[String(u.email).toLowerCase()] = u.id;
   });
+  return { idByName: idByName, idByEmail: idByEmail };
+}
+function diffOps(before, after) {
+  const ops = [];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const idByClient = {}, idByJob = {};
+  const userIndex = buildUserIndex(after.users);
+  const idByName = userIndex.idByName, idByEmail = userIndex.idByEmail;
   (after.clients || []).forEach((c) => { if (c.id) idByClient[c.name] = c.id; });
   Object.assign(idByJob, CLOUD_IDS.job);
 
@@ -5957,7 +6028,17 @@ class Component extends DCLogic {
     // signal, and a screen that waits for a round trip before showing what you typed is
     // not usable there.
     if (USE_CLOUD) {
-      try { outboxPush(diffOps(before, data)); } catch (e) { /* never block the edit */ }
+      // The catch stays — a broken diff must never take the local edit down with it, and
+      // this runs on every single mutate(), including ones nobody is watching a screen
+      // for. But it used to swallow completely, and that is exactly how a real
+      // numbering-claim handover went missing: diffOps (or the id resolution inside it)
+      // can throw for reasons that only ever show up on one particular device's actual
+      // data, and a silently-eaten exception here means the write was never queued, never
+      // dead-lettered, and left no trace anywhere for anyone to find — not even the error
+      // log this project built specifically so failures wouldn't have to be re-discovered
+      // by hand. Logged now, so the NEXT one is a code, not a mystery.
+      try { outboxPush(diffOps(before, data)); }
+      catch (e) { logError('sync', e, { doing: 'diff' }); }
       this.scheduleDrain();
     }
   }
@@ -7542,7 +7623,7 @@ class Component extends DCLogic {
   // The objective reader, reachable without a ticket. It is a pure function of the log,
   // and the cases worth asserting are the shorthand people actually write — which is far
   // easier to enumerate here than to stage a ticket for, one job log at a time.
-  suggestJobTypeForTest(jobType, events) { return suggestJobType(jobType, events); }
+  suggestJobTypeForTest(jobType, events) { return suggestJobTypes(jobType, events); }
 
   // Reachable so the shed can be tested for what it must NOT drop. Asserting that it
   // frees something is easy; asserting that it never touches the tickets or the outbox is
@@ -8772,8 +8853,9 @@ class Component extends DCLogic {
         }));
     }
     // What the log says this job was for. Computed once here rather than in the binding
-    // object, because both the phone and desk copies of the field read it.
-    const objectiveSuggestion = t ? suggestJobType(t.jobType, t.events) : '';
+    // object, because both the phone and desk copies of the field read it. Usually one
+    // reading; two where the wording is genuinely ambiguous.
+    const objectiveSuggestions = t ? suggestJobTypes(t.jobType, t.events) : [];
 
     const curCodes = new Set(t ? (t.items || []).map(it => it.code) : []);
     const onList = {};
@@ -9085,7 +9167,16 @@ class Component extends DCLogic {
         confirm: () => {
           const to = (S.handoverTo || '').trim();
           if (!to) return;
-          const target = (D.users || []).find(u => u.name === to) || {};
+          // `this.state.data.users` here, deliberately, not the closed-over `D` this
+          // dialog object was built with. `D` is a snapshot from whichever render put this
+          // confirm callback on screen; if anything updated the store in between — a
+          // hydrate finishing, a background sync — that render is stale by the time the
+          // tap lands, and checking the stale snapshot would pass a check the LIVE data
+          // (which is what diffOps actually reads a moment later, inside mutate()) might
+          // fail. Reading live here is what makes this guard trustworthy rather than a
+          // second copy of the same mistake.
+          const liveUsers = this.state.data.users || [];
+          const target = liveUsers.find(u => u.name === to) || {};
           // Refused rather than recorded half-way.
           //
           // The claim reaches the database as `holder_id`, resolved from this person's
@@ -9098,6 +9189,26 @@ class Component extends DCLogic {
           if (USE_CLOUD && !target.email && !target.id) {
             this.toast('claim-moved', to + ' has not reached the server yet, so the claim '
               + 'cannot be moved to them. Sync, then try again.', 'warn');
+            this.setState({ dialog: null, handoverTo: '' });
+            return;
+          }
+          // The check above asks "does this person have SOME email or id" — which is not
+          // the same question diffOps asks a moment later, and a real handover was lost
+          // exactly on that gap: the target had an email, this guard passed, the app
+          // mutated local state and said "done," and the id lookup diffOps runs
+          // independently on the SAME data still came back empty, so nothing was ever
+          // queued — silently, with no warning and no dead-letter entry. Resolving here,
+          // with the exact same lookup diffOps will use, closes that gap: if it would fail
+          // a moment from now, it is refused now, honestly, instead of a success toast for
+          // a handover that never happened.
+          const claimIndex = buildUserIndex(liveUsers);
+          const resolvedId = target.id
+            || (target.email && claimIndex.idByEmail[String(target.email).toLowerCase()])
+            || claimIndex.idByName[to] || null;
+          if (USE_CLOUD && !resolvedId) {
+            this.toast('claim-moved', 'This device cannot resolve ' + to + ' to an account '
+              + 'the server recognises, so the claim cannot be moved to them yet. Sync this '
+              + 'device, then try again.', 'warn');
             this.setState({ dialog: null, handoverTo: '' });
             return;
           }
@@ -10181,18 +10292,27 @@ class Component extends DCLogic {
       onJobTypeFocus: commitJobType.focus, onJobTypeBlur: commitJobType.blur,
       // Read out of the job log, offered, and applied only on a tap. Hidden entirely on a
       // sealed ticket: a suggestion that cannot be accepted is a control that lies.
-      objectiveSuggestion: objectiveSuggestion,
-      objectiveSuggested: !!objectiveSuggestion && !locked,
-      acceptObjective: () => {
-        if (!t || !objectiveSuggestion || locked) return;
-        const was = t.jobType || '';
-        this.patchTicket({ jobType: objectiveSuggestion });
-        // Written down as an edit with both values, like every other field change on this
-        // screen — a job type that changed itself and left no trace is exactly what the
-        // "suggested, never imposed" rule exists to prevent.
-        this.log('Job type set from the job log: ' + (was || '(blank)')
-          + ' → ' + objectiveSuggestion + '.', 'edit');
-      },
+      //
+      // A list rather than one value, because "pressure test" means either CSG TEST or
+      // PRESSURE TEST and both are real job types here. Each chip carries its own accept,
+      // so the handler applies the reading that was tapped instead of the one the
+      // suggester happened to return first.
+      objectiveSuggested: objectiveSuggestions.length > 0 && !locked,
+      objectiveSuggestions: objectiveSuggestions.map((whole) => ({
+        label: whole,
+        accept: () => {
+          if (!t || locked) return;
+          const was = t.jobType || '';
+          this.patchTicket({ jobType: whole });
+          // Written down as an edit with both values, like every other field change on
+          // this screen — a job type that changed itself and left no trace is exactly what
+          // the "suggested, never imposed" rule exists to prevent. The entry says the log
+          // proposed it and a person accepted it, which is the distinction that matters
+          // when somebody queries the objective months later.
+          this.log('Job type set from the job log: ' + (was || '(blank)')
+            + ' → ' + whole + '.', 'edit');
+        },
+      })),
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
@@ -11011,6 +11131,28 @@ class Component extends DCLogic {
               + ', who had not closed it — closed in the office by ' + (x.closedBy || who) + '.'
             : '';
           (x.audit = x.audit || []).push({ ts: when, kind: 'lifecycle', by: who, text: 'Approved by ' + who + ' · ticket total ' + total + '. Prices frozen against the ' + x.customer + ' price list.' + behalf });
+          // Approving is what puts a job into the awaiting-paperwork state, and until now
+          // nothing said so.
+          //
+          // The state is DERIVED — approved plus signedDocsMissing() — so no event was
+          // ever written for entering it. That was survivable while an unbounded banner
+          // sat on top of the inbox shouting about every waiting ticket. Replacing that
+          // banner with a count is the right change and it removed the only thing pushing
+          // the backlog at anyone: a job could sit unsigned for a month with nothing
+          // surfacing it, because the bell only ever saw the approval.
+          //
+          // One entry, here, naming what is owed. Notifications derive from the trail, so
+          // the bell picks it up with no second wiring — the same reason the sheet's
+          // ARRIVAL needed no wiring of its own. Leaving the state is already covered:
+          // the last upload writes "sent back the ..." and moves the ticket to finance.
+          const owed = this.signedDocsMissing(x);
+          if (owed.length) {
+            (x.audit = x.audit || []).push({
+              ts: when, kind: 'lifecycle', by: who,
+              text: 'Waiting on the client for ' + owed.join(' and ')
+                + '. The job stays under Awaiting paperwork until they come back.',
+            });
+          }
         });
         this.setState({ dialog: 'approved' });
       },

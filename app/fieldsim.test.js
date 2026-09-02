@@ -281,7 +281,63 @@ const trail = (p, id) => p.evaluate((tid) => {
   }, ids[0]);
   check('with both documents in, nothing is still being chased',
     finance.missing.length === 0 && finance.chased === 0, JSON.stringify(finance));
+
+  // ── The signed paperwork comes back, and the job moves to finance ────────
+  //
+  // Emptying awaitingDocs() is not the same claim as reaching finance: one is the chase
+  // list going quiet, the other is the ticket's own status advancing. This asserts the
+  // transition, because it is the state finance actually reads.
+  const toFinance = await office.p.evaluate((tid) => {
+    const app = window.__mkApp;
+    app.mutate((d) => {
+      const t = d.tickets.find(x => x.id === tid);
+      t.attachments = [
+        { id: 'f1', docKind: 'service_ticket', filename: 's.pdf', path: tid + '/s.pdf' },
+      ];
+    });
+    // The second sheet through the real path, which is what advances the status.
+    app.advanceTo(tid, 'sent_finance', 'Signed Job Log received — sent to finance (digital).');
+    const t = app.state.data.tickets.find(x => x.id === tid);
+    return { status: t.status, stamped: !!t.sentFinanceAt,
+      trail: (t.audit || []).map(a => a.text) };
+  }, ids[2]);
+  check('the job advances to sent to finance', toFinance.status === 'sent_finance',
+    toFinance.status);
+  check('and the moment is stamped, not just the label changed', toFinance.stamped === true);
+  check('with the reason on the record',
+    toFinance.trail.some(x => /sent to finance/i.test(x)),
+    JSON.stringify(toFinance.trail.filter(x => /finance/i.test(x)).slice(0, 1)));
+
+  // ── A sealed ticket refuses the technician ───────────────────────────────
+  //
+  // Not "the button is hidden" — the app refusing. A hidden control is a UI choice; this
+  // is the rule underneath it, which is what matters when a ticket is reopened, handed
+  // over, or reached from a stale screen.
   await office.ctx.close();
+  const sealed = await boot(b, 'yousef@makaman.ly', 390);
+  const refused = await sealed.p.evaluate(() => {
+    const app = window.__mkApp;
+    const t = app.state.data.tickets[0];
+    app.mutate((d) => {
+      const x = d.tickets.find(y => y.id === t.id);
+      x.status = 'approved';
+      x.approvedAt = new Date().toISOString();
+      x.approvedBy = 'Omar Al-Saleh';
+    });
+    const before = JSON.stringify(app.state.data.tickets.find(x => x.id === t.id).well);
+    app.setState({ activeId: t.id, techScreen: 'log', roleTab: 'tickets' });
+    return { id: t.id, sealed: app.settled(app.state.data.tickets.find(x => x.id === t.id)),
+      before: before };
+  });
+  check('the technician\'s own approved ticket reads as sealed', refused.sealed === true);
+  await sealed.p.waitForTimeout(600);
+  await sealed.p.getByRole('button', { name: /Reopen for corrections|Job done/i }).first().click();
+  await sealed.p.waitForTimeout(700);
+  const told = await sealed.p.evaluate(() => document.body.innerText);
+  check('and pressing done on it says why, rather than doing nothing',
+    /approved and sealed|Ask the operations manager/i.test(told),
+    (told.match(/(approved and sealed|Ask the operations manager)[^\n]{0,50}/) || ['(silent)'])[0]);
+  await sealed.ctx.close();
 
   // ══ The Observer ═════════════════════════════════════════════════════════
   const obs = await boot(b, 'founder@makaman.ly');
@@ -291,12 +347,51 @@ const trail = (p, id) => p.evaluate((tid) => {
       canEdit: app.hasPermission('ticket.edit_closed'),
       seesEdits: app.hasPermission('activity.view_edits'),
       canApprove: app.hasPermission('ticket.approve'),
+      canNote: app.hasPermission('note.add'),
+      canResolve: app.hasPermission('note.resolve'),
     };
   });
   check('the Observer cannot approve', observer.canApprove === false);
   check('nor edit a closed ticket', observer.canEdit === false);
   check('nor read the edit trail', observer.seesEdits === false);
+
+  // The Observer CAN raise a note — that is the point of the role. Somebody who reads the
+  // finished work and can say "this one looks wrong" without being able to change it.
+  check('but the Observer can raise a note', observer.canNote === true);
+  const obsNote = await obs.p.evaluate(() => {
+    const app = window.__mkApp;
+    const closed = app.state.data.tickets.find(x => app.settled(x))
+      || app.state.data.tickets[0];
+    app.addNote(closed.id, 'This total looks high against the same job last month.');
+    const t = app.state.data.tickets.find(x => x.id === closed.id);
+    return { id: closed.id, notes: (t.notes || []).map(n => ({ body: n.body, by: n.by })),
+      trail: (t.audit || []).map(a => a.text) };
+  });
+  check('and it lands on a closed ticket', obsNote.notes.length >= 1,
+    JSON.stringify(obsNote.notes.slice(-1)));
+  check('recorded in the trail so the office is told',
+    obsNote.trail.some(x => /looks high against the same job/.test(x)),
+    JSON.stringify(obsNote.trail.filter(x => /looks high/.test(x)).slice(0, 1)));
+  check('and resolving is NOT the Observer\'s to do', observer.canResolve === false);
   await obs.ctx.close();
+
+  // The office resolves what the Observer raised — the other half of the loop.
+  const closer = await boot(b, 'omar@makaman.ly');
+  const closed = await closer.p.evaluate((tid) => {
+    const app = window.__mkApp;
+    app.mutate((d) => {
+      const t = d.tickets.find(x => x.id === tid) || d.tickets[0];
+      (t.notes = t.notes || []).push({ id: 'obsnote', body: 'Raised by the Observer.',
+        by: 'Fatima Al-Rashid', at: new Date().toISOString() });
+    });
+    const t = app.state.data.tickets.find(x => x.id === tid) || app.state.data.tickets[0];
+    app.resolveNote(t.id, 'obsnote');
+    const after = app.state.data.tickets.find(x => x.id === t.id);
+    return (after.notes || []).filter(n => n.id === 'obsnote').map(n => !!n.resolvedAt);
+  }, obsNote.id);
+  check('the office resolves the Observer\'s note', closed.every(Boolean),
+    JSON.stringify(closed));
+  await closer.ctx.close();
 
   // ══ Volume ═══════════════════════════════════════════════════════════════
   //

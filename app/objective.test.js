@@ -38,30 +38,45 @@ async function boot(b, email) {
 // The pure function, exercised directly. The cases are the ones a technician actually
 // types, not the ones the regex was written for — which is the only way to find out that
 // "P/T" with spaces round the slash was being missed.
+// Each case is the FULL set of readings the log allows, in order.
+//
+// "Pressure test" is two different jobs in this company — PKR FOR CSG TEST and PKR FOR
+// PRESSURE TEST both exist — so it offers both and the office picks. Everything else
+// resolves to one. Pinning the ambiguous case to CSG TEST, which is how this started,
+// made PKR FOR PRESSURE TEST unreachable from the log and made a guess on the office's
+// behalf that they would never see.
 const CASES = [
-  ['a bare pressure test', 'PKR', ['Rigged up, pressure tested lines to 3000 psi.'],
-    'PKR FOR CSG TEST'],
+  ['a bare pressure test offers both readings', 'PKR',
+    ['Rigged up, pressure tested lines to 3000 psi.'],
+    ['PKR FOR CSG TEST', 'PKR FOR PRESSURE TEST']],
   ['the abbreviation, spaced', 'PKR', ['Ran tool, P / T OK at 2500.'],
-    'PKR FOR CSG TEST'],
+    ['PKR FOR CSG TEST', 'PKR FOR PRESSURE TEST']],
   ['the abbreviation, tight', 'PKR', ['P/T to 3000 psi — held.'],
-    'PKR FOR CSG TEST'],
+    ['PKR FOR CSG TEST', 'PKR FOR PRESSURE TEST']],
+  ['casing test is not ambiguous, so it offers one', 'PKR',
+    ['Casing tested to 3000 psi.'], ['PKR FOR CSG TEST']],
+  ['CST test, its own job type', 'RBP', ['CST test completed.'], ['RBP FOR CST TEST']],
+  ['between perfs wins over the general pressure test', 'COMBINATION',
+    ['Pressure test between perfs, held.'],
+    ['COMBINATION FOR PRESSURE TEST BETWEEN PERFS']],
   ['two objectives, in the order written', 'RBP',
     ['Acid job performed by client.', 'Then pressure test to 3000 psi.'],
-    'RBP FOR ACID JOB & CSG TEST'],
+    ['RBP FOR ACID JOB & CSG TEST', 'RBP FOR ACID JOB & PRESSURE TEST']],
   ['two in one line, in the order written', 'RBP',
     ['Cement job first, injectivity test after.'],
-    'RBP FOR CEMENT JOB & INJECTIVITY TEST'],
+    ['RBP FOR CEMENT JOB & INJECTIVITY TEST']],
   ['added to an objective already on the ticket', 'PKR FOR CSG TEST',
     ['Acid job on the same trip.'],
-    'PKR FOR CSG TEST & ACID JOB'],
-  ['nothing to add when it is already said', 'PKR FOR CSG TEST',
-    ['Pressure tested to 3000 psi.'], ''],
+    ['PKR FOR CSG TEST & ACID JOB']],
+  ['already said, so only the other reading is left to offer', 'PKR FOR CSG TEST',
+    ['Pressure tested to 3000 psi.'], ['PKR FOR CSG TEST & PRESSURE TEST']],
   ['nothing at all in an ordinary log', 'PKR',
-    ['Rigged up on wellhead.', 'Released from location.'], ''],
+    ['Rigged up on wellhead.', 'Released from location.'], []],
   ['a duplicate mention counts once', 'PKR',
-    ['P/T at 2000.', 'Second pressure test at 3000.'], 'PKR FOR CSG TEST'],
+    ['P/T at 2000.', 'Second pressure test at 3000.'],
+    ['PKR FOR CSG TEST', 'PKR FOR PRESSURE TEST']],
   ['objectives alone when no tool has been named', '',
-    ['Cement job performed by client.'], 'CEMENT JOB'],
+    ['Cement job performed by client.'], ['CEMENT JOB']],
 ];
 
 (async () => {
@@ -73,7 +88,8 @@ const CASES = [
     const got = await p.evaluate((cases) => cases.map(([, jobType, lines]) =>
       window.__mkApp.suggestJobTypeForTest(jobType, lines.map(x => ({ text: x })))), CASES);
     CASES.forEach(([name, , , want], i) => {
-      check(name, got[i] === want, JSON.stringify(got[i]) + ' wanted ' + JSON.stringify(want));
+      check(name, JSON.stringify(got[i]) === JSON.stringify(want),
+        JSON.stringify(got[i]) + ' wanted ' + JSON.stringify(want));
     });
     await ctx.close();
   }
@@ -116,18 +132,38 @@ const CASES = [
       return {
         jobType: x.jobType,
         trail: (x.audit || []).map(a => a.kind + ' :: ' + a.text).filter(s => /Job type/i.test(s)),
-        chip: document.querySelectorAll('.mk-suggest-chip').length,
+        chips: Array.from(document.querySelectorAll('.mk-suggest-chip'))
+          .map(x => (x.textContent || '').trim()),
       };
     }, t);
-    check('accepting writes it', after.jobType === 'PKR FOR CSG TEST & ACID JOB',
-      JSON.stringify(after.jobType));
+    check('accepting writes the reading that was tapped',
+      after.jobType === 'PKR FOR CSG TEST & ACID JOB', JSON.stringify(after.jobType));
     check('the change is on the record with both values',
       after.trail.some(s => /PKR → PKR FOR CSG TEST & ACID JOB/.test(s)),
       JSON.stringify(after.trail));
     check('it is an edit, not a job stage',
       after.trail.every(s => s.indexOf('edit ::') === 0), JSON.stringify(after.trail));
-    check('and the chip goes once there is nothing left to add', after.chip === 0,
-      after.chip + ' still shown');
+    // The accepted reading is gone; the OTHER one is still on offer, because the log still
+    // says P/T and that still also means PRESSURE TEST. Anything else would be the feature
+    // quietly deciding the ambiguity after all, one tap later.
+    check('the accepted reading is no longer offered',
+      !after.chips.some(c => /^↑ PKR FOR CSG TEST & ACID JOB$/.test(c)),
+      JSON.stringify(after.chips));
+    check('and the other reading still is',
+      after.chips.some(c => /PRESSURE TEST/.test(c)), JSON.stringify(after.chips));
+
+    // Take that one too, and there is nothing left to propose.
+    await p.locator('.mk-suggest-chip').first().click();
+    await p.waitForTimeout(600);
+    const spent = await p.evaluate((id) => ({
+      jobType: (window.__mkApp.state.data.tickets.find(x => x.id === id) || {}).jobType,
+      chips: document.querySelectorAll('.mk-suggest-chip').length,
+    }), t);
+    check('accepting both leaves the job type carrying each objective once',
+      spent.jobType === 'PKR FOR CSG TEST & ACID JOB & PRESSURE TEST',
+      JSON.stringify(spent.jobType));
+    check('and the chips go once there is nothing left to add', spent.chips === 0,
+      spent.chips + ' still shown');
     await ctx.close();
   }
 

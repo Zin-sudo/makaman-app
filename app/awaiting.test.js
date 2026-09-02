@@ -135,6 +135,101 @@ const stage = (p, n) => p.evaluate((many) => {
     await ctx.close();
   }
 
+  // ── Somebody is actually told ────────────────────────────────────────────
+  //
+  // The state is derived — approved plus signedDocsMissing() — so nothing was ever written
+  // when a job entered it, and the bell only saw the approval. That was survivable while an
+  // unbounded banner shouted about every waiting ticket above the inbox. Replacing the
+  // banner with a count is the right change, and it removed the only thing pushing the
+  // backlog at anyone: a job could sit unsigned for a month with nothing surfacing it.
+  //
+  // Approving now writes one entry naming what is owed. Notifications derive from the
+  // trail, so the bell picks it up with no second wiring.
+  {
+    const { ctx, p } = await boot(b, 'omar@makaman.ly');
+    const id = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const t = app.state.data.tickets.find(x => x.status === 'done')
+        || app.state.data.tickets.find(x => x.status !== 'approved');
+      app.mutate((d) => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.status = 'done';
+        x.ticketNo = '7700';
+        x.mileage = 40;
+        x.jobType = 'PKR FOR CSG TEST';
+        x.items = [{ code: 'MKN-1801', desc: 'A line', qty: 1, uom: 'Km', cost: 10, ov: {} }];
+        x.attachments = [];
+        x.audit = [];
+      });
+      app.openReview(t.id);
+      return t.id;
+    });
+    await p.waitForTimeout(700);
+    await p.getByRole('button', { name: /^Approve ticket$/ }).click();
+    await p.waitForTimeout(800);
+
+    const after = await p.evaluate((tid) => {
+      const app = window.__mkApp;
+      const t = app.state.data.tickets.find(x => x.id === tid);
+      return {
+        trail: (t.audit || []).map(a => a.kind + ' :: ' + a.text),
+        // The bell reads the trail. Somebody else's entry, so it counts as unread.
+        chased: app.awaitingDocs([t]).length,
+      };
+    }, id);
+
+    check('approving records that the paperwork is now owed',
+      after.trail.some(x => /lifecycle :: Waiting on the client for/.test(x)),
+      JSON.stringify(after.trail.filter(x => /Waiting on/.test(x))));
+    check('and names which documents, not just "paperwork"',
+      after.trail.some(x => /Signed Service Ticket and Signed Job Log/.test(x)),
+      (after.trail.find(x => /Waiting on/.test(x)) || '(none)').slice(0, 100));
+    check('it is a job stage, so the field and the Observer see it too',
+      after.trail.filter(x => /Waiting on the client/.test(x))
+        .every(x => x.indexOf('lifecycle ::') === 0));
+    check('and the ticket really is in the chased set', after.chased === 1,
+      String(after.chased));
+
+    // The approval dialog stays up until it is answered, and it covers the screen — the
+    // second approval below cannot reach its button through it.
+    await p.evaluate(() => window.__mkApp.setState({ dialog: null }));
+    await p.waitForTimeout(400);
+
+    // A ticket approved with both sheets already in hand owes nothing, and must not
+    // announce a wait that is not happening.
+    const quiet = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const t = app.state.data.tickets.find(x => x.status !== 'approved');
+      if (!t) return null;
+      app.mutate((d) => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.status = 'done'; x.ticketNo = '7701'; x.mileage = 40;
+        x.jobType = 'PKR FOR CSG TEST';
+        x.items = [{ code: 'MKN-1801', desc: 'A line', qty: 1, uom: 'Km', cost: 10, ov: {} }];
+        x.audit = [];
+        x.attachments = [
+          { id: 'q1', docKind: 'service_ticket', filename: 's.pdf', path: t.id + '/s.pdf' },
+          { id: 'q2', docKind: 'job_log', filename: 'l.pdf', path: t.id + '/l.pdf' },
+        ];
+      });
+      app.openReview(t.id);
+      return t.id;
+    });
+    if (quiet) {
+      await p.waitForTimeout(700);
+      await p.getByRole('button', { name: /^Approve ticket$/ }).click();
+      await p.waitForTimeout(800);
+      const said = await p.evaluate((tid) => {
+        const t = window.__mkApp.state.data.tickets.find(x => x.id === tid);
+        return (t.audit || []).map(a => a.text);
+      }, quiet);
+      check('a job approved with both sheets in hand announces no wait',
+        !said.some(x => /Waiting on the client/.test(x)),
+        JSON.stringify(said.filter(x => /Waiting/.test(x))));
+    }
+    await ctx.close();
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);

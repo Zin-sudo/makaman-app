@@ -192,6 +192,47 @@ assertStubParses(DB);
     await p.close();
   }
 
+  // ── The promise itself, driven ───────────────────────────────────────────
+  //
+  // Everything above proves the right rows reach localStorage. That is not the promise.
+  // The promise is that a technician at a well with no signal opens the app and finds his
+  // running job on the screen — and the distance between "the right bytes were written"
+  // and "the app opens and shows it" is exactly where the uuid bug lived for weeks, with
+  // every store-level assertion passing the whole time.
+  //
+  // So: sign in with signal, lose it, reload, and read the screen.
+  {
+    const p = await open();
+    await login(p, 'yousef@makaman.ly');
+    await p.evaluate(() => window.__mkApp.persist(window.__mkApp.state.data));
+    await p.waitForTimeout(500);
+
+    // The signal goes. Every request from here fails the way a dead connection fails.
+    await p.evaluate(() => { window.__offline = true; });
+    await p.reload({ waitUntil: 'domcontentloaded' });
+    await p.waitForTimeout(2200);
+
+    const cold = await p.evaluate(() => {
+      const app = window.__mkApp;
+      return {
+        signedIn: !!(app.state.session && app.state.session.name),
+        onScreen: document.body.innerText,
+        tickets: (app.state.data.tickets || []).map(t => t.id),
+        wellShown: /BG-214/.test(document.body.innerText),
+      };
+    });
+    check('the app opens with no signal at all', cold.signedIn === true,
+      cold.signedIn ? 'signed in from the device' : 'landed on the login screen');
+    check('and his own running job is there', cold.tickets.indexOf(TICKET) >= 0,
+      JSON.stringify(cold.tickets));
+    check('rendered on screen, not merely present in the store', cold.wellShown === true,
+      (cold.onScreen.match(/BG-\d+/) || ['(no well on screen)'])[0]);
+    // The one thing that must NOT happen: demo tickets standing in for real ones.
+    check('and no invented job is shown in place of it',
+      !/Northern Gulf Petroleum|Al-Dhafra Energy/.test(cold.onScreen));
+    await p.close();
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);
