@@ -74,6 +74,96 @@ async function open(b) {
     await ctx.close();
   }
 
+  // ── A3 · Where the time actually goes ───────────────────────────────────
+  //
+  // "Make sure we don't have a single dependency bottleneck — if one action is taking 90%
+  // of the round trip that is our bottleneck." The count of requests cannot answer that:
+  // twenty that overlap cost one round trip, and two that wait on each other cost two.
+  // So every answer the fake gives records its own span, and the critical path is the
+  // UNION of the spans — overlapping requests are paid once.
+  //
+  // What is charged to each dependency is its EXCLUSIVE contribution: how much shorter
+  // the pull would be if that one request did not exist. A first attempt charged each
+  // event its whole duration as a share of the path, which reported nineteen parallel
+  // 60 ms requests as nineteen things each holding 100% of a 60 ms path — every one of
+  // them "the bottleneck", in the shape that is precisely the absence of one. Sharing a
+  // window with nineteen others is not the same as owning it.
+  //
+  // The rule: no dependency may own more than half the critical path. Above that, making
+  // everything else faster changes nothing measurable.
+  {
+    const { ctx, p } = await open(b);
+    const r = await p.evaluate((ms) => {
+      window.__stubLatency = ms;
+      window.__events = [];
+      const t0 = Date.now();
+      return window.__mkApp.hydrateForTest().then(() => ({
+        wall: Date.now() - t0,
+        events: window.__events.map(e => ({ what: e.what, ms: e.end - e.start,
+          start: e.start - t0, end: e.end - t0 })),
+      }), () => ({ wall: Date.now() - t0, events: [] }));
+    }, LATENCY);
+
+    // The union of a set of spans, in milliseconds.
+    const union = (evs) => {
+      const merged = [];
+      evs.slice().sort((a, b) => a.start - b.start).forEach((e) => {
+        const last = merged[merged.length - 1];
+        if (last && e.start <= last.end) last.end = Math.max(last.end, e.end);
+        else merged.push({ start: e.start, end: e.end });
+      });
+      return { ms: merged.reduce((n, x) => n + (x.end - x.start), 0), stages: merged.length };
+    };
+    const whole = union(r.events);
+    const path = whole.ms || 1;
+
+    // One table fetched in four pages is one dependency, not four.
+    const names = Array.from(new Set(r.events.map(e => e.what)));
+    const table = names.map((what) => {
+      const without = union(r.events.filter(e => e.what !== what)).ms;
+      return { what: what, owns: path - without, share: (path - without) / path,
+        ms: r.events.filter(e => e.what === what).reduce((n, e) => n + e.ms, 0) };
+    }).sort((a, b) => b.owns - a.owns || b.ms - a.ms);
+
+    console.log('\n    critical path ' + path + ' ms of ' + r.wall + ' ms wall · '
+      + r.events.length + ' requests in ' + whole.stages + ' stage(s)');
+    console.log('      owns   spent  dependency');
+    table.slice(0, 6).forEach(x => console.log('      '
+      + String(Math.round(x.share * 100)).padStart(3) + '%  '
+      + String(x.ms).padStart(5) + ' ms  ' + x.what));
+
+    check('every request in the pull is accounted for', r.events.length > 0,
+      r.events.length + ' events');
+    const worst = table[0];
+    check('no single dependency owns more than half the critical path',
+      !!worst && worst.share <= 0.5,
+      worst ? worst.what + ' owns ' + Math.round(worst.share * 100) + '%' : 'nothing measured');
+    check('and the pull is wide rather than deep',
+      whole.stages <= 3, whole.stages + ' sequential stages');
+
+    // And the detector is shown to fire, because one that has only ever said "no
+    // bottleneck" is not known to work. One table is made ten times slower than the rest;
+    // it should own nearly all of a path it now defines by itself.
+    const rigged = await p.evaluate((ms) => {
+      window.__stubLatency = ms;
+      window.__slowOne = { what: 'tickets', ms: ms * 10 };
+      window.__events = [];
+      const t0 = Date.now();
+      return window.__mkApp.hydrateForTest().then(() => {
+        window.__slowOne = null;
+        return { events: window.__events.map(e => ({ what: e.what,
+          start: e.start - t0, end: e.end - t0 })) };
+      });
+    }, LATENCY);
+    const rigWhole = union(rigged.events).ms || 1;
+    const rigWithout = union(rigged.events.filter(e => e.what !== 'tickets')).ms;
+    const rigShare = (rigWhole - rigWithout) / rigWhole;
+    check('a real bottleneck IS caught — the check is not vacuous',
+      rigShare > 0.5, 'tickets owns ' + Math.round(rigShare * 100)
+        + '% when made ' + (LATENCY * 10) + ' ms');
+    await ctx.close();
+  }
+
   // ── The price list does not come down with everything else ──
   //
   // It used to: 2,610 rows, the company's entire pricing, pulled at every sign-in onto

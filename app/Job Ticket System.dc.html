@@ -1649,6 +1649,21 @@
   <sc-if value="{{ showMgrPage }}" hint-placeholder-val="{{ true }}">
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
 
+      <!-- The office learns it has lost the connection.
+           Until now it did not. The Sync tab an office user sees is "Field devices" —
+           about the technicians' phones, not about this machine — so the only place the
+           office's own connection state appeared was a dot in the technician's app bar,
+           which the office never sees. That mattered less when every device cached
+           everything; it matters now, because this machine keeps no tickets, so what is
+           on screen while the connection is down is the last thing fetched and cannot be
+           refreshed or reliably changed. Said once, at the top, on every office screen. -->
+      <sc-if value="{{ officeOffline }}" hint-placeholder-val="{{ false }}">
+        <div class="mk-note" style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:11px 14px;font-size:13px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">
+          <span style="width:9px;height:9px;flex:none;border-radius:50%;background:var(--warning)"></span>
+          <div><strong>No connection.</strong> {{ officeOfflineHint }}</div>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
         <div class="mk-pagehead" style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
           <div>
@@ -2349,7 +2364,9 @@
               <!-- Letterhead — reproduces the real workbook's own header area above the
                    title row: an English company WordArt block and an Arabic one flanking
                    the Makaman logo, taken from the actual drawing XML embedded in
-                   reference/Autofill_ServiceTikcet_System.xlsx (not invented). -->
+                   reference/Autofill_ServiceTikcet_System.xlsx (not invented) — that workbook now
+                   lives in git history rather than the tree; `git log --diff-filter=D --
+                   reference/` finds the commit that removed it. -->
               <div style="display:flex;align-items:center;justify-content:center;gap:14px;padding-bottom:14px">
                 <div style="flex:1;text-align:center;font-size:9px;font-weight:700;line-height:1.6;letter-spacing:0.02em">
                   MAKAMAN LIBYA COMPANY<br>OIL SERVICES INCORPORATED<br>TOOLS &amp; TESTING<br>TRIPOLI- LIBYA
@@ -3190,7 +3207,7 @@
 
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;roundTripFactor&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;tsType&quot;:&quot;number&quot;,&quot;min&quot;:1,&quot;max&quot;:3,&quot;section&quot;:&quot;Charging&quot;},&quot;strictNumberFormat&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Rules&quot;}}">
-const BUILD = 'field-test.1 · 27 Aug 2026';
+const BUILD = 'v1.0.0 · trial · 2 Sep 2026';
 const K = 'makaman.jobtickets.v2';
 const SK = 'makaman.jobtickets.session.v1';
 
@@ -3755,6 +3772,50 @@ function withoutPriceLists(data) {
     clients: clients.map((cl) => ((cl.items || []).length
       ? Object.assign({}, cl, { items: [], priceListLoaded: false })
       : cl)),
+  });
+}
+
+// What a device keeps between sessions, decided by who is holding it.
+//
+// The instruction was "only the unsynced should be in localStorage; the synced should be
+// fetched when connected". Taken literally that breaks the promise the app exists for: a
+// `logging` ticket IS synced — the office needs the live view of it — so a technician at
+// a well with no signal would open the app and find his own running job missing. What is
+// actually being asked for is that office data stops piling up on phones, and that is
+// what this does:
+//
+//   technician          his own working set: jobs he is on the crew of, open or recently
+//                       closed. Synced or not — being on the server is not a reason to
+//                       lose it from the device that has no signal.
+//   ops / admin / observer   nothing. They work at a desk on a connection; caching a
+//                       ticket list for them only creates the case where two office users
+//                       edit the same ticket from two stale copies.
+//   an admin acting as a technician   the technician's rules. That is the case that needs
+//                       the offline behaviour, and it is the one a role check alone gets
+//                       wrong.
+//
+// The outbox is not here and never is: it lives under its own key, is written by
+// outboxWrite(), and is never evicted by anything. Unsent work is the one thing that
+// cannot be refetched.
+const CACHE_CLOSED_DAYS = 30;
+function cacheFor(data, session, actingAs) {
+  const role = actingAs ? 'tech' : ((session || {}).roleKey || 'tech');
+  if (role !== 'tech') {
+    // Reference data only — the customers, job types and numbering the screens need to
+    // render at all. No tickets, no audit trail, no notes, no attachments.
+    return Object.assign({}, data, { tickets: [] });
+  }
+  const name = (session || {}).name || '';
+  const email = (session || {}).email || '';
+  const cutoff = Date.now() - CACHE_CLOSED_DAYS * 24 * 60 * 60 * 1000;
+  return Object.assign({}, data, {
+    tickets: (data.tickets || []).filter((t) => {
+      if (!inCrew(t, name, email)) return false;
+      if (t.status === 'logging' || t.status === 'done') return true;
+      // Closed a while ago and settled: the office has it, and it is one refetch away.
+      const at = Date.parse(t.approvedAt || t.end || t.syncedAt || '') || 0;
+      return !at || at > cutoff;
+    }),
   });
 }
 
@@ -4838,7 +4899,9 @@ const SHEET = {
 };
 
 // ── The real workbook, and where each field lands in it ───────────────────────────
-// reference/Autofill_ServiceTikcet_System.xlsx, shipped as app/uploads/. The export
+// Autofill_ServiceTikcet_System.xlsx — the client's own template, shipped as
+// app/uploads/. The source workbook was removed from the tree to keep the deployed
+// directory light; it is in git history (git log --diff-filter=D -- reference/). The export
 // fills THIS file rather than building a new one, so the sheets the customer receives
 // are the sheets they already know — same column widths, merges, borders, print setup,
 // logo and price-list tabs. Only the values change.
@@ -5663,7 +5726,13 @@ class Component extends DCLogic {
     //
     // Only in cloud mode. The demo store's price lists ARE its seed data; dropping them
     // there would empty the demo on the first save.
-    const payload = JSON.stringify(USE_CLOUD ? withoutPriceLists(data) : data);
+    //
+    // cacheFor() is the same idea one level up: what this device keeps at all, decided by
+    // who is signed into it. Both run here rather than at the call sites so a screen added
+    // later cannot leak by forgetting — persist() is the only door to localStorage.
+    const payload = JSON.stringify(USE_CLOUD
+      ? withoutPriceLists(cacheFor(data, this.state.session, this.state.actingAs))
+      : data);
     if (this.tryWrite(key, payload)) {
       this.watchStorageHeadroom(payload.length);
       return true;
@@ -6899,36 +6968,53 @@ class Component extends DCLogic {
   activityEntries() {
     const S = this.state, D = this.state.data, F = this.fmt();
     const deep = this.hasPermission('activity.view_edits');
+    // `stamp` and `edge` are read through getters, so they cost nothing until somebody
+    // looks at them.
+    //
+    // Every entry used to be formatted on the way past — a date through Intl and a colour
+    // through cardTreatment() — and then the whole feed was sorted and the first 40 or 60
+    // shown. At 400 tickets that is thousands of formatted stamps built to display sixty,
+    // on every render. Profiled: two thirds of the render sat in fdate/ftime.
+    //
+    // Getters rather than a separate decorate() pass because the shape has to stay
+    // exactly what it was. Every consumer still reads `a.stamp` and `a.edge` and cannot
+    // tell the difference; only the ones actually rendered pay for them.
+    const entry = (a, kind, where, edgeOf, open) => {
+      const e = { ts: a.ts, by: a.by || '', kind: kind, text: a.text, where: where, open: open };
+      Object.defineProperty(e, 'stamp', { enumerable: true, configurable: true,
+        get: function () {
+          const v = F.stamp(a.ts);
+          Object.defineProperty(e, 'stamp', { value: v, enumerable: true, writable: true });
+          return v;
+        } });
+      Object.defineProperty(e, 'edge', { enumerable: true, configurable: true,
+        get: function () {
+          const v = edgeOf();
+          Object.defineProperty(e, 'edge', { value: v, enumerable: true, writable: true });
+          return v;
+        } });
+      return e;
+    };
     return (D.tickets || [])
-      .reduce((acc, x) => acc.concat((x.audit || []).map((a) => ({
-        ts: a.ts,
-        by: a.by || '',
-        kind: auditKind(a),
-        text: a.text,
-        stamp: F.stamp(a.ts),
-        where: (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
-        edge: this.cardTreatment(x).edge,
-        open: () => (S.role === 'tech'
+      .reduce((acc, x) => acc.concat((x.audit || []).map((a) => entry(
+        a, auditKind(a),
+        (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
+        () => this.cardTreatment(x).edge,
+        () => (S.role === 'tech'
           ? this.setState({ activeId: x.id, techScreen: 'log', roleTab: 'tickets' })
-          : this.openReview(x.id, { roleTab: 'tickets' })),
-      }))), [])
+          : this.openReview(x.id, { roleTab: 'tickets' }))))), [])
       // Price-list history has no ticket to hang off, so it is concatenated here rather
       // than being a second feed on a second screen. A deletion is 'lifecycle' because
       // the row is gone and everyone entitled to the feed should see that; a corrected
       // figure is 'edit', which is the same line the ticket trail draws.
-      .concat((D.priceAudit || []).map((a) => ({
-        ts: a.ts,
-        by: a.by || '',
-        kind: a.kind === 'lifecycle' ? 'lifecycle' : 'edit',
-        text: a.text,
-        stamp: F.stamp(a.ts),
-        where: 'Price list · ' + (a.client || ''),
-        edge: 'var(--success)',
-        open: () => this.hasPermission('pricelist.view')
+      .concat((D.priceAudit || []).map((a) => entry(
+        a, a.kind === 'lifecycle' ? 'lifecycle' : 'edit',
+        'Price list · ' + (a.client || ''),
+        () => 'var(--success)',
+        () => this.hasPermission('pricelist.view')
           ? (this.setState({ adminTab: 'price', adminClient: a.client, roleTab: 'tickets' }),
              this.ensurePriceList(a.client))
-          : null,
-      })))
+          : null)))
       .filter((a) => deep || a.kind === 'lifecycle')
       .sort((a, b) => new Date(b.ts) - new Date(a.ts));
   }
@@ -6942,11 +7028,17 @@ class Component extends DCLogic {
   // records of one fact drifting apart quietly.
   //
   // Your own actions are excluded. Nobody needs telling what they just did.
-  unreadEntries() {
+  unreadEntries() { return this.unreadEntriesFrom(this.activityEntries()); }
+  // The filter, separated from the walk that feeds it.
+  //
+  // A render needs both the whole feed and the unread part of it, and calling this used
+  // to mean walking the entire audit history again. The caller that already holds the
+  // feed passes it in; everything else — tests, the odd one-off — keeps the old shape.
+  unreadEntriesFrom(entries) {
     const readAt = ((this.state.data || {}).settings || {}).notificationsReadAt || '';
     const me = (this.state.session && this.state.session.name) || '';
     const since = readAt ? new Date(readAt).getTime() : 0;
-    return this.activityEntries().filter((a) =>
+    return (entries || []).filter((a) =>
       a.by !== me && new Date(a.ts).getTime() > since);
   }
 
@@ -8491,7 +8583,35 @@ class Component extends DCLogic {
       ? approved.filter(x => inCrew(x, myName, myEmail))
       : approved;
 
-    const reportRows = (() => {
+    // Only when the screen that shows them is open.
+    //
+    // Both places this list renders are inside the Account tab, and it was being built on
+    // EVERY render — every keystroke in the inbox search, every tick of the sync state —
+    // mapping every approved job through ticketView() to produce rows nobody was looking
+    // at. Measured at 400 tickets on a 4x-throttled CPU: 133 ms of a 655 ms render, the
+    // single largest thing in it, spent entirely off-screen.
+    //
+    // An empty array is the correct value for a list that is not being displayed: the
+    // sc-for renders nothing either way, and the month picker beside it reads a different
+    // binding. When the tab opens, the render that opens it builds the rows.
+    // The audit trail, read once per render rather than eight times.
+    //
+    // activityEntries() walks every audit entry on every ticket and formats a timestamp
+    // for each. unreadEntries() is a filter over it, and the notification bell alone
+    // asked for it SEVEN times in one binding object — a count, a title, a heading, a
+    // wobble class, two emptiness flags and the rows — with activityFeed making an
+    // eighth. Every one of those was a full pass over the company's history, on every
+    // render, on every screen, whether or not the bell was open.
+    //
+    // Profiled at 400 tickets on a 4x-throttled CPU: about two thirds of a 655 ms render,
+    // almost all of it inside fdate/ftime/dt formatting the same stamps over and over.
+    // This is the single-dependency bottleneck A3 went looking for, and it was not in the
+    // network at all.
+    const activity = this.activityEntries();
+    const unread = this.unreadEntriesFrom(activity);
+
+    const reportsOpen = S.roleTab === 'account';
+    const reportRows = !reportsOpen ? [] : (() => {
       const inMonth = reportBase.filter(x => {
         if (!S.reportMonth) return true;
         const d = dt(x.end || x.start);
@@ -9480,7 +9600,7 @@ class Component extends DCLogic {
       // tickets, so who altered a figure is the office's business, not the crew's.
       activityFeed: (() => {
         const want = S.activityKind || 'all';
-        return this.activityEntries()
+        return activity
           .filter(a => want === 'all' || a.kind === want)
           .slice(0, 60);
       })(),
@@ -9675,9 +9795,26 @@ class Component extends DCLogic {
       // Storage & Export — Ops Manager only.
       settingsIsMgr: S.role === 'mgr',
       clock: F.time(iso(new Date())),
+      // The office is online-only by design (its machine caches no tickets), so it has to
+      // be told the moment that stops being true. Not shown to an office user swapped into
+      // the technician view: that view IS the offline one, and it has its own signal.
+      officeOffline: !S.online && !S.actingAs && S.role !== 'tech',
+      officeOfflineHint: 'The office works online — tickets are not held on this machine, '
+        + 'so what is on screen cannot be refreshed until signal returns. Anything already '
+        + 'queued is safe and will send itself.',
       netDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
       netLabel: S.online ? 'ONLINE' : 'NO SIGNAL',
-      netHint: S.online ? 'Detected automatically' : 'Work is stored on this device until signal returns',
+      // The offline hint has to match what the device actually does, and since the cache
+      // became per-role those are two different sentences. A technician's phone keeps his
+      // own jobs and queues his edits; an office machine keeps no tickets at all, so
+      // telling an Ops Manager his work is "stored on this device until signal returns"
+      // would be a promise nothing behind it keeps. An admin swapped into the technician
+      // view gets the technician's answer, because that is the behaviour he now has.
+      netHint: S.online
+        ? 'Detected automatically'
+        : ((S.actingAs || S.role === 'tech')
+          ? 'Your own jobs and any unsent changes are held on this device until signal returns'
+          : 'The office works online. Tickets are not held on this machine — reconnect to see and change them. Anything already queued is still safe.'),
       // One signal at a time. The Sync tab already says everything the banner would,
       // and louder — showing both meant the technician saw the same warning twice with
       // the tab's own controls right beneath it.
@@ -9701,19 +9838,16 @@ class Component extends DCLogic {
       // Animista's wobble runs once and stops — `both` leaves it on its last frame — so
       // binding the class to "there is something unread" plays it when unread work
       // appears and not on every re-render, because the class is already there by then.
-      notifyWobble: this.unreadEntries().length ? 'wobble-hor-top' : '',
-      notifyCount: (() => { const n = this.unreadEntries().length; return n > 99 ? '99+' : String(n); })(),
-      notifyAny: this.unreadEntries().length > 0,
-      notifyNone: this.unreadEntries().length === 0,
-      notifyTitle: (() => {
-        const n = this.unreadEntries().length;
-        return n === 0 ? 'Nothing new' : n === 1 ? '1 thing you have not seen' : n + ' things you have not seen';
-      })(),
-      notifyHeading: (() => {
-        const n = this.unreadEntries().length;
-        return n === 0 ? 'Up to date' : n === 1 ? '1 unread' : n + ' unread';
-      })(),
-      notifyRows: this.unreadEntries().slice(0, 40).map((a) => ({
+      notifyWobble: unread.length ? 'wobble-hor-top' : '',
+      notifyCount: unread.length > 99 ? '99+' : String(unread.length),
+      notifyAny: unread.length > 0,
+      notifyNone: unread.length === 0,
+      notifyTitle: unread.length === 0 ? 'Nothing new'
+        : unread.length === 1 ? '1 thing you have not seen'
+        : unread.length + ' things you have not seen',
+      notifyHeading: unread.length === 0 ? 'Up to date'
+        : unread.length === 1 ? '1 unread' : unread.length + ' unread',
+      notifyRows: unread.slice(0, 40).map((a) => ({
         text: a.text, where: a.where, stamp: a.stamp, edge: a.edge,
         open: () => { this.setState({ showNotifications: false }); a.open(); },
       })),

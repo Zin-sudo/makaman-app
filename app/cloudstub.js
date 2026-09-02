@@ -82,10 +82,25 @@ window.__rtt = 0;
 // Set this and every answer is delayed, so a suite can measure the critical path in
 // wall-clock rather than counting requests and guessing at the shape.
 window.__stubLatency = 0;
-window.__wire = function (body) {
+// Every request, with what it asked for and when it started and finished.
+//
+// The count alone cannot answer "is one thing taking most of the time" -- twenty requests
+// that all overlap cost one round trip, and two that wait on each other cost two. So each
+// answer records its own span, and a suite reconstructs the critical path from the spans
+// rather than from the count. Cleared by a suite before the run it wants to measure.
+window.__events = [];
+// One dependency made deliberately slow, so the bottleneck detector can be shown to
+// fire. A detector that has only ever reported "no bottleneck" is not known to work.
+window.__slowOne = null;    // { what: 'tickets', ms: 600 }
+window.__wire = function (body, what) {
   var ms = window.__stubLatency || 0;
-  if (!ms) return Promise.resolve(body);
-  return new Promise(function (r) { setTimeout(function () { r(body); }, ms); });
+  if (window.__slowOne && window.__slowOne.what === what) ms = window.__slowOne.ms;
+  var ev = { what: what || 'unknown', start: Date.now(), end: 0 };
+  window.__events.push(ev);
+  if (!ms) { ev.end = Date.now(); return Promise.resolve(body); }
+  return new Promise(function (r) {
+    setTimeout(function () { ev.end = Date.now(); r(body); }, ms);
+  });
 };
 window.__writes = [];
 window.__uploads = [];
@@ -163,7 +178,7 @@ window.supabase = {
               if (window.__offline) return fail();
               return window.__wire(filtered.length
                 ? { data: filtered[0], error: null }
-                : { data: null, error: { message: 'no rows' } });
+                : { data: null, error: { message: 'no rows' } }, table);
             },
             then: function (ok, no) {
               window.__rtt++;
@@ -174,7 +189,7 @@ window.supabase = {
                 ? { data: head ? null : filtered,
                     count: ranged ? preRangeCount : filtered.length, error: null }
                 : { data: filtered, error: null };
-              return (window.__offline ? fail() : window.__wire(body)).then(ok, no);
+              return (window.__offline ? fail() : window.__wire(body, table)).then(ok, no);
             },
           };
               // Anything the app calls that this stub has not learned yet is named out loud.
@@ -272,7 +287,14 @@ window.supabase = {
         // for a person with no explicit exceptions: hasPermission() then falls back to
         // the role defaults, which is what this suite is about. permissions.test.js
         // covers the registry itself.
-        return Promise.resolve({ data: [], error: null });
+        //
+        // Through __wire like every other request, so it appears in the timing breakdown
+        // and obeys the latency knob. It used to resolve immediately, which made
+        // my_permissions -- a real round trip in production, and one hydrate() waits on
+        // -- free in every measurement. A fake that is instant where the real thing is
+        // not does not measure the shape of the real thing.
+        window.__rtt++;
+        return window.__wire({ data: [], error: null }, 'rpc:my_permissions');
       },
       auth: {
         signInWithPassword: function (c) {

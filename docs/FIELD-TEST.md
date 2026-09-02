@@ -27,7 +27,7 @@ the wrong thing.
 | 0.5 | Database snapshot taken, with the time written down | Admin | ☐ |
 | 0.6 | Price list checked for the **specific client** each crew will visit — open it in the app and read three prices against the client's own sheet | Ops | ☐ |
 | 0.7 | Each phone: open the site **with signal**, sign in once, install to home screen ("Add to Home Screen" / "Install app") | Technician | ☐ |
-| 0.8 | Build stamp on the login screen reads **`field-test.1 · 27 Aug 2026`**. If it says anything else, the phone is running an older build — hard-refresh with signal and check again | Technician | ☐ |
+| 0.8 | Build stamp on the login screen reads **`v1.0.0 · trial · 2 Sep 2026`**. If it says anything else, the phone is running an older build — hard-refresh with signal and check again | Technician | ☐ |
 | 0.9 | Airplane mode on, close the app fully, reopen it. It must open and show your jobs. If it shows a blank page, 0.7 did not finish — redo it with signal | Technician | ☐ |
 | 0.10 | Ticket-number series claimed by the right person | Ops | ☐ |
 

@@ -39,6 +39,18 @@ The batch the field trial runs on. First numbered release.
   customer's list when it opens something that needs it, held for the session and never
   written to disk.
 - **Cold boot** 5,029 KB → 1,967 KB; the full pull 34 requests / 4 sequential → 19 / 2.
+- **The render was reading the whole audit trail eight times.** `activityEntries()` walks
+  every audit entry on every ticket and formats a timestamp for each; `unreadEntries()` is
+  a filter over it, and the notification bell alone asked for it seven times per render —
+  a count, a title, a heading, a wobble class, two emptiness flags and the rows — with the
+  activity feed making an eighth. Every one was a full pass over the company's history, on
+  every screen, whether or not the bell was open. Read once now, and each entry's stamp
+  and colour computed only if something displays it. **At 400 tickets on a 4× throttled
+  CPU the render went from 655 ms to 195 ms.**
+- This was the single-dependency bottleneck the latency audit went looking for, and it was
+  not in the network. `app/perf.test.js` now reconstructs the critical path from per-request
+  spans and asserts no dependency owns more than half of it — checked against a
+  deliberately slowed request, so the detector is known to fire.
 
 ### Fixed
 
@@ -58,6 +70,14 @@ The batch the field trial runs on. First numbered release.
   tile could read 1 above an empty table.
 
 ### Changed
+
+- **Devices keep only what they need.** A technician keeps his own working set — jobs he is
+  crewed on, open or recently closed, synced or not, because being on the server is not a
+  reason to lose it from a device that has no signal. Office machines keep no tickets at
+  all and are told so plainly when the connection drops: the office had no indicator of its
+  own connection anywhere, since the Sync tab it sees is *Field devices*, about the
+  technicians' phones. An admin swapped into the technician view gets the technician's
+  rules. The outbox is never evicted by any of it.
 
 - **Base Location and Customer Representative** are hardcoded onto every ticket
   (`Makaman Base {Awjilah} 29°06'29.2"N 21°22'37.6"E` and `Drilling/Workover Office`) and
@@ -91,6 +111,12 @@ Against `docs/UX-PRINCIPLES.md`, adopted this release.
 
 ### Also
 
+- `app/fieldsim.test.js`: one continuous run through a day in the field — six jobs raised
+  and logged, edits surviving a reload, kit accounted for at closing with the answers
+  reaching the audit trail, four closed and two left running, three approved, one reopened
+  with a reason and corrected and re-approved, notes raised and resolved, the signed
+  paperwork returned — plus a 400-ticket volume guard. Nothing touches the live database.
+- `app/cachepolicy.test.js`: what each role's device keeps between sessions.
 - Downloadable error log (`makaman.errorlog.v1`): every refusal and failed request with
   its code and source, as markdown, from either Account screen.
 - `CLAUDE.md` and `docs/UX-PRINCIPLES.md` added, so the project's standing constraints
