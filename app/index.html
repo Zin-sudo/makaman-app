@@ -3261,6 +3261,18 @@ const SETTLED_STATES = ['approved', 'sent_client', 'sent_finance'];
 const SETTLED_RANK = (st) => SETTLED_STATES.indexOf(st);
 // The two places the company works out of. Constrained in the database as well, so a
 // second spelling of the same yard cannot split a report that groups by it.
+// Where the work goes out from, and who signs for it at the client. Both are the same on
+// every ticket this company raises, so they are stamped automatically rather than typed:
+// a field somebody has to fill in identically every time is a field that eventually gets
+// filled in wrongly, and it prints on the sheet the client keeps.
+//
+// Only the office can change them, and only on a ticket already in review — the technician
+// never sees an editable version. `org_defaults` still holds the live values so the office
+// can change them for everybody without a deploy; these constants are the floor, so a
+// missing or empty row can never put a blank where the base should be.
+const DEFAULT_BASE_LOCATION = 'Makaman Base {Awjilah} 29°06\'29.2"N 21°22\'37.6"E';
+const DEFAULT_CUSTOMER_REP = 'Drilling/Workover Office';
+
 const BASES = ['MKN Operations Base', 'MKN Headquarters'];
 // The field and the office that dispatches it work out of Operations; the admin and the
 // observer sit at Headquarters. A default, not a rule — anybody can be posted elsewhere.
@@ -3918,8 +3930,8 @@ function hydrate() {
         shareLocation: !!mySettings.share_location,
       },
       orgDefaults: {
-        baseLocation: (orgDefaults[0] || {}).base_location || '',
-        customerRep: (orgDefaults[0] || {}).customer_rep || '',
+        baseLocation: (orgDefaults[0] || {}).base_location || DEFAULT_BASE_LOCATION,
+        customerRep: (orgDefaults[0] || {}).customer_rep || DEFAULT_CUSTOMER_REP,
       },
       clients: clients.map((cl) => shapeClient(cl, P[cl.id])),
       jobTypes: jobTypes.map((j) => j.name),
@@ -4100,10 +4112,23 @@ function shedStorage(keep) {
 function outboxWrite(q) {
   try { localStorage.setItem(OUTBOX_K, JSON.stringify(q)); } catch (e) { /* quota */ }
 }
+// Every op carries a number of its own, and that is what the drain settles against.
+//
+// Coalescing by key is right — two edits to one ticket are one write, the later carrying
+// everything — but a KEY is not an identity. The drain has to be able to say "I sent THIS
+// op", not "I sent something called tickets:X", because by the time it finishes there may
+// be a different op wearing the same name.
 function outboxPush(ops) {
   if (!ops.length) return;
   const q = outboxRead();
+  // Numbered from the queue itself rather than from a counter held in memory: the queue
+  // on disk is the only thing both a reload and a drain-in-flight can agree about, and a
+  // module-level counter would restart at zero on every reload and re-issue ids that are
+  // still queued. Ops being sent right now are still in `q`, so their numbers are counted
+  // and cannot be handed out twice.
+  let seq = q.reduce((m, x) => Math.max(m, (x && x.seq) || 0), 0);
   ops.forEach((op) => {
+    op.seq = ++seq;
     const at = q.findIndex((x) => x.key === op.key);
     if (at >= 0) q[at] = op; else q.push(op);
   });
@@ -4186,10 +4211,33 @@ function outboxSend(c, op) {
 // hammering a dead connection is exactly the pile-up this is here to prevent. What
 // succeeded is removed; what did not stays for the next attempt.
 function outboxDrain() {
+  // One drain at a time.
+  //
+  // Two overlapping drains read the same queue and send the same ops twice — the office
+  // saw a change written twice and a refusal set aside twice. Both `scheduleDrain` and
+  // `refresh` call this, and a slow network makes the overlap the normal case rather than
+  // a rare one. A second caller joins the drain already running; anything queued since is
+  // picked up by the next one, which is what the queue is for.
+  //
+  // Parked on the function rather than in a module-level `let` deliberately: the suites
+  // lift these functions out and re-evaluate them in isolation, and a bare module
+  // variable would be undefined in there. A property travels with the function.
+  if (outboxDrain.inflight) return outboxDrain.inflight;
   const c = sb();
   if (!c) return Promise.resolve(0);
-  const q = outboxRead();
+  let q = outboxRead();
   if (!q.length) return Promise.resolve(0);
+  // Everything gets a number before anything is sent.
+  //
+  // The drain settles by seq (see the tail of this function), so an op without one could
+  // never be removed and would jam the queue for ever. Ops queued by an older build — or
+  // put there directly by a suite — have none, so they are numbered here, once, before the
+  // first send. Writing it back means the numbers survive the reload that follows.
+  if (q.some((op) => op && !op.seq)) {
+    let seq = q.reduce((m, x) => Math.max(m, (x && x.seq) || 0), 0);
+    q = q.map((op) => (op && !op.seq) ? Object.assign({}, op, { seq: ++seq }) : op);
+    outboxWrite(q);
+  }
   let done = 0;  // how far the queue has been settled — sent, or given up on
   let sent = 0;
   const step = (n) => {
@@ -4206,6 +4254,19 @@ function outboxDrain() {
         // A conflict is terminal by nature — the version it was made against will never
         // come back — so it is set aside on the first refusal rather than after five
         // attempts that cannot succeed and five more chances to look like a flaky network.
+        // No signal is not a refusal, and must never be counted as one.
+        //
+        // `tries` used to be reset on every drain by a bug in how the queue was written
+        // back, so this limit was never really reached. With that fixed the limit became
+        // real — and it was counting dropped connections, so five drains with no signal
+        // would abandon a technician's closed ticket into the set-aside pile as though
+        // the database had rejected it. Hours without signal at a wellhead is the normal
+        // case this app is built for, not an error.
+        //
+        // So only an answer FROM the server counts. A connection that never arrived
+        // leaves the op exactly as it was, and stops this drain: everything queued behind
+        // it is about to fail for the same reason, and trying proves nothing.
+        if (errorKind(err) === 'NET') return Promise.reject(err);
         q[n].tries = (q[n].tries || 0) + 1;
         if (!(err && err.mkTerminal) && q[n].tries < OUTBOX_TRIES) return Promise.resolve();
         done = n + 1;
@@ -4214,10 +4275,48 @@ function outboxDrain() {
       }
     );
   };
-  return step(0).then(() => {
-    outboxWrite(q.slice(done));
+  const run = step(0).catch((err) => {
+    // Reached only by the no-signal path above. Nothing was lost; the queue keeps
+    // whatever it had and the next drain picks up where this one stopped.
+    if (errorKind(err) !== 'NET') throw err;
+  }).then(() => {
+    // Re-read, and remove only what THIS drain actually settled.
+    //
+    // This used to be `outboxWrite(q.slice(done))` — write back the tail of the queue as
+    // it looked when the drain STARTED. Anything queued while it was in flight was
+    // therefore erased by it, and a drain is in flight for as long as the network takes.
+    //
+    // That is not a corner case: approving a ticket makes several changes in a row, and a
+    // drain is scheduled after the first of them. So the office pressed Approve, the app
+    // said done, the write was wiped by the drain already running, the server never heard
+    // about it, and the next sign-in pulled the ticket back to Awaiting review. Ticket
+    // 1883 sat in the live database at status 'done' with approved_at null while the
+    // office believed it was approved. Reproduced deliberately before this was changed.
+    //
+    // Settled by seq rather than by key, because an op queued during the drain may carry
+    // the same key as the one just sent — that is exactly the case being protected, and
+    // filtering by key would delete the new op along with the old.
+    const settled = {};
+    q.slice(0, done).forEach((op) => { if (op && op.seq) settled[op.seq] = true; });
+    // What this drain learned about the ops it did NOT settle — chiefly `tries`, which is
+    // how an op the server keeps refusing eventually stops blocking the queue. That count
+    // lives on the in-memory copy; the copy on disk does not have it, so writing the disk
+    // version straight back would reset the retry count on every pass and the op would be
+    // retried for ever instead of being set aside after five attempts.
+    const mine = {};
+    q.forEach((op) => { if (op && op.seq) mine[op.seq] = op; });
+    const now = outboxRead();
+    outboxWrite(now
+      .filter((op) => !op || !op.seq || !settled[op.seq])
+      // An op replaced on disk while this drain ran carries a new seq and is not in
+      // `mine`, so the newer disk version is the one kept — which is the whole point.
+      .map((op) => (op && op.seq && mine[op.seq]) ? mine[op.seq] : op));
     return sent;
   });
+  const clear = () => { outboxDrain.inflight = null; };
+  const settledRun = run.then((v) => { clear(); return v; }, (e) => { clear(); throw e; });
+  outboxDrain.inflight = settledRun;
+  return settledRun;
 }
 // Given-up ops are kept rather than discarded quietly: the change itself is still in the
 // replica and on screen, so the only thing lost is the attempt to send it, and a record
@@ -4244,7 +4343,17 @@ function outboxSetAside(op, why) {
     // refused" and nothing more, which is not enough for anyone to act on — and the most
     // likely cause here, two devices reaching for one ticket number, has an obvious
     // remedy the moment it is named.
-    dead.push({ at: new Date().toISOString(), op: op, why: reason });
+    // One line per refusal, not one per attempt.
+    //
+    // A ticket can have two edits queued against it — one made while an earlier drain was
+    // in flight — and if the server has moved on, both are refused for the same reason.
+    // That is one problem for the person to deal with, and telling them "2 changes were
+    // refused" about a single ticket sends them looking for a second one that does not
+    // exist. Same op, same reason: bump the count and keep the newest timestamp.
+    const at = new Date().toISOString();
+    const same = dead.find((e) => e && (e.op || {}).key === (op || {}).key && e.why === reason);
+    if (same) { same.n = (same.n || 1) + 1; same.at = at; }
+    else dead.push({ at: at, op: op, why: reason, n: 1 });
     localStorage.setItem(DEADLETTER_K, JSON.stringify(dead.slice(-50)));
   } catch (e) { /* quota */ }
 }
@@ -4704,11 +4813,30 @@ function ago(days, h, m) { const d = new Date(); d.setDate(d.getDate() - days); 
 function dt(s) { return s ? new Date(s) : null; }
 // Wall-clock parts of an instant as seen in `tz`. Everything below is built on this so
 // there is exactly one place where a UTC instant becomes a local calendar reading.
+// Formatters, built once and kept.
+//
+// `new Intl.DateTimeFormat(...)` is the most expensive constructor in the standard
+// library, and every date on screen was building a fresh one. ticketView() emits about six
+// stamps per ticket, so a 120-row inbox constructed seven hundred formatters per render
+// and a 400-row one constructed well over two thousand. Measured on a 4x-throttled CPU —
+// roughly a mid-range Android — that was 273 ms for 120 tickets and 1,684 ms for 400: the
+// Tickets tab visibly hanging on a phone, and the only interaction in the whole app over
+// budget.
+//
+// There are a handful of distinct shapes in the entire app, so they are cached on the
+// options that define them. Same formatter object, identical output — an Intl formatter
+// is stateless and reusable by design. The key must carry the timezone AND the hour cycle
+// or a 12-hour reader would be handed a 24-hour stamp.
+const DTF_CACHE = {};
+function dtf(opt) {
+  const key = JSON.stringify(opt);
+  return DTF_CACHE[key] || (DTF_CACHE[key] = new Intl.DateTimeFormat('en-GB', opt));
+}
 function zoneParts(d, tz) {
   const opt = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
   if (tz && tz !== 'device') opt.timeZone = tz;
   const out = {};
-  new Intl.DateTimeFormat('en-GB', opt).formatToParts(d).forEach(x => { if (x.type !== 'literal') out[x.type] = x.value; });
+  dtf(opt).formatToParts(d).forEach(x => { if (x.type !== 'literal') out[x.type] = x.value; });
   return out;
 }
 // datetime-local inputs need 'YYYY-MM-DDTHH:mm' with no timezone suffix. It must be the
@@ -4819,19 +4947,19 @@ function fdate(s, tz) {
   const d = dt(s); if (!d) return '—';
   const opt = { day: 'numeric', month: 'short', year: 'numeric' };
   if (tz && tz !== 'device') opt.timeZone = tz;
-  return new Intl.DateTimeFormat('en-GB', opt).format(d);
+  return dtf(opt).format(d);
 }
 function fshort(s, tz) {
   const d = dt(s); if (!d) return '—';
   const opt = { day: 'numeric', month: 'short' };
   if (tz && tz !== 'device') opt.timeZone = tz;
-  return new Intl.DateTimeFormat('en-GB', opt).format(d);
+  return dtf(opt).format(d);
 }
 function ftime(s, tz, hour12) {
   const d = dt(s); if (!d) return '—';
   const opt = { hour: 'numeric', minute: '2-digit', hour12: !!hour12 };
   if (tz && tz !== 'device') opt.timeZone = tz;
-  return new Intl.DateTimeFormat('en-GB', opt).format(d);
+  return dtf(opt).format(d);
 }
 function fstamp(s, tz, hour12) { return s ? fdate(s, tz) + ' · ' + ftime(s, tz, hour12) : '—'; }
 // Not every client is billed in dollars. Sirte Oil Company's agreement is written in
@@ -4919,7 +5047,7 @@ function seed() {
     // formula. Pre-filled onto every new ticket, stays constant unless the Ops Manager
     // deliberately overrides it for that one ticket.
     orgDefaults: {
-      baseLocation: BASES[0], customerRep: 'Workover Office',
+      baseLocation: DEFAULT_BASE_LOCATION, customerRep: DEFAULT_CUSTOMER_REP,
     },
     clients: [
       { name: 'Kuwait Oil Group', currency: 'USD', fields: 'Burgan North, Raudhatain', rigs: 'WS-11, WS-14, RIG-208', items: priceList(1) },
@@ -9528,7 +9656,8 @@ class Component extends DCLogic {
             audit: [{ ts: dr.arrival, text: 'Job ticket opened on device — arrival stamped.', kind: 'lifecycle', by: dr.tech }],
             // B13/F14 — permanent admin-configured defaults, pre-filled here, only the
             // Ops Manager can change them afterwards (see the review screen).
-            baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',
+            baseLocation: (d.orgDefaults || {}).baseLocation || DEFAULT_BASE_LOCATION,
+            customerRep: (d.orgDefaults || {}).customerRep || DEFAULT_CUSTOMER_REP,
           });
         });
         this.setState({ activeId: id, techScreen: 'log', draft: null });
@@ -9968,7 +10097,8 @@ class Component extends DCLogic {
             synced: true, syncedAt: now,
             currency: ((d.clients || []).find(c => c.name === (dr.customer || '').trim()) || {}).currency || DEFAULT_CURRENCY,
             ticketNo: '', mileage: '', events: [], items: [],
-            baseLocation: (d.orgDefaults || {}).baseLocation || '', customerRep: (d.orgDefaults || {}).customerRep || '',
+            baseLocation: (d.orgDefaults || {}).baseLocation || DEFAULT_BASE_LOCATION,
+            customerRep: (d.orgDefaults || {}).customerRep || DEFAULT_CUSTOMER_REP,
             audit: [{ ts: now, kind: 'lifecycle', by: myName, text: 'Ticket raised in the office by ' + myName + ' and assigned to ' + dr.tech + '.' }],
           });
         });

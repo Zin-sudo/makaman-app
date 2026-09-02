@@ -132,8 +132,18 @@ assertStubParses(DB);
   // version-guarded update (S11) and this assertion went red while the behaviour it names
   // was unchanged — a check pinned to a mechanism stops testing the claim the moment the
   // mechanism moves.
+  // Two, not one, and two is correct.
+  //
+  // The first write is the edit. The second is the sync stamp — reconnecting marks the
+  // ticket synced, which is a header change and a real thing the server has to be told.
+  // This said `=== 1` and passed only because the drain used to destroy anything queued
+  // while it was in flight, and the sync stamp is queued during exactly that window: the
+  // number encoded the data-loss bug rather than the claim in its own name.
+  //
+  // The claim is that ten edits do not become ten requests. Bounded, so a regression that
+  // stopped coalescing would still be caught.
   check('a day of edits did not become a day of requests',
-    w.filter(x => x.table === 'tickets').length === 1,
+    w.filter(x => x.table === 'tickets').length <= 2,
     w.filter(x => x.table === 'tickets').length + ' ticket writes');
 
   // ── children are replaced, not duplicated, on replay ─────────────────────

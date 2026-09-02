@@ -82,9 +82,13 @@ const openAccount = async (p) => {
     // deliberate — a dropped connection must not look like a rejection. So the queue is
     // driven that far, the way a device with signal would drive it: one drain per
     // attempt. Anything less tests the retry, not the refusal.
-    for (let i = 0; i < 6; i++) {
+    // Drains are exclusive now — a second caller joins the one already running rather
+    // than starting its own — so each attempt has to be allowed to finish before the next
+    // is asked for. Looping faster than that lands fewer real attempts than iterations
+    // and the op never reaches the give-up limit, which made this flaky.
+    for (let i = 0; i < 8; i++) {
       await p.evaluate(() => window.__mkApp.refresh().catch(() => {}));
-      await p.waitForTimeout(150);
+      await p.waitForTimeout(280);
     }
     await p.evaluate(() => { window.__failInsert = ''; window.__failMessage = ''; });
   };
