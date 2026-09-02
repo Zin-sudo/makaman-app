@@ -3776,6 +3776,13 @@ function errorKind(err) {
   if (/MK_STALE/.test(raw)) return 'STALE';
   if (/invalid input syntax|invalid input value|out of range/i.test(raw)) return 'TYPE';
   if (/duplicate key|already exists|unique constraint/i.test(raw)) return 'DUP';
+  // BEFORE the policy test, not after it. Postgres says "violates foreign key constraint",
+  // and the RLS pattern below matches a bare `violates` — so every foreign-key failure was
+  // reported as MK-SYNC-RLS, telling the reader "the signed-in account is not permitted to
+  // write that row" about a refusal that had nothing to do with permissions. Two separate
+  // investigations went at the policies because of it while the real cause — a row pointing
+  // at a job the server no longer has — sat unnamed in the same sentence.
+  if (/foreign key|violates foreign/i.test(raw)) return 'LINK';
   if (/row-level security|permission denied|not allowed|violates/i.test(raw)) return 'RLS';
   if (/JWT|invalid session|not authenticated|refresh token/i.test(raw)) return 'AUTH';
   if (/quota|exceeded the storage|QuotaExceeded/i.test(raw)) return 'QUOTA';
@@ -4417,31 +4424,37 @@ function repairTicketIds(data) {
 // string of this shape anywhere on an op is proof the op is dead, whatever it is about.
 const LEGACY_ID = /"k\d{10,}"/;
 
+// Which ticket an op is about, wherever that is written on it.
+//
+// `op.ticketId` and `op.rows` are the two that were missing, and their absence is why a
+// ticket_items op carrying an August id was still being refused on two accounts in
+// September. Child-table ops are built as
+//   { key: 'ticket_items:<id>', table, action: 'replace', ticketId, rows }
+// — no `row` at all, and a key that does not begin 'tickets:' — so every branch below
+// missed, this returned '', and the op was judged perfectly sendable for ever.
+//
+// At module scope because the drain needs the same answer the purge does: it is what tells
+// one ticket's writes apart from another's, and a queue that cannot tell them apart lets
+// one dead row stop everything.
+function opTicket(op) {
+  if (!op) return '';
+  const k = String(op.key || '');
+  if (k.indexOf('tickets:') === 0) return k.replace(/^tickets:(del:)?/, '');
+  if (op.ticketId) return String(op.ticketId);
+  const row = op.row || {};
+  if (row.ticket_id) return String(row.ticket_id);
+  if (op.table === 'tickets' && row.id) return String(row.id);
+  const rows = op.rows || [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].ticket_id) return String(rows[i].ticket_id);
+  }
+  return '';
+}
+
 // Everything queued or set aside that the database could never take. Returns how many
 // were dropped, so a caller can say so rather than silently tidying up behind somebody.
 function purgeUnsendable() {
-  // Which ticket an op is about, wherever that is written on it.
-  //
-  // `op.ticketId` and `op.rows` are the two that were missing, and their absence is why a
-  // ticket_items op carrying an August id was still being refused on two accounts in
-  // September. Child-table ops are built as
-  //   { key: 'ticket_items:<id>', table, action: 'replace', ticketId, rows }
-  // — no `row` at all, and a key that does not begin 'tickets:' — so every branch below
-  // missed, ticketOf returned '', and the op was judged perfectly sendable for ever.
-  const ticketOf = (op) => {
-    if (!op) return '';
-    const k = String(op.key || '');
-    if (k.indexOf('tickets:') === 0) return k.replace(/^tickets:(del:)?/, '');
-    if (op.ticketId) return String(op.ticketId);
-    const row = op.row || {};
-    if (row.ticket_id) return String(row.ticket_id);
-    if (op.table === 'tickets' && row.id) return String(row.id);
-    const rows = op.rows || [];
-    for (let i = 0; i < rows.length; i++) {
-      if (rows[i] && rows[i].ticket_id) return String(rows[i].ticket_id);
-    }
-    return '';
-  };
+  const ticketOf = opTicket;
   // Two independent reasons, because the first one is a list of places to look and lists
   // of places to look are exactly what let this through. The second reads the whole op and
   // cannot be defeated by a shape nobody has written yet.
@@ -4665,10 +4678,18 @@ function outboxSend(c, op) {
     .then((r) => { if (r.error) throw r.error; if (!op.rows.length) return { error: null }; return c.from(op.table).insert(op.rows); })
     .then((r) => { if (r && r.error) throw r.error; });
 }
-// Drains oldest-first and stops at the first failure rather than pressing on. If the
-// network dropped mid-drain, everything after the failure is about to fail too, and
-// hammering a dead connection is exactly the pile-up this is here to prevent. What
-// succeeded is removed; what did not stays for the next attempt.
+// Drains oldest-first. A failure holds up the ops that depend on it — the ones about the
+// same job — and nothing else. A lost connection still stops the whole thing, because there
+// everything behind really is about to fail too. What succeeded is removed; what did not
+// stays for the next attempt.
+//
+// This used to stop the ENTIRE drain at the first failure, and the cost of that was a week.
+// An audit entry was queued against a ticket the office had since deleted, so it failed its
+// foreign key and could never succeed — and the numbering-claim handover sitting behind it
+// was never attempted. Not refused. Not misfiled. Never reached. Three fixes went into the
+// claim while the thing blocking it was an unrelated dead row that had nothing to do with
+// it. The dependency the old rule protected is real, but it is per ticket: a claim on the
+// numbering series depends on no job at all.
 function outboxDrain() {
   // One drain at a time.
   //
@@ -4707,6 +4728,14 @@ function outboxDrain() {
   // the set and the prefix agree.
   const settled = {};
   const settle = (op) => { if (op && op.seq) settled[op.seq] = true; };
+  // Which jobs have already had a write refused on this pass. A ticket's rows must still go
+  // in order — a log line cannot be written before the job it belongs to — so once one of
+  // them fails, the rest of that job waits for the next drain. Everything else carries on.
+  //
+  // An op that is about no ticket is its own group, keyed by its own name, so two unrelated
+  // singletons (the numbering claim, the org defaults) can never block each other either.
+  const blocked = {};
+  const groupOf = (op) => opTicket(op) || String((op && op.key) || '');
   let sent = 0;
   const me = currentAccount();
   const step = (n) => {
@@ -4725,6 +4754,9 @@ function outboxDrain() {
     // accepted as Lateri.
     const op = q[n];
     if (me && op && op.acct && op.acct !== me) return step(n + 1);
+    // Its job already had a write refused on this pass. Left exactly as it is, for the next
+    // drain, once whatever is wrong with that job has been dealt with.
+    if (blocked[groupOf(op)]) return step(n + 1);
     return outboxSend(c, q[n]).then(
       () => { settle(q[n]); sent += 1; return step(n + 1); },
       (err) => {
@@ -4751,7 +4783,23 @@ function outboxDrain() {
         // it is about to fail for the same reason, and trying proves nothing.
         if (errorKind(err) === 'NET') return Promise.reject(err);
         q[n].tries = (q[n].tries || 0) + 1;
-        if (!(err && err.mkTerminal) && q[n].tries < OUTBOX_TRIES) return Promise.resolve();
+        // A foreign key that does not resolve is as terminal as a version conflict: the row
+        // it points at is not there, and asking four more times cannot put it there. This
+        // is the shape the deleted test tickets left behind — audit entries belonging to
+        // jobs the office had removed on purpose — and retrying them was five chances per
+        // drain for a permanent failure to be mistaken for a flaky connection.
+        const terminal = (err && err.mkTerminal) || errorKind(err) === 'LINK';
+        if (!terminal && q[n].tries < OUTBOX_TRIES) {
+          // Still queued, so it will be tried again — and anything about the same job has
+          // to wait behind it, or a log line could be written before the job it belongs to.
+          // Everything about every OTHER job carries on, which is the whole point.
+          blocked[groupOf(q[n])] = true;
+          return step(n + 1);
+        }
+        // Set aside: it has LEFT the queue, so nothing is waiting on it any more and its
+        // job is not blocked. Blocking here as well was wrong — a technician's log line is
+        // a row of its own, perfectly writable, and holding it back because somebody else
+        // edited the ticket header first would strand it for no reason.
         settle(q[n]);
         outboxSetAside(q[n], err);
         return step(n + 1);
@@ -4814,10 +4862,13 @@ function outboxSetAside(op, why) {
   // The same refusal, twice over and for two different readers. The dead-letter is what
   // the app shows the person now, in their words; the error log is what gets handed to
   // somebody who can fix it, with the server's own words and a code.
+  // Which job, wherever the op happens to record it — not only when the key starts
+  // 'tickets:', which was the one case that needed it least. Tonight's export could not say
+  // which job an audit entry belonged to, and that is precisely the question somebody
+  // reading it has to answer.
   logError('sync', why, {
     table: op && op.table, action: op && op.action,
-    ticket: op && String(op.key || '').indexOf('tickets:') === 0
-      ? String(op.key).replace(/^tickets:(del:)?/, '') : undefined,
+    ticket: opTicket(op) || undefined,
   });
   try {
     const dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]');
@@ -4847,6 +4898,14 @@ function refusalText(err) {
   }
   if (/ticket_number|duplicate key/i.test(raw)) {
     return 'That ticket number is already used on another job. Two devices can reach for the same number while one is out of signal — give this job the next free number and sync again.';
+  }
+  // Before the policy sentence, for the same reason errorKind tests it first: Postgres says
+  // "violates foreign key constraint", the policy pattern matches a bare `violates`, and
+  // the person was told their account lacked a permission it never lacked.
+  if (/foreign key|violates foreign/i.test(raw)) {
+    return 'The job this change belongs to is not on the server — it was most likely '
+      + 'deleted in the office. The change cannot be saved against a job that is no longer '
+      + 'there, so it has been set aside rather than retried.';
   }
   if (/row-level security|permission denied|violates/i.test(raw)) {
     return 'The server would not accept this change from your account.';

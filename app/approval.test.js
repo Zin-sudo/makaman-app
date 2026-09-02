@@ -89,7 +89,7 @@ async function open(ctx, cfg) {
       // send" and passes half the assertions below for entirely the wrong reason.
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
                      'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
-                     'deadletterKey', 'logError', 'outboxSetAside', 'outboxDrain']
+                     'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
@@ -123,9 +123,16 @@ async function open(ctx, cfg) {
       `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, SK, () => stub);
 
       const runs = [];
-      for (let i = 0; i < 6; i++) runs.push(await fn());
+      // What is STILL queued after each pass, so "held its place" can be asserted as the
+      // op still being there rather than inferred from nothing else having been sent.
+      const remaining = [];
+      for (let i = 0; i < 6; i++) {
+        runs.push(await fn());
+        remaining.push(JSON.parse(localStorage.getItem(OUTBOX_K) || '[]').map(o => o.key));
+      }
       return {
         runs: runs,
+        remaining: remaining,
         goodSent: goodSent,
         left: JSON.parse(localStorage.getItem(OUTBOX_K) || '[]').length,
         refused: JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]').map(d => d.op.table),
@@ -136,9 +143,19 @@ async function open(ctx, cfg) {
 
     check('the refused op is written to the error log with a code',
       out.logged.indexOf('MK-SYNC-RLS on profiles') >= 0, out.logged.join(' | '));
-    check('the refused op holds its place while it is still worth retrying', out.runs[0] === 0,
-      'first drain sent ' + out.runs[0]);
-    check('the write behind it eventually gets through', out.goodSent === 1,
+    // This used to read "the first drain sent 0" — the refused op stopped the whole queue,
+    // and the write behind it waited five drains for the refusal to age out. That was the
+    // documented behaviour and it is what this file's own opening line calls the bug: a
+    // permanently-refused op must not freeze the ops behind it. It no longer does. A
+    // failure holds up its own job's rows and nothing else, so an unrelated write goes on
+    // the FIRST pass. (Cost of the old rule, 2 Sep: an audit entry for a deleted ticket sat
+    // at the head of a queue and a numbering-claim handover behind it was never attempted
+    // for a week.)
+    check('the refused op holds its place while it is still worth retrying',
+      out.remaining[0].indexOf('poison') >= 0, JSON.stringify(out.remaining[0]));
+    check('but the unrelated write behind it goes on the very first drain',
+      out.runs[0] === 1, 'first drain sent ' + out.runs[0]);
+    check('the write behind it gets through exactly once', out.goodSent === 1,
       'clients upserts that succeeded: ' + out.goodSent);
     check('the queue drains empty instead of jamming', out.left === 0, 'left: ' + out.left);
     check('the refusal is kept, not discarded silently', out.refused.join(',') === 'profiles',
