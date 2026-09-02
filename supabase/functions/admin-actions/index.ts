@@ -166,14 +166,30 @@ Deno.serve(async (req) => {
       const fullName = body.full_name as string
       if (!email || !password) return json({ error: 'email and password are required.' }, 400)
 
-      // `created_by_office` goes in APP metadata, not user metadata, and the distinction
-      // is the whole security of it. handle_new_user refuses any address outside
-      // @makaman.ly and caps self-registration at five a day; this flag is what exempts
-      // the office, so a person who could set it themselves could sign up as anyone.
-      // user_metadata is caller-supplied — `supabase.auth.signUp({ options: { data } })`
-      // writes it straight from the browser. app_metadata can only be written through the
-      // admin API, which needs the service-role key, which lives in this function's
-      // environment and nowhere a client can reach.
+      // The office announces who it is expecting BEFORE creating them.
+      //
+      // handle_new_user refuses any address outside @makaman.ly and caps unapproved
+      // sign-ups at five; this is what exempts the office. It used to be the
+      // `created_by_office` flag below on its own, and that flag is only read correctly if
+      // GoTrue puts custom app_metadata in the INSERT the trigger fires on rather than in a
+      // follow-up write. A probe against the live database proved the failure that
+      // assumption allows: with five sign-ups pending and the flag not yet written, the
+      // office's own account was refused — on trial morning, in the one path with no
+      // workaround.
+      //
+      // So the exemption no longer depends on GoTrue's ordering. This row is written by us,
+      // with the service-role key, in a request that has already re-derived the caller from
+      // their own JWT and required ops_manager or admin. The trigger consumes it. A client
+      // cannot forge one: office_invites has RLS on and no policies, so anon and
+      // authenticated reach nothing, and only the service role can write.
+      //
+      // The app_metadata flag stays as a second path — free if GoTrue does write it in the
+      // insert. Neither is load-bearing alone, which is the point.
+      const { error: inviteErr } = await admin
+        .from('office_invites')
+        .upsert({ email: email.toLowerCase(), invited_by: callerId }, { onConflict: 'email' })
+      if (inviteErr) throw inviteErr
+
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
         password,
@@ -181,7 +197,18 @@ Deno.serve(async (req) => {
         user_metadata: { full_name: fullName },
         app_metadata: { created_by_office: true },
       })
-      if (createErr) throw createErr
+      // A note left behind by a failed createUser is worthless — the trigger ignores
+      // anything older than five minutes — but clearing it keeps the table empty rather
+      // than relying on that.
+      if (createErr) {
+        // try/catch rather than .catch(): the query builder is PromiseLike, not a Promise,
+        // so it has then() and may not have catch(), and a missing method here would
+        // replace a useful createUser error with a TypeError about the cleanup.
+        try {
+          await admin.from('office_invites').delete().eq('email', email.toLowerCase())
+        } catch { /* the trigger ignores a note older than five minutes anyway */ }
+        throw createErr
+      }
 
       // The on_auth_user_created trigger already inserted a pending technician
       // profile row — just activate it.
