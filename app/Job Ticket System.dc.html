@@ -3687,6 +3687,30 @@ const CACHE_K = 'makaman.cloud.v1';
 const OUTBOX_K = 'makaman.outbox.v1';
 const DEADLETTER_K = 'makaman.outbox.refused.v1';
 const ERRLOG_K = 'makaman.errorlog.v1';
+// Whose log this is. A device is not one person here — Lateri signed in, then Abobaker
+// signed in on the same phone, and the log the app showed him was Lateri's, because
+// nothing namespaced it by account. Each signed-in account gets its own key; before
+// anyone has signed in (an error during sign-in itself) or if nothing running can say who
+// is signed in, everything falls into one device-wide bucket rather than being lost.
+//
+// Reads the LIVE component when one is running — window.__mkApp.state.session is the
+// truth the instant a sign-in or sign-out happens, with no separate bookkeeping anywhere
+// else to fall out of step with it — and falls back to the persisted session record
+// itself, the same one load() reads, for anything that can fire before mount.
+function currentErrlogAccount() {
+  if (typeof window !== 'undefined' && window.__mkApp && window.__mkApp.state) {
+    return (window.__mkApp.state.session || {}).email || null;
+  }
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SK) : null;
+    if (raw) { const s = JSON.parse(raw); return (s && s.email) || null; }
+  } catch (e) { /* none yet */ }
+  return null;
+}
+function errlogKey() {
+  const acct = currentErrlogAccount();
+  return acct ? ERRLOG_K + '.' + String(acct).toLowerCase() : ERRLOG_K;
+}
 
 // ── The error log ────────────────────────────────────────────────────────────
 //
@@ -3737,7 +3761,10 @@ function logError(area, err, ctx) {
     const code = 'MK-' + String(area || 'APP').toUpperCase() + '-' + kind;
     const raw = String((err && (err.message || err.details || err.hint || err.error)) || err || '')
       .slice(0, 400);
-    const list = JSON.parse(localStorage.getItem(ERRLOG_K) || '[]');
+    // Computed once — a synchronous function, but two calls could in principle answer
+    // differently, and reading and writing the same account's log is the whole point.
+    const storeKey = errlogKey();
+    const list = JSON.parse(localStorage.getItem(storeKey) || '[]');
     // Grouped on everything that would make two entries the same fault. The context is
     // part of the key, so the same code against two different tables stays two entries.
     const key = code + '|' + raw + '|' + JSON.stringify(ctx || {});
@@ -3749,7 +3776,7 @@ function logError(area, err, ctx) {
         raw: raw, ctx: ctx || {}, n: 1, first: now, last: now });
     }
     // Oldest first, so the cap drops history rather than the fault happening right now.
-    localStorage.setItem(ERRLOG_K, JSON.stringify(list.slice(-ERRLOG_MAX)));
+    localStorage.setItem(storeKey, JSON.stringify(list.slice(-ERRLOG_MAX)));
   } catch (e) { /* the log must never become the problem it exists to report */ }
 }
 // The code, said in words. Kept here rather than in the report so the two halves of a
@@ -3776,7 +3803,7 @@ const ERROR_KIND = {
   UNKNOWN: 'Not classified — read the server text below.',
 };
 function errorLogRead() {
-  try { return JSON.parse(localStorage.getItem(ERRLOG_K) || '[]'); } catch (e) { return []; }
+  try { return JSON.parse(localStorage.getItem(errlogKey()) || '[]'); } catch (e) { return []; }
 }
 function errorLogCount() {
   return errorLogRead().reduce((n, e) => n + (e.n || 1), 0);
@@ -9040,7 +9067,7 @@ class Component extends DCLogic {
         okLabel: 'Clear it', cancelLabel: 'Keep it', hasCancel: true,
         okBg: 'var(--danger)', okFg: '#fff',
         confirm: () => {
-          try { localStorage.removeItem(ERRLOG_K); } catch (e) { /* nothing to do */ }
+          try { localStorage.removeItem(errlogKey()); } catch (e) { /* nothing to do */ }
           this.setState({ dialog: null });
           this.toast('errlog', 'Error log cleared.', 'ok');
         },

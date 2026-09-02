@@ -59,10 +59,13 @@ const openAccount = async (p) => {
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
 
-  // The log, read the way anything else would read it — off the device. Nothing about
-  // this is a test hook: it is where the file is built from.
-  const log = (p) => p.evaluate(() =>
-    JSON.parse(localStorage.getItem('makaman.errorlog.v1') || '[]'));
+  // The log, read the way anything else would read it — off the device, scoped to
+  // whoever is signed in on that page right now, same as the app itself does it.
+  const log = (p) => p.evaluate(() => {
+    const acct = (window.__mkApp.state.session || {}).email;
+    const key = 'makaman.errorlog.v1' + (acct ? '.' + acct.toLowerCase() : '');
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  });
 
   // Makes the fake server refuse the next write with a real Postgres sentence, then does
   // something that writes. Driven through the app's own queue rather than by calling the
@@ -218,6 +221,55 @@ const openAccount = async (p) => {
     check('and the person is told rather than left wondering',
       /queued change\(s\) were cleared|never going to send/i.test(after.said),
       after.said.slice(0, 120).replace(/\n/g, ' '));
+    await ctx.close();
+  }
+
+  // ── Each account's log is its own, even on a device both of them used ──
+  //
+  // The reported symptom: Lateri signed in on a phone, hit a real refusal; Abobaker signed
+  // in on that SAME phone afterward and was shown Lateri's log, because the key it lived
+  // under carried no identity of its own — one localStorage key, whoever last wrote it.
+  // This drives both accounts through ONE page (one shared localStorage, the actual
+  // condition), signing out and back in rather than opening two contexts, since two
+  // contexts would each get their own storage and prove nothing about a shared device.
+  {
+    const { ctx, p } = await signIn(b, db(), 'awhida@makaman.ly');
+    await refuseWith(p, 'invalid input syntax for type uuid: "a5-first-account"');
+    const awhidaFirst = await log(p);
+    check('the first account has its refusal', awhidaFirst.length > 0,
+      awhidaFirst.length + ' entries');
+
+    await openAccount(p);
+    await p.getByRole('button', { name: /^Log out$/ }).first().click();
+    await p.waitForTimeout(700);
+    const i2 = p.locator('input');
+    await i2.nth(0).fill('tech@makaman.ly'); await i2.nth(1).fill('x');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(1600);
+
+    const techBefore = await log(p);
+    check("a second account on the same device does not inherit the first account's log",
+      techBefore.length === 0, JSON.stringify(techBefore.map(e => e.code)));
+
+    await refuseWith(p, 'duplicate key value violates unique constraint "a5-second-account"');
+    const techAfter = await log(p);
+    check('and records its own refusal into its own, empty-until-now log',
+      techAfter.length === 1 && techAfter[0].code === 'MK-SYNC-DUP',
+      JSON.stringify(techAfter.map(e => e.code)));
+
+    await openAccount(p);
+    await p.getByRole('button', { name: /^Log out$/ }).first().click();
+    await p.waitForTimeout(700);
+    const i3 = p.locator('input');
+    await i3.nth(0).fill('awhida@makaman.ly'); await i3.nth(1).fill('x');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(1600);
+
+    const awhidaBack = await log(p);
+    check("switching back, the first account's own history is exactly as it left it",
+      awhidaBack.length === awhidaFirst.length
+        && awhidaBack.every(e => e.code !== 'MK-SYNC-DUP'),
+      JSON.stringify(awhidaBack.map(e => e.code)));
     await ctx.close();
   }
 

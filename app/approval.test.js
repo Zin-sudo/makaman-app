@@ -76,12 +76,23 @@ async function open(ctx, cfg) {
       // error and this suite went red for a reason that had nothing to do with the queue.
       // outboxSetAside now writes the refusal to the error log as well as to the
       // dead-letter — the same fact, once for the person and once for whoever has to fix
-      // it — so logError and the classifier it leans on come along too.
+      // it — so logError and the classifier it leans on come along too. logError writes
+      // under errlogKey(), not ERRLOG_K directly, since A5 (2 Sep) — one account's log
+      // must not be another's on the same device — so that resolver, and the session
+      // lookup underneath it, both have to come along or logError silently no-ops
+      // (caught by its own try/catch, which is exactly how a missing grab() name hides
+      // itself here rather than throwing where it would be noticed).
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
-                     'errorKind', 'logError', 'outboxSetAside', 'outboxDrain']
+                     'errorKind', 'currentErrlogAccount', 'errlogKey', 'logError',
+                     'outboxSetAside', 'outboxDrain']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
+      // window.__mkApp inside this Function IS the real page's running app (a `new
+      // Function` still shares the page's global window) and nobody has signed in on it
+      // here — so currentErrlogAccount() reads a null session and errlogKey() falls back
+      // to its device-wide bucket, which is plain ERRLOG_K. That is exactly the key read
+      // back below, so nothing else has to change for this block.
       localStorage.setItem(OUTBOX_K, JSON.stringify([
         { key: 'poison', table: 'profiles', action: 'upsert', row: { id: 'x' } },
         { key: 'good', table: 'clients', action: 'upsert', row: { id: 'y' } },
