@@ -92,6 +92,13 @@ window.__events = [];
 // One dependency made deliberately slow, so the bottleneck detector can be shown to
 // fire. A detector that has only ever reported "no bottleneck" is not known to work.
 window.__slowOne = null;    // { what: 'tickets', ms: 600 }
+// How long the client's OWN session restore takes to settle, simulating the real
+// supabase-js client reading its persisted session out of storage asynchronously on a
+// cold boot. Deliberately its own knob, not __stubLatency and not routed through
+// __wire — it must never touch __rtt or __events, both of which existing suites assert
+// exact counts and shapes against, and a session restore is not a table round trip.
+window.__sessionRestoreMs = window.__sessionRestoreMs || 0;
+window.__sessionRestoredAt = 0;
 window.__wire = function (body, what) {
   var ms = window.__stubLatency || 0;
   if (window.__slowOne && window.__slowOne.what === what) ms = window.__slowOne.ms;
@@ -313,6 +320,22 @@ window.supabase = {
             : { error: { message: 'Invalid login credentials' } });
         },
         signOut: function () { return Promise.resolve({ error: null }); },
+        // What a real client resolves once its OWN session restore (out of its own
+        // storage) has settled — the thing componentDidMount now waits on before firing
+        // the boot-time hydrate, so the very first request carries a real session rather
+        // than going out anon. window.__sessionRestoreMs simulates how long that restore
+        // takes; window.__sessionRestoredAt records when it settled, so a suite can assert
+        // ordering (nothing in window.__events should start before this).
+        getSession: function () {
+          var s = window.__stubUser ? { user: { id: window.__stubUser } } : null;
+          var ms = window.__sessionRestoreMs || 0;
+          var finish = function () {
+            window.__sessionRestoredAt = Date.now();
+            return { data: { session: s }, error: null };
+          };
+          if (!ms) return Promise.resolve(finish());
+          return new Promise(function (r) { setTimeout(function () { r(finish()); }, ms); });
+        },
         // Who the SERVER says is signed in, which is the question the self-check asks and
         // a different question from who the app believes. Remembers whoever last signed
         // in, so a report can be checked against the account that produced it.

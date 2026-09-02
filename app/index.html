@@ -5943,7 +5943,25 @@ class Component extends DCLogic {
     // Opening the app on a session that was already signed in. Same reasoning as after a
     // login: the cached replica is on screen immediately, and the pull that replaces it
     // is allowed to fail without disturbing anything.
-    if (USE_CLOUD && this.state.session) this.refresh();
+    //
+    // this.state.session — checked above — is the app's OWN locally-cached flag, read
+    // synchronously out of localStorage by load(). It is always ready instantly, which is
+    // what lets the signed-in screens show up with no delay, offline-first. But the
+    // client that actually attaches a bearer token to every request restores ITS OWN
+    // session asynchronously, out of its own storage, and on a cold boot there is a
+    // window where this flag is already true and that client has not finished yet.
+    // Firing hydrate() into that window sends the first requests with no token at all —
+    // as anon — and every RLS check that calls is_staff() answers "permission denied for
+    // function is_staff," which is exactly what MK-LOAD-RLS turned out to be.
+    // getSession() is documented to wait for that restore to settle, so waiting on it
+    // (rather than on the flag alone) closes the race. Nothing about the boot itself
+    // changes — the cached replica is already on screen either way — only the network
+    // call waits an extra tick.
+    if (USE_CLOUD && this.state.session) {
+      const c = sb();
+      (c ? c.auth.getSession().catch(() => null) : Promise.resolve(null))
+        .then(() => this.refresh());
+    }
 
     // Connectivity is a fact about the device, not a preference. It used to be a
     // button the technician could hold in "no signal" while actually connected —
