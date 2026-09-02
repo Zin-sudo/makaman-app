@@ -6716,7 +6716,11 @@ class Component extends DCLogic {
         if (r.error || !r.data) throw r.error || new Error('Could not get a link.');
         // Opened rather than fetched: the browser handles the download, and nothing about
         // the file passes through this app's memory.
-        window.open(r.data.signedUrl, '_blank');
+        // noopener: the opened tab is Supabase-Storage-controlled, not user content, so
+        // this is defense in depth rather than a response to anything seen — but a tab
+        // opened with a target and no noopener can reach back via window.opener, and
+        // there is no reason to leave that door open.
+        window.open(r.data.signedUrl, '_blank', 'noopener');
       })
       .catch(err => this.toast('master', err.message || 'Could not get a link to the file.', 'warn'));
   }
@@ -7659,7 +7663,11 @@ class Component extends DCLogic {
         if (r.error || !r.data) throw r.error || new Error('Could not get a link.');
         // Opened rather than fetched: the browser handles it, and nothing about the file
         // passes through this app's memory.
-        window.open(r.data.signedUrl, '_blank');
+        // noopener: the opened tab is Supabase-Storage-controlled, not user content, so
+        // this is defense in depth rather than a response to anything seen — but a tab
+        // opened with a target and no noopener can reach back via window.opener, and
+        // there is no reason to leave that door open.
+        window.open(r.data.signedUrl, '_blank', 'noopener');
       })
       .catch((err) => {
         logError('file', err, { doing: 'open', path: path });
