@@ -125,11 +125,22 @@ function db(itemsPerClient) {
     await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('whatever');
     await p.getByRole('button', { name: /log in/i }).click();
     await p.waitForTimeout(2200);
-    // Throw away half of one customer's items on the device, exactly as a truncated
-    // fetch would have left them, and ask the check what it thinks.
+    // Fetch a customer's list the way the office does, then throw away two thirds of it
+    // on the device — exactly as a truncated fetch would have left it — and ask the check
+    // what it thinks.
+    //
+    // The fetch has to happen first now. Price lists no longer come down at sign-in
+    // (0045 refuses them to anyone outside the office, and the client stopped pulling
+    // them for everyone), so the check has nothing to compare until the office has asked
+    // for one. That is also why it reports "none fetched yet this session" rather than
+    // "short by 30" on a device that is behaving correctly — a red line on a healthy
+    // device is worse than no line.
     const rows = await p.evaluate(() => {
-      window.__mkApp.mutate(d => { d.clients[0].items = d.clients[0].items.slice(0, 10); });
-      return window.__mkApp.runSelfCheck();
+      const app = window.__mkApp;
+      return app.ensurePriceList(app.state.data.clients[0].name).then(() => {
+        app.mutate(d => { d.clients[0].items = d.clients[0].items.slice(0, 10); });
+        return app.runSelfCheck();
+      });
     });
     await ctx.close();
     const verdict = find(rows, 'Price lists complete');

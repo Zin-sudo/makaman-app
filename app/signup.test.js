@@ -148,6 +148,64 @@ async function fresh(b) {
     await ctx.close();
   }
 
+  // ── The sign-up link is public, so the form says who it is for ───────────
+  //
+  // Migration 0046 is the control: handle_new_user refuses anything outside @makaman.ly
+  // and caps self-registration at five a rolling day, and neither of those can be
+  // reached from a browser. What is asserted here is the OTHER half — that a person who
+  // types the wrong address is told so, in words, before a password leaves the device.
+  //
+  // Deliberately not asserted here: that the refusal happens. That is a database rule
+  // and this suite runs against the local store, where there is no trigger to fire. The
+  // proof of the rule is the impersonation probe recorded in the migration file; the
+  // proof of the courtesy is below. A test that mocked the trigger would prove neither.
+  {
+    const { ctx, p } = await fresh(b);
+    await p.getByText(/Sign up/i).first().click();
+    await p.waitForTimeout(600);
+
+    const shown = await p.evaluate(() => document.body.innerText);
+    check('the form states the requirement before anything is typed',
+      /company @makaman\.ly address/i.test(shown));
+    check('and says what to do without one',
+      /ask the office to create your account/i.test(shown));
+    check('the email field shows the shape expected',
+      await p.evaluate(() =>
+        (document.querySelector('input[type=email]') || {}).placeholder || '') === 'you@makaman.ly');
+
+    // An outside address, refused by the form itself.
+    const i = p.locator('input');
+    await i.nth(0).fill('A Stranger');
+    await i.nth(1).fill('someone@gmail.com');
+    await i.nth(2).fill('zelten-well-31');
+    await i.nth(3).fill('zelten-well-31');
+    await p.getByRole('button', { name: /Request account/i }).click();
+    await p.waitForTimeout(900);
+    const after = await p.evaluate(() => ({
+      text: document.body.innerText,
+      // Still on the form, with what was typed intact — an error that clears the fields
+      // makes the person retype four things to change one.
+      name: (document.querySelectorAll('input')[0] || {}).value,
+      email: (document.querySelectorAll('input')[1] || {}).value,
+      made: (JSON.parse(localStorage.getItem('makaman.jobtickets.v2') || '{}').users || [])
+        .some(u => /gmail\.com/i.test(u.email || '')),
+    }));
+    check('an outside address is refused in plain language',
+      /Only @makaman\.ly addresses can sign up/i.test(after.text), after.text.slice(0, 90));
+    check('no account is created for it', after.made === false);
+    check('and the form keeps what was typed',
+      after.name === 'A Stranger' && after.email === 'someone@gmail.com',
+      after.name + ' / ' + after.email);
+
+    // The same form, a company address: through to the pending screen.
+    await i.nth(1).fill('newstarter@makaman.ly');
+    await p.getByRole('button', { name: /Request account/i }).click();
+    await p.waitForTimeout(1400);
+    check('a company address goes through',
+      /approve your account/i.test(await p.evaluate(() => document.body.innerText)));
+    await ctx.close();
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);

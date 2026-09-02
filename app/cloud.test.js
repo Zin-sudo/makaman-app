@@ -72,9 +72,40 @@ assertStubParses(DB);
     t && JSON.stringify(t.crew));
   check('an unfinished job has no end date rather than an invalid one',
     t && t.end === '', t && JSON.stringify(t.end));
-  check('the price list is attached to its customer',
-    (d.clients || []).length === 1 && d.clients[0].items.length === 1
-    && d.clients[0].items[0].code === 'MKN-1801');
+  // The customer arrives; its prices do not, and that is the point. They used to come
+  // down with everything else — 2,610 rows onto every device — and migration 0045 now
+  // refuses them to anyone outside the office. The office asks for one customer's list
+  // when it opens something that needs it, and THAT is where the items appear.
+  check('the customer arrives with no prices attached',
+    (d.clients || []).length === 1 && (d.clients[0].items || []).length === 0,
+    JSON.stringify((d.clients[0] || {}).items));
+  // A technician asking gets nothing, and does not even ask: ensurePriceList checks
+  // pricelist.view before it opens a request, because a technician's device WOULD be
+  // refused by RLS and an empty result is indistinguishable on screen from a customer
+  // with no prices. Not asking says the true thing; asking and being refused does not.
+  const askedAsTech = await p.evaluate(() => {
+    const app = window.__mkApp;
+    const name = app.state.data.clients[0].name;
+    const before = window.__rtt || 0;
+    return app.ensurePriceList(name).then(() => ({
+      items: (app.client(name).items || []).length,
+      asked: (window.__rtt || 0) - before,
+    }));
+  });
+  check('a technician asking for prices is given none', askedAsTech.items === 0,
+    JSON.stringify(askedAsTech));
+
+  // The office, on its own page, gets the whole list attached to that customer.
+  const office = await open();
+  await login(office, 'omar@makaman.ly');
+  const priced = await office.evaluate(() => {
+    const app = window.__mkApp;
+    const name = app.state.data.clients[0].name;
+    return app.ensurePriceList(name).then(() => (app.client(name).items || []));
+  });
+  check('and the office gets them when it asks, attached to that customer',
+    priced.length === 1 && priced[0].code === 'MKN-1801', JSON.stringify(priced));
+  await office.close();
   // Spelled in the app's own vocabulary, which is not the column names. This asserts the
   // translated keys specifically: an unrecognised key does not fail, it silently falls
   // back to the default, so 'a settings object arrived' proves nothing on its own.

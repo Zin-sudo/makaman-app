@@ -636,6 +636,61 @@
      to their canonical form, so `[style*="border-left:3px solid"]` never matches the
      `border-left: 3px solid` the browser actually holds. */
   .mk-note { border-radius:var(--radius-notice); animation:bounce-bottom 0.9s both; }
+  /* A proposal, and it has to look like one. Quieter than the accent buttons around it —
+     an outline and a wash rather than a filled block — because it competes with the
+     screen's real action and losing that competition is the point. Full height, so it is
+     still a thumb target on a phone. */
+  .mk-suggest-chip {
+    display:inline-flex; align-items:center; gap:6px; margin-top:7px;
+    min-height:40px; padding:6px 13px; max-width:100%;
+    font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:600;
+    font-size:13px; letter-spacing:0.03em; text-align:left; line-height:1.3;
+    cursor:pointer; background:var(--accent-wash); color:var(--accent-ink);
+    border:1px dashed var(--accent-deep); border-radius:var(--radius-notice);
+  }
+  .mk-suggest-chip:active { background:var(--accent-wash-2); }
+  /* The four row deletes: a job-log line, a charged line, an allocated tool, a price-list
+     line. Each was a bare 15px × with `background:none;border:0`, a min-width of 40 and
+     NO MIN-HEIGHT at all — so its real target was the height of one glyph, sitting beside
+     the text input it deletes, under a gloved thumb at a wellhead.
+
+     40 × 40 minimum, and it reads as destructive rather than as punctuation: a danger
+     wash on hover and press. Each one carries an aria-label naming what it removes,
+     because "×" is what four different controls have in common, not what any of them
+     does. */
+  .mk-rowdel {
+    flex:none; display:inline-flex; align-items:center; justify-content:center;
+    min-width:40px; min-height:40px; padding:0; font-size:17px; line-height:1;
+    color:var(--ink-faint); background:none; border:1px solid transparent; cursor:pointer;
+  }
+  .mk-rowdel:hover { color:var(--danger); border-color:rgba(var(--danger-rgb),0.35); background:rgba(var(--danger-rgb),0.08); }
+  .mk-rowdel:active { background:rgba(var(--danger-rgb),0.18); }
+  .mk-rowdel:disabled { opacity:0.4; cursor:default; background:none; border-color:transparent; color:var(--ink-faint); }
+  /* The counter tiles. They were divs; one of them now filters the inbox, and a thing
+     that responds to a tap has to be a button — hidden affordance is the fault, not the
+     styling. The non-acting ones get cursor:default and no action line, so the row still
+     reads as figures rather than as five controls. */
+  .mk-stat-tile {
+    display:block; width:100%; text-align:left; padding:13px 14px;
+    border:1px solid rgba(var(--ink-rgb),0.16); color:inherit; font:inherit;
+  }
+  /* The same thing on a phone, where there is no counter row to put it in: one line,
+     full thumb height, above the list it filters. */
+  .mk-awaiting-strip {
+    width:100%; display:flex; align-items:center; gap:10px;
+    min-height:48px; padding:10px 13px; margin-bottom:14px;
+    border:1px solid var(--warning); cursor:pointer; color:var(--ink);
+    font-size:13px; line-height:1.4; text-align:left;
+  }
+  .mk-awaiting-n {
+    flex:none; min-width:28px; padding:2px 7px; text-align:center;
+    font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:600;
+    /* --warning-deep, not --warning. In the light theme --warning is #b5790c and
+       --on-accent is white, which measures 3.68:1 — under the 4.5 this text needs at 17px
+       and caught by layout.test.js rather than by eye. --warning-deep is darker in the
+       light theme and lighter in the dark one, so the same pair clears it both ways. */
+    font-size:17px; background:var(--warning-deep); color:var(--on-accent);
+  }
 
   /* ── The switch ──────────────────────────────────────────────────────────
      The old one was a 42x24 rectangle with a square block inside it that jumped
@@ -808,7 +863,10 @@
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Full name</div>
           <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" placeholder="{{ signupPlaceholder }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:5px">
+          <!-- The requirement said before the attempt, not after it: a rule a person only
+               meets by failing is a rule the form kept to itself. -->
+          <div style="font-size:11px;line-height:1.4;color:var(--ink-faint);margin-bottom:14px">{{ signupDomainHint }}</div>
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Password</div>
           <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
           <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Confirm password</div>
@@ -1119,17 +1177,17 @@
               <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
               <input dir="auto" value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="width:100%;min-height:40px;margin-top:16px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
               </div>
+              <!-- The awaiting-paperwork backlog, as one line rather than as a list.
+                   It used to render every waiting ticket in an unbounded warning box
+                   above the inbox: twenty tickets waiting on a signature meant twenty
+                   rows of warning before the first ticket somebody came to look at. The
+                   count is the whole message; the list is one tap away. -->
               <sc-if value="{{ awaitingDocsAny }}" hint-placeholder-val="{{ false }}">
-                <div class="mk-soft" style="padding:12px 14px;margin-bottom:14px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.1)">
-                  <div style="font-size:13px;line-height:1.45;color:var(--ink);margin-bottom:8px">{{ awaitingDocsLabel }}</div>
-                  <sc-for list="{{ awaitingDocsRows }}" as="w" hint-placeholder-count="2">
-                    <button onClick="{{ w.open }}" style="width:100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:7px 0;border:0;border-top:1px solid rgba(var(--ink-rgb),0.1);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
-                      <span style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }}</span>
-                      <span style="flex:1;min-width:0;font-size:12px;color:var(--ink-dim)">{{ w.customer }}</span>
-                      <span style="font-size:11px;color:var(--warning-ink)">{{ w.missing }}</span>
-                    </button>
-                  </sc-for>
-                </div>
+                <button onClick="{{ toggleAwaitingFilter }}" class="mk-awaiting-strip" style="border-color:{{ awaitingFilterEdge }};background:{{ awaitingFilterBg }}">
+                  <span class="mk-awaiting-n">{{ awaitingDocsCount }}</span>
+                  <span style="flex:1;min-width:0;text-align:left">{{ awaitingDocsPhrase }}</span>
+                  <span style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--warning-ink)">{{ awaitingFilterAction }}</span>
+                </button>
               </sc-if>
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:16px 0 8px">On this device</div>
               <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
@@ -1252,6 +1310,11 @@
               <div style="margin:14px 0 4px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Job type (objective)</label>
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+                <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
+                  <!-- Proposed from the job log, never written without a tap. The objectives
+                       come out in the order they were mentioned, joined with &. -->
+                  <button onClick="{{ acceptObjective }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ objectiveSuggestion }}</button>
+                </sc-if>
                 <datalist id="jobtypes">
                   <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="4">
                     <option value="{{ j.name }}"></option>
@@ -1264,7 +1327,7 @@
                   <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
                     <div style="width:74px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:var(--ink-faint)">{{ e.timeLine }}</span></div>
                     <textarea dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
-                    <button onClick="{{ e.remove }}" title="Delete line" style="min-width:40px;flex:none;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                    <button onClick="{{ e.remove }}" class="mk-rowdel" title="Delete this job-log line" aria-label="Delete this job-log line">×</button>
                   </div>
                 </sc-for>
               </div>
@@ -1587,18 +1650,6 @@
     <div class="mk-page" style="padding:26px 30px 70px;max-width:1420px;margin:0 auto">
 
       <sc-if value="{{ mgrInbox }}" hint-placeholder-val="{{ true }}">
-        <sc-if value="{{ awaitingDocsAny }}" hint-placeholder-val="{{ false }}">
-          <div class="mk-soft" style="padding:12px 14px;margin-bottom:14px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.1)">
-            <div style="font-size:13px;line-height:1.45;color:var(--ink);margin-bottom:8px">{{ awaitingDocsLabel }}</div>
-            <sc-for list="{{ awaitingDocsRows }}" as="w" hint-placeholder-count="2">
-              <button onClick="{{ w.open }}" style="width:100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:7px 0;border:0;border-top:1px solid rgba(var(--ink-rgb),0.1);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
-                <span style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }}</span>
-                <span style="flex:1;min-width:0;font-size:12px;color:var(--ink-dim)">{{ w.customer }}</span>
-                <span style="font-size:11px;color:var(--warning-ink)">{{ w.missing }}</span>
-              </button>
-            </sc-for>
-          </div>
-        </sc-if>
         <div class="mk-pagehead" style="display:flex;align-items:flex-end;gap:16px;margin-bottom:20px">
           <div>
             <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">Ticket Inbox</h2>
@@ -1614,10 +1665,11 @@
         </div>
         <div class="mk-stats4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
           <sc-for list="{{ mgrStats }}" as="s" hint-placeholder-count="4">
-            <div style="padding:13px 14px;border:1px solid rgba(var(--ink-rgb),0.16)">
+            <button onClick="{{ s.pick }}" class="mk-stat-tile" style="border-color:{{ s.edge }};background:{{ s.bg }};cursor:{{ s.cursor }}">
               <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--ink-faint)">{{ s.label }}</div>
               <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:{{ s.color }}">{{ s.value }}</div>
-            </div>
+              <div style="font-size:10px;letter-spacing:0.04em;text-transform:uppercase;color:var(--warning-ink);min-height:12px">{{ s.action }}</div>
+            </button>
           </sc-for>
         </div>
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
@@ -1992,7 +2044,7 @@
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                         <sc-if value="{{ it.showRemove }}" hint-placeholder-val="{{ true }}">
-                          <button onClick="{{ it.remove }}" title="Remove line" style="min-width:40px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                          <button onClick="{{ it.remove }}" class="mk-rowdel" title="Remove this charged line" aria-label="Remove this charged line">×</button>
                         </sc-if>
                       </td>
                     </tr>
@@ -2014,6 +2066,11 @@
               <div style="margin-bottom:12px;max-width:420px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Job type (objective)</label>
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+                <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
+                  <!-- Proposed from the job log, never written without a tap. The objectives
+                       come out in the order they were mentioned, joined with &. -->
+                  <button onClick="{{ acceptObjective }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ objectiveSuggestion }}</button>
+                </sc-if>
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
@@ -2043,7 +2100,7 @@
                     <input dir="auto" value="{{ a.item }}" onChange="{{ a.onItem }}" placeholder="7&quot; PKR / crossover…" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
                     <input dir="auto" value="{{ a.qty }}" onChange="{{ a.onQty }}" placeholder="Qty" style="width:56px;flex:none;min-height:34px;padding:6px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
                     <input dir="auto" value="{{ a.note }}" onChange="{{ a.onNote }}" placeholder="Note" style="flex:1;min-width:0;min-height:34px;padding:6px 9px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.14);color:var(--ink)">
-                    <button onClick="{{ a.remove }}" title="Remove" style="min-width:40px;flex:none;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                    <button onClick="{{ a.remove }}" class="mk-rowdel" title="Remove this allocated tool" aria-label="Remove this allocated tool">×</button>
                   </div>
                 </sc-for>
                 <button onClick="{{ addAssetRow }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">+ Add item</button>
@@ -2100,7 +2157,10 @@
             </div>
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">4 · Approval</div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">4 · Approval</div>
+                <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">{{ checksHeading }}</div>
+              </div>
               <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
                 <sc-for list="{{ checks }}" as="c" hint-placeholder-count="3">
                   <div style="display:flex;gap:9px;font-size:13px;color:{{ c.color }}">
@@ -2489,7 +2549,7 @@
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
                   <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <sc-if value="{{ canDeletePrices }}" hint-placeholder-val="{{ true }}">
-                      <button onClick="{{ p.remove }}" title="Remove this line" style="min-width:40px;font-size:15px;color:var(--ink-faint);background:none;border:0;cursor:pointer">×</button>
+                      <button onClick="{{ p.remove }}" class="mk-rowdel" title="Remove this line from the price list" aria-label="Remove this line from the price list">×</button>
                     </sc-if>
                   </td>
                 </tr>
@@ -3273,6 +3333,93 @@ const SETTLED_RANK = (st) => SETTLED_STATES.indexOf(st);
 const DEFAULT_BASE_LOCATION = 'Makaman Base {Awjilah} 29°06\'29.2"N 21°22\'37.6"E';
 const DEFAULT_CUSTOMER_REP = 'Drilling/Workover Office';
 
+// What the job was FOR, read back out of what the technician wrote it up as.
+//
+// A job type in this company is `{TOOL} FOR {OBJECTIVE}` — `PKR FOR CSG TEST`,
+// `RBP FOR CEMENT JOB`. The tool is known when the ticket is raised; the objective often
+// is not, because a job that went out to set a plug also ended up pressure testing, and
+// what actually happened is written in the job log line by line. So the log is read and
+// the objective proposed from it.
+//
+// SUGGESTED, never written. Every phrase below is a guess about what somebody meant by an
+// abbreviation scribbled at a wellhead, and a guess that writes itself into the ticket is
+// a guess nobody gets to check. It appears as a chip the ticket opener or the office taps
+// to accept, and the field stays typeable either way.
+//
+// Order matters twice: within a line, the phrase mentioned first is the objective named
+// first, so `PKR FOR CSG TEST & ACID JOB` reads in the order the work happened; and
+// across the list, the more specific pattern must come before the more general one or
+// "PRESSURE TEST" would swallow every "P/T".
+// `test(?:ed|ing)?` throughout, and it is not padding. A job log is written in the past
+// tense — "rigged up, pressure TESTED lines to 3000 psi" — and a pattern anchored on the
+// bare noun matches the way a form asks the question rather than the way a technician
+// answers it. Found by a test case taken from the seeded log rather than invented.
+const OBJECTIVE_PHRASES = [
+  { re: /\b(?:pressure|press\.?)\s*test(?:ed|ing)?\b|\bp\s*\/\s*t\b/i, name: 'CSG TEST' },
+  { re: /\b(?:casing|csg)\s*test(?:ed|ing)?\b/i, name: 'CSG TEST' },
+  { re: /\bcement(?:ing)?\s*job\b/i, name: 'CEMENT JOB' },
+  { re: /\bacid(?:izing|ising)?\s*(?:job|treatment)?\b/i, name: 'ACID JOB' },
+  { re: /\binjectivity\s*test(?:ed|ing)?\b/i, name: 'INJECTIVITY TEST' },
+  { re: /\bfrac(?:turing)?\s*job\b/i, name: 'FRAC JOB' },
+  { re: /\bcommunication\s*test(?:ed|ing)?\b/i, name: 'COMMUNICATION TEST' },
+  { re: /\b(?:locate\s*leak|leak\s*location)\b/i, name: 'LOCATE LEAK' },
+  { re: /\bwellhead\s*maintenance\b/i, name: 'WELLHEAD MAINTENANCE' },
+];
+
+// Split `PKR FOR CSG TEST & ACID JOB` back into its tool and its objectives, so a second
+// suggestion adds to the first rather than replacing it. A job type that does not carry
+// the word FOR is left whole as the tool, which is the honest reading of a free-text
+// field somebody may have typed anything into.
+function splitJobType(jobType) {
+  const s = String(jobType || '').trim();
+  const at = s.toUpperCase().indexOf(' FOR ');
+  if (at < 0) return { tool: s, objectives: [] };
+  return {
+    tool: s.slice(0, at).trim(),
+    objectives: s.slice(at + 5).split('&').map((x) => x.trim().toUpperCase()).filter(Boolean),
+  };
+}
+
+// The objective this job log describes, combined with whatever the ticket already says.
+// Returns '' when there is nothing to add — no phrase found, or every phrase found is
+// already on the ticket — so the caller can show a chip or show nothing without a second
+// comparison.
+function suggestJobType(jobType, events) {
+  const found = [];
+  (events || []).forEach((e) => {
+    const text = String((e && e.text) || '');
+    // Where in the line each phrase first appears, so the objectives come out in the
+    // order the technician wrote them rather than the order this list happens to be in.
+    OBJECTIVE_PHRASES
+      .map((ph) => ({ name: ph.name, at: text.search(ph.re) }))
+      .filter((x) => x.at >= 0)
+      .sort((a, b) => a.at - b.at)
+      .forEach((x) => { if (found.indexOf(x.name) < 0) found.push(x.name); });
+  });
+  if (!found.length) return '';
+
+  const cur = splitJobType(jobType);
+  const add = found.filter((n) => cur.objectives.indexOf(n) < 0);
+  if (!add.length) return '';
+  const all = cur.objectives.concat(add);
+  // No tool named yet — the technician has not said what went in the hole, and inventing
+  // one would be the part of this that cannot be guessed. The objectives alone are still
+  // worth offering; the office completes the front half.
+  return (cur.tool ? cur.tool + ' FOR ' : '') + all.join(' & ');
+}
+
+// Who may ask for an account.
+//
+// The real control is migration 0046, in the database: handle_new_user refuses anything
+// outside this domain and caps self-registration at five a rolling day. This constant is
+// the courtesy half — it says the requirement on the form before anything is typed, and
+// refuses in plain English rather than letting GoTrue answer with "Database error saving
+// new user", which is what a trigger exception turns into on its way back to the browser.
+//
+// A check here is not a check. Nothing stops the same request being sent straight to
+// /auth/v1/signup. It is here so the person typing knows why, not so the server can relax.
+const SIGNUP_DOMAIN = '@makaman.ly';
+
 const BASES = ['MKN Operations Base', 'MKN Headquarters'];
 // The field and the office that dispatches it work out of Operations; the admin and the
 // observer sit at Headquarters. A default, not a rule — anybody can be posted elsewhere.
@@ -3598,6 +3745,19 @@ function shapeUser(p) {
     lastSync: '', status: p.status,
   };
 }
+// A copy of the store with every client's priced items taken out, leaving everything else
+// alone. Returns the same object when there is nothing to strip, so the common case costs
+// one loop and no allocation.
+function withoutPriceLists(data) {
+  const clients = (data && data.clients) || [];
+  if (!clients.some((cl) => cl && (cl.items || []).length)) return data;
+  return Object.assign({}, data, {
+    clients: clients.map((cl) => ((cl.items || []).length
+      ? Object.assign({}, cl, { items: [], priceListLoaded: false })
+      : cl)),
+  });
+}
+
 function shapeClient(c, items) {
   return {
     id: c.id, name: c.name, currency: c.currency || DEFAULT_CURRENCY,
@@ -3766,6 +3926,70 @@ function rowsChildren(t, idByName) {
 // belongs to the database's row-level security, not to this function: a technician's
 // select on tickets simply returns fewer rows than an Ops Manager's. Filtering here as
 // well would be a second, weaker copy of a rule that already exists.
+// Four of these tables have no `id` column — permissions is keyed on permission_id,
+// and ticket_crew, user_permissions and user_settings on their own columns. Ordering
+// every table by 'id' would not have truncated them, it would have failed the request
+// outright and taken the whole sign-in down with it, so the key is named per table
+// rather than assumed. (All four are small enough that a second page never comes; the
+// order is there to make the request valid, not to make it correct.)
+const PAGE = 1000;
+const ORDER_KEY = {
+  permissions: 'permission_id',
+  ticket_crew: 'ticket_id',
+  user_permissions: 'user_id',
+  user_settings: 'user_id',
+};
+
+// Hoisted out of hydrate() so the on-demand price-list fetch can reuse it rather than
+// growing a second, simpler pager that would page differently and be wrong differently.
+// `narrow` is applied to the query before ordering — that is the only thing a single
+// client's list needs that the full pull does not.
+function pageAll(c, table, cols, narrow) {
+  const key = ORDER_KEY[table] || 'id';
+  const page = (from, size, withCount) => {
+    const base = withCount
+      ? c.from(table).select(cols || '*', { count: 'exact' })
+      : c.from(table).select(cols || '*');
+    const sel = narrow ? narrow(base) : base;
+    return sel.order(key, { ascending: true }).range(from, from + size - 1);
+  };
+  return page(0, PAGE, true).then((res) => {
+    if (res.error) return res;
+    const first = res.data || [];
+    const total = (typeof res.count === 'number') ? res.count : null;
+    // What actually arrived IS the page size, whatever was asked for.
+    const step = first.length;
+    // Nothing more to get: the table fits in one page, or it is empty, or the server
+    // would not say how big it is — in which case fall back to walking it.
+    if (!step) return { data: first, error: null };
+    if (total === null) return walk(first, step);
+    if (first.length >= total) return { data: first, error: null };
+
+    const jobs = [];
+    for (let from = step; from < total; from += step) jobs.push(page(from, step, false));
+    return Promise.all(jobs).then((pages) => {
+      const bad = pages.find((x) => x.error);
+      if (bad) return bad;
+      const rows = pages.reduce((acc, x) => acc.concat(x.data || []), first.slice());
+      // The count was taken before the other pages were asked for. If the table grew
+      // in between, finish it off properly.
+      return rows.length < total ? walk(rows, step) : { data: rows, error: null };
+    });
+  });
+  // The original walk, kept for the two cases the fan-out cannot serve: a server that
+  // withheld the count, and a table that grew mid-flight.
+  function walk(rows, size) {
+    const more = (from) => page(from, size, false).then((res) => {
+      if (res.error) return res;
+      const got = res.data || [];
+      if (!got.length) return { data: rows, error: null };
+      rows = rows.concat(got);
+      return more(from + got.length);
+    });
+    return more(rows.length);
+  }
+}
+
 function hydrate() {
   const c = sb();
   if (!c) return Promise.reject(new Error('No server configured.'));
@@ -3787,19 +4011,6 @@ function hydrate() {
   // Ordered as well as paged: a stable order is what makes the page boundaries mean
   // anything. Without it two pages can overlap or skip rows entirely.
   //
-  // Four of these tables have no `id` column — permissions is keyed on permission_id,
-  // and ticket_crew, user_permissions and user_settings on their own columns. Ordering
-  // every table by 'id' would not have truncated them, it would have failed the request
-  // outright and taken the whole sign-in down with it, so the key is named per table
-  // rather than assumed. (All four are small enough that a second page never comes; the
-  // order is there to make the request valid, not to make it correct.)
-  const PAGE = 1000;
-  const ORDER_KEY = {
-    permissions: 'permission_id',
-    ticket_crew: 'ticket_id',
-    user_permissions: 'user_id',
-    user_settings: 'user_id',
-  };
   // Paged, and the pages fetched at the same time rather than one after another.
   //
   // The first version of this walked the table a page at a time and stopped only when a
@@ -3829,52 +4040,16 @@ function hydrate() {
   // flight the count is already stale, and this walks the remainder the old way rather
   // than silently returning a short table — a shortfall here is exactly the bug this
   // whole function exists to have fixed.
-  const all = (table, cols) => {
-    const key = ORDER_KEY[table] || 'id';
-    const page = (from, size, withCount) => {
-      const sel = withCount
-        ? c.from(table).select(cols || '*', { count: 'exact' })
-        : c.from(table).select(cols || '*');
-      return sel.order(key, { ascending: true }).range(from, from + size - 1);
-    };
-    return page(0, PAGE, true).then((res) => {
-      if (res.error) return res;
-      const first = res.data || [];
-      const total = (typeof res.count === 'number') ? res.count : null;
-      // What actually arrived IS the page size, whatever was asked for.
-      const step = first.length;
-      // Nothing more to get: the table fits in one page, or it is empty, or the server
-      // would not say how big it is — in which case fall back to walking it.
-      if (!step) return { data: first, error: null };
-      if (total === null) return walk(first, step);
-      if (first.length >= total) return { data: first, error: null };
-
-      const jobs = [];
-      for (let from = step; from < total; from += step) jobs.push(page(from, step, false));
-      return Promise.all(jobs).then((pages) => {
-        const bad = pages.find((x) => x.error);
-        if (bad) return bad;
-        const rows = pages.reduce((acc, x) => acc.concat(x.data || []), first.slice());
-        // The count was taken before the other pages were asked for. If the table grew
-        // in between, finish it off properly.
-        return rows.length < total ? walk(rows, step) : { data: rows, error: null };
-      });
-    });
-    // The original walk, kept for the two cases the fan-out cannot serve: a server that
-    // withheld the count, and a table that grew mid-flight.
-    function walk(rows, size) {
-      const more = (from) => page(from, size, false).then((res) => {
-        if (res.error) return res;
-        const got = res.data || [];
-        if (!got.length) return { data: rows, error: null };
-        rows = rows.concat(got);
-        return more(from + got.length);
-      });
-      return more(rows.length);
-    }
-  };
+  const all = (table, cols) => pageAll(c, table, cols);
   return Promise.all([
-    all('profiles'), all('clients'), all('price_list_items'), all('job_types'),
+    // `price_list_items` is deliberately NOT here. It is 2,610 rows — the company's
+    // entire pricing — and pulling it on every sign-in put a commercial document on every
+    // technician's phone, in localStorage, on a device that goes to a client's wellhead.
+    // Migration 0045 now refuses the read to anyone outside the office, and the office
+    // fetches a single client's rows when it opens the price screen or adds a charged
+    // line (see ensurePriceList). A ticket's own charged lines live on the ticket, so
+    // nothing a technician does depends on this.
+    all('profiles'), all('clients'), all('job_types'),
     all('ticket_numbering'), all('org_defaults'), all('asset_questions'),
     all('numbering_claim'), all('user_settings'),
     all('tickets'), all('ticket_lines'), all('ticket_items'), all('ticket_assets'),
@@ -3893,7 +4068,7 @@ function hydrate() {
   ]).then((res) => {
     const bad = res.find((r) => r.error);
     if (bad) throw new Error(bad.error.message || 'Could not load data.');
-    const [profiles, clients, priceItems, jobTypes, numbering, orgDefaults, assetQs,
+    const [profiles, clients, jobTypes, numbering, orgDefaults, assetQs,
       claim, settings, tickets, lines, items, assets, crew, audit, notes, attachments,
       permCatalogue, myPerms, lastExport, permOverrides] = res.map((r) => r.data || []);
 
@@ -3910,7 +4085,7 @@ function hydrate() {
     };
     const byTs = (a, b) => new Date(a.logged_at || a.changed_at || 0) - new Date(b.logged_at || b.changed_at || 0);
     const L = by(lines, 'ticket_id'), I = by(items, 'ticket_id'), A = by(assets, 'ticket_id'),
-      C = by(crew, 'ticket_id'), U = by(audit, 'ticket_id'), P = by(priceItems, 'client_id'),
+      C = by(crew, 'ticket_id'), U = by(audit, 'ticket_id'),
       N = by(notes, 'ticket_id'), AT = by(attachments, 'ticket_id');
 
     const mySettings = settings[0] || {};
@@ -3933,7 +4108,11 @@ function hydrate() {
         baseLocation: (orgDefaults[0] || {}).base_location || DEFAULT_BASE_LOCATION,
         customerRep: (orgDefaults[0] || {}).customer_rep || DEFAULT_CUSTOMER_REP,
       },
-      clients: clients.map((cl) => shapeClient(cl, P[cl.id])),
+      // Named and priced in their own currency, but with no items until somebody in the
+      // office asks for them. `items: []` is the resting state of a client on a device,
+      // not a client whose price list is empty — `priceListLoaded` is what tells those
+      // two apart, so an office screen can say "fetching" rather than "there is nothing".
+      clients: clients.map((cl) => shapeClient(cl, [])),
       jobTypes: jobTypes.map((j) => j.name),
       users: profiles.map(shapeUser),
       // The catalogue as the admin screen lists it, sorted the way it reads: by
@@ -5474,7 +5653,17 @@ class Component extends DCLogic {
     // same shape, and a device that has been used for both must not serve one as the
     // other after a mode change.
     const key = USE_CLOUD ? CACHE_K : K;
-    const payload = JSON.stringify(data);
+    // Price lists are fetched, used, and never written down.
+    //
+    // ensurePriceList() puts a client's items into state so the screens can read them
+    // from the one place they have always read them from. This is the gate that keeps
+    // them off the disk: they live for the session and go when the tab does. Stripping
+    // here rather than at each call site means a screen added later cannot leak them by
+    // forgetting — persist() is the only door to localStorage.
+    //
+    // Only in cloud mode. The demo store's price lists ARE its seed data; dropping them
+    // there would empty the demo on the first save.
+    const payload = JSON.stringify(USE_CLOUD ? withoutPriceLists(data) : data);
     if (this.tryWrite(key, payload)) {
       this.watchStorageHeadroom(payload.length);
       return true;
@@ -6103,6 +6292,10 @@ class Component extends DCLogic {
       activeId: id, mgrScreen: 'review',
       reviewSnap: { id: id, content: this.reviewContent(t), at: iso(new Date()) },
     }, extra || {}));
+    // The customer's prices, so the item search and the suggested lines have something to
+    // work with by the time somebody reaches them. Fired here rather than during render:
+    // a fetch started from a render runs again on every re-render.
+    if (t) this.ensurePriceList(t.customer);
   }
   reviewDirty() {
     const S = this.state;
@@ -6195,6 +6388,58 @@ class Component extends DCLogic {
     });
   }
   client(name) { return this.state.data.clients.find(c => c.name === name); }
+
+  // A client's priced items, fetched the first time somebody in the office needs them.
+  //
+  // They used to arrive with everything else at sign-in — 2,610 rows on every device
+  // including phones that have no use for them and no business holding them. Now the
+  // screens that read `client.items` ask for them here, and the result is put into state
+  // where those screens have always looked. persist() strips them again on the way to
+  // localStorage, so this is a session-lived cache and nothing more.
+  //
+  // Three guards, each for a fault seen before:
+  //   · the office only. A technician's device would be refused by RLS (0045) and get an
+  //     empty list back, which is indistinguishable on screen from a client with no
+  //     prices. Not asking is clearer than asking and being refused.
+  //   · once per client per session, tracked on the client row itself rather than in a
+  //     module Map, so a sign-out that rebuilds the store also forgets what it had.
+  //   · one request in flight per client. The review screen and the item search can both
+  //     want the same list in the same tick.
+  ensurePriceList(name) {
+    if (!USE_CLOUD || !name) return Promise.resolve();
+    if (!this.hasPermission('pricelist.view')) return Promise.resolve();
+    const cl = this.client(name);
+    if (!cl || cl.priceListLoaded) return Promise.resolve();
+    const inflight = this._priceInflight || (this._priceInflight = {});
+    if (inflight[cl.id]) return inflight[cl.id];
+    const c = sb();
+    if (!c) return Promise.resolve();
+
+    const done = () => { delete inflight[cl.id]; };
+    const run = pageAll(c, 'price_list_items', '*', (q) => q.eq('client_id', cl.id))
+      .then((res) => {
+        if (res.error) throw res.error;
+        // shapeClient owns the column-to-app translation; going through it means the
+        // on-demand path and the old bulk path cannot describe an item differently.
+        const shaped = shapeClient(cl, res.data || []);
+        this.setState({
+          data: Object.assign({}, this.state.data, {
+            clients: this.state.data.clients.map((x) => (x.id === cl.id
+              ? Object.assign({}, x, { items: shaped.items, priceListLoaded: true })
+              : x)),
+          }),
+        });
+        done();
+      })
+      .catch((err) => {
+        done();
+        logError('prices', err, { doing: 'fetch price list', client: name });
+        this.toast('prices:' + cl.id, 'Could not fetch the price list for ' + name
+          + '. The charged lines already on tickets are unaffected.', 'warn');
+      });
+    inflight[cl.id] = run;
+    return run;
+  }
   // The currency a ticket is priced in. Read off the ticket first: like the unit prices
   // themselves, it is frozen onto the ticket when the job is raised, so re-negotiating a
   // client's contract later cannot silently restate an approved ticket in another
@@ -6680,7 +6925,8 @@ class Component extends DCLogic {
         where: 'Price list · ' + (a.client || ''),
         edge: 'var(--success)',
         open: () => this.hasPermission('pricelist.view')
-          ? this.setState({ adminTab: 'price', adminClient: a.client, roleTab: 'tickets' })
+          ? (this.setState({ adminTab: 'price', adminClient: a.client, roleTab: 'tickets' }),
+             this.ensurePriceList(a.client))
           : null,
       })))
       .filter((a) => deep || a.kind === 'lifecycle')
@@ -6903,8 +7149,23 @@ class Component extends DCLogic {
         (r) => (r.data ? Object.keys(r.data).length : 0) + ' capability keys resolved'),
       // The one the field reported. Per customer, what the server holds against what this
       // device actually received — which is the whole 2,610-row paging question.
+      //
+      // Only asked of a device that is supposed to hold any. Since 0045 a technician is
+      // refused these rows and since B1 no device fetches them at sign-in, so on a phone
+      // this check would compare a server count against a deliberate zero and report the
+      // whole price list "short" — a red line on a healthy device, which is worse than no
+      // line at all. On an office device the question is still the right one, asked of
+      // whatever ensurePriceList has actually pulled this session.
       guard('Price lists complete', () => {
-        const local = (this.state.data.clients || []);
+        const local = (this.state.data.clients || []).filter((cl) => cl.priceListLoaded);
+        if (!this.hasPermission('pricelist.view')) {
+          add('Price lists complete', true, 'not held on this device — the office fetches them when needed');
+          return;
+        }
+        if (!local.length) {
+          add('Price lists complete', true, 'none fetched yet this session — nothing to check');
+          return;
+        }
         return Promise.all(local.map((cl) =>
           c.from('price_list_items').select('id', { count: 'exact', head: true })            // cl.id IS the server's uuid — shapeClient carries it straight through.
             .eq('client_id', cl.id)
@@ -7186,6 +7447,10 @@ class Component extends DCLogic {
   // how many of them are sequential — which is the number that decides whether the app
   // feels quick on a Libyan mobile connection. See perf.test.js.
   hydrateForTest() { return hydrate(); }
+  // The objective reader, reachable without a ticket. It is a pure function of the log,
+  // and the cases worth asserting are the shorthand people actually write — which is far
+  // easier to enumerate here than to stage a ticket for, one job log at a time.
+  suggestJobTypeForTest(jobType, events) { return suggestJobType(jobType, events); }
 
   // Reachable so the shed can be tested for what it must NOT drop. Asserting that it
   // frees something is easy; asserting that it never touches the tickets or the outbox is
@@ -8266,9 +8531,22 @@ class Component extends DCLogic {
     // the office has a copy of belongs in the inbox whether or not the latest local
     // change has been pushed back yet.
     const everReached = (x) => x.synced || !!x.syncedAt;
-    const inboxPage = pageOf(bandedTickets(
-      LIVE.filter(x => everReached(x) && (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))));
-    const myPage = pageOf(bandedTickets(myTickets.filter(matchesQuery)));
+    // The awaiting-paperwork counter narrows this list rather than duplicating it above.
+    // Built from the same awaitingDocs() the counter counted, so the number on the tile
+    // and the number of rows underneath it cannot come apart.
+    // With the filter on the list IS the counted set, not the ordinary list narrowed to
+    // it. The difference is not cosmetic: the inbox is gated on everReached() — a ticket
+    // this device has seen the server acknowledge — and the counter is not, so narrowing
+    // the ordinary list could leave the tile saying 1 above an empty table. A count and a
+    // list that disagree is the exact failure this replaced a duplicated banner to avoid.
+    // Caught by attachments.test.js, where the fixture's ticket has no sync stamp.
+    const inboxPage = pageOf(bandedTickets(S.awaitingFilter
+      ? awaitingDocs.filter(x => (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))
+      : LIVE.filter(x => everReached(x) && (!S.techFilter || inCrew(x, S.techFilter, ''))
+        && matchesQuery(x))));
+    const myPage = pageOf(bandedTickets(S.awaitingFilter
+      ? awaitingDocs.filter(x => inCrew(x, myName, myEmail) && matchesQuery(x))
+      : myTickets.filter(matchesQuery)));
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
 
@@ -8301,9 +8579,12 @@ class Component extends DCLogic {
     const reorderItems = (items) => items.slice().sort((a, b) => itemRank(a) - itemRank(b));
     // Shared by the search results, "Frequently added" chips, and price-list dropdown.
     // Adds item and reorders according to business logic.
-    const addItemByCode = (code) => {
-      if (locked || !code || !t || !curClient) return;
-      const src = curClient.items.find(i => i.code === code); if (!src) return;
+    // The one place a charge line is built, whatever produced it — the item search, a
+    // suggestion off the price list, or a suggestion off this customer's history. `origin`
+    // is only the words that reach the audit trail; the line itself is made the same way
+    // every time, so a suggested line and a searched line cannot come out different.
+    const addItemLine = (src, origin) => {
+      if (locked || !src || !t) return;
       const isPercent = src.kind === 'percent';
       const qty = isPercent ? '' : (src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1);
       this.mutate(d => {
@@ -8315,7 +8596,12 @@ class Component extends DCLogic {
         x.items = reorderItems(x.items);
       });
       this.setState({ itemSearch: '' }); // Clear search after adding
-      this.log('Item ' + src.code + ' added from the ' + t.customer + ' price list.', 'edit');
+      this.log('Item ' + src.code + ' added ' + origin + '.', 'edit');
+    };
+    const addItemByCode = (code) => {
+      if (locked || !code || !t || !curClient) return;
+      const src = curClient.items.find(i => i.code === code); if (!src) return;
+      addItemLine(src, 'from the ' + t.customer + ' price list');
     };
     // A charge line typed from nothing.
     //
@@ -8333,23 +8619,64 @@ class Component extends DCLogic {
       });
       this.log('Charge line added by hand.', 'edit');
     };
-    // Behavioral suggestion: up to 3 items charged most often on this client's other
-    // tickets that aren't already on this one — lets the Ops Manager one-click the items
-    // they reach for on nearly every job instead of searching/scrolling the price list.
+    // Up to three items this customer is charged most often, so the Ops Manager can one-tap
+    // the lines that go on nearly every job instead of searching the price list for them.
+    //
+    // Built from HISTORY, not from the price list. It used to be
+    // `curClient.items.filter(i => usageCounts[i.code] …)` — the price list intersected
+    // with usage — and that made a behavioural feature depend on a reference table in two
+    // ways that both failed:
+    //
+    //   · No client row, no suggestions. A ticket whose customer name does not match a
+    //     client exactly has `curClient === null`, and the office types customer names.
+    //   · A re-import wipes them. The corrected batches land with corrected item numbers;
+    //     every historical code that changed stops intersecting and the feature silently
+    //     empties, which is what was reported.
+    //
+    // History is the actual evidence of "what this customer gets charged", and it is on
+    // tickets this device already holds. The price list is now consulted only to freshen
+    // the price and to notice a code that has since been retired — a retired code is
+    // MARKED, never dropped, because the office charging it eleven times is a stronger
+    // signal than its absence from a list that has just been re-imported.
     const usageCounts = {};
-    if (curClient) {
-      LIVE.filter(x => x.customer === curClient.name).forEach(x => (x.items || []).forEach(it => {
-        if (it.kind === 'percent') return;
-        usageCounts[it.code] = (usageCounts[it.code] || 0) + 1;
-      }));
+    const histLine = {};
+    const forCustomer = (t && t.customer) || (curClient && curClient.name) || '';
+    if (forCustomer) {
+      LIVE.filter(x => x.customer === forCustomer && (!t || x.id !== t.id))
+        .forEach(x => (x.items || []).forEach(it => {
+          if (it.kind === 'percent' || !it.code) return;
+          usageCounts[it.code] = (usageCounts[it.code] || 0) + 1;
+          // The most recent wording and price wins, so a suggestion whose code is gone
+          // from the price list still carries a description somebody wrote, not a blank.
+          histLine[it.code] = it;
+        }));
     }
+    // What the log says this job was for. Computed once here rather than in the binding
+    // object, because both the phone and desk copies of the field read it.
+    const objectiveSuggestion = t ? suggestJobType(t.jobType, t.events) : '';
+
     const curCodes = new Set(t ? (t.items || []).map(it => it.code) : []);
-    const suggestedItems = curClient ? curClient.items
-      .filter(i => i.kind !== 'percent' && usageCounts[i.code] && !curCodes.has(i.code))
-      .sort((a, b) => (usageCounts[b.code] || 0) - (usageCounts[a.code] || 0))
+    const onList = {};
+    ((curClient || {}).items || []).forEach(i => { onList[i.code] = i; });
+    const suggestedItems = Object.keys(usageCounts)
+      .filter(code => !curCodes.has(code))
+      .sort((a, b) => usageCounts[b] - usageCounts[a] || a.localeCompare(b))
       .slice(0, 3)
-      .map(i => ({ code: i.code, label: i.code + ' — ' + i.desc, add: () => addItemByCode(i.code) }))
-      : [];
+      .map(code => {
+        // The current row when the code still exists — the price on a suggestion should
+        // be today's, not the one from a job in March. Otherwise the historical line,
+        // labelled so nobody adds a retired code without noticing.
+        const live = onList[code];
+        const src = live || histLine[code];
+        const desc = (src && src.desc) || '';
+        return {
+          code: code,
+          label: code + ' — ' + desc + (live ? '' : ' · not on the current price list'),
+          add: () => addItemLine(src, live
+            ? 'from the ' + forCustomer + ' price list'
+            : 'from ' + forCustomer + ' history — the code is not on the current price list'),
+        };
+      });
 
     // Clamped here as well as by maxLength on the input. The attribute stops typing;
     // it does not stop a paste on every browser, and it does nothing at all for a value
@@ -8418,6 +8745,11 @@ class Component extends DCLogic {
       { key: 'type', label: 'Job type (objective) set', pass: !!(t.jobType || '').trim() },
     ] : [];
     const canApprove = checks.every(c => c.pass);
+    // The short name of each unfinished check, for the button. The checklist labels are
+    // written to be read in a column ("Mileage (one way) entered"); on a button they have
+    // to fit in a line, so each check carries a second, shorter word for this.
+    const CHECK_SHORT = { no: 'a ticket number', km: 'mileage', items: 'a charged item', type: 'a job type' };
+    const approveBlockers = checks.filter(c => !c.pass).map(c => CHECK_SHORT[c.key] || c.label);
 
     // Sheet preview layout — reproduces the field order, grouping and labels of the real
     // "Autofill_ServiceTikcet_System.xlsx" template (Service Ticket / Job Log sheets)
@@ -8690,8 +9022,20 @@ class Component extends DCLogic {
           this.setState({ dialog: null });
         },
       },
+      // The end of the flow says what happened AND what happens next.
+      //
+      // It said the first half only — approved, locked, sheets ready — and stopped there,
+      // which leaves the job looking finished at the exact moment its longest-running
+      // obligation begins. Approving is what puts a ticket on the awaiting-paperwork
+      // count: the client still has to sign and stamp both sheets and send them back, and
+      // until they do it sits in that count with nobody having been told it would.
       approved: {
-        title: 'Ticket approved', body: 'Ticket ' + (t ? t.ticketNo : '') + ' is approved and locked for the technician. The four sheets are ready to fill.',
+        title: 'Ticket approved',
+        body: 'Ticket ' + (t ? t.ticketNo : '') + ' is approved and locked for the technician. '
+          + 'The four sheets are ready to fill.\n\n'
+          + 'Next: it now shows under Awaiting paperwork until the client returns the '
+          + 'signed and stamped Service Ticket and Job Log. Tap that count on the inbox to '
+          + 'see everything still outstanding.',
         okLabel: 'Preview sheets', hasCancel: true, cancelLabel: 'Back to inbox',
         confirm: () => this.setState({ dialog: null, mgrScreen: 'print' }),
       },
@@ -8845,6 +9189,13 @@ class Component extends DCLogic {
       const pass = S.authPassword || '';
       const confirm = S.authConfirm || '';
       if (!name || !email || !pass || !confirm) { this.setState({ authError: 'Fill in every field.' }); return; }
+      // Checked before the breach lookup, which is a network call: an address that cannot
+      // become an account should not send a password anywhere at all.
+      if (email.slice(-SIGNUP_DOMAIN.length) !== SIGNUP_DOMAIN) {
+        this.setState({ authError: 'Only ' + SIGNUP_DOMAIN + ' addresses can sign up. '
+          + 'If you do not have one, ask the office to create your account.' });
+        return;
+      }
       this.setState({ authBusy: true, authError: '' });
       // The breach check runs before the account is created, not after: a password that
       // is already public should never reach the server at all.
@@ -9029,6 +9380,9 @@ class Component extends DCLogic {
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
       doLogin: doLogin,
       doSignup: doSignup,
+      signupPlaceholder: 'you' + SIGNUP_DOMAIN,
+      signupDomainHint: 'Must be a company ' + SIGNUP_DOMAIN + ' address. '
+        + 'No company address? Ask the office to create your account.',
       doLogout: doLogout,
       createTechnician: createTechnician,
       newTechName: S.newTechName, newTechEmail: S.newTechEmail, newTechPassword: S.newTechPassword,
@@ -9418,17 +9772,26 @@ class Component extends DCLogic {
       // Derived on every render from the same signedDocs() the ticket screen uses, so the
       // chase list cannot disagree with the ticket it points at.
       awaitingDocsAny: awaitingDocs.length > 0,
+      awaitingDocsCount: String(awaitingDocs.length),
+      // Two labels because there are two places, and the count is written once in each.
+      // The strip already shows the figure in its badge, so its sentence must not say the
+      // number again — "16 · 16 approved jobs are still waiting" is what happens when one
+      // label is reused in a place that already counted.
+      awaitingDocsPhrase: awaitingDocs.length === 1
+        ? 'approved job still waiting on its signed paperwork'
+        : 'approved jobs still waiting on their signed paperwork',
       awaitingDocsLabel: awaitingDocs.length === 1
         ? 'One approved job is still waiting on its signed paperwork.'
         : awaitingDocs.length + ' approved jobs are still waiting on their signed paperwork.',
-      awaitingDocsRows: awaitingDocs.map((x) => ({
-        noLabel: x.ticketNo || 'No number',
-        customer: x.customer || '',
-        missing: this.signedDocsMissing(x).join(' · '),
-        open: () => (S.role === 'tech'
-          ? this.setState({ activeId: x.id, techScreen: 'log', roleTab: 'tickets' })
-          : this.openReview(x.id, { roleTab: 'tickets' })),
-      })),
+      // A filter, not a second list. The tickets are already on this screen; showing them
+      // again above it was the bug. Tapping narrows what is below to exactly those jobs,
+      // and tapping again puts everything back — so the way out is the way in.
+      toggleAwaitingFilter: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
+      awaitingFilterOn: !!S.awaitingFilter,
+      awaitingFilterAction: S.awaitingFilter ? 'Show all' : 'Show these',
+      awaitingFilterEdge: S.awaitingFilter ? 'var(--warning-ink)' : 'var(--warning)',
+      awaitingFilterBg: S.awaitingFilter
+        ? 'rgba(var(--warning-rgb),0.22)' : 'rgba(var(--warning-rgb),0.1)',
 
       // ── Signed paperwork on the open ticket ──
       //
@@ -9687,6 +10050,20 @@ class Component extends DCLogic {
       },
       onMileageFocus: commitMileage.focus, onMileageBlur: commitMileage.blur,
       onJobTypeFocus: commitJobType.focus, onJobTypeBlur: commitJobType.blur,
+      // Read out of the job log, offered, and applied only on a tap. Hidden entirely on a
+      // sealed ticket: a suggestion that cannot be accepted is a control that lies.
+      objectiveSuggestion: objectiveSuggestion,
+      objectiveSuggested: !!objectiveSuggestion && !locked,
+      acceptObjective: () => {
+        if (!t || !objectiveSuggestion || locked) return;
+        const was = t.jobType || '';
+        this.patchTicket({ jobType: objectiveSuggestion });
+        // Written down as an edit with both values, like every other field change on this
+        // screen — a job type that changed itself and left no trace is exactly what the
+        // "suggested, never imposed" rule exists to prevent.
+        this.log('Job type set from the job log: ' + (was || '(blank)')
+          + ' → ' + objectiveSuggestion + '.', 'edit');
+      },
       curEvents: t ? (t.events || []).map((e, i) => ({
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
@@ -9972,12 +10349,29 @@ class Component extends DCLogic {
       mgrTeam: S.mgrScreen === 'team',
       goTeam: () => this.setState({ mgrScreen: 'team' }),
       awaitingCount: awaiting.length,
+      // Four figures and, when there is one, a fifth that does something.
+      //
+      // The awaiting-paperwork backlog used to be an unbounded list in a warning box
+      // above this row — every waiting ticket rendered in full, so twenty of them buried
+      // the inbox somebody opened the screen to read. It belongs with the other counts,
+      // and tapping it filters the table below rather than duplicating it.
       mgrStats: [
-        { label: 'Awaiting review', value: String(awaiting.length), color: 'var(--accent)' },
-        { label: 'Approved', value: String(approved.length), color: 'var(--ink-strong)' },
-        { label: 'Still in the field', value: String(LIVE.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)' },
-        { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)' },
-      ],
+        { label: 'Awaiting review', value: String(awaiting.length), color: 'var(--accent)',
+          edge: 'rgba(var(--ink-rgb),0.16)', bg: 'transparent', cursor: 'default', action: '', pick: () => {} },
+        { label: 'Approved', value: String(approved.length), color: 'var(--ink-strong)',
+          edge: 'rgba(var(--ink-rgb),0.16)', bg: 'transparent', cursor: 'default', action: '', pick: () => {} },
+        { label: 'Still in the field', value: String(LIVE.filter(x => x.status === 'logging').length), color: 'var(--ink-strong)',
+          edge: 'rgba(var(--ink-rgb),0.16)', bg: 'transparent', cursor: 'default', action: '', pick: () => {} },
+        { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)',
+          edge: 'rgba(var(--ink-rgb),0.16)', bg: 'transparent', cursor: 'default', action: '', pick: () => {} },
+      ].concat(awaitingDocs.length ? [{
+        label: 'Awaiting paperwork', value: String(awaitingDocs.length), color: 'var(--warning-ink)',
+        edge: S.awaitingFilter ? 'var(--warning-ink)' : 'var(--warning)',
+        bg: S.awaitingFilter ? 'rgba(var(--warning-rgb),0.22)' : 'rgba(var(--warning-rgb),0.1)',
+        cursor: 'pointer',
+        action: S.awaitingFilter ? 'Show all' : 'Show these',
+        pick: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
+      }] : []),
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
         actionLabel: this.settled(x) ? 'View' : 'Review',
         review: () => this.openReview(x.id),
@@ -10292,6 +10686,9 @@ class Component extends DCLogic {
         const from = (t || {}).customer || '';
         if (!t || !to || to === from) return;
         this.patchTicket({ customer: to });
+        // The new customer's prices, so the item search works on the very next keystroke
+        // rather than after somebody wonders why it found nothing.
+        this.ensurePriceList(to);
         // Written down, because this is a change to what the job is FOR and the trail is
         // the only place that answers "why is this priced against Waha". Recorded as an
         // edit rather than a job stage: it is somebody correcting the paperwork.
@@ -10432,10 +10829,28 @@ class Component extends DCLogic {
         ? 'Approved ' + F.stamp(t.approvedAt) + ' by ' + (t.approvedBy || 'Ops Manager') + '. Prices and lines are frozen — reopen the ticket to change anything.'
         : 'This ticket is approved and frozen. Reopen it to change anything.',
       grandTotal: t ? money(this.ticketTotal(t), this.ticketCurrency(t)) : money(0),
+      // A dimmed button with an unchanged label is a dead control with no stated cause.
+      //
+      // This read "Approve ticket" whether or not the four checks passed; only the opacity
+      // moved, to 0.45. The checks above it were already ticked or not, so the information
+      // was on screen — but the thing being pressed said nothing, and the person pressing
+      // it is looking at the button. The checks know exactly what is missing, so the
+      // heading counts and the label names what is left, shortest thing first.
+      checksHeading: checks.length
+        ? 'Ready to approve — ' + checks.filter(c => c.pass).length + ' of ' + checks.length
+        : 'Ready to approve',
       checks: checks.map(c => ({ label: c.label, mark: c.pass ? '✓' : '○', color: c.pass ? 'var(--accent-deep)' : 'var(--ink-faint)' })),
       approveDisabled: readOnly || !canApprove || this.settled(t),
       approveOpacity: (readOnly || !canApprove || this.settled(t)) ? 0.45 : 1,
-      approveLabel: readOnly ? 'Read-only — Observer' : (this.settled(t) ? 'Approved' : 'Approve ticket'),
+      approveLabel: readOnly
+        ? 'Read-only — Observer'
+        : (this.settled(t)
+          ? 'Approved'
+          : (canApprove
+            ? 'Approve ticket'
+            // Named, not counted. "2 checks left" sends somebody back up the page to work
+            // out which two; the words are already written on the checklist.
+            : 'Needs ' + approveBlockers.join(' and '))),
       approve: () => {
         if (readOnly || !canApprove || !t || this.settled(t)) return;
         const who = (S.session && S.session.name) || 'Ops Manager';
@@ -10971,7 +11386,11 @@ class Component extends DCLogic {
         mileage: e => { const v = e.target.value; this.patchTicket({ mileage: v === '' ? '' : Number(v) }); },
         pickItem: e => this.setState({ pickItem: e.target.value }),
         itemSearch: e => this.setState({ itemSearch: e.target.value }),
-        adminClient: e => this.setState({ adminClient: e.target.value }),
+        adminClient: e => {
+          const name = e.target.value;
+          this.setState({ adminClient: name });
+          this.ensurePriceList(name);
+        },
         newJobType: e => this.setState({ newJobType: e.target.value }),
         reason: e => this.setState({ reasonText: e.target.value }),
         founderCount: e => this.setState({ founderCount: Number(e.target.value) }),

@@ -231,14 +231,51 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
   await p4.evaluate(() => { window.__db.ticket_attachments.length = 0; });
   await login(p4, 'omar@makaman.ly');
   await p4.waitForTimeout(600);
-  let inbox = await p4.innerText('body');
-  check('the office sees an approved job with no paperwork back on its inbox',
-    /still waiting on its signed paperwork|still waiting on their signed paperwork/.test(inbox), '');
-  check('and the chase list names WHICH documents are missing',
-    /Signed Service Ticket · Signed Job Log/.test(inbox));
-  check('and names the ticket number so it can be chased', /1883/.test(inbox));
+  // The chase moved from a banner to a counter, and this block moved with it.
+  //
+  // It used to be an unbounded list of waiting tickets rendered above the inbox, naming
+  // each one and its missing documents — so twenty jobs waiting on a client's signature
+  // buried the inbox somebody opened the screen to read, and every ticket appeared twice.
+  // Now the counter row carries the number, tapping it narrows the inbox to exactly those
+  // jobs, and WHICH documents are missing is on the ticket, one tap further in. Every
+  // question the old banner answered is still answered; none of them is answered by
+  // pushing the work off the screen.
+  const chase = () => p4.evaluate(() => {
+    const tile = Array.from(document.querySelectorAll('.mk-stat-tile'))
+      .find(x => /Awaiting paperwork/i.test(x.innerText || ''));
+    return {
+      shown: !!tile,
+      n: tile ? Number((tile.innerText.match(/\d+/) || [0])[0]) : 0,
+    };
+  });
 
-  // One arrives; the chase list narrows rather than clearing.
+  let waiting = await chase();
+  check('the office sees an approved job with no paperwork back on its inbox',
+    waiting.shown && waiting.n === 1, JSON.stringify(waiting));
+
+  // Tapping narrows the inbox to the jobs being chased, and they are still identified by
+  // their ticket number — which is what the office reads down the phone to the client.
+  await p4.locator('.mk-stat-tile', { hasText: /Awaiting paperwork/i }).first().click();
+  await p4.waitForTimeout(900);
+  const filtered = await p4.evaluate(() => ({
+    on: window.__mkApp.state.awaitingFilter === true,
+    rows: Array.from(document.querySelectorAll('.mk-stack tbody tr'))
+      .map(r => (r.innerText || '').replace(/\s+/g, ' ').trim()),
+  }));
+  check('and names the ticket number so it can be chased',
+    filtered.on && filtered.rows.some(r => /1883/.test(r)),
+    JSON.stringify(filtered.rows).slice(0, 160));
+
+  // WHICH documents are missing is on the ticket, one tap further in — named one per row
+  // with its own state, rather than as a joined string in a banner.
+  await openTicket(p4);
+  const onTicket = await p4.innerText('body');
+  check('and the ticket names WHICH documents are missing',
+    /Signed Service Ticket/.test(onTicket) && /Signed Job Log/.test(onTicket)
+      && /Awaiting 2 of 2/.test(onTicket),
+    (onTicket.match(/Awaiting \d of \d/) || ['(no count)'])[0]);
+
+  // One arrives; the job is still being chased, for one document rather than two.
   await p4.evaluate(([tid, ops]) => {
     window.__db.ticket_attachments.push({ id: 'a-svc', ticket_id: tid, path: tid + '/s.pdf',
       filename: 'signed-service-ticket.pdf', mime: 'application/pdf', bytes: 2048,
@@ -246,11 +283,12 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
   }, [TICKET, OPS]);
   await p4.evaluate(() => window.__mkApp.refresh());
   await p4.waitForTimeout(1500);
-  inbox = await p4.innerText('body');
-  check('with one document in, the chase list still lists the other',
-    /Signed Job Log/.test(inbox) && !/Signed Service Ticket · Signed Job Log/.test(inbox));
+  const half = await p4.innerText('body');
+  check('with one document in, the ticket still asks for the other',
+    /Awaiting 1 of 2/.test(half) && /Signed Job Log/.test(half),
+    (half.match(/Awaiting \d of \d/) || ['(no count)'])[0]);
 
-  // Both in; the job leaves the list entirely.
+  // Both in; the job leaves the count entirely.
   await p4.evaluate(([tid, ops]) => {
     window.__db.ticket_attachments.push({ id: 'a-log', ticket_id: tid, path: tid + '/l.pdf',
       filename: 'signed-job-log.pdf', mime: 'application/pdf', bytes: 3072,
@@ -258,9 +296,11 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
   }, [TICKET, OPS]);
   await p4.evaluate(() => window.__mkApp.refresh());
   await p4.waitForTimeout(1500);
-  inbox = await p4.innerText('body');
-  check('once both are in the job drops off the chase list',
-    !/still waiting on its signed paperwork|still waiting on their signed paperwork/.test(inbox));
+  await p4.evaluate(() => window.__mkApp.setState({ mgrScreen: 'inbox', awaitingFilter: false }));
+  await p4.waitForTimeout(700);
+  waiting = await chase();
+  check('once both are in the job drops out of the count',
+    !waiting.shown, JSON.stringify(waiting));
 
   // The office may withdraw a wrong scan; the technician may not.
   await openTicket(p4);

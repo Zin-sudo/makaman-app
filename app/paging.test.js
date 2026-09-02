@@ -15,6 +15,13 @@
 // So the fixture is deliberately bigger than one page, split unevenly across five
 // customers in the same proportions as the real lists, and the fake server truncates
 // every page exactly the way the real one does.
+//
+// WHERE THE PAGER LIVES NOW. These rows no longer come down at sign-in. Migration 0045
+// refuses price_list_items to anyone outside the office and the client stopped pulling
+// them for everybody; a single customer's list is fetched when the office opens something
+// that needs it (ensurePriceList → pageAll). That is a change of caller, not of pager —
+// the same count-driven fan-out, and the same way to get it wrong — so the fixture, the
+// caps and every count below are unchanged. Only the line that asks has moved.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
@@ -78,13 +85,35 @@ function bigDB() {
     await p.waitForTimeout(2600);
     return p;
   };
-  const counts = (p) => p.evaluate(() =>
-    (window.__mkApp.state.data.clients || []).map(c => c.name + ':' + (c.items || []).length));
+  // Every customer's list, fetched the way the office fetches them — one at a time, on
+  // demand. Sequentially rather than all at once, so a shortfall belongs to one request
+  // and not to five racing each other.
+  const counts = (p) => p.evaluate(() => {
+    const app = window.__mkApp;
+    const names = (app.state.data.clients || []).map(c => c.name);
+    return names.reduce((chain, n) => chain.then(() => app.ensurePriceList(n)),
+      Promise.resolve())
+      .then(() => (app.state.data.clients || [])
+        .map(c => c.name + ':' + (c.items || []).length));
+  });
 
   // ── The fixture really is bigger than one page ───────────────────────────
   {
     const total = SHAPE.reduce((n, x) => n + x[1], 0);
     check('the fixture is larger than a single page', total === 2610 && total > 1000, total + ' rows');
+  }
+
+  // ── Nothing arrives uninvited ────────────────────────────────────────────
+  //
+  // The first thing to be sure of, now that the office asks: that nobody was handed the
+  // pricing without asking. A phone at a wellhead holding 2,610 priced lines is the fault
+  // migration 0045 exists to close, and a client-side regression would put them back.
+  {
+    const p = await open(1000);
+    const atSignIn = await p.evaluate(() =>
+      (window.__mkApp.state.data.clients || []).reduce((n, c) => n + (c.items || []).length, 0));
+    check('signing in brings no price-list rows at all', atSignIn === 0, atSignIn + ' rows');
+    await p.close();
   }
 
   // ── Under the real cap, every customer arrives whole ─────────────────────
@@ -116,7 +145,7 @@ function bigDB() {
   // ── A tighter cap changes nothing, because it is paged ───────────────────
   //
   // If the fix were "ask for more rows" rather than "keep asking", a smaller page would
-  // break it again. 250 forces eleven round trips for the largest customer.
+  // break it again. 250 forces four round trips for the largest customer.
   {
     const p = await open(250);
     const got = await counts(p);

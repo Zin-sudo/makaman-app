@@ -178,6 +178,91 @@ const priceAudit = (p) => p.evaluate(() => (window.__mkApp.state.data.priceAudit
     await ctx.close();
   }
 
+  // ── Suggested items come from what this customer is actually charged ─────
+  //
+  // The reported regression: the suggestions stopped appearing. Cause was that they were
+  // built by intersecting the PRICE LIST with usage — `curClient.items.filter(...)` — so
+  // they needed a client row matching the ticket's customer name exactly, and they needed
+  // every historical item number to still be on the current list.
+  //
+  // Both of those break on the two things that are about to happen: the office types
+  // customer names by hand, and the corrected batches are being re-imported with changed
+  // codes. So the source is now history — the lines ops actually charged this customer —
+  // and the price list is consulted only to freshen the price and to notice a code that
+  // has been retired. A retired code is MARKED, not dropped: eleven past charges are
+  // better evidence than one absence from a list that was re-imported this morning.
+  {
+    const { ctx, p } = await boot(b, 'omar@makaman.ly');
+
+    const r = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const d = app.state.data;
+      const cl = d.clients[0];
+      // An OPEN ticket, deliberately. Suggestions are offered where a line can still be
+      // added; on an approved ticket the whole charge table is sealed and offering one
+      // would be a control that does nothing.
+      const t = d.tickets.find(x => x.status === 'logging') || d.tickets[0];
+      const codeA = cl.items[0].code;       // still on the price list
+      const codeB = cl.items[1].code;       // about to be retired from it
+      const other = d.tickets.filter(x => x.id !== t.id).slice(0, 3);
+
+      app.mutate((data) => {
+        const cur = data.tickets.find(x => x.id === t.id);
+        cur.customer = cl.name;
+        cur.items = [];
+        // Three past jobs for this customer, all charging both codes.
+        other.forEach((o, n) => {
+          const x = data.tickets.find(y => y.id === o.id);
+          x.customer = cl.name;
+          x.items = [
+            { code: codeA, desc: 'Charged before, code still live', qty: 1, uom: 'Km', cost: 10, ov: {} },
+            { code: codeB, desc: 'Charged before, code since retired', qty: 1, uom: 'Ea', cost: 20, ov: {} },
+          ];
+        });
+        // The re-import: codeB no longer exists on the price list at all.
+        const c = data.clients.find(y => y.id === cl.id);
+        c.items = c.items.filter(i => i.code !== codeB);
+      });
+      app.openReview(t.id);
+      return { codeA: codeA, codeB: codeB, client: cl.name, ticket: t.id };
+    });
+    await p.waitForTimeout(700);
+
+    const sug = await p.evaluate(() => (window.__mkApp.render
+      ? null : null) || Array.from(document.querySelectorAll('button'))
+      .map(x => (x.textContent || '').trim())
+      .filter(x => /—/.test(x)));
+    const both = await p.evaluate((c) => {
+      const txt = document.body.innerText;
+      return { hasA: txt.indexOf(c.codeA) !== -1, hasB: txt.indexOf(c.codeB) !== -1,
+        marked: /not on the current price list/i.test(txt) };
+    }, r);
+
+    check('a code still on the price list is suggested', both.hasA, r.codeA);
+    check('a code the re-import removed is suggested too', both.hasB, r.codeB);
+    check('and it is marked rather than passed off as current', both.marked,
+      sug.filter(x => /price list/i.test(x)).join(' | ') || '(no marker found)');
+
+    // The other half of the old bug: no matching client row at all.
+    const orphan = await p.evaluate((c) => {
+      const app = window.__mkApp;
+      app.mutate((d) => {
+        const cur = d.tickets.find(x => x.id === c.ticket);
+        // A customer name the office typed that matches no client row exactly.
+        cur.customer = c.client + ' (Onshore)';
+        d.tickets.filter(x => x.id !== c.ticket).slice(0, 3)
+          .forEach(o => { d.tickets.find(y => y.id === o.id).customer = c.client + ' (Onshore)'; });
+      });
+      app.openReview(c.ticket);
+      return true;
+    }, r);
+    await p.waitForTimeout(700);
+    const orphanText = await p.evaluate((c) => document.body.innerText.indexOf(c.codeA) !== -1, r);
+    check('and suggestions survive a customer name that matches no client row',
+      orphan && orphanText, r.codeA + ' under an unmatched customer');
+    await ctx.close();
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);

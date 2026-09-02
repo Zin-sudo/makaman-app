@@ -166,11 +166,20 @@ Deno.serve(async (req) => {
       const fullName = body.full_name as string
       if (!email || !password) return json({ error: 'email and password are required.' }, 400)
 
+      // `created_by_office` goes in APP metadata, not user metadata, and the distinction
+      // is the whole security of it. handle_new_user refuses any address outside
+      // @makaman.ly and caps self-registration at five a day; this flag is what exempts
+      // the office, so a person who could set it themselves could sign up as anyone.
+      // user_metadata is caller-supplied — `supabase.auth.signUp({ options: { data } })`
+      // writes it straight from the browser. app_metadata can only be written through the
+      // admin API, which needs the service-role key, which lives in this function's
+      // environment and nowhere a client can reach.
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         user_metadata: { full_name: fullName },
+        app_metadata: { created_by_office: true },
       })
       if (createErr) throw createErr
 

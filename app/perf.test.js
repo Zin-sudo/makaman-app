@@ -74,25 +74,51 @@ async function open(b) {
     await ctx.close();
   }
 
-  // ── And it still brings back everything ──
+  // ── The price list does not come down with everything else ──
   //
-  // The entire point of the pager. Fast and short is not an improvement.
+  // It used to: 2,610 rows, the company's entire pricing, pulled at every sign-in onto
+  // every device including phones that have no use for it. Migration 0045 refuses the
+  // read to anyone outside the office and hydrate() no longer asks. What replaces it is
+  // ensurePriceList(), which fetches ONE customer's rows when the office actually opens
+  // something that needs them — and it has to be complete, because a short price list is
+  // the fault this whole pager exists to have fixed.
   {
     const { ctx, p } = await open(b);
-    const got = await p.evaluate(() =>
+    const atSignIn = await p.evaluate(() =>
       (window.__mkApp.state.data.clients || []).reduce((n, c) => n + (c.items || []).length, 0));
-    check('all 2,610 price-list rows still arrive', got === 2610, got + ' of 2610');
+    check('a full pull brings no price-list rows at all', atSignIn === 0, atSignIn + ' rows');
+
+    // Asked for, and complete. Same count-driven fan-out, one customer's worth.
+    const fetched = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const name = app.state.data.clients[0].name;
+      return app.ensurePriceList(name).then(() => (app.client(name).items || []).length);
+    });
+    check('and the office gets all 2,610 when it asks for them', fetched === 2610,
+      fetched + ' of 2610');
 
     // A server whose own cap is smaller than the page asked for. The count-driven
     // fan-out learns the real page size from what actually came back, so this must
     // still be complete — and it is the case a first draft of the pager got wrong.
     const capped = await p.evaluate(() => {
       window.__maxRows = 250;
-      return window.__mkApp.hydrateForTest().then(() =>
-        (window.__mkApp.state.data.clients || []).reduce((n, c) => n + (c.items || []).length, 0));
+      const app = window.__mkApp;
+      const name = app.state.data.clients[0].name;
+      // Cleared so the second fetch is a real fetch and not the guard returning early.
+      app.setState({ data: Object.assign({}, app.state.data, {
+        clients: app.state.data.clients.map(c => Object.assign({}, c, { items: [], priceListLoaded: false })) }) });
+      return app.ensurePriceList(name).then(() => (app.client(name).items || []).length);
     });
     check('and still arrive when the server caps pages below what was asked for',
       capped === 2610, capped + ' of 2610 with a 250-row cap');
+
+    // The point of the whole change: fetched, used, never written down.
+    const onDisk = await p.evaluate(() => {
+      const raw = localStorage.getItem('makaman.cloud.v1')
+        || localStorage.getItem('makaman.jobtickets.v2') || '{}';
+      return ((JSON.parse(raw).clients) || []).reduce((n, c) => n + ((c.items || []).length), 0);
+    });
+    check('and none of them reach localStorage', onDisk === 0, onDisk + ' rows on disk');
     await ctx.close();
   }
 
