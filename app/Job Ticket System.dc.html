@@ -1011,7 +1011,13 @@
     <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 22px;background:rgba(var(--warning-rgb),0.16);border-bottom:2px solid var(--warning)">
       <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--warning)"></span>
       <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>{{ refusedLabel }}</strong> {{ refusedWhy }}</div>
-      <button onClick="{{ dismissRefused }}" style="flex:none;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.35)">DISMISS</button>
+      <div style="flex:none;display:flex;gap:8px">
+        <!-- The default action: give the server another chance rather than lose the
+             record of the attempt. A dropped connection and a policy refusal look the
+             same from here, and only one of those is actually permanent. -->
+        <button onClick="{{ retryRefused }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">RETRY</button>
+        <button onClick="{{ askDismissRefused }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.35)">DISMISS</button>
+      </div>
     </div>
   </sc-if>
 
@@ -4705,6 +4711,36 @@ function outboxSetAsideLatest() {
     const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
     return dead.length ? (dead[dead.length - 1].why || '') : '';
   } catch (e) { return ''; }
+}
+// The banner reappeared every launch and Dismiss threw the record of the failed work away
+// for good — the only two things a person could do with a change the server refused. This
+// is the third, and the honest default: give the server another chance rather than assume
+// the worst about a refusal that may have had nothing to do with the row itself (a device
+// that changed on the far side, a conflict since resolved by hand in the office).
+//
+// Re-queued with `tries` reset to 0, so a change that reaches here from having been
+// legitimately given up on gets the FULL retry budget again, not zero more attempts.
+// Coalesced into the live queue by key exactly the way outboxPush already does it, so a
+// dead-lettered op does not clobber a newer edit to the same row made since — the newer
+// one wins, which is correct: retrying the STALE version of a change nobody asked to keep
+// would be its own kind of silent data loss.
+function outboxRetryDeadLetter() {
+  let dead = [];
+  try { dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]'); }
+  catch (e) { return 0; }
+  if (!dead.length) return 0;
+  const q = outboxRead();
+  let seq = q.reduce((m, x) => Math.max(m, (x && x.seq) || 0), 0);
+  dead.forEach((entry) => {
+    const op = entry && entry.op;
+    if (!op || !op.key) return;
+    const fresh = Object.assign({}, op, { seq: ++seq, tries: 0 });
+    const at = q.findIndex((x) => x && x.key === fresh.key);
+    if (at >= 0) q[at] = fresh; else q.push(fresh);
+  });
+  outboxWrite(q);
+  try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
+  return dead.length;
 }
 
 // ── Turning a change in the replica into ops ─────────────────────────────────
@@ -9060,6 +9096,20 @@ class Component extends DCLogic {
         },
         cancel: () => { this.pendingLeave = null; this.setState({ dialog: null }); },
       },
+      dismissRefused: {
+        title: 'Give up on these changes?',
+        body: 'The server never received them, and this throws away the only record that '
+          + 'they were tried. RETRY puts them back in the queue for another attempt instead '
+          + '— try that first unless the office already knows and has dealt with it another '
+          + 'way.',
+        okLabel: 'Give up on them', cancelLabel: 'Keep them', hasCancel: true,
+        okBg: 'var(--danger)', okFg: 'var(--on-danger)',
+        confirm: () => {
+          try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
+          this.setState({ dialog: null });
+          this.toast('errlog', 'Refused changes dismissed.', 'ok');
+        },
+      },
       clearErrors: {
         title: 'Clear the error log?',
         body: 'This is the only copy — nothing is kept on the server. Download the .md file '
@@ -9978,15 +10028,29 @@ class Component extends DCLogic {
       // that can tell us is a write actually being refused.
       // What the server would not take. Read from the set-aside pile rather than held in
       // state, so it survives a reload — the change is still missing tomorrow.
-      refusedAny: !S.refusedDismissed && outboxSetAsideCount() > 0,
+      // No refusedDismissed flag any more — clearing the pile (Retry re-queues it away;
+      // Dismiss deletes it, after asking) is what makes this false now, not a separate
+      // bit of state that could fall out of step with what is actually still sitting there.
+      refusedAny: outboxSetAsideCount() > 0,
       refusedLabel: outboxSetAsideCount() === 1
         ? 'One change was refused by the server and has not been saved.'
         : outboxSetAsideCount() + ' changes were refused by the server and have not been saved.',
       refusedWhy: outboxSetAsideLatest(),
-      dismissRefused: () => {
-        try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
-        this.setState({ refusedDismissed: true });
+      // The default action: put the ops back in the outbox and try again, rather than
+      // assume every refusal is permanent. Not gated behind a dialog — asking "are you
+      // sure you want to try again" would be a strange question, and nothing here is lost
+      // if the retry fails the same way; it just goes back on the pile.
+      retryRefused: () => {
+        const n = outboxRetryDeadLetter();
+        if (!n) return;
+        this.toast('retry-refused', n === 1
+          ? 'Trying that change again.' : 'Trying ' + n + ' changes again.', 'ok');
+        this.scheduleDrain();
       },
+      // Dismiss now means something a person could regret — it throws away the record of
+      // work the server never received, not just a banner — so it asks first, the same
+      // way clearing the error log does.
+      askDismissRefused: () => this.setState({ dialog: 'dismissRefused' }),
 
       // Notifications. Derived from the audit trail on every render rather than stored,
       // so there is never a count that disagrees with the list beneath it.
