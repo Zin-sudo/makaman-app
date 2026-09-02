@@ -154,8 +154,11 @@ async function signIn(b, DB, email) {
     check('with a real uuid for a primary key',
       row && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(row.id),
       row && row.id);
-    check('and nothing is left stuck in the outbox', await p.evaluate(() =>
-      JSON.parse(localStorage.getItem('makaman.outbox.v1') || '[]').length === 0));
+    check('and nothing is left stuck in the outbox', await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      return JSON.parse(localStorage.getItem(
+        'makaman.outbox.v1' + (acct ? '.' + acct.toLowerCase() : '')) || '[]').length === 0;
+    }));
     await ctx.close();
   }
 

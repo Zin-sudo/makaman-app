@@ -182,8 +182,12 @@ assertStubParses(DB);
     await p.waitForTimeout(700);
     await p.evaluate(() => window.__mkApp.persist(window.__mkApp.state.data));
     await p.waitForTimeout(400);
-    const q = await p.evaluate(() =>
-      JSON.parse(localStorage.getItem('makaman.outbox.v1') || '[]'));
+    // Filed under the signed-in account: unsent work belongs to a person, not to a phone.
+    const q = await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      return JSON.parse(localStorage.getItem(
+        'makaman.outbox.v1' + (acct ? '.' + acct.toLowerCase() : '')) || '[]');
+    });
     const disk = await onDisk(p);
     check('an office edit made with no signal is still queued',
       q.some(o => o.table === 'tickets'), JSON.stringify(q.map(o => o.key)));

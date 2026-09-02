@@ -181,15 +181,31 @@ const openAccount = async (p) => {
   // ids it could still SEE on a ticket, so an op orphaned by a withdrawal was immortal.
   {
     const { ctx, p } = await signIn(b, db(), 'awhida@makaman.ly');
+    // Seeded under the OLD device-wide keys, deliberately: that is where a device coming
+    // off the previous build actually has them, so this drives the adoption as well as the
+    // purge. Whatever survives has to end up in this account's queue, not be abandoned in
+    // a key nothing reads any more.
     await p.evaluate(() => {
       localStorage.setItem('makaman.outbox.v1', JSON.stringify([
         { key: 'tickets:k1787950609277', table: 'tickets', action: 'upsert_ticket', row: { id: 'k1787950609277' } },
         { key: 'ticket_lines:abc', table: 'ticket_lines', action: 'upsert', row: { id: 'abc', ticket_id: 'k1787950609277' } },
-        { key: 'numbering_claim', table: 'numbering_claim', action: 'upsert', row: { id: true } },
+        // The two shapes that survived every purge until now, and were still being refused
+        // on two accounts five days after the id generator was fixed. A child-table
+        // `replace` names its ticket in `ticketId` and carries `rows`, not `row` — so every
+        // branch of the old ticketOf() missed, and the op was judged perfectly sendable.
+        { key: 'ticket_items:k1787952107732', table: 'ticket_items', action: 'replace',
+          ticketId: 'k1787952107732', rows: [{ code: 'MKN-1801', qty: 1 }] },
+        { key: 'ticket_assets:k1787952107732', table: 'ticket_assets', action: 'replace',
+          rows: [{ ticket_id: 'k1787952107732', key: 'reclaimed', answer: 'Yes' }] },
+        { key: 'numbering_claim', table: 'numbering_claim', action: 'update', id: true, row: { holder_id: null } },
       ]));
       localStorage.setItem('makaman.outbox.refused.v1', JSON.stringify([
         { at: new Date().toISOString(), why: 'invalid input syntax for type uuid',
           op: { key: 'tickets:k1787950609277', table: 'tickets', row: { id: 'k1787950609277' } } },
+        // The same blindness in the pile, which is why the banner never cleared.
+        { at: new Date().toISOString(), why: 'invalid input syntax for type uuid',
+          op: { key: 'ticket_items:k1787952107732', table: 'ticket_items', action: 'replace',
+            ticketId: 'k1787952107732', rows: [] } },
       ]));
     });
     // Through a reload, which is where this has to work: the purge runs in the store
@@ -206,17 +222,28 @@ const openAccount = async (p) => {
     await p.addInitScript(() => { window.__offline = true; });
     await p.reload({ waitUntil: 'networkidle' });
     await p.waitForTimeout(1800);
-    const after = await p.evaluate(() => ({
-      left: JSON.parse(localStorage.getItem('makaman.outbox.v1') || '[]').map(o => o.key),
-      refused: JSON.parse(localStorage.getItem('makaman.outbox.refused.v1') || '[]').length,
-      said: document.body.innerText,
-    }));
+    const after = await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      const sfx = acct ? '.' + acct.toLowerCase() : '';
+      return {
+        left: JSON.parse(localStorage.getItem('makaman.outbox.v1' + sfx) || '[]').map(o => o.key),
+        refused: JSON.parse(localStorage.getItem('makaman.outbox.refused.v1' + sfx) || '[]').length,
+        legacyGone: localStorage.getItem('makaman.outbox.v1') === null,
+        said: document.body.innerText,
+      };
+    });
     check('an op naming a ticket id no server can accept is dropped',
       after.left.indexOf('tickets:k1787950609277') < 0, after.left.join(','));
     check('and so is its child row, which named it too',
       after.left.indexOf('ticket_lines:abc') < 0, after.left.join(','));
+    check('a child-table replace naming it in ticketId goes too — the shape that survived',
+      after.left.indexOf('ticket_items:k1787952107732') < 0, after.left.join(','));
+    check('and one naming it only inside rows[]',
+      after.left.indexOf('ticket_assets:k1787952107732') < 0, after.left.join(','));
     check('while a perfectly good op is left alone',
       after.left.indexOf('numbering_claim') >= 0, after.left.join(','));
+    check('and it was adopted into this account rather than left in the shared key',
+      after.legacyGone === true, 'legacy key still present');
     check('the standing refusal goes with it', after.refused === 0, String(after.refused));
     check('and the person is told rather than left wondering',
       /queued change\(s\) were cleared|never going to send/i.test(after.said),

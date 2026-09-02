@@ -48,7 +48,13 @@ assertStubParses(DB);
     await p.waitForTimeout(1600);
   };
   const store = (p) => p.evaluate(() => window.__mkApp.state.data);
-  const outbox = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.outbox.v1') || '[]'));
+  // Scoped to the signed-in account: unsent work belongs to a person, not to a
+  // phone. A device-wide queue is how one account came to drain another's.
+  const outbox = (p) => p.evaluate(() => {
+    const acct = (window.__mkApp.state.session || {}).email;
+    return JSON.parse(localStorage.getItem(
+      'makaman.outbox.v1' + (acct ? '.' + acct.toLowerCase() : '')) || '[]');
+  });
   const writes = (p) => p.evaluate(() => window.__writes);
 
   // ── a cold start in cloud mode shows no demo data ────────────────────────

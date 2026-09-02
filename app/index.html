@@ -3693,30 +3693,55 @@ const CACHE_K = 'makaman.cloud.v1';
 const OUTBOX_K = 'makaman.outbox.v1';
 const DEADLETTER_K = 'makaman.outbox.refused.v1';
 const ERRLOG_K = 'makaman.errorlog.v1';
-// Whose log this is. A device is not one person here — Lateri signed in, then Abobaker
-// signed in on the same phone, and the log the app showed him was Lateri's, because
-// nothing namespaced it by account. Each signed-in account gets its own key; before
-// anyone has signed in (an error during sign-in itself) or if nothing running can say who
-// is signed in, everything falls into one device-wide bucket rather than being lost.
+// Whose device-side record this is. A device is not one person here, and everything below
+// that assumed it was has now cost real work.
+//
+// The error log was the visible half: Lateri signed in, then Abobaker signed in on the same
+// phone, and the log the app showed him was Lateri's. The outbox is the half that actually
+// destroyed something. It is unsent WORK, and it was kept under one device-wide key that
+// sign-out did not clear — so Abobaker's session drained ops Lateri had queued, and sent
+// them AS ABOBAKER. That is why a numbering-claim handover never once reached the server
+// in a week of trying: `numbering_claim`'s insert policy is admin-only, so the moment the
+// owner signed in as Abobaker to check the handover had worked, the very act of checking
+// refused and destroyed it. Proven against the live database on 2 Sep: the identical op is
+// refused as Abobaker and succeeds as Lateri.
+//
+// So the rule is now one rule, for all three: a record about a person is filed under that
+// person. Before anyone has signed in — an error during sign-in itself, a queue written by
+// a build that predates this — it falls into the device-wide bucket rather than being lost,
+// and load() adopts that bucket once it knows who is here.
 //
 // Reads the LIVE component when one is running — window.__mkApp.state.session is the
 // truth the instant a sign-in or sign-out happens, with no separate bookkeeping anywhere
 // else to fall out of step with it — and falls back to the persisted session record
 // itself, the same one load() reads, for anything that can fire before mount.
-function currentErrlogAccount() {
+function currentAccount() {
   if (typeof window !== 'undefined' && window.__mkApp && window.__mkApp.state) {
-    return (window.__mkApp.state.session || {}).email || null;
+    const live = (window.__mkApp.state.session || {}).email;
+    if (live) return live;
   }
+  // Falls through rather than returning null, because a running component with no session
+  // in state is not the same as nobody being signed in. persistSession() writes SK and
+  // THEN setState()s, and updateSettings() runs inside that gap — so a component-only
+  // answer filed the first ops of every sign-in under the device-wide key. Reading SK
+  // second closes the gap from both ends: on the way in SK is already right, and on the
+  // way out doLogout clears SK before it clears state, so a logout never reads back as
+  // still-signed-in.
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(SK) : null;
     if (raw) { const s = JSON.parse(raw); return (s && s.email) || null; }
   } catch (e) { /* none yet */ }
   return null;
 }
-function errlogKey() {
-  const acct = currentErrlogAccount();
-  return acct ? ERRLOG_K + '.' + String(acct).toLowerCase() : ERRLOG_K;
+// One suffixing rule, so a fourth per-person key cannot be added later that quietly forgets
+// to use it.
+function acctKey(base) {
+  const acct = currentAccount();
+  return acct ? base + '.' + String(acct).toLowerCase() : base;
 }
+function errlogKey() { return acctKey(ERRLOG_K); }
+function outboxKey() { return acctKey(OUTBOX_K); }
+function deadletterKey() { return acctKey(DEADLETTER_K); }
 
 // ── The error log ────────────────────────────────────────────────────────────
 //
@@ -4387,41 +4412,96 @@ function repairTicketIds(data) {
   return { fixed: n, ids: ids, purged: purged };
 }
 
+// An id minted by the generator this app used before uuids: 'k' + Date.now(). Nothing in
+// the database will ever accept one — every id column it could land in is a uuid — so a
+// string of this shape anywhere on an op is proof the op is dead, whatever it is about.
+const LEGACY_ID = /"k\d{10,}"/;
+
 // Everything queued or set aside that the database could never take. Returns how many
 // were dropped, so a caller can say so rather than silently tidying up behind somebody.
 function purgeUnsendable() {
   // Which ticket an op is about, wherever that is written on it.
+  //
+  // `op.ticketId` and `op.rows` are the two that were missing, and their absence is why a
+  // ticket_items op carrying an August id was still being refused on two accounts in
+  // September. Child-table ops are built as
+  //   { key: 'ticket_items:<id>', table, action: 'replace', ticketId, rows }
+  // — no `row` at all, and a key that does not begin 'tickets:' — so every branch below
+  // missed, ticketOf returned '', and the op was judged perfectly sendable for ever.
   const ticketOf = (op) => {
     if (!op) return '';
     const k = String(op.key || '');
     if (k.indexOf('tickets:') === 0) return k.replace(/^tickets:(del:)?/, '');
+    if (op.ticketId) return String(op.ticketId);
     const row = op.row || {};
     if (row.ticket_id) return String(row.ticket_id);
     if (op.table === 'tickets' && row.id) return String(row.id);
+    const rows = op.rows || [];
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].ticket_id) return String(rows[i].ticket_id);
+    }
     return '';
   };
-  const dead = (op) => { const t = ticketOf(op); return !!t && !IS_UUID.test(t); };
+  // Two independent reasons, because the first one is a list of places to look and lists
+  // of places to look are exactly what let this through. The second reads the whole op and
+  // cannot be defeated by a shape nobody has written yet.
+  const dead = (op) => {
+    if (!op) return false;
+    const t = ticketOf(op);
+    if (t && !IS_UUID.test(t)) return true;
+    try { return LEGACY_ID.test(JSON.stringify(op)); } catch (e) { return false; }
+  };
   let dropped = 0;
-  try {
-    const q = JSON.parse(localStorage.getItem(OUTBOX_K) || '[]');
-    const keep = q.filter((op) => !dead(op));
-    dropped += q.length - keep.length;
-    if (keep.length !== q.length) localStorage.setItem(OUTBOX_K, JSON.stringify(keep));
-  } catch (e) { /* an unreadable outbox is already empty for our purposes */ }
-  try {
-    const pile = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
-    const keep = pile.filter((e) => !dead(e && e.op));
-    dropped += pile.length - keep.length;
-    if (keep.length !== pile.length) {
-      if (keep.length) localStorage.setItem(DEADLETTER_K, JSON.stringify(keep));
-      else localStorage.removeItem(DEADLETTER_K);
-    }
-  } catch (e) { /* nothing to do */ }
+  const sweep = (key, opOf) => {
+    try {
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      const keep = list.filter((e) => !dead(opOf(e)));
+      dropped += list.length - keep.length;
+      if (keep.length === list.length) return;
+      if (keep.length) localStorage.setItem(key, JSON.stringify(keep));
+      else localStorage.removeItem(key);
+    } catch (e) { /* an unreadable queue is already empty for our purposes */ }
+  };
+  sweep(outboxKey(), (op) => op);
+  sweep(deadletterKey(), (e) => e && e.op);
   return dropped;
 }
 
+// The queue written by every build before this one, under a single device-wide key that
+// sign-out never cleared. Whatever is still in it belongs to whoever is signed in now —
+// that is already who the old code would have sent it as — so it is purged and then
+// adopted, once, rather than abandoned where nothing will ever look at it again.
+//
+// Runs only when somebody is signed in: with no account there is no queue to adopt it
+// into, and the legacy key is left exactly where it is until there is.
+function adoptLegacyQueues() {
+  if (!currentAccount()) return 0;
+  let moved = 0;
+  const migrate = (legacy, scoped) => {
+    if (legacy === scoped) return;
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(legacy) || '[]'); }
+    catch (e) { list = []; }
+    try { localStorage.removeItem(legacy); } catch (e) { /* nothing to do */ }
+    if (!list.length) return;
+    let mine = [];
+    try { mine = JSON.parse(localStorage.getItem(scoped) || '[]'); }
+    catch (e) { mine = []; }
+    // Theirs first: they were queued before anything this account has done since.
+    const joined = list.concat(mine);
+    moved += list.length;
+    try { localStorage.setItem(scoped, JSON.stringify(joined)); } catch (e) { /* quota */ }
+  };
+  migrate(OUTBOX_K, outboxKey());
+  migrate(DEADLETTER_K, deadletterKey());
+  migrate(ERRLOG_K, errlogKey());
+  // Purged AFTER adoption, so a dead op inherited from the old key dies here rather than
+  // becoming this account's problem.
+  return moved;
+}
+
 function outboxRead() {
-  try { return JSON.parse(localStorage.getItem(OUTBOX_K) || '[]'); } catch (e) { return []; }
+  try { return JSON.parse(localStorage.getItem(outboxKey()) || '[]'); } catch (e) { return []; }
 }
 // Making room without losing the record.
 //
@@ -4432,7 +4512,10 @@ function outboxRead() {
 // storage problem must not become a data problem.
 function shedStorage(keep) {
   let freed = false;
-  [K, CACHE_K, DEADLETTER_K].forEach((k) => {
+  // deadletterKey(), not DEADLETTER_K: the pile being shed has to be the one actually
+  // being written, or a device under quota pressure would drop a stranger's diagnostic
+  // and keep its own — freeing nothing and reporting that it had.
+  [K, CACHE_K, deadletterKey()].forEach((k) => {
     if (k === keep) return;
     if (localStorage.getItem(k) === null) return;
     try { localStorage.removeItem(k); freed = true; } catch (e) { /* nothing to do */ }
@@ -4441,7 +4524,7 @@ function shedStorage(keep) {
 }
 
 function outboxWrite(q) {
-  try { localStorage.setItem(OUTBOX_K, JSON.stringify(q)); } catch (e) { /* quota */ }
+  try { localStorage.setItem(outboxKey(), JSON.stringify(q)); } catch (e) { /* quota */ }
 }
 // Every op carries a number of its own, and that is what the drain settles against.
 //
@@ -4458,10 +4541,31 @@ function outboxPush(ops) {
   // still queued. Ops being sent right now are still in `q`, so their numbers are counted
   // and cannot be handed out twice.
   let seq = q.reduce((m, x) => Math.max(m, (x && x.seq) || 0), 0);
+  const acct = currentAccount();
   ops.forEach((op) => {
     op.seq = ++seq;
+    // Who queued it. The queue is filed per account now, so this should never disagree
+    // with the key it lives under — which is the point of writing it down: the drain can
+    // refuse to send an op it cannot attribute, instead of trusting that the filing was
+    // right. A write sent as the wrong person is exactly what cost a week of handovers.
+    //
+    // `acct`, deliberately not `by`: the delete action already reads `op.by` as the COLUMN
+    // to match on (`.eq(op.by || 'id', op.id)`), so an author stamped there would turn
+    // every delete into `.eq('someone@makaman.ly', id)`. Two meanings, one field, and the
+    // one that breaks is the one that removes rows.
+    if (acct) op.acct = acct;
     const at = q.findIndex((x) => x.key === op.key);
-    if (at >= 0) q[at] = op; else q.push(op);
+    if (at >= 0) {
+      // The retry budget belongs to the KEY, not to this particular op object.
+      //
+      // Replacing wholesale reset `tries` to nothing every time a later edit regenerated
+      // the same key, so an op the server refuses for ever never reached OUTBOX_TRIES,
+      // was never set aside, and sat at the head of the queue blocking everything behind
+      // it — including, for a week, a numbering-claim handover. Carried forward, a
+      // permanently-refused op ages out in five attempts the way it was always meant to.
+      const tries = q[at].tries;
+      q[at] = tries ? Object.assign({}, op, { tries: tries }) : op;
+    } else q.push(op);
   });
   outboxWrite(q);
 }
@@ -4512,6 +4616,30 @@ function outboxSend(c, op) {
       });
   }
   if (op.action === 'upsert') return c.from(op.table).upsert(op.row).then((r) => { if (r.error) throw r.error; });
+  // A row that already exists and must not be created by a client.
+  //
+  // PostgREST's upsert is INSERT ... ON CONFLICT DO UPDATE, so it has to pass the INSERT
+  // policy even when every row it will ever touch already exists. `numbering_claim` is a
+  // seeded singleton whose INSERT policy is admin-only, while its UPDATE policy is the one
+  // that actually describes the rule — the holder may hand it on, an admin may move it,
+  // anyone may take it when nobody holds it. Sent as an upsert, an ops_manager holding the
+  // claim could never pass it to anybody, because the question being asked was "may you
+  // create this row" and the answer is no. Proven against the live database: the same
+  // handover is refused as an upsert and accepted as an update.
+  //
+  // `.select()` so a row count comes back: an update that matches nothing is not an error
+  // in Postgres, and silently changing nothing is the failure mode this whole batch exists
+  // to stop.
+  if (op.action === 'update') {
+    return c.from(op.table).update(op.row).eq('id', op.id).select().then((r) => {
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.length) {
+        // Not retryable by itself, but it must not pass as success.
+        throw new Error('No row matched ' + op.table + ' id=' + String(op.id)
+          + ' — it was not there, or the policy did not allow this account to change it.');
+      }
+    });
+  }
   if (op.action === 'delete') {
     return c.from(op.table).delete().eq(op.by || 'id', op.id).then((r) => { if (r.error) throw r.error; });
   }
@@ -4569,12 +4697,36 @@ function outboxDrain() {
     q = q.map((op) => (op && !op.seq) ? Object.assign({}, op, { seq: ++seq }) : op);
     outboxWrite(q);
   }
-  let done = 0;  // how far the queue has been settled — sent, or given up on
+  // Which ops this drain settled — sent, or given up on — by their own number.
+  //
+  // This was a single high-water mark, `done`, and everything before it was removed. A
+  // prefix says "settled" and "skipped" with the same number, and there is now one op that
+  // must be stepped over WITHOUT being removed (see below), which a prefix cannot express:
+  // advancing past it would delete somebody's unsent work. Recording each settled op by
+  // seq says exactly what happened to each one. For every path that existed before this,
+  // the set and the prefix agree.
+  const settled = {};
+  const settle = (op) => { if (op && op.seq) settled[op.seq] = true; };
   let sent = 0;
+  const me = currentAccount();
   const step = (n) => {
     if (n >= q.length) return Promise.resolve();
+    // Never send one person's work as another.
+    //
+    // The queue is filed per account now, so reaching this should be impossible — which is
+    // why it is checked rather than assumed. It is left in place, not sent and not failed,
+    // because it is somebody's unsent work and the only thing wrong with it is that the
+    // wrong person is holding the phone. It goes when they sign in.
+    //
+    // This is the invariant a week of vanished numbering-claim handovers was missing: the
+    // op was correct, the queue was shared, and Abobaker's session sent Lateri's write —
+    // where `numbering_claim`'s insert policy is admin-only, so it was refused five times
+    // and destroyed. Verified against the live database: identical op, refused as Abobaker,
+    // accepted as Lateri.
+    const op = q[n];
+    if (me && op && op.acct && op.acct !== me) return step(n + 1);
     return outboxSend(c, q[n]).then(
-      () => { done = n + 1; sent += 1; return step(n + 1); },
+      () => { settle(q[n]); sent += 1; return step(n + 1); },
       (err) => {
         // A failed op keeps its place: the ops behind it may depend on it, and a lost
         // connection means everything after is about to fail too. But a failure the
@@ -4600,7 +4752,7 @@ function outboxDrain() {
         if (errorKind(err) === 'NET') return Promise.reject(err);
         q[n].tries = (q[n].tries || 0) + 1;
         if (!(err && err.mkTerminal) && q[n].tries < OUTBOX_TRIES) return Promise.resolve();
-        done = n + 1;
+        settle(q[n]);
         outboxSetAside(q[n], err);
         return step(n + 1);
       }
@@ -4626,9 +4778,8 @@ function outboxDrain() {
     //
     // Settled by seq rather than by key, because an op queued during the drain may carry
     // the same key as the one just sent — that is exactly the case being protected, and
-    // filtering by key would delete the new op along with the old.
-    const settled = {};
-    q.slice(0, done).forEach((op) => { if (op && op.seq) settled[op.seq] = true; });
+    // filtering by key would delete the new op along with the old. `settled` is filled in
+    // as each op is actually settled, above.
     // What this drain learned about the ops it did NOT settle — chiefly `tries`, which is
     // how an op the server keeps refusing eventually stops blocking the queue. That count
     // lives on the in-memory copy; the copy on disk does not have it, so writing the disk
@@ -4669,7 +4820,7 @@ function outboxSetAside(op, why) {
       ? String(op.key).replace(/^tickets:(del:)?/, '') : undefined,
   });
   try {
-    const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
+    const dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]');
     // The reason is kept, not just the op. Without it the pile answers "something was
     // refused" and nothing more, which is not enough for anyone to act on — and the most
     // likely cause here, two devices reaching for one ticket number, has an obvious
@@ -4685,7 +4836,7 @@ function outboxSetAside(op, why) {
     const same = dead.find((e) => e && (e.op || {}).key === (op || {}).key && e.why === reason);
     if (same) { same.n = (same.n || 1) + 1; same.at = at; }
     else dead.push({ at: at, op: op, why: reason, n: 1 });
-    localStorage.setItem(DEADLETTER_K, JSON.stringify(dead.slice(-50)));
+    localStorage.setItem(deadletterKey(), JSON.stringify(dead.slice(-50)));
   } catch (e) { /* quota */ }
 }
 // Postgres speaks in constraint names. The office speaks in tickets.
@@ -4703,12 +4854,12 @@ function refusalText(err) {
   return raw || 'The server refused this change.';
 }
 function outboxSetAsideCount() {
-  try { return JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]').length; }
+  try { return JSON.parse(localStorage.getItem(deadletterKey()) || '[]').length; }
   catch (e) { return 0; }
 }
 function outboxSetAsideLatest() {
   try {
-    const dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]');
+    const dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]');
     return dead.length ? (dead[dead.length - 1].why || '') : '';
   } catch (e) { return ''; }
 }
@@ -4726,7 +4877,7 @@ function outboxSetAsideLatest() {
 // would be its own kind of silent data loss.
 function outboxRetryDeadLetter() {
   let dead = [];
-  try { dead = JSON.parse(localStorage.getItem(DEADLETTER_K) || '[]'); }
+  try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); }
   catch (e) { return 0; }
   if (!dead.length) return 0;
   const q = outboxRead();
@@ -4739,7 +4890,7 @@ function outboxRetryDeadLetter() {
     if (at >= 0) q[at] = fresh; else q.push(fresh);
   });
   outboxWrite(q);
-  try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
+  try { localStorage.removeItem(deadletterKey()); } catch (e) { /* nothing to do */ }
   return dead.length;
 }
 
@@ -4918,8 +5069,10 @@ function diffOps(before, after) {
     // saying what it said before and let the next hydrate settle it.
     const releasing = !wantEmail && !wantName;
     if (holderId || releasing) {
-      ops.push({ key: 'numbering_claim', table: 'numbering_claim', action: 'upsert', row: {
-        id: true,
+      // `update`, not `upsert`. The row is seeded and singular; no client should ever be
+      // creating it, and asking to create it is what made the admin-only INSERT policy the
+      // gate instead of the UPDATE policy that states the actual rule. See outboxSend.
+      ops.push({ key: 'numbering_claim', table: 'numbering_claim', action: 'update', id: true, row: {
         holder_id: holderId,
         since: tsOut((after.numbering || {}).since) || new Date().toISOString() } });
     }
@@ -5614,6 +5767,10 @@ class Component extends DCLogic {
       // That is why an Ops Manager was still being shown "invalid input syntax for type
       // uuid: k1787950609277" every session weeks after the id generator was fixed — the
       // repair meant to clear it was unreachable. Two correct halves that never met.
+      // Before the repair, not after: anything inherited from the old device-wide key has
+      // to be in this account's queue by the time the purge runs, or a dead op would be
+      // adopted one load and only killed on the next.
+      adoptLegacyQueues();
       const repair = repairTicketIds(data);
       if (repair.fixed) data.__repairedTicketIds = repair.fixed;
       // Queued work no server could ever take, cleared on the way past. Counted so the
@@ -5819,6 +5976,11 @@ class Component extends DCLogic {
       if (session) localStorage.setItem(SK, JSON.stringify(session));
       else localStorage.removeItem(SK);
     } catch (e) { /* quota */ }
+    // Every route into a session comes through here, which is why the adoption is here and
+    // not in the five places that call it. A device that boots signed out never reaches
+    // load() again after somebody signs in, so without this a legacy queue would sit
+    // invisible until the next reload. Idempotent — it deletes the old key as it goes.
+    if (session) { adoptLegacyQueues(); purgeUnsendable(); }
     // Somebody signing in for the first time has not missed anything.
     //
     // Unread is "after the mark you last read to", and a new account has no mark — so
@@ -9113,7 +9275,7 @@ class Component extends DCLogic {
         okLabel: 'Give up on them', cancelLabel: 'Keep them', hasCancel: true,
         okBg: 'var(--danger)', okFg: 'var(--on-danger)',
         confirm: () => {
-          try { localStorage.removeItem(DEADLETTER_K); } catch (e) { /* nothing to do */ }
+          try { localStorage.removeItem(deadletterKey()); } catch (e) { /* nothing to do */ }
           this.setState({ dialog: null });
           this.toast('errlog', 'Refused changes dismissed.', 'ok');
         },
@@ -9606,6 +9768,13 @@ class Component extends DCLogic {
         // last one's tickets sitting in the list before their own pull lands. The outbox
         // is left alone: it holds work that has not reached the office yet, and it is
         // the previous user's work whether or not they are still signed in.
+        //
+        // That last sentence was true as a description and false as a mechanism. The queue
+        // was one device-wide key, so "the previous user's work" was simply whatever was
+        // there, and the next person to sign in drained it AS THEMSELVES — which is how a
+        // numbering-claim handover queued by an admin was refused, five times, as the
+        // ops_manager who signed in afterwards to check it had worked. It is filed per
+        // account now, so leaving it alone actually leaves it with its owner.
         try { localStorage.removeItem(CACHE_K); } catch (e) { /* quota */ }
         this.setState({ data: Object.assign(seed(), { tickets: [], clients: [], users: [] }) });
         if (sb()) sb().auth.signOut().catch(() => {});

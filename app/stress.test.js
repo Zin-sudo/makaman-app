@@ -99,17 +99,23 @@ const freeStorage = (p) => p.evaluate(() => {
     const ctx = await b.newContext();
     const p = await signIn(ctx, 'yousef@makaman.ly');
     const r = await p.evaluate(() => {
+      // Both queues are filed per account now — unsent work belongs to a person, not to a
+      // phone — so the pile the shed has to find is this account's, not the bare key an
+      // older build wrote. Somebody else's pile on the same device is deliberately left
+      // alone: it is their diagnostic, and freeing space is not a reason to take it.
+      const acct = (window.__mkApp.state.session || {}).email;
+      const sfx = acct ? '.' + acct.toLowerCase() : '';
       localStorage.setItem('makaman.cloud.v1', '{"tickets":[]}');
-      localStorage.setItem('makaman.outbox.refused.v1', '[{"op":"x"}]');
-      const outboxBefore = localStorage.getItem('makaman.outbox.v1');
+      localStorage.setItem('makaman.outbox.refused.v1' + sfx, '[{"op":"x"}]');
+      const outboxBefore = localStorage.getItem('makaman.outbox.v1' + sfx);
       const storeBefore = localStorage.getItem('makaman.jobtickets.v2');
       const freed = window.__mkApp.shedStorage('makaman.jobtickets.v2');
       return {
         freed: freed,
         keptStore: localStorage.getItem('makaman.jobtickets.v2') === storeBefore,
-        keptOutbox: localStorage.getItem('makaman.outbox.v1') === outboxBefore,
+        keptOutbox: localStorage.getItem('makaman.outbox.v1' + sfx) === outboxBefore,
         droppedCache: localStorage.getItem('makaman.cloud.v1') === null,
-        droppedDead: localStorage.getItem('makaman.outbox.refused.v1') === null,
+        droppedDead: localStorage.getItem('makaman.outbox.refused.v1' + sfx) === null,
       };
     });
     check('the shed finds something to drop', r.freed);

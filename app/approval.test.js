@@ -82,9 +82,14 @@ async function open(ctx, cfg) {
       // lookup underneath it, both have to come along or logError silently no-ops
       // (caught by its own try/catch, which is exactly how a missing grab() name hides
       // itself here rather than throwing where it would be noticed).
+      // The queue itself is filed per account now, so outboxRead/Write go through
+      // outboxKey() and the dead-letter through deadletterKey() — both on top of the one
+      // suffixing rule, acctKey(currentAccount()). Miss any of them and outboxRead's own
+      // try/catch turns the ReferenceError into an empty queue, which reads as "nothing to
+      // send" and passes half the assertions below for entirely the wrong reason.
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
-                     'errorKind', 'currentErrlogAccount', 'errlogKey', 'logError',
-                     'outboxSetAside', 'outboxDrain']
+                     'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
+                     'deadletterKey', 'logError', 'outboxSetAside', 'outboxDrain']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
@@ -106,11 +111,16 @@ async function open(ctx, cfg) {
               : (goodSent++, { error: null })),
         }),
       };
+      // SK is passed in rather than left to fall over: currentAccount() reads it when the
+      // running component has no session, and an undefined SK would raise a ReferenceError
+      // inside that function's own try/catch — swallowed, answering "nobody is signed in"
+      // for the wrong reason. Correct answer here either way, but not by accident.
+      const SK = 'makaman.jobtickets.session.v1';
       const fn = new Function('OUTBOX_K', 'DEADLETTER_K', 'OUTBOX_TRIES', 'ERRLOG_K',
-                              'ERRLOG_MAX', 'sb', `
+                              'ERRLOG_MAX', 'SK', 'sb', `
         ${parts}
         return outboxDrain;
-      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, () => stub);
+      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, SK, () => stub);
 
       const runs = [];
       for (let i = 0; i < 6; i++) runs.push(await fn());

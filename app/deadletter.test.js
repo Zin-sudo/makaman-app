@@ -49,8 +49,14 @@ async function deadLetterOneChange(p, message) {
   }
   await p.evaluate(() => { window.__failInsert = ''; window.__failMessage = ''; });
 }
-const deadLetterCount = (p) => p.evaluate(() =>
-  JSON.parse(localStorage.getItem('makaman.outbox.refused.v1') || '[]').length);
+// Scoped to whoever is signed in, the same way the app files it. The pile is unsent WORK,
+// so it belongs to a person, not to a phone — a device-wide key is how one account came to
+// drain another's queue and destroy it.
+const deadLetterCount = (p) => p.evaluate(() => {
+  const acct = (window.__mkApp.state.session || {}).email;
+  const key = 'makaman.outbox.refused.v1' + (acct ? '.' + acct.toLowerCase() : '');
+  return JSON.parse(localStorage.getItem(key) || '[]').length;
+});
 const banner = (p) => p.evaluate(() => ({
   shown: /refused by the server/.test(document.body.innerText),
   retryBtn: !!Array.from(document.querySelectorAll('button')).find(x => /^RETRY$/.test(x.innerText || '')),
@@ -116,6 +122,58 @@ const banner = (p) => p.evaluate(() => ({
     check('confirming actually discards it', await deadLetterCount(p) === 0);
     const b4 = await banner(p);
     check('and the banner clears', b4.shown === false);
+    await ctx.close();
+  }
+
+  // ── A refused op ages out even while it keeps being regenerated ──────────
+  //
+  // The retry budget belongs to the KEY, not to the object carrying it. outboxPush
+  // coalesces by key, and it used to replace the queued op wholesale — dropping `tries`.
+  // So an op the server refuses for ever, on a row somebody keeps editing, reset its own
+  // budget on every edit, never reached OUTBOX_TRIES, was never set aside, and sat at the
+  // head of the queue blocking everything behind it. That is a queue that cannot drain and
+  // a device that cannot say why.
+  {
+    const { ctx, p } = await boot(b, makeDB());
+    // A job-log line, edited over and over. Same row, so the same op KEY every time — which
+    // is what makes it coalesce. A plain upsert, not the ticket header's upsert_ticket:
+    // that one is terminal on its first refusal and so never accumulates tries at all,
+    // which is a different path and cannot show this.
+    await p.evaluate(() => {
+      window.__failInsert = 'ticket_lines';
+      window.__failMessage = 'invalid input syntax for type uuid: "not-a-uuid"';
+    });
+    const lineOp = (p2) => p2.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      const q = JSON.parse(localStorage.getItem(
+        'makaman.outbox.v1' + (acct ? '.' + acct.toLowerCase() : '')) || '[]');
+      const op = q.find(o => String(o.key).indexOf('ticket_lines:') === 0);
+      return op ? (op.tries || 0) : -1;
+    });
+    const tries = [];
+    for (let i = 0; i < 7; i++) {
+      await p.evaluate((n) => {
+        const app = window.__mkApp;
+        const t = (app.state.data.tickets || []).find(x => (x.events || []).length) || {};
+        app.mutate((d) => {
+          const x = d.tickets.find(y => y.id === t.id);
+          if (x && (x.events || []).length) x.events[0].text = 'Edited, pass ' + n + '.';
+        });
+      }, i);
+      await p.evaluate(() => window.__mkApp.refresh().catch(() => {}));
+      await p.waitForTimeout(300);
+      tries.push(await lineOp(p));
+    }
+    await p.evaluate(() => { window.__failInsert = ''; window.__failMessage = ''; });
+    // Reads as [2,4,-1,2,4,-1,2]: the count climbs across re-queues, hits the limit, the op
+    // leaves the queue for the pile (-1), and the next edit starts a fresh one. Before the
+    // fix it could never climb — every edit handed it a new object with no `tries` at all,
+    // so it stuck at the first attempt for ever and nothing behind it could be sent.
+    check('the retry count climbs instead of resetting on every re-queue',
+      Math.max.apply(null, tries) >= 2, JSON.stringify(tries));
+    check('so the op reaches the limit and leaves the queue for the set-aside pile',
+      tries.indexOf(-1) >= 0 && await deadLetterCount(p) > 0,
+      'tries seen ' + JSON.stringify(tries) + ', pile ' + (await deadLetterCount(p)));
     await ctx.close();
   }
 

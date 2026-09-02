@@ -52,8 +52,14 @@ assertStubParses(DB);
     await p.waitForTimeout(1700);
   };
   const dbTicket = (p) => p.evaluate(([id]) => window.__db.tickets.find(r => r.id === id), [TICKET]);
-  const setAside = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.outbox.refused.v1') || '[]'));
-  const outbox = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.outbox.v1') || '[]'));
+  // Scoped to the signed-in account: unsent work belongs to a person, not to a
+  // phone. A device-wide queue is how one account came to drain another's.
+  const scoped = (base) => (p) => p.evaluate((b) => {
+    const acct = (window.__mkApp.state.session || {}).email;
+    return JSON.parse(localStorage.getItem(b + (acct ? '.' + acct.toLowerCase() : '')) || '[]');
+  }, base);
+  const setAside = scoped('makaman.outbox.refused.v1');
+  const outbox = scoped('makaman.outbox.v1');
 
   // ── the version reaches the device at all ───────────────────────────────────────────
   const p = await open();
@@ -117,7 +123,7 @@ assertStubParses(DB);
   // is a retryable failure and should be retried. What matters is that the CONFLICT did
   // not then spend the remaining attempts looking like a flaky connection — five refusals
   // that cannot succeed is five chances to mistake a lost change for a slow one.
-  const tries = await p.evaluate(() => JSON.parse(localStorage.getItem('makaman.outbox.refused.v1') || '[]')[0].op.tries);
+  const tries = (await setAside(p))[0].op.tries;
   check('a conflict is set aside at once rather than burning through every retry',
     tries < 5, tries + ' of 5 attempts used');
 

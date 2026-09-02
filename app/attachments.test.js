@@ -147,9 +147,14 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
   });
   check('the file\'s BYTES are never written to localStorage — that is why this needs signal', !cached.bytes);
   check('but its name is, so a technician down a hole still sees what came back', cached.name === true);
+  // The signed-in account's queue, not the bare key: reading the wrong one would make
+  // this pass whatever the app did, which is worse than not asserting it at all.
   check('nothing was queued in the outbox for the paperwork itself',
-    !(await p.evaluate(() => JSON.parse(localStorage.getItem('makaman.outbox.v1') || '[]')))
-      .some(o => /attachment/.test(o.table || '')));
+    !(await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      return JSON.parse(localStorage.getItem(
+        'makaman.outbox.v1' + (acct ? '.' + acct.toLowerCase() : '')) || '[]');
+    })).some(o => /attachment/.test(o.table || '')));
 
   // ── what is refused, and refused before anything is written ─────────────────────────
   const upCount = () => p.evaluate(() => window.__uploads.length);
