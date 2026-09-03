@@ -67,6 +67,9 @@ async function signIn(ctx, email, fresh) {
   await p.waitForTimeout(900);
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(800);
+  // Reports lives behind its own tile now, not open on the Account tab.
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
 
   let body = await p.innerText('body');
   check('the technician has a reports panel', /MY APPROVED JOBS/i.test(body));
@@ -105,6 +108,8 @@ async function signIn(ctx, email, fresh) {
   p = await signIn(ctx, 'mahmoud@makaman.ly');
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(800);
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
   body = await p.innerText('body');
   check('the colleague sees their own job', /5002/.test(body));
   check('and the shared one', /5003/.test(body));
@@ -115,6 +120,8 @@ async function signIn(ctx, email, fresh) {
   p = await signIn(ctx, 'omar@makaman.ly');
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(800);
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
   body = await p.innerText('body');
   check('the office view is unchanged — every approved job',
     /5001/.test(body) && /5002/.test(body) && /5003/.test(body));

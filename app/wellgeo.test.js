@@ -1,10 +1,7 @@
-// Two things: the coordinates printed beside the well number, and the press-and-hold
-// that copies the technician's own position out of the app bar.
+// The coordinates printed beside the well number, on the generated sheet.
 //
-// The reason both are worth asserting is that both fail quietly. A footnote that runs
-// into the next column still produces a PDF — an unreadable one. A copy that silently
-// does nothing looks exactly like a copy that worked, right up to the moment someone
-// pastes an empty message to the person coming to find them.
+// Worth asserting because it fails quietly: a footnote that runs into the next column
+// still produces a PDF — an unreadable one.
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 const pathmod = require('path');
@@ -20,84 +17,9 @@ const COORD = '28.906745, 19.213311';
   fs.mkdirSync(TMP, { recursive: true });
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
 
-  // ── press and hold copies, a tap does not ────────────────────────────────
-  const mob = await browser.newContext({
-    viewport: { width: 430, height: 940 }, hasTouch: true, isMobile: true,
-    permissions: ['geolocation', 'clipboard-read', 'clipboard-write'],
-    geolocation: { latitude: FIX.lat, longitude: FIX.lon },
-  });
-  let p = await mob.newPage();
-  p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
-  await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; window.__HOLD_TEST_MS = 250; });
-  await p.goto(URL, { waitUntil: 'networkidle' });
-  await p.waitForTimeout(300);
-  await p.evaluate(() => localStorage.clear());
-  await p.reload({ waitUntil: 'networkidle' });
-  await p.waitForTimeout(700);
-  let i = p.locator('input');
-  await i.nth(0).fill('yousef@makaman.ly'); await i.nth(1).fill('makaman2026');
-  await p.getByRole('button', { name: /log in/i }).click();
-  await p.waitForTimeout(2000);
-
-  const chip = p.locator('.mk-nav-fix');
-  check('the app bar carries the position chip', await chip.count() === 1);
-  check('and it reads as coordinates', (await chip.innerText()).includes(COORD),
-    (await chip.innerText()).replace(/\s+/g, ' '));
-
-  const box = await chip.boundingBox();
-  const press = (ms) => p.evaluate(async ([x, y, hold]) => {
-    const el = document.elementFromPoint(x, y).closest('.mk-nav-fix');
-    const ev = (t) => el.dispatchEvent(new PointerEvent(t, { bubbles: true, clientX: x, clientY: y }));
-    ev('pointerdown');
-    await new Promise(r => setTimeout(r, hold));
-    ev('pointerup');
-    await new Promise(r => setTimeout(r, 120));
-  }, [box.x + box.width / 2, box.y + box.height / 2, ms]);
-  const clip = () => p.evaluate(() => navigator.clipboard.readText());
-  const toastNow = () => p.evaluate(() => window.__mkApp.state.toast);
-
-  await p.evaluate(() => navigator.clipboard.writeText('UNTOUCHED'));
-  await press(80);
-  check('a quick tap does not copy', (await clip()) === 'UNTOUCHED', await clip());
-  // Falsy rather than strictly null: nothing has raised a banner yet this session, so
-  // state.toast is still undefined — it only becomes null once one has been dismissed.
-  check('and raises no banner', !(await toastNow()));
-
-  await press(400);
-  check('a press and hold copies the coordinates', (await clip()) === COORD, await clip());
-  let t = await toastNow();
-  check('and says so', !!t && /Coordinates Copied!/i.test(t.text), JSON.stringify(t));
-  check('in the success tone, not the default blue', !!t && t.tone === 'ok', t && t.tone);
-
-  // Held twice in a row: one banner, not two stacked. Same anti-spam rule as everything
-  // else that can be pressed repeatedly.
-  await press(400);
-  check('holding again does not stack a second banner',
-    await p.evaluate(() => document.querySelectorAll('.mk-toast').length) === 1);
-
-  // ── the banner is short, not the standard six seconds ────────────────────
-  const life = await p.evaluate(async ([x, y]) => {
-    const el = document.elementFromPoint(x, y).closest('.mk-nav-fix');
-    const ev = (n) => el.dispatchEvent(new PointerEvent(n, { bubbles: true, clientX: x, clientY: y }));
-    const app = window.__mkApp;
-    app.dismissToast();
-    await new Promise(r => setTimeout(r, 60));
-    ev('pointerdown');
-    await new Promise(r => setTimeout(r, 300));
-    ev('pointerup');
-    const t0 = performance.now();
-    while (!app.state.toast && performance.now() - t0 < 2000) await new Promise(r => setTimeout(r, 10));
-    const born = performance.now();
-    while (app.state.toast && performance.now() - born < 9000) await new Promise(r => setTimeout(r, 20));
-    return Math.round(performance.now() - born);
-  }, [box.x + box.width / 2, box.y + box.height / 2]);
-  check('the copy banner clears in about two seconds, not six',
-    life > 1500 && life < 3000, life + ' ms');
-  await p.close();
-
   // ── the coordinates print beside the well number ─────────────────────────
   const desk = await browser.newContext({ viewport: { width: 1400, height: 1000 }, acceptDownloads: true });
-  p = await desk.newPage();
+  const p = await desk.newPage();
   p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
   await p.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
   await p.goto(URL, { waitUntil: 'networkidle' });
@@ -105,7 +27,7 @@ const COORD = '28.906745, 19.213311';
   await p.evaluate(() => localStorage.clear());
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
-  i = p.locator('input');
+  const i = p.locator('input');
   await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('makaman2026');
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(1400);

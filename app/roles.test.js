@@ -64,10 +64,15 @@ const tab = async (p, name) => {
   body = await p.innerText('body');
   check('observer Tickets no longer carries report controls', !/Report size/.test(body));
   body = await tab(p, 'Account');
+  check('observer Account has a Reports tile', /Reports/i.test(body));
+  // Reports lives behind its own tile now, not open on the Account tab.
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
+  body = await p.innerText('body');
   // Case-insensitive: innerText applies text-transform, so these render uppercase.
   // "Generate report" became "Generate bundle — N tickets" when the report grew a
   // month filter and a per-ticket download.
-  check('observer Account has Reports', /Reports/i.test(body) && /Report size/i.test(body) && /Generate bundle/i.test(body));
+  check('and opening it shows Reports', /Reports/i.test(body) && /Report size/i.test(body) && /Generate bundle/i.test(body));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);

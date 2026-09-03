@@ -59,6 +59,9 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await p.waitForTimeout(400);
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(700);
+  // Reports lives behind its own tile now, not open on the Account tab.
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
   await p.getByRole('button', { name: /Generate bundle/i }).click();
   await p.waitForTimeout(500);
   let body = await p.innerText('body');

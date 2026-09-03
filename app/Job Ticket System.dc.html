@@ -269,13 +269,7 @@
        two purely decorative text pieces so the bar stays one line and nothing clips. */
     .mk-nav-title { display:none !important; }
     .mk-nav-role { display:none !important; }
-    /* The position readout is the reason the bar is crowded, and it is also the piece
-       that must survive: a screenshot is worth nothing to a search party without it.
-       So the name gives up its width instead of wrapping to two lines, and the label
-       above the coordinates goes — the numbers are self-evidently coordinates. */
     .mk-nav-name { white-space:nowrap !important; }
-    .mk-nav-fix-label { display:none !important; }
-    .mk-nav-fix { padding-left:9px !important; padding-right:9px !important; }
   }
   @media (max-width: 640px) {
     /* Two across rather than one. Four figures stacked single-file pushed the actual
@@ -959,12 +953,6 @@
       <img src="uploads/makaman-logo-mark.png" alt="Makaman" style="height:26px;width:auto;flex:none">
       <div class="mk-nav-title" style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;letter-spacing:0.02em">MAKAMAN <span style="opacity:0.5">/</span> JOB TICKETS</div>
     </div>
-    <sc-if value="{{ showBarFix }}" hint-placeholder-val="{{ true }}">
-      <div class="mk-nav-fix" onClick="{{ barFixRetry }}" onPointerDown="{{ holdCopyStart }}" onPointerUp="{{ holdCopyCancel }}" onPointerLeave="{{ holdCopyCancel }}" onPointerCancel="{{ holdCopyCancel }}" onContextMenu="{{ swallowMenu }}" title="{{ barFixHint }}" style="display:flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid rgba(var(--on-navbar-rgb),0.22);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;opacity:{{ barFixDim }}">
-        <span class="mk-nav-fix-label" style="opacity:0.55;text-transform:uppercase;font-size:10px;letter-spacing:0.06em">Position</span>
-        <span style="font-weight:600">{{ barFixText }}</span>
-      </div>
-    </sc-if>
     <!-- Swapping into the field, and back out. Always beside the name, because the
          thing it changes is who the app thinks you are working as, and that has to be
          readable from the same glance that tells you who you are. -->
@@ -1560,39 +1548,6 @@
               <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Account</h2>
               <div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
 
-              <!-- Approved work, printable here. The office no longer posts a hardcopy
-                   out to the field for signing and waits for it to come back. -->
-              <sc-if value="{{ showReports }}" hint-placeholder-val="{{ true }}">
-                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-bottom:14px">
-                  <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">{{ reportsTitle }}</div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Month — counted by End Job date</label>
-                  <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-                    <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
-                      <option value="{{ m.key }}">{{ m.label }}</option>
-                    </sc-for>
-                  </select>
-                  <label style="display:block;font-size:12px;margin-bottom:6px;color:var(--ink-dim)">Up to {{ founderCount }} jobs · showing {{ reportCountLabel }}</label>
-                  <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:12px">
-                  <sc-if value="{{ hasReportRows }}" hint-placeholder-val="{{ true }}">
-                    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-                      <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="2">
-                        <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid rgba(var(--ink-rgb),0.12)">
-                          <div style="flex:1;min-width:0">
-                            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }} · {{ r.customer }}</div>
-                            <div style="font-size:11px;color:var(--ink-faint);overflow-wrap:anywhere">{{ r.locLine }} · {{ r.dateRange }}</div>
-                          </div>
-                          <button onClick="{{ r.download }}" style="flex:none;padding:6px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
-                        </div>
-                      </sc-for>
-                    </div>
-                  </sc-if>
-                  <sc-if value="{{ noReportRows }}" hint-placeholder-val="{{ false }}">
-                    <div style="padding:14px 0;text-align:center;font-size:12px;color:var(--ink-faint)">Nothing approved yet for that month. Sheets can be printed once the operations manager approves the job.</div>
-                  </sc-if>
-                  <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
-                  <div style="font-size:11px;color:var(--ink-faint);margin-top:6px;line-height:1.45">ZIP gives that job's four sheets to print and sign — originals in one PDF, copies in the other.</div>
-                </div>
-              </sc-if>
               <sc-if value="{{ showProfile }}" hint-placeholder-val="{{ true }}">
                 <div style="border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:14px">
                   <sc-for list="{{ profileRows }}" as="r" hint-placeholder-count="4">
@@ -2789,6 +2744,80 @@
         </div>
       </sc-if>
 
+      <!-- Reports, the bundle button that used to live inside it, and the master workbook
+           — three containers that used to sit permanently open on the Account tab, the one
+           screen every role lands on. Behind the Reports tile now, same as every other
+           tool (2026-09-03). -->
+      <sc-if value="{{ adminReports }}" hint-placeholder-val="{{ false }}">
+        <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px;max-width:900px">
+          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">{{ reportsTitle }}</div>
+          <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Month — counted by End Job date</label>
+          <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+            <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
+              <option value="{{ m.key }}">{{ m.label }}</option>
+            </sc-for>
+          </select>
+          <label style="display:block;font-size:13px;margin-bottom:8px;color:var(--ink-dim)">Report size — up to {{ founderCount }} approved jobs · showing {{ reportCountLabel }}</label>
+          <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:14px">
+
+          <sc-if value="{{ hasReportRows }}" hint-placeholder-val="{{ true }}">
+            <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto;margin-bottom:12px">
+              <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead>
+                  <tr>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Technician</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Field / Well / Rig</th>
+                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Date</th>
+                    <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="3">
+                    <tr>
+                      <td data-label="Ticket No." style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }}</td>
+                      <td data-label="Technician" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.crewLabel }}</td>
+                      <td data-label="Customer" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.customer }}</td>
+                      <td data-label="Field / Well / Rig" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:var(--ink-dim)">{{ r.locLine }}</td>
+                      <td data-label="Date" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:var(--ink-dim)">{{ r.dateRange }}</td>
+                      <td style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
+                        <button onClick="{{ r.download }}" title="Download this ticket only" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noReportRows }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:18px 0;text-align:center;font-size:13px;color:var(--ink-faint)">No approved jobs finished in that month.</div>
+          </sc-if>
+
+          <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
+          <div style="font-size:11px;color:var(--ink-faint);margin-top:6px;line-height:1.45">The bundle is one overview table of everything listed above. ZIP on a row gives that ticket alone: originals in one PDF, copies in the other.</div>
+        </div>
+        <!-- One row per approved job, rebuilt by the server whenever an approval changes.
+             The line beneath says how fresh it is, because a shared file whose age nobody
+             can see is a file nobody trusts. -->
+        <sc-if value="{{ showMasterExport }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px;max-width:900px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success-ink);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
+                <div style="font-size:12px;color:{{ masterTone }};margin-top:2px">{{ masterState }}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button onClick="{{ downloadMaster }}" disabled="{{ masterCannotDownload }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download</button>
+              <button onClick="{{ refreshMaster }}" disabled="{{ masterBusy }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Rebuild now</button>
+            </div>
+            <div style="font-size:11px;color:var(--ink-faint);margin-top:8px;line-height:1.45">One row per approved job. The server rebuilds it on its own within a minute of any approval — Rebuild now is only for when you do not want to wait. The download link expires after a minute.</div>
+          </div>
+        </sc-if>
+      </sc-if>
+
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
@@ -3036,76 +3065,6 @@
       <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ true }}">
         <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Account</h2>
         <div style="font-size:13px;color:var(--ink-faint);margin-bottom:20px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
-        <sc-if value="{{ showReports }}" hint-placeholder-val="{{ false }}">
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
-            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">{{ reportsTitle }}</div>
-            <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Month — counted by End Job date</label>
-            <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
-              <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
-                <option value="{{ m.key }}">{{ m.label }}</option>
-              </sc-for>
-            </select>
-            <label style="display:block;font-size:13px;margin-bottom:8px;color:var(--ink-dim)">Report size — up to {{ founderCount }} approved jobs · showing {{ reportCountLabel }}</label>
-            <input type="range" min="1" max="50" value="{{ founderCount }}" onChange="{{ f.founderCount }}" style="width:100%;margin-bottom:14px">
-
-            <sc-if value="{{ hasReportRows }}" hint-placeholder-val="{{ true }}">
-              <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto;margin-bottom:12px">
-                <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:13px">
-                  <thead>
-                    <tr>
-                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
-                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Technician</th>
-                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
-                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Field / Well / Rig</th>
-                      <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Date</th>
-                      <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="3">
-                      <tr>
-                        <td data-label="Ticket No." style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ r.noLabel }}</td>
-                        <td data-label="Technician" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.crewLabel }}</td>
-                        <td data-label="Customer" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ r.customer }}</td>
-                        <td data-label="Field / Well / Rig" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:var(--ink-dim)">{{ r.locLine }}</td>
-                        <td data-label="Date" style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:12px;color:var(--ink-dim)">{{ r.dateRange }}</td>
-                        <td style="padding:9px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
-                          <button onClick="{{ r.download }}" title="Download this ticket only" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
-                        </td>
-                      </tr>
-                    </sc-for>
-                  </tbody>
-                </table>
-              </div>
-            </sc-if>
-            <sc-if value="{{ noReportRows }}" hint-placeholder-val="{{ false }}">
-              <div style="padding:18px 0;text-align:center;font-size:13px;color:var(--ink-faint)">No approved jobs finished in that month.</div>
-            </sc-if>
-
-            <button onClick="{{ generateBundle }}" style="width:100%;min-height:42px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Generate bundle — {{ reportCountLabel }}</button>
-            <div style="font-size:11px;color:var(--ink-faint);margin-top:6px;line-height:1.45">The bundle is one overview table of everything listed above. ZIP on a row gives that ticket alone: originals in one PDF, copies in the other.</div>
-          </div>
-        </sc-if>
-        <!-- ══ MASTER WORKBOOK ══ -->
-        <!-- One row per approved job, rebuilt by the server whenever an approval changes.
-             The line beneath says how fresh it is, because a shared file whose age nobody
-             can see is a file nobody trusts. -->
-        <sc-if value="{{ showMasterExport }}" hint-placeholder-val="{{ false }}">
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-              <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success-ink);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
-                <div style="font-size:12px;color:{{ masterTone }};margin-top:2px">{{ masterState }}</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button onClick="{{ downloadMaster }}" disabled="{{ masterCannotDownload }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download</button>
-              <button onClick="{{ refreshMaster }}" disabled="{{ masterBusy }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Rebuild now</button>
-            </div>
-            <div style="font-size:11px;color:var(--ink-faint);margin-top:8px;line-height:1.45">One row per approved job. The server rebuilds it on its own within a minute of any approval — Rebuild now is only for when you do not want to wait. The download link expires after a minute.</div>
-          </div>
-        </sc-if>
         <sc-if value="{{ showClaimPanel }}" hint-placeholder-val="{{ false }}">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
             <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket numbering claim</div>
@@ -5613,8 +5572,6 @@ const GEO_MAX_AGE_MS = 30000;
 // the hourly office ping because this one is read off the screen in the moment, but not
 // so short that it keeps the GPS awake.
 const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO_TEST_MS) || 120000;
-// How long a press has to last before it counts as a hold rather than a tap.
-const HOLD_COPY_MS = (typeof window !== 'undefined' && window.__HOLD_TEST_MS) || 450;
 // A confirmation of something the user just did, so it goes as soon as it is read.
 const COPY_TOAST_MS = 2000;
 
@@ -5685,6 +5642,64 @@ function fileSize(n) {
   if (v < 1024) return v + ' B';
   if (v < 1024 * 1024) return Math.round(v / 1024) + ' KB';
   return (v / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// A signed sheet photographed on a phone can run several megabytes; the paperwork it
+// carries only needs to stay legible, not stay full sensor resolution. Downscaled and
+// re-encoded before it ever reaches attachFile's upload — the same move loadSheetLogo
+// already makes for the letterhead, for the same reason: fewer bytes over a field
+// connection, and fewer bytes against a Storage quota billed by the gigabyte.
+//
+// 1800px on the long edge is comfortably past what a phone photo of an A4 sheet needs to
+// keep every number and signature readable, at JPEG quality 0.82 — the same ballpark a
+// camera's own "Large" preset already picks.
+//
+// PDFs pass through untouched — nothing here can shrink one, and a scan is not a photo to
+// re-encode. HEIC passes through untouched too: an <img> cannot be relied on to decode it
+// in every browser this app runs in, and a guess that fails silently would drop the photo
+// rather than compress it. Anything that fails for any reason — a corrupt file, a canvas
+// that throws, a result no smaller than the original — resolves to the original file
+// unchanged. A slightly larger upload is a nuisance; a signed sheet that never arrives
+// because compression ate it is a job the office cannot close.
+const ATTACH_IMAGE_MAX_DIM = 1800;
+const ATTACH_IMAGE_QUALITY = 0.82;
+function compressImageFile(file) {
+  if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type || '')) return Promise.resolve(file);
+  if (typeof document === 'undefined' || typeof Image === 'undefined') return Promise.resolve(file);
+  return new Promise((resolve) => {
+    let objectUrl;
+    const cleanup = () => { if (objectUrl) try { URL.revokeObjectURL(objectUrl); } catch (e) {} };
+    const done = (f) => { cleanup(); resolve(f); };
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (e) { resolve(file); return; }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const longEdge = Math.max(img.naturalWidth, img.naturalHeight);
+        const scale = Math.min(1, ATTACH_IMAGE_MAX_DIM / longEdge);
+        // Already small enough — nothing to gain by re-encoding it again.
+        if (scale >= 1) { done(file); return; }
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * scale);
+        c.height = Math.round(img.naturalHeight * scale);
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob((blob) => {
+          if (!blob || blob.size >= file.size) { done(file); return; }
+          const dot = (file.name || '').lastIndexOf('.');
+          const base = dot > 0 ? file.name.slice(0, dot) : (file.name || 'photo');
+          let out;
+          try { out = new File([blob], base + '.jpg', { type: 'image/jpeg' }); }
+          catch (e) { out = blob; }
+          done(out);
+        }, 'image/jpeg', ATTACH_IMAGE_QUALITY);
+      } catch (e) { done(file); }
+    };
+    img.onerror = () => done(file);
+    img.src = objectUrl;
+  });
 }
 
 const BASE_ITEMS = [
@@ -6300,10 +6315,7 @@ class Component extends DCLogic {
     // that an empty sync writes nothing.
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
     // Checks every minute whether an hourly pin is due; see geoTick.
-    this.geoTimer = setInterval(() => { this.geoTick(); this.selfGeoTick(); }, GEO_TICK_MS);
-    // Once at boot as well as on the timer, so the bar carries a coordinate from the
-    // first screen rather than a minute in.
-    this.selfGeoTick();
+    this.geoTimer = setInterval(() => this.geoTick(), GEO_TICK_MS);
     // Registers sw.js so the app is a real installable PWA on any device (see the
     // <link rel="manifest"> in <helmet>). Swallows failures silently — e.g. when run
     // from file:// or a sandboxed preview with no service-worker support — since this is
@@ -6374,10 +6386,16 @@ class Component extends DCLogic {
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
   }
   componentDidUpdate(prevProps, prevState) {
+    // The runtime's own StreamableComponent calls this during boot without a prevState
+    // (caught live in geo.test.js's console, silently — nothing here failed a check,
+    // it just threw once into the void on every affected run). Treat a missing prevState
+    // as "everything changed": one extra scroll-to-top on that first update is harmless,
+    // a thrown TypeError on every update from here on is not.
+    const P = prevState || {};
     const S = this.state;
-    if (prevState.roleTab !== S.roleTab || prevState.mgrScreen !== S.mgrScreen
-      || prevState.techScreen !== S.techScreen || prevState.adminTab !== S.adminTab
-      || prevState.activeId !== S.activeId) {
+    if (P.roleTab !== S.roleTab || P.mgrScreen !== S.mgrScreen
+      || P.techScreen !== S.techScreen || P.adminTab !== S.adminTab
+      || P.activeId !== S.activeId) {
       this.scrollToTop();
     }
   }
@@ -6597,24 +6615,16 @@ class Component extends DCLogic {
       );
     } catch (e) { done(null); }
   }
-  // Where this device is, for the person holding it.
+  // Where this device is, for the person holding it — kept out of the store entirely,
+  // never synced, never on a ticket. There used to be a readout for it in the app bar;
+  // it was pulled (owner's request, 2026-09-03 — never reliably prompted for permission
+  // in the field). What is left is the one real reason this still runs: turning "Share
+  // my arrival location" on is the technician asking the browser for permission, and
+  // that ask should happen the moment he does it, not wait on the next ticket he opens.
   //
-  // Separate from every other fix in this file, and separate on purpose. The sharing
-  // toggle governs what the office is told, not what the technician may know about his
-  // own position — someone who has turned sharing off and is then lost in the desert
-  // still needs to be able to read a coordinate off his own screen and send it to
-  // whoever can come and get him. So this runs whatever the toggle says.
-  //
-  // What keeps that honest is where the value is kept: component state, never
-  // `this.state.data`. The store is the thing that persists and syncs; a fix that is
-  // not in it cannot reach the office by any path, cannot ride up with a ticket, and
-  // cannot be queued in the outbox. Turning sharing off still means the office learns
-  // nothing. It no longer means the technician learns nothing either.
-  //
-  // `force` is an explicit request from the technician — he tapped the readout, or he
-  // turned sharing on. It clears a refusal, ignores the freshness guard, and asks again.
-  // The rule against badgering is about the app asking unprompted; it was never meant to
-  // mean that a man who has decided he needs his position cannot ask for it.
+  // `force` clears a stale refusal and asks again regardless of the freshness guard —
+  // the rule against badgering is about the app asking unprompted, not about refusing a
+  // person who has just told it to ask.
   selfGeoTick(force) {
     const S = this.state;
     // Technicians only. They are the ones who go out; an office desktop would just be
@@ -6679,27 +6689,6 @@ class Component extends DCLogic {
       navigator.geolocation.getCurrentPosition(take, (err) => fail(err, false),
         { enableHighAccuracy: true, timeout: 15000, maximumAge: force ? 0 : SELF_GEO_INTERVAL_MS });
     } catch (e) { done(null, 'unavailable'); }
-  }
-  // Press and hold the coordinates to copy them. The case this exists for is someone
-  // lost who needs to send a position to whoever can come and get them: reading twelve
-  // digits off a screen into a message is exactly the moment a digit gets dropped, and
-  // it is the worst possible moment for that.
-  //
-  // Bound to pointer events rather than touch, so a thumb and a mouse both work without
-  // two code paths. Any movement or release before the hold completes cancels it, so
-  // scrolling the page past the bar does not fire a copy.
-  holdCopyStart() {
-    if (this.holdTimer) clearTimeout(this.holdTimer);
-    const fix = this.state.selfFix;
-    if (!fix) return;
-    this.holdTimer = setTimeout(() => {
-      this.holdTimer = null;
-      this.copyText(geoText(fix), 'coords', 'Coordinates Copied!');
-    }, HOLD_COPY_MS);
-  }
-  holdCopyCancel() {
-    if (this.holdTimer) clearTimeout(this.holdTimer);
-    this.holdTimer = null;
   }
   // The async clipboard API is the right one and needs a secure context, which the PWA
   // always has. The execCommand fallback is for the browsers that still refuse it — an
@@ -8004,63 +7993,71 @@ class Component extends DCLogic {
       this.toast('attach', 'No signal. A file cannot wait in the queue the way a job log can — try again in coverage.', 'warn');
       return Promise.resolve();
     }
-    if (file.size > ATTACH_MAX_BYTES) {
-      this.toast('attach', 'That file is ' + fileSize(file.size) + '. The limit is ' + fileSize(ATTACH_MAX_BYTES) + '.', 'warn');
-      return Promise.resolve();
-    }
-    // An empty file passes no CHECK in the table and would leave bytes in the bucket with
-    // no row pointing at them, so it is stopped before either write.
-    if (!file.size) {
-      this.toast('attach', 'That file is empty.', 'warn');
-      return Promise.resolve();
-    }
-    const mime = file.type || '';
-    if (ATTACH_TYPES.indexOf(mime) < 0) {
-      this.toast('attach', 'Only PDFs and photos can be attached.', 'warn');
-      return Promise.resolve();
-    }
-    const who = (this.state.session && this.state.session.name) || '';
-    const name = String(file.name || 'file').trim() || 'file';
-    const dot = name.lastIndexOf('.');
-    const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-    // The first path segment is the ticket id, and the storage policies key on exactly
-    // that — it is what ties the bytes to the same visibility rule as the job. The rest is
-    // a fresh uuid, so two people attaching "scan.pdf" in the same minute cannot collide
-    // and no client's filename ever becomes a guessable object key.
-    const path = ticketId + '/' + uuid() + (ext ? '.' + ext : '');
+    // A photo is downscaled before anything below looks at its size or its name, so the
+    // checks that follow see the file that is actually about to go over the wire, not the
+    // one the camera produced. PDFs and anything already small pass through untouched.
     this.setState({ attachBusy: true });
-    return c.storage.from('attachments').upload(path, file, { contentType: mime, upsert: false })
-      .then((up) => {
-        if (up.error) throw up.error;
-        return c.from('ticket_attachments').insert({
-          ticket_id: ticketId, path: path, filename: name, mime: mime, bytes: file.size,
-          uploaded_by: CLOUD_IDS.me, doc_kind: docKind,
-        });
-      })
-      .then((ins) => {
-        if (ins.error) {
-          // The bytes are already in the bucket and nothing now points at them. Left
-          // alone that is an orphan nobody can see, list or delete through the app — so
-          // the upload is undone before the failure is reported.
-          return c.storage.from('attachments').remove([path]).then(() => { throw ins.error; });
-        }
-        // Recorded like everything else. Notifications are derived from the trail, so
-        // this is also what tells the office a signed sheet arrived — no second wiring.
-        const label = (SIGNED_DOCS.find((d) => d.key === docKind) || {}).label || 'document';
-        this.logOn(ticketId, (who || 'Someone') + ' sent back the ' + label + ' — ' + name + ' (' + fileSize(file.size) + ')', 'lifecycle');
-        // Signed and stamped paperwork is what finance is waiting for, so its arrival is
-        // the transition. From approved as well as from sent_client: the office can be
-        // handed a signed sheet by hand without anyone having downloaded a PDF first.
-        this.advanceTo(ticketId, 'sent_finance',
-          'Signed ' + label + ' received — sent to finance (digital).');
-        return this.refresh();
-      })
-      .then(() => { this.setState({ attachBusy: false }); this.toast('attach', name + ' attached.', 'ok'); })
-      .catch((err) => {
+    return compressImageFile(file).then((file) => {
+      if (file.size > ATTACH_MAX_BYTES) {
         this.setState({ attachBusy: false });
-        logError('file', err, { doing: 'upload', kind: docKind, ticket: ticketId, mime: mime, bytes: file.size });
-        this.toast('attach', (err && err.message) || 'The file could not be attached.', 'warn');
-      });
+        this.toast('attach', 'That file is ' + fileSize(file.size) + '. The limit is ' + fileSize(ATTACH_MAX_BYTES) + '.', 'warn');
+        return;
+      }
+      // An empty file passes no CHECK in the table and would leave bytes in the bucket with
+      // no row pointing at them, so it is stopped before either write.
+      if (!file.size) {
+        this.setState({ attachBusy: false });
+        this.toast('attach', 'That file is empty.', 'warn');
+        return;
+      }
+      const mime = file.type || '';
+      if (ATTACH_TYPES.indexOf(mime) < 0) {
+        this.setState({ attachBusy: false });
+        this.toast('attach', 'Only PDFs and photos can be attached.', 'warn');
+        return;
+      }
+      const who = (this.state.session && this.state.session.name) || '';
+      const name = String(file.name || 'file').trim() || 'file';
+      const dot = name.lastIndexOf('.');
+      const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+      // The first path segment is the ticket id, and the storage policies key on exactly
+      // that — it is what ties the bytes to the same visibility rule as the job. The rest is
+      // a fresh uuid, so two people attaching "scan.pdf" in the same minute cannot collide
+      // and no client's filename ever becomes a guessable object key.
+      const path = ticketId + '/' + uuid() + (ext ? '.' + ext : '');
+      return c.storage.from('attachments').upload(path, file, { contentType: mime, upsert: false })
+        .then((up) => {
+          if (up.error) throw up.error;
+          return c.from('ticket_attachments').insert({
+            ticket_id: ticketId, path: path, filename: name, mime: mime, bytes: file.size,
+            uploaded_by: CLOUD_IDS.me, doc_kind: docKind,
+          });
+        })
+        .then((ins) => {
+          if (ins.error) {
+            // The bytes are already in the bucket and nothing now points at them. Left
+            // alone that is an orphan nobody can see, list or delete through the app — so
+            // the upload is undone before the failure is reported.
+            return c.storage.from('attachments').remove([path]).then(() => { throw ins.error; });
+          }
+          // Recorded like everything else. Notifications are derived from the trail, so
+          // this is also what tells the office a signed sheet arrived — no second wiring.
+          const label = (SIGNED_DOCS.find((d) => d.key === docKind) || {}).label || 'document';
+          this.logOn(ticketId, (who || 'Someone') + ' sent back the ' + label + ' — ' + name + ' (' + fileSize(file.size) + ')', 'lifecycle');
+          // Signed and stamped paperwork is what finance is waiting for, so its arrival is
+          // the transition. From approved as well as from sent_client: the office can be
+          // handed a signed sheet by hand without anyone having downloaded a PDF first.
+          this.advanceTo(ticketId, 'sent_finance',
+            'Signed ' + label + ' received — sent to finance (digital).');
+          return this.refresh();
+        })
+        .then(() => { this.setState({ attachBusy: false }); this.toast('attach', name + ' attached.', 'ok'); })
+        .catch((err) => {
+          this.setState({ attachBusy: false });
+          logError('file', err, { doing: 'upload', kind: docKind, ticket: ticketId, mime: mime, bytes: file.size });
+          this.toast('attach', (err && err.message) || 'The file could not be attached.', 'warn');
+        });
+    });
   }
   // A link that expires, minted for the person asking. Never a stored URL: the object is
   // a client's signed paperwork, and a URL that never dies is a URL that eventually leaks
@@ -8123,6 +8120,11 @@ class Component extends DCLogic {
   // and the cases worth asserting are the shorthand people actually write — which is far
   // easier to enumerate here than to stage a ticket for, one job log at a time.
   suggestJobTypeForTest(jobType, events) { return suggestJobTypes(jobType, events); }
+  // The downscale, reachable directly on a File built in-page rather than staged through a
+  // real upload — the contract worth asserting (smaller, capped dimensions, PDFs and
+  // already-small images untouched) is about the function, not about the storage call
+  // after it.
+  compressImageFileForTest(file) { return compressImageFile(file); }
 
   // Reachable so the shed can be tested for what it must NOT drop. Asserting that it
   // frees something is easy; asserting that it never touches the tickets or the outbox is
@@ -9193,7 +9195,12 @@ class Component extends DCLogic {
     const activity = this.activityEntries();
     const unread = this.unreadEntriesFrom(activity);
 
-    const reportsOpen = S.roleTab === 'account';
+    // Reports moved off the Account tab itself and behind its own tile, which — like
+    // every other admin tool — opens by setting roleTab back to 'tickets' alongside
+    // adminTab. The guard has to recognize both shapes now, or it starves the screen it
+    // was written to feed: this is what happens when the second reader of a flag some
+    // other feature added quietly moves out from under it.
+    const reportsOpen = S.roleTab === 'account' || (S.roleTab === 'tickets' && S.adminTab === 'reports');
     const reportRows = !reportsOpen ? [] : (() => {
       const inMonth = reportBase.filter(x => {
         if (!S.reportMonth) return true;
@@ -9919,11 +9926,6 @@ class Component extends DCLogic {
           // someone signed in and looking at yesterday's tickets, not bounced back to
           // the login screen with a network error.
           this.refresh();
-          // Ask for the position now rather than waiting on the minute timer. At mount
-          // there was no session, so the call there did nothing — without this the bar
-          // sits empty for the first minute of every shift, which is exactly the minute
-          // someone would be checking it.
-          this.selfGeoTick();
         })
         .catch(err => {
           logError('auth', err, { doing: 'sign in', email: email });
@@ -10056,16 +10058,6 @@ class Component extends DCLogic {
         .catch(err => this.setState({ newTechError: err.message, newTechDone: false, authBusy: false }));
     };
 
-    // What the position readout says when it has nothing to show. Written out as a
-    // lookup rather than a chain of ternaries in the binding, because the runtime does
-    // not take ternaries inside {{ }} and because the three cases are genuinely
-    // different problems with three different answers.
-    let barFixText = 'NO GPS FIX · TAP TO RETRY';
-    if (S.selfFix) barFixText = geoText(S.selfFix);
-    else if (S.selfFixSeeking) barFixText = 'FINDING YOU…';
-    else if (S.selfFixWhy === 'blocked') barFixText = 'LOCATION BLOCKED · ALLOW IT IN YOUR BROWSER';
-    else if (S.selfFixWhy === 'unsupported') barFixText = 'THIS DEVICE HAS NO LOCATION';
-
     return {
       loggedIn: !!S.session && S.session.status === 'active',
       isPendingUser: !!S.session && S.session.status === 'pending',
@@ -10107,29 +10099,6 @@ class Component extends DCLogic {
       sessionName: S.session ? S.session.name : '',
       // See adminAction: true while any privileged call is in flight.
       serverBusy: !!S.serverBusy,
-      // The technician's own coordinates, on every screen he can reach. The point is
-      // that a screenshot of any tab carries them: someone lost with no idea where he
-      // is can send whatever is already on screen and be found from it, without having
-      // to navigate anywhere first. Shown regardless of the sharing toggle — see
-      // selfGeoTick for why that is not a leak.
-      showBarFix: S.role === 'tech' && !!S.session && !!(S.selfFix || S.selfFixFailed || S.selfFixSeeking),
-      // Three different failures used to read the same four words. A technician at the
-      // base saw NO GPS FIX, turned the sharing toggle on and off — which governs what
-      // the OFFICE is told and has never had anything to do with whether his own phone
-      // can find him — and had no way of learning that. Each one now says what happened
-      // and what to do about it, and every one of them can be retried by tapping.
-      barFixText: barFixText,
-      barFixHint: S.selfFix ? 'Press and hold to copy'
-        : (S.selfFixWhy === 'blocked'
-          ? 'Location is blocked for this site in your browser settings. Allow it there, then tap here.'
-          : 'Tap to look for your position again'),
-      barFixRetry: () => { if (!S.selfFix) this.selfGeoTick(true); },
-      barFixDim: S.selfFix ? 1 : 0.72,
-      holdCopyStart: () => this.holdCopyStart(),
-      holdCopyCancel: () => this.holdCopyCancel(),
-      // A long press on a phone otherwise raises the browser's own text-selection menu
-      // over the banner confirming the copy. Suppressed only on this one element.
-      swallowMenu: e => { e.preventDefault(); },
       goToLogin: () => this.setState({ authScreen: 'login', authError: '', signupDone: false }),
       goToSignup: () => this.setState({ authScreen: 'signup', authError: '', signupDone: false }),
       doLogin: doLogin,
@@ -10183,7 +10152,7 @@ class Component extends DCLogic {
       // result to somebody who can act on it, and a diagnostic only the admin can run is
       // a diagnostic that is never there when it is needed.
       showAdminPage: S.roleTab === 'tickets' && !!S.adminTab
-        && (S.role === 'admin' || S.adminTab === 'check'
+        && (S.role === 'admin' || S.adminTab === 'check' || S.adminTab === 'reports'
             || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))),
       showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review',
       // Activity/Sync/Account are written once for the office roles and once, styled
@@ -10194,7 +10163,13 @@ class Component extends DCLogic {
       // ── Bottom navigation ──────────────────────────────────────────────────
       // Four destinations, the same for every role: the work itself, what has been
       // happening, what is still waiting to reach the server, and the account.
-      navTickets: S.roleTab === 'tickets',
+      // Excludes an open admin subpage the same way showMgrPage already does — self-check,
+      // price list and now Reports all set roleTab back to 'tickets' alongside adminTab so
+      // the shared subpage (showAdminPage) can render, and without this the technician's
+      // own ticket list stayed mounted underneath it: invisible on screen, but still in the
+      // DOM, still full of every ticket's own text. Nothing broken to look at, but a page
+      // that is not what it says it is.
+      navTickets: S.roleTab === 'tickets' && !S.adminTab,
       navActivity: S.roleTab === 'activity',
       navSync: S.roleTab === 'sync',
       navAccount: S.roleTab === 'account',
@@ -10342,15 +10317,26 @@ class Component extends DCLogic {
         const selfCheck = tile('Self-check', 'Something not working? Run this and send the result.',
           'system', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)',
           () => this.setState({ adminTab: 'check', roleTab: 'tickets' }));
+        // Reports, the bundle button that lived inside it, and the master workbook were
+        // three containers permanently open on the Account tab — the one screen every
+        // role lands on. One tile, same place every other tool already lives, collapses
+        // all three behind a tap (2026-09-03, owner's request for a cleaner Account tab).
+        const reports = tile('Reports', S.role === 'tech' ? 'Your approved jobs, printable sheets'
+          : 'Bundles, ZIPs and the master file', 'activity',
+          'rgba(var(--success-rgb),0.16)', 'var(--success)',
+          () => this.setState({ adminTab: 'reports', roleTab: 'tickets' }));
         if (S.role === 'admin') {
           const go = (t) => () => this.setState({ adminTab: t, roleTab: 'tickets' });
           return [
             tile('Price Lists', list.length + ' priced items · ' + D.clients.length + ' customers', 'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)', go('price')),
             tile('Numbering & Job Types', D.series.length + ' series · ' + D.jobTypes.length + ' job types', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('numbers')),
             tile('Users & Customers', (D.users || []).length + ' users · ' + D.clients.length + ' customers', 'people', 'var(--accent-wash)', 'var(--accent)', go('people')),
-            tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
             tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
+            // Reports, then the trailing utility trio every role ends on — System,
+            // Self-check, Settings — kept together on purpose (owner's request, 2026-09-03).
+            reports,
+            tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
             selfCheck,
             settings,
           ];
@@ -10364,11 +10350,12 @@ class Component extends DCLogic {
               'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)',
               () => this.setState({ adminTab: 'price', roleTab: 'tickets' })));
           }
+          mine.push(reports);
           mine.push(selfCheck);
           mine.push(settings);
           return mine;
         }
-        return [selfCheck, settings];
+        return [reports, selfCheck, settings];
       })(),
       // The signed-in user's own record, for the technician's Account tab. Identity
       // rather than statistics: their numbers belong on Tickets, where the tickets are.
@@ -11777,7 +11764,8 @@ class Component extends DCLogic {
       // showing rather than repeating the whole menu above it.
       adminToolTitle: { price: 'Price Lists', numbers: 'Numbering & Job Types',
         people: 'Users & Customers', system: 'System', assets: 'Closing Questions',
-        perms: 'Permissions', check: 'Self-check' }[S.adminTab] || 'Admin',
+        perms: 'Permissions', check: 'Self-check',
+        reports: S.role === 'tech' ? 'My approved jobs' : 'Reports' }[S.adminTab] || 'Admin',
       adminToolHint: {
         price: 'Priced items per customer — changes apply to new ticket lines only.',
         assets: 'What a technician is asked about allocated tools when they close a job.',
@@ -11786,9 +11774,12 @@ class Component extends DCLogic {
         system: 'Charging rules and the danger zone.',
         perms: 'What each person may do. A role sets the default; a tick here overrides it for one person.',
         check: 'What only a browser can tell you: whether this build really reaches the project, and whether everything arrived.',
+        reports: S.role === 'tech' ? 'Printable sheets for jobs the office has approved.'
+          : 'Bundles, ZIPs and the master workbook of every approved job.',
       }[S.adminTab] || '',
       backToAccount: () => this.setState({ roleTab: 'account', adminTab: null }),
       adminCheck: S.adminTab === 'check',
+      adminReports: S.adminTab === 'reports',
       checkBusy: !!S.checkBusy,
       checkOpacity: S.checkBusy ? 0.5 : 1,
       checkLabel: S.checkBusy ? 'Checking…' : ((S.checkRows || []).length ? 'Run again' : 'Run checks'),

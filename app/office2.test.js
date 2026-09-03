@@ -60,9 +60,14 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
 
   await tab(p, 'Account');
   check('the Ops Manager has Reports too', /Reports/i.test(await p.innerText('body')));
+  // Reports lives behind its own tile now, not open on the Account tab.
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
   const slider = p.locator('input[type=range]').first();
   check('the report slider starts at 1', await slider.getAttribute('min') === '1',
     'min=' + await slider.getAttribute('min'));
+  await p.getByRole('button', { name: /‹ Account/i }).click();
+  await p.waitForTimeout(500);
 
   // Team carries the same position
   await p.getByText('Team', { exact: false }).first().click();

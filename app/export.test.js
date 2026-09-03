@@ -64,6 +64,9 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await p.waitForTimeout(1000);
   await p.getByRole('button', { name: /^Account$/i }).last().click();
   await p.waitForTimeout(800);
+  // Reports lives behind its own tile now, not open on the Account tab.
+  await p.getByRole('button', { name: /^Reports/i }).first().click();
+  await p.waitForTimeout(500);
   let body = await p.innerText('body');
   check('the report offers a month filter', /Month — counted by End Job date/i.test(body));
   check('and lists the tickets before anything is generated', /Ticket No\./i.test(body) && /ZIP/.test(body));
@@ -147,6 +150,9 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await hi.nth(0).fill('omar@makaman.ly'); await hi.nth(1).fill('makaman2026');
   await h.getByRole('button', { name: /log in/i }).click(); await h.waitForTimeout(1000);
   await h.getByRole('button', { name: /^Account$/i }).last().click(); await h.waitForTimeout(800);
+  // Reports lives behind its own tile now, not open on the Account tab.
+  await h.getByRole('button', { name: /^Reports/i }).first().click();
+  await h.waitForTimeout(500);
 
   const months = await h.locator('select').first().locator('option').allInnerTexts();
   check('a February-to-March job is offered under March', months.some(m => /March 2026/.test(m)), months.join(' | '));

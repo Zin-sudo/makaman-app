@@ -44,6 +44,10 @@ const login = async (p, email) => {
     await login(p, email);
     await p.getByText('Account', { exact: true }).first().click();
     await p.waitForTimeout(700);
+    // Reports (and the master file inside it) lives behind its own tile now, not open
+    // on the Account tab.
+    await p.getByRole('button', { name: /^Reports/i }).first().click();
+    await p.waitForTimeout(500);
     const seen = await p.evaluate(() => /master file — approved jobs/i.test(document.body.innerText));
     check(`${who} ${offered ? 'sees' : 'does not see'} the master file`, seen === offered);
     await ctx.close();
@@ -56,6 +60,8 @@ const login = async (p, email) => {
     await login(p, 'omar@makaman.ly');
     await p.getByText('Account', { exact: true }).first().click();
     await p.waitForTimeout(700);
+    await p.getByRole('button', { name: /^Reports/i }).first().click();
+    await p.waitForTimeout(500);
     const t = await p.evaluate(() => document.body.innerText);
     check('an unbuilt file says so rather than looking broken',
       /no file built yet/i.test(t));
