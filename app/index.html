@@ -2818,6 +2818,45 @@
         </sc-if>
       </sc-if>
 
+      <!-- The signed service ticket and job log are emailed to this list, both attached,
+           the moment the second document lands on an approved job — no button, no
+           button to forget to press. A disabled row stays on the list without receiving
+           anything, which is how a new address gets proven before it goes live. -->
+      <sc-if value="{{ adminPaperwork }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px">
+          <div class="mk-note" style="margin-bottom:14px;padding:10px 12px;font-size:12px;line-height:1.5;background:var(--accent-wash);border-left:3px solid var(--accent-deep);color:var(--accent-ink)">Sends automatically the moment both signed documents are attached to an approved job — the Service Ticket and the Job Log, both attached, with the job's data and log in the message. Nothing here waits for a button.</div>
+          <sc-if value="{{ paperworkLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:20px 0;text-align:center;font-size:13px;color:var(--ink-faint)">Loading…</div>
+          </sc-if>
+          <sc-if value="{{ paperworkEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:20px 0;text-align:center;font-size:13px;color:var(--ink-faint)">Nobody is on the list yet.</div>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px">
+            <sc-for list="{{ paperworkRows }}" as="r" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid rgba(var(--ink-rgb),0.12);border-bottom:none">
+                <div style="flex:1;min-width:0;font-size:14px;overflow-wrap:anywhere">{{ r.email }}</div>
+                <button onClick="{{ r.toggle }}" class="mk-switch" role="switch" aria-checked="{{ r.toggleOn }}" style="background:{{ r.toggleBg }}"><span class="mk-switch-knob" style="inset-inline-start:{{ r.toggleKnob }}"></span></button>
+                <button onClick="{{ r.remove }}" title="Remove from the list" style="flex:none;width:34px;height:34px;font-size:16px;line-height:1;cursor:pointer;background:transparent;border:1px solid rgba(var(--danger-rgb),0.4);color:var(--danger)">×</button>
+              </div>
+            </sc-for>
+            <div style="border:1px solid rgba(var(--ink-rgb),0.12)"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input dir="auto" type="email" value="{{ newPaperworkEmail }}" onChange="{{ f.newPaperworkEmail }}" placeholder="name@makaman.ly" style="flex:1;min-width:200px;min-height:42px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <button onClick="{{ addPaperworkRecipient }}" style="padding:9px 18px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add</button>
+          </div>
+          <div style="font-size:11px;color:var(--ink-faint);margin-top:10px;line-height:1.45">New addresses start switched off — test one at a time before turning the rest on.</div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:20px;padding-top:16px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600">Delete from Supabase once emailed</div>
+              <div style="font-size:12px;color:var(--ink-faint);margin-top:2px;line-height:1.4">Off by default. Once the emails have held up, turn this on to keep the Supabase bucket free — the two files leave Storage right after the email is confirmed sent; the record that they arrived stays on the ticket.</div>
+            </div>
+            <button onClick="{{ togglePaperworkDeleteAfterEmail }}" class="mk-switch" role="switch" aria-checked="{{ paperworkDeleteAfterEmailOn }}" style="background:{{ paperworkDeleteAfterEmailBg }}"><span class="mk-switch-knob" style="inset-inline-start:{{ paperworkDeleteAfterEmailKnob }}"></span></button>
+          </div>
+        </div>
+      </sc-if>
+
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
@@ -3568,7 +3607,7 @@ const PERMISSION_DEFAULTS = (function () {
         'activity.view_edits', 'user.act_as_technician']],
     [['admin'],
       ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.disable',
-        'user.manage_permissions', 'jobtype.manage']],
+        'user.manage_permissions', 'jobtype.manage', 'paperwork_email.manage']],
   ];
   const out = {};
   groups.forEach(([roles, keys]) => keys.forEach((k) => { out[k] = roles; }));
@@ -8112,6 +8151,115 @@ class Component extends DCLogic {
       .catch((err) => this.toast('attach', (err && err.message) || 'The file could not be removed.', 'warn'));
   }
 
+  // The distribution list for the paperwork email — read and written straight against
+  // Supabase, not through the outbox. Nothing here needs to work offline: only an admin,
+  // already online, ever opens this panel, and going through the ticket-sync machinery
+  // for a boolean and a handful of email addresses would be more mechanism than the data
+  // deserves. RLS (paperwork_email_recipients_manage, 0051) is the real gate either way —
+  // this is a courtesy early exit, the same relationship every other admin-only action in
+  // this file already has with hasPermission().
+  loadPaperworkRecipients() {
+    if (!this.hasPermission('paperwork_email.manage')) return Promise.resolve();
+    const c = sb();
+    if (!c || !USE_CLOUD) {
+      this.toast('paperwork', 'This needs a connection to the office.', 'warn');
+      return Promise.resolve();
+    }
+    this.setState({ paperworkBusy: true });
+    return Promise.all([
+      c.from('paperwork_email_recipients').select('*').order('created_at', { ascending: true }),
+      c.from('org_defaults').select('paperwork_delete_after_email').eq('id', true).maybeSingle(),
+    ])
+      .then(([rows, org]) => {
+        if (rows.error) throw rows.error;
+        if (org.error) throw org.error;
+        this.setState({
+          paperworkRecipients: rows.data || [],
+          paperworkDeleteAfterEmail: !!(org.data || {}).paperwork_delete_after_email,
+          paperworkBusy: false,
+        });
+      })
+      .catch((err) => {
+        this.setState({ paperworkBusy: false });
+        logError('paperwork', err, { doing: 'load recipients' });
+        this.toast('paperwork', (err && err.message) || 'Could not load the list.', 'warn');
+      });
+  }
+  // Off by default (org_defaults' own column default), and left alone until the owner
+  // flips it — see 0051/0053's send-paperwork-email: only then does a successful send
+  // delete the two Storage objects, never before, and never the ticket_attachments rows
+  // that record the paperwork arrived.
+  togglePaperworkDeleteAfterEmail() {
+    const c = sb();
+    if (!c) { this.toast('paperwork', 'This needs a connection to the office.', 'warn'); return; }
+    const next = !this.state.paperworkDeleteAfterEmail;
+    this.setState({ paperworkDeleteAfterEmail: next });
+    c.from('org_defaults').update({ paperwork_delete_after_email: next }).eq('id', true)
+      .then((r) => { if (r.error) throw r.error; })
+      .catch((err) => {
+        this.setState({ paperworkDeleteAfterEmail: !next });
+        logError('paperwork', err, { doing: 'toggle delete-after-email' });
+        this.toast('paperwork', (err && err.message) || 'Could not save that change.', 'warn');
+      });
+  }
+  // Optimistic, with a real revert on failure — a switch that visibly flips back when the
+  // write fails is the only honest way to show "that did not save" on a control this small.
+  togglePaperworkRecipient(row) {
+    const c = sb();
+    if (!c) { this.toast('paperwork', 'This needs a connection to the office.', 'warn'); return; }
+    const next = !row.enabled;
+    const apply = (enabled) => this.setState({
+      paperworkRecipients: (this.state.paperworkRecipients || [])
+        .map((r) => (r.id === row.id ? Object.assign({}, r, { enabled: enabled }) : r)),
+    });
+    apply(next);
+    c.from('paperwork_email_recipients').update({ enabled: next }).eq('id', row.id)
+      .then((r) => { if (r.error) throw r.error; })
+      .catch((err) => {
+        apply(row.enabled);
+        logError('paperwork', err, { doing: 'toggle recipient' });
+        this.toast('paperwork', (err && err.message) || 'Could not save that change.', 'warn');
+      });
+  }
+  addPaperworkRecipient() {
+    const email = (this.state.newPaperworkEmail || '').trim().toLowerCase();
+    if (!email || email.indexOf('@') < 0) {
+      this.toast('paperwork', 'Type a real email address.', 'warn');
+      return;
+    }
+    const c = sb();
+    if (!c) { this.toast('paperwork', 'This needs a connection to the office.', 'warn'); return; }
+    c.from('paperwork_email_recipients').insert({ email: email, enabled: false, added_by: CLOUD_IDS.me })
+      .select().single()
+      .then((r) => {
+        if (r.error) throw r.error;
+        this.setState({
+          paperworkRecipients: (this.state.paperworkRecipients || []).concat([r.data]),
+          newPaperworkEmail: '',
+        });
+      })
+      .catch((err) => {
+        logError('paperwork', err, { doing: 'add recipient' });
+        this.toast('paperwork', (err && err.message) || 'Could not add that address — it may already be on the list.', 'warn');
+      });
+  }
+  removePaperworkRecipient(row) {
+    const c = sb();
+    if (!c) { this.toast('paperwork', 'This needs a connection to the office.', 'warn'); return; }
+    const before = this.state.paperworkRecipients || [];
+    this.setState({ paperworkRecipients: before.filter((r) => r.id !== row.id) });
+    c.from('paperwork_email_recipients').delete().eq('id', row.id)
+      .then((r) => { if (r.error) throw r.error; })
+      .catch((err) => {
+        // Resynced rather than reinserted locally — a delete that actually failed server
+        // side could have failed for a reason (a race with another admin's edit) that a
+        // blind local reinsert would paper over.
+        this.loadPaperworkRecipients();
+        logError('paperwork', err, { doing: 'remove recipient' });
+        this.toast('paperwork', (err && err.message) || 'Could not remove that address.', 'warn');
+      });
+  }
+
   sheetGeometry() { return SHEET; }
 
   // Hydration, reachable so a failure can be read rather than inferred from an empty
@@ -10347,6 +10495,8 @@ class Component extends DCLogic {
             tile('Users & Customers', (D.users || []).length + ' users · ' + D.clients.length + ' customers', 'people', 'var(--accent-wash)', 'var(--accent)', go('people')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
             tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
+            tile('Paperwork Email', 'Who gets the signed service ticket and job log', 'people', 'var(--accent-wash)', 'var(--accent)',
+              () => { this.setState({ adminTab: 'paperwork', roleTab: 'tickets' }); this.loadPaperworkRecipients(); }),
             // Reports, then the trailing utility trio every role ends on — System,
             // Self-check, Settings — kept together on purpose (owner's request, 2026-09-03).
             reports,
@@ -11778,7 +11928,7 @@ class Component extends DCLogic {
       // showing rather than repeating the whole menu above it.
       adminToolTitle: { price: 'Price Lists', numbers: 'Numbering & Job Types',
         people: 'Users & Customers', system: 'System', assets: 'Closing Questions',
-        perms: 'Permissions', check: 'Self-check',
+        perms: 'Permissions', check: 'Self-check', paperwork: 'Paperwork Email',
         reports: S.role === 'tech' ? 'My approved jobs' : 'Reports' }[S.adminTab] || 'Admin',
       adminToolHint: {
         price: 'Priced items per customer — changes apply to new ticket lines only.',
@@ -11788,12 +11938,30 @@ class Component extends DCLogic {
         system: 'Charging rules and the danger zone.',
         perms: 'What each person may do. A role sets the default; a tick here overrides it for one person.',
         check: 'What only a browser can tell you: whether this build really reaches the project, and whether everything arrived.',
+        paperwork: 'Who receives the signed service ticket and job log automatically once both arrive.',
         reports: S.role === 'tech' ? 'Printable sheets for jobs the office has approved.'
           : 'Bundles, ZIPs and the master workbook of every approved job.',
       }[S.adminTab] || '',
       backToAccount: () => this.setState({ roleTab: 'account', adminTab: null }),
       adminCheck: S.adminTab === 'check',
       adminReports: S.adminTab === 'reports',
+      adminPaperwork: S.adminTab === 'paperwork',
+      paperworkLoading: !!S.paperworkBusy,
+      paperworkEmpty: !S.paperworkBusy && (S.paperworkRecipients || []).length === 0,
+      paperworkRows: (S.paperworkRecipients || []).map((r) => ({
+        id: r.id, email: r.email,
+        toggleBg: r.enabled ? 'var(--accent)' : 'var(--field)',
+        toggleKnob: r.enabled ? '24px' : '3px',
+        toggleOn: r.enabled ? 'true' : 'false',
+        toggle: () => this.togglePaperworkRecipient(r),
+        remove: () => this.removePaperworkRecipient(r),
+      })),
+      newPaperworkEmail: S.newPaperworkEmail || '',
+      addPaperworkRecipient: () => this.addPaperworkRecipient(),
+      paperworkDeleteAfterEmailOn: S.paperworkDeleteAfterEmail ? 'true' : 'false',
+      paperworkDeleteAfterEmailBg: S.paperworkDeleteAfterEmail ? 'var(--accent)' : 'var(--field)',
+      paperworkDeleteAfterEmailKnob: S.paperworkDeleteAfterEmail ? '24px' : '3px',
+      togglePaperworkDeleteAfterEmail: () => this.togglePaperworkDeleteAfterEmail(),
       checkBusy: !!S.checkBusy,
       checkOpacity: S.checkBusy ? 0.5 : 1,
       checkLabel: S.checkBusy ? 'Checking…' : ((S.checkRows || []).length ? 'Run again' : 'Run checks'),
@@ -12231,6 +12399,7 @@ class Component extends DCLogic {
         newTechPassword: e => this.setState({ newTechPassword: e.target.value, newTechError: '', newTechDone: false }),
         defBaseLocation: e => { const v = e.target.value; this.mutate(d => { (d.orgDefaults = d.orgDefaults || {}).baseLocation = v; }); },
         defCustomerRep: e => { const v = e.target.value; this.mutate(d => { (d.orgDefaults = d.orgDefaults || {}).customerRep = v; }); },
+        newPaperworkEmail: e => this.setState({ newPaperworkEmail: e.target.value }),
       },
     };
   }
