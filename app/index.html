@@ -3374,10 +3374,11 @@ const DEFAULT_CUSTOMER_REP = 'Drilling/Workover Office';
 // What the job was FOR, read back out of what the technician wrote it up as.
 //
 // A job type in this company is `{TOOL} FOR {OBJECTIVE}` — `PKR FOR CSG TEST`,
-// `RBP FOR CEMENT JOB`. The tool is known when the ticket is raised; the objective often
-// is not, because a job that went out to set a plug also ended up pressure testing, and
-// what actually happened is written in the job log line by line. So the log is read and
-// the objective proposed from it.
+// `RBP FOR CEMENT JOB`. The tool is usually known when the ticket is raised; the
+// objective often is not, because a job that went out to set a plug also ended up
+// pressure testing, and what actually happened is written in the job log line by line.
+// So the log is read and the objective proposed from it — and when the ticket was never
+// given a tool either, the log is asked for that too (see TOOL_PHRASES below).
 //
 // SUGGESTED, never written. Every phrase below is a guess about what somebody meant by an
 // abbreviation scribbled at a wellhead, and a guess that writes itself into the ticket is
@@ -3437,6 +3438,37 @@ function splitJobType(jobType) {
   };
 }
 
+// The tool itself, read the same way — recognized phrasing only, normalized to the
+// abbreviation this company's own job-type list already uses. "Packer" and "PKR" are the
+// same tool; "retrievable bridge plug" and "RBP" are the same tool; "cement retainer" and
+// "CR" are the same tool; "combo" and "COMBINATION" are the same tool. Nothing here is
+// guessed past what a technician actually named — a tool never mentioned in the log is a
+// tool this function has nothing to say about, same as OBJECTIVE_PHRASES above.
+//
+// Only asked when the ticket itself has no tool yet (see suggestJobTypes) — a tool already
+// set is what somebody in the field or the office decided, and a job log that happens to
+// mention a second tool in passing does not get to overrule that.
+const TOOL_PHRASES = [
+  { re: /\b(?:packers?|pkr)\b/i, name: 'PKR' },
+  { re: /\b(?:retrievable\s*bridge\s*plugs?|rbp)\b/i, name: 'RBP' },
+  { re: /\b(?:cement\s*retainers?|cr)\b/i, name: 'CR' },
+  { re: /\b(?:combinations?|combo)\b/i, name: 'COMBINATION' },
+];
+
+// The earliest tool mention across the log wins — the tool that went in the hole was
+// decided at the start of the job, not renamed by whatever gets logged afterward.
+function deriveTool(events) {
+  for (let i = 0; i < (events || []).length; i++) {
+    const text = String((events[i] && events[i].text) || '');
+    const hits = TOOL_PHRASES
+      .map((ph) => ({ name: ph.name, at: text.search(ph.re) }))
+      .filter((x) => x.at >= 0)
+      .sort((a, b) => a.at - b.at);
+    if (hits.length) return hits[0].name;
+  }
+  return '';
+}
+
 // The objective this job log describes, combined with whatever the ticket already says.
 // Returns '' when there is nothing to add — no phrase found, or every phrase found is
 // already on the ticket — so the caller can show a chip or show nothing without a second
@@ -3462,6 +3494,9 @@ function suggestJobTypes(jobType, events) {
   if (!found.length) return [];
 
   const cur = splitJobType(jobType);
+  // A tool already on the ticket is trusted over anything read from the log — see
+  // TOOL_PHRASES above. Only when the ticket has none yet is the log itself asked.
+  const tool = cur.tool || deriveTool(events);
   // One suggestion per reading of the ambiguous phrase, and only the first ambiguous match
   // is expanded. Expanding every one would be a cross product — three ambiguous phrases
   // would be eight chips — and a screen of near-identical options is not a choice, it is a
@@ -3479,10 +3514,10 @@ function suggestJobTypes(jobType, events) {
     const add = objectives.filter((n) => cur.objectives.indexOf(n) < 0);
     if (!add.length) return;
     const all = cur.objectives.concat(add);
-    // No tool named yet — the technician has not said what went in the hole, and inventing
-    // one would be the part of this that cannot be guessed. The objectives alone are still
-    // worth offering; the office completes the front half.
-    const whole = (cur.tool ? cur.tool + ' FOR ' : '') + all.join(' & ');
+    // Still nothing to call it if neither the ticket nor the log ever named a tool — that
+    // is the one thing this cannot invent. The objectives alone are still worth offering;
+    // the office completes the front half.
+    const whole = (tool ? tool + ' FOR ' : '') + all.join(' & ');
     if (out.indexOf(whole) < 0) out.push(whole);
   });
   return out;

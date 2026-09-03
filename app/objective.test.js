@@ -1,14 +1,16 @@
 // The job objective, read back out of the job log.
 //
-// A job type here is `{TOOL} FOR {OBJECTIVE}` — `PKR FOR CSG TEST`. The tool is known
-// when the ticket is raised; what the job turned out to be FOR is written line by line
-// at the wellhead, in the shorthand people actually use ("P/T to 3000 psi"). So the log
-// is read and an objective proposed from it.
+// A job type here is `{TOOL} FOR {OBJECTIVE}` — `PKR FOR CSG TEST`. The tool is usually
+// known when the ticket is raised; what the job turned out to be FOR is written line by
+// line at the wellhead, in the shorthand people actually use ("P/T to 3000 psi"). So the
+// log is read and an objective proposed from it — and when the ticket was never given a
+// tool either, the same log is read for that too ("Ran RBP…" is a tool telling on itself).
 //
 // Two things are being guarded, and the second matters more than the first:
 //
 //   1. That the phrases are recognised, in the order they were written, joined with `&`,
-//      and that a tool already on the ticket is kept rather than overwritten.
+//      and that a tool already on the ticket is kept rather than overwritten by a second
+//      tool the log happens to mention in passing.
 //   2. That NOTHING is written until somebody taps. Every phrase in the table is a guess
 //      about an abbreviation, and a guess that writes itself into a ticket is a guess
 //      nobody gets to check. The whole feature is only safe because it is a proposal.
@@ -77,6 +79,30 @@ const CASES = [
     ['PKR FOR CSG TEST', 'PKR FOR PRESSURE TEST']],
   ['objectives alone when no tool has been named', '',
     ['Cement job performed by client.'], ['CEMENT JOB']],
+
+  // The tool itself, read the same way from the log when the ticket never named one —
+  // TOOL_PHRASES, added alongside OBJECTIVE_PHRASES. Recognized phrasing only, normalized
+  // to this company's own abbreviations, and never offered without an objective to pair
+  // it with — a tool alone is not a job type.
+  ['a bare tool mention is not enough on its own', '',
+    ['Ran RBP 7" to 8,420 ft, set plug.'], []],
+  ['packer in the log becomes PKR', '',
+    ['Ran tool, packer set at 8,420 ft.', 'Casing tested to 3000 psi.'],
+    ['PKR FOR CSG TEST']],
+  ['the abbreviation read straight from the seeded log wording', '',
+    ['Ran RBP 7" to 8,420 ft, set plug, pulled out of hole.',
+      'Cement job performed by client, standing by.'],
+    ['RBP FOR CEMENT JOB']],
+  ['cement retainer in the log becomes CR', '',
+    ['Ran cement retainer to 8,000 ft, set.', 'Cement job performed by client.'],
+    ['CR FOR CEMENT JOB']],
+  ['combo in the log becomes COMBINATION', '',
+    ['Rigged up combo tool.', 'Casing tested to 3000 psi.'],
+    ['COMBINATION FOR CSG TEST']],
+  ['a tool already on the ticket is kept, not overruled by a second tool in the log',
+    'PKR FOR CSG TEST',
+    ['Ran RBP for backup.', 'Acid job on the same trip.'],
+    ['PKR FOR CSG TEST & ACID JOB']],
 ];
 
 (async () => {
