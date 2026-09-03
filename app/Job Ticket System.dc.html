@@ -7658,8 +7658,9 @@ class Component extends DCLogic {
     // to. Elapsed is now the slowest single check, which is the number that means
     // something.
     const ORDER = ['Build', 'Mode', 'Project', 'Service worker', 'Reachable',
-      'Signed in (server)', 'Capabilities', 'Price lists complete', 'Tickets visible',
-      'Signed file links', 'Edge function', 'Elapsed'];
+      'Signed in (server)', 'Outbox', 'Set aside', 'Numbering claim', 'Capabilities',
+      'Price lists complete', 'Tickets visible', 'Signed file links', 'Edge function',
+      'Elapsed'];
     const rank = (name) => {
       const i = ORDER.indexOf(name);
       // The per-customer lines are indented children of 'Price lists complete' and sit
@@ -7681,6 +7682,76 @@ class Component extends DCLogic {
           return u;
         },
         (e) => { add('Signed in (server)', false, e.message); return null; }),
+      // What is sitting unsent on THIS device, and whether it looks stuck.
+      //
+      // A week of numbering-claim handovers going nowhere, and sixteen dead rows retried
+      // in a loop, both went unseen by every version of this check before tonight —
+      // Self-check asked whether the app could reach the server and stopped there, with
+      // nothing at all to say about what the device was actually holding back. A queue
+      // with something in it is normal; the same queue with an op that has already failed
+      // a few times is the thing worth a red line, before it reaches the set-aside pile.
+      guard('Outbox', () => {
+        const q = outboxRead();
+        if (!q.length) { add('Outbox', true, 'nothing queued'); return; }
+        const jobs = {};
+        let maxTries = 0;
+        q.forEach((op) => {
+          jobs[opTicket(op) || (op && op.key) || '?'] = true;
+          if (op && (op.tries || 0) > maxTries) maxTries = op.tries;
+        });
+        const jobCount = Object.keys(jobs).length;
+        add('Outbox', maxTries < 3,
+          q.length + ' op(s) queued across ' + jobCount + ' job(s)'
+            + (maxTries > 0 ? ', one retried ' + maxTries + ' time(s) already' : ''));
+      }),
+      // What has already been given up on, split the way the banner now splits it — a
+      // terminal refusal (a job that is no longer on the server) is a Dismiss, not a
+      // Retry, and reporting sixteen rows as sixteen problems is how a diagnostic becomes
+      // noise. This names the jobs, the same information an error-log export had to be
+      // read by hand to recover tonight.
+      guard('Set aside', () => {
+        let dead = [];
+        try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); } catch (e) { /* none */ }
+        if (!dead.length) { add('Set aside', true, 'nothing set aside'); return; }
+        const terminal = dead.filter((d) => d && d.terminal);
+        const retryable = dead.filter((d) => d && !d.terminal);
+        const jobs = {};
+        terminal.forEach((d) => { const t = d.op && opTicket(d.op); if (t) jobs[t] = true; });
+        const bits = [];
+        if (terminal.length) {
+          bits.push(terminal.length + ' terminal — ' + Object.keys(jobs).length
+            + ' job(s) no longer on the server, Dismiss is the only action');
+        }
+        if (retryable.length) bits.push(retryable.length + ' worth pressing Retry on');
+        // Reached only when dead.length > 0 (the empty case returned above), so this is
+        // always a red line — there is something here for a person to look at, whether or
+        // not any of it is actually retryable.
+        add('Set aside', false, bits.join(' · '));
+      }),
+      // The one row that took three sessions of live impersonation probes to pin down,
+      // asked directly instead: does this device's own idea of who holds the numbering
+      // claim actually agree with what the server has? A device can show "You" for a
+      // week while the real row never moved, with nothing on screen to say so.
+      guard('Numbering claim', () => c.from('numbering_claim').select('holder_id').eq('id', true).single().then(
+        (r) => {
+          if (r.error) { add('Numbering claim', false, r.error.message); return; }
+          const serverHolderId = (r.data || {}).holder_id || null;
+          const users = this.state.data.users || [];
+          const serverHolder = users.find((u) => u.id === serverHolderId);
+          const serverLabel = serverHolder ? serverHolder.name
+            : (serverHolderId ? '(a user not on this device — sync it)' : 'nobody');
+          const local = this.state.data.numbering || {};
+          const idx = buildUserIndex(users);
+          const localEmail = String(local.holderEmail || '').toLowerCase();
+          const localId = (localEmail && idx.idByEmail[localEmail])
+            || (local.holderName && idx.idByName[local.holderName]) || null;
+          const agrees = localId === serverHolderId;
+          add('Numbering claim', agrees, agrees
+            ? serverLabel + ' holds it, and this device agrees'
+            : 'this device shows ' + (local.holderName || 'nobody') + ', the server shows '
+              + serverLabel + ' — sync this device, or the claim on screen is not real');
+        },
+        (e) => add('Numbering claim', false, e.message))),
       // The capability map, straight from the database function the gates read.
       step('Capabilities', () => c.rpc('my_permissions'),
         (r) => (r.data ? Object.keys(r.data).length : 0) + ' capability keys resolved'),

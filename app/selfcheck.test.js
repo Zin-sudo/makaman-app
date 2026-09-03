@@ -155,6 +155,160 @@ function db(itemsPerClient) {
       find(rows, '  Waha Oil Company').detail);
   }
 
+  // ── And it would have caught the outbox bugs too ──────────────────────────
+  //
+  // A week of numbering-claim handovers going nowhere, and sixteen dead rows retried in a
+  // loop, were both invisible to every version of this check before tonight — it asked
+  // whether the app could reach the server and stopped there. These three drive the checks
+  // added to close that: what is queued and does it look stuck, what has been given up on
+  // and is any of it worth retrying, and does this device's own claim agree with the
+  // server's row.
+
+  // A healthy but MID-SYNC device — something queued, nothing stuck yet — must not read as
+  // a problem. A red line on every device that just made an edit is worse than no line.
+  {
+    const rows = await run(db(30));
+    check('a freshly-queued op reads as healthy, not stuck',
+      find(rows, 'Outbox').ok === true, find(rows, 'Outbox').detail);
+  }
+
+  // A queued op that has already failed a few times — the starvation shape, before it is
+  // bad enough to be set aside.
+  {
+    const DB = db(30);
+    const ctx = await b.newContext({ viewport: { width: 1200, height: 950 }, serviceWorkers: 'block' });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+    await p.route('**/vendor/supabase.umd.js', r => r.fulfill({
+      status: 200, contentType: 'application/javascript', body: STUB(DB) }));
+    await p.route('**/functions/v1/admin-actions', r => r.fulfill({ status: 401, body: 'no' }));
+    await p.addInitScript(() => {
+      window.MAKAMAN_CONFIG = { authMode: 'cloud', supabaseUrl: 'https://stub.test', supabaseKey: 'stub' };
+      window.__DRAIN_TEST_MS = 120;
+    });
+    await p.goto(URL, { waitUntil: 'networkidle' });
+    await p.waitForTimeout(300);
+    await p.evaluate(() => localStorage.clear());
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(700);
+    const i = p.locator('input');
+    await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('whatever');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(2200);
+    const rows = await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      const key = 'makaman.outbox.v1' + (acct ? '.' + acct.toLowerCase() : '');
+      localStorage.setItem(key, JSON.stringify([
+        { key: 'audit_log:a1', table: 'audit_log', action: 'upsert', seq: 1,
+          acct: acct, tries: 3, row: { id: 'a1', ticket_id: 'ttt', text: 'stuck' } },
+      ]));
+      return window.__mkApp.runSelfCheck();
+    });
+    await ctx.close();
+    const verdict = find(rows, 'Outbox');
+    check('an op retried several times without succeeding is caught',
+      verdict.ok === false, verdict.detail);
+    check('and the count and the retry number are both in plain words',
+      /1 op\(s\) queued/.test(verdict.detail) && /3 time\(s\)/.test(verdict.detail), verdict.detail);
+  }
+
+  // A set-aside pile with both a terminal (dead job) and a retryable entry — the exact
+  // split the banner now makes, named the same way.
+  {
+    const DB = db(30);
+    const ctx = await b.newContext({ viewport: { width: 1200, height: 950 }, serviceWorkers: 'block' });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+    await p.route('**/vendor/supabase.umd.js', r => r.fulfill({
+      status: 200, contentType: 'application/javascript', body: STUB(DB) }));
+    await p.route('**/functions/v1/admin-actions', r => r.fulfill({ status: 401, body: 'no' }));
+    await p.addInitScript(() => {
+      window.MAKAMAN_CONFIG = { authMode: 'cloud', supabaseUrl: 'https://stub.test', supabaseKey: 'stub' };
+      window.__DRAIN_TEST_MS = 120;
+    });
+    await p.goto(URL, { waitUntil: 'networkidle' });
+    await p.waitForTimeout(300);
+    await p.evaluate(() => localStorage.clear());
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(700);
+    const i = p.locator('input');
+    await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('whatever');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(2200);
+    const rows = await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      const key = 'makaman.outbox.refused.v1' + (acct ? '.' + acct.toLowerCase() : '');
+      localStorage.setItem(key, JSON.stringify([
+        { at: new Date().toISOString(), why: 'the job is gone', n: 1, terminal: true,
+          op: { key: 'audit_log:dead1', table: 'audit_log',
+            row: { id: 'dead1', ticket_id: 'deleted-job-1' } } },
+        { at: new Date().toISOString(), why: 'a policy since corrected', n: 1, terminal: false,
+          op: { key: 'clients:c1', table: 'clients', row: { id: 'c1' } } },
+      ]));
+      return window.__mkApp.runSelfCheck();
+    });
+    await ctx.close();
+    const verdict = find(rows, 'Set aside');
+    check('a non-empty pile is a red line', verdict.ok === false, verdict.detail);
+    check('terminal entries are named as Dismiss-only, not retryable',
+      /1 terminal/.test(verdict.detail) && /Dismiss/.test(verdict.detail), verdict.detail);
+    check('and what is actually worth retrying is called out separately',
+      /1 worth pressing Retry/.test(verdict.detail), verdict.detail);
+  }
+
+  // ── The numbering claim, checked against the server directly ─────────────
+  //
+  // The row that took three sessions of live impersonation probes to pin down: this
+  // device's own idea of who holds the claim, asked whether it actually agrees with what
+  // the server has, rather than assumed from what the screen shows.
+  {
+    const rows = await run(db(30));
+    const verdict = find(rows, 'Numbering claim');
+    check('a device whose claim matches the server says so, and names who holds it',
+      verdict.ok === true && /Omar Al-Saleh/.test(verdict.detail), verdict.detail);
+  }
+  {
+    const DB = db(30);
+    const ctx = await b.newContext({ viewport: { width: 1200, height: 950 }, serviceWorkers: 'block' });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+    await p.route('**/vendor/supabase.umd.js', r => r.fulfill({
+      status: 200, contentType: 'application/javascript', body: STUB(DB) }));
+    await p.route('**/functions/v1/admin-actions', r => r.fulfill({ status: 401, body: 'no' }));
+    await p.addInitScript(() => {
+      window.MAKAMAN_CONFIG = { authMode: 'cloud', supabaseUrl: 'https://stub.test', supabaseKey: 'stub' };
+      window.__DRAIN_TEST_MS = 120;
+    });
+    await p.goto(URL, { waitUntil: 'networkidle' });
+    await p.waitForTimeout(300);
+    await p.evaluate(() => localStorage.clear());
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(700);
+    const i = p.locator('input');
+    await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('whatever');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(2200);
+    // The server's row (fixture) still names Omar. This device is told, locally, that
+    // somebody else holds it — the exact shape of a queued handover that never reached
+    // the server, or a hydrate that has not run since it moved.
+    const rows = await p.evaluate(() => {
+      const app = window.__mkApp;
+      const other = (app.state.data.users || []).find(u => u.email !== 'omar@makaman.ly');
+      app.mutate((d) => {
+        d.numbering = { holderEmail: other ? other.email : 'nobody@nowhere.ly',
+          holderName: other ? other.name : 'Nobody', since: new Date().toISOString(), history: [] };
+      });
+      return app.runSelfCheck();
+    });
+    await ctx.close();
+    const verdict = find(rows, 'Numbering claim');
+    check('a local claim that disagrees with the server is caught',
+      verdict.ok === false, verdict.detail);
+    check('and both sides are named, not just "wrong"',
+      /this device shows/.test(verdict.detail) && /the server shows/.test(verdict.detail),
+      verdict.detail);
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);
