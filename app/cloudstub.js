@@ -121,6 +121,11 @@ window.__offline = window.__offline || false;
 // Fault knobs, so the failure paths can be driven rather than reasoned about.
 window.__failUpload = false;
 window.__failInsert = '';
+// More than one table refusing at once. A real dead job fails on the ticket AND on
+// every row that belongs to it, and a single-table knob can only ever show half of
+// that -- which is the half that made the cascade look like one isolated fault.
+// Shape: { tickets: 'message', audit_log: 'message' }.
+window.__failTables = window.__failTables || null;
 // What the fake server refuses WITH, when it refuses.
 //
 // A refusal is not one thing. The app now sorts them — a wrong type, a policy, a clashing
@@ -241,6 +246,8 @@ window.supabase = {
           // ticket header, every audit entry and every job-log line goes out that way,
           // and insert() is reached only for an attachment row. A fault knob that covers
           // insert alone can only break the one path the app almost never takes.
+          var multi = window.__failTables && window.__failTables[table];
+          if (multi) return Promise.resolve({ data: null, error: { message: multi } });
           if (window.__failInsert === table) {
             return Promise.resolve({ data: null, error: {
               message: window.__failMessage || 'row refused by the database' } });
@@ -254,6 +261,8 @@ window.supabase = {
         },
         insert: function (rs) {
           if (window.__offline) return fail();
+          var multi = window.__failTables && window.__failTables[table];
+          if (multi) return Promise.resolve({ data: null, error: { message: multi } });
           if (window.__failInsert === table) {
             return Promise.resolve({ data: null, error: {
               message: window.__failMessage || 'row refused by the database' } });

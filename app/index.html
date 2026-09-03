@@ -1012,10 +1012,13 @@
       <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--warning)"></span>
       <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>{{ refusedLabel }}</strong> {{ refusedWhy }}</div>
       <div style="flex:none;display:flex;gap:8px">
-        <!-- The default action: give the server another chance rather than lose the
-             record of the attempt. A dropped connection and a policy refusal look the
-             same from here, and only one of those is actually permanent. -->
-        <button onClick="{{ retryRefused }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">RETRY</button>
+        <!-- Offered only when something in the pile could actually succeed on a second
+             attempt. A dropped connection deserves another go; a job that is no longer on
+             the server does not, and offering one turns a dead job into a loop somebody
+             keeps pressing while the error log fills up. -->
+        <sc-if value="{{ refusedRetryable }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ retryRefused }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">RETRY</button>
+        </sc-if>
         <button onClick="{{ askDismissRefused }}" style="padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.35)">DISMISS</button>
       </div>
     </div>
@@ -4754,6 +4757,9 @@ function outboxDrain() {
     // accepted as Lateri.
     const op = q[n];
     if (me && op && op.acct && op.acct !== me) return step(n + 1);
+    // Already dealt with earlier in this same pass — retired alongside a job that cannot be
+    // created (see below). Without this it would be sent again after being written off.
+    if (op && op.seq && settled[op.seq]) return step(n + 1);
     // Its job already had a write refused on this pass. Left exactly as it is, for the next
     // drain, once whatever is wrong with that job has been dealt with.
     if (blocked[groupOf(op)]) return step(n + 1);
@@ -4801,7 +4807,26 @@ function outboxDrain() {
         // a row of its own, perfectly writable, and holding it back because somebody else
         // edited the ticket header first would strand it for no reason.
         settle(q[n]);
-        outboxSetAside(q[n], err);
+        // A job that can never be created takes its rows with it, in one go.
+        //
+        // Three deleted test jobs, each naming a technician who had been removed with them,
+        // produced SIXTEEN refusals on one phone: the ticket, then its items, its assets,
+        // its crew, and one op per audit entry — every one of them failing its own foreign
+        // key, separately, on every pass, each writing its own line in the error log. They
+        // are not sixteen problems. They are one job that is gone, and saying it sixteen
+        // times is how a diagnostic becomes noise.
+        //
+        // Only when the JOB ITSELF is what was refused, and refused terminally. A single
+        // child row failing says nothing about the others.
+        const alsoRetired = [];
+        if (terminal && String(q[n].key || '').indexOf('tickets:') === 0) {
+          const job = groupOf(q[n]);
+          for (let j = 0; j < q.length; j++) {
+            if (j === n || !q[j] || (q[j].seq && settled[q[j].seq])) continue;
+            if (groupOf(q[j]) === job) { settle(q[j]); alsoRetired.push(q[j]); }
+          }
+        }
+        outboxSetAside(q[n], err, terminal, alsoRetired);
         return step(n + 1);
       }
     );
@@ -4852,7 +4877,12 @@ function outboxDrain() {
 // replica and on screen, so the only thing lost is the attempt to send it, and a record
 // of which writes the database would not take is the first thing worth having when a
 // device and the office disagree.
-function outboxSetAside(op, why) {
+// `terminal` says whether this can EVER succeed, and it is the drain that knows — it has
+// the error in hand and has already decided. Written down here because the banner has to
+// stop offering to retry something that cannot work: a foreign key that does not resolve
+// will not resolve on the sixteenth attempt either, and offering it turns a dead job into
+// a loop the person keeps pressing. `alsoRetired` are the rows written off with it.
+function outboxSetAside(op, why, terminal, alsoRetired) {
   // The reason is worked out BEFORE the try, so the try guards only the storage write.
   // It used to be computed inside, and when refusalText was briefly unreachable the
   // ReferenceError was caught by a `catch` meant for quota — the refusal was dropped and
@@ -4884,9 +4914,16 @@ function outboxSetAside(op, why) {
     // refused" about a single ticket sends them looking for a second one that does not
     // exist. Same op, same reason: bump the count and keep the newest timestamp.
     const at = new Date().toISOString();
+    const also = (alsoRetired || []).length;
     const same = dead.find((e) => e && (e.op || {}).key === (op || {}).key && e.why === reason);
-    if (same) { same.n = (same.n || 1) + 1; same.at = at; }
-    else dead.push({ at: at, op: op, why: reason, n: 1 });
+    if (same) {
+      same.n = (same.n || 1) + 1; same.at = at;
+      if (terminal) same.terminal = true;
+      if (also) same.also = Math.max(same.also || 0, also);
+    } else {
+      dead.push({ at: at, op: op, why: reason, n: 1,
+        terminal: !!terminal, also: also || undefined });
+    }
     localStorage.setItem(deadletterKey(), JSON.stringify(dead.slice(-50)));
   } catch (e) { /* quota */ }
 }
@@ -4939,9 +4976,19 @@ function outboxRetryDeadLetter() {
   try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); }
   catch (e) { return 0; }
   if (!dead.length) return 0;
+  // Only what could actually succeed on a second attempt. A refusal marked terminal — a
+  // job that is not on the server, a version that will never come back — is not pending
+  // work waiting for better luck, and re-queueing it just runs the same guaranteed
+  // failures again. That is not hypothetical: sixteen dead rows belonging to three deleted
+  // jobs went round this loop repeatedly on a real phone, filling the error log each pass
+  // while nothing changed. Those entries stay in the pile, where Dismiss is the honest
+  // action and the banner now says so.
+  const worthIt = dead.filter((e) => e && !e.terminal);
+  const keep = dead.filter((e) => e && e.terminal);
+  if (!worthIt.length) return 0;
   const q = outboxRead();
   let seq = q.reduce((m, x) => Math.max(m, (x && x.seq) || 0), 0);
-  dead.forEach((entry) => {
+  worthIt.forEach((entry) => {
     const op = entry && entry.op;
     if (!op || !op.key) return;
     const fresh = Object.assign({}, op, { seq: ++seq, tries: 0 });
@@ -4949,8 +4996,19 @@ function outboxRetryDeadLetter() {
     if (at >= 0) q[at] = fresh; else q.push(fresh);
   });
   outboxWrite(q);
-  try { localStorage.removeItem(deadletterKey()); } catch (e) { /* nothing to do */ }
-  return dead.length;
+  try {
+    if (keep.length) localStorage.setItem(deadletterKey(), JSON.stringify(keep));
+    else localStorage.removeItem(deadletterKey());
+  } catch (e) { /* nothing to do */ }
+  return worthIt.length;
+}
+// How many of the set-aside refusals are worth another attempt. The banner needs the two
+// counts apart: an action that cannot possibly work should not be offered at all.
+function outboxRetryableCount() {
+  try {
+    return JSON.parse(localStorage.getItem(deadletterKey()) || '[]')
+      .filter((e) => e && !e.terminal).length;
+  } catch (e) { return 0; }
 }
 
 // ── Turning a change in the replica into ops ─────────────────────────────────
@@ -7945,6 +8003,9 @@ class Component extends DCLogic {
   setAsideForTest(op, why) { return outboxSetAside(op, why); }
   refusedCount() { return outboxSetAsideCount(); }
   refusedLatest() { return outboxSetAsideLatest(); }
+  // The retry the banner offers, reachable without the button — because the case worth
+  // asserting hardest is the one where the button is deliberately NOT there.
+  retryRefusedForTest() { const n = outboxRetryDeadLetter(); this.scheduleDrain(); return n; }
 
   // Same reasoning as sheetGeometry: a test that cannot read the map can only check that
   // the output looks plausible, not that it was driven by the template's own cells.
@@ -10268,14 +10329,27 @@ class Component extends DCLogic {
       // Dismiss deletes it, after asking) is what makes this false now, not a separate
       // bit of state that could fall out of step with what is actually still sitting there.
       refusedAny: outboxSetAsideCount() > 0,
-      refusedLabel: outboxSetAsideCount() === 1
-        ? 'One change was refused by the server and has not been saved.'
-        : outboxSetAsideCount() + ' changes were refused by the server and have not been saved.',
+      refusedLabel: outboxRetryableCount() > 0
+        ? (outboxSetAsideCount() === 1
+          ? 'One change was refused by the server and has not been saved.'
+          : outboxSetAsideCount() + ' changes were refused by the server and have not been saved.')
+        // Nothing here can be sent, ever, so the words say that rather than implying it is
+        // still on its way. Counted in JOBS, not rows: sixteen refusals about three deleted
+        // jobs is three things to know about, and phrasing it as sixteen sends somebody
+        // looking for thirteen problems that do not exist.
+        : (outboxSetAsideCount() === 1
+          ? 'One change cannot be saved — the job it belongs to is no longer on the server.'
+          : outboxSetAsideCount() + ' changes cannot be saved — the jobs they belong to are '
+            + 'no longer on the server.'),
       refusedWhy: outboxSetAsideLatest(),
-      // The default action: put the ops back in the outbox and try again, rather than
-      // assume every refusal is permanent. Not gated behind a dialog — asking "are you
-      // sure you want to try again" would be a strange question, and nothing here is lost
-      // if the retry fails the same way; it just goes back on the pile.
+      // RETRY is offered only when something could actually succeed on a second attempt.
+      //
+      // It used to be offered for everything, and that turned a dead job into a loop: press
+      // it, sixteen guaranteed failures run, the banner comes back, the error log grows by
+      // sixteen more lines, nothing changes. A control that cannot do what it says is worse
+      // than no control — so when the pile is entirely terminal the button is not there and
+      // Dismiss, which is the only real option, is what remains.
+      refusedRetryable: outboxRetryableCount() > 0,
       retryRefused: () => {
         const n = outboxRetryDeadLetter();
         if (!n) return;
