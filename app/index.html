@@ -6321,6 +6321,31 @@ class Component extends DCLogic {
       window.addEventListener('offline', this.netListener);
     }
   }
+  // Start every page at the top. Not called from each place a screen changes — there are
+  // dozens of those, on both the phone and desk copies, and enumerating them is exactly
+  // the kind of list one new nav button quietly falls outside of. Instead this is the ONE
+  // place every screen change already passes through regardless of how it got here: React
+  // calls componentDidUpdate after any setState, so comparing the five keys that decide
+  // which screen is on display catches every navigation, current and future, in one spot.
+  //
+  // Scrolls both possible containers unconditionally rather than branching on role: the
+  // one that doesn't apply to the screen currently rendered is simply a no-op, and
+  // guessing which applies is one more way to miss a case a straight reset cannot.
+  scrollToTop() {
+    if (typeof document !== 'undefined') {
+      const body = document.querySelector('.mk-tab-body');
+      if (body) body.scrollTop = 0;
+    }
+    if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
+  }
+  componentDidUpdate(prevProps, prevState) {
+    const S = this.state;
+    if (prevState.roleTab !== S.roleTab || prevState.mgrScreen !== S.mgrScreen
+      || prevState.techScreen !== S.techScreen || prevState.adminTab !== S.adminTab
+      || prevState.activeId !== S.activeId) {
+      this.scrollToTop();
+    }
+  }
   componentWillUnmount() {
     if (typeof window !== 'undefined') {
       window.removeEventListener('error', this.onWindowError);
