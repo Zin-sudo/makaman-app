@@ -4028,7 +4028,10 @@ function shapeTicket(t, kids, nameById, clientById, jobById, emailById) {
     holder: nameById[t.holder_id] || nameById[t.technician_id] || '',
     customer: t.customer || (clientById[t.client_id] || {}).name || '',
     field: t.field_name || '', well: t.well_no || '', rig: t.rig_name || '',
-    jobType: jobById[t.job_type_id] || '',
+    // job_type_text first: it is what was actually typed, verbatim, whether or not the
+    // catalog has ever heard of it. The jobById lookup is only a fallback for a ticket
+    // synced before this column existed, when job_type_id really was the only record.
+    jobType: t.job_type_text || jobById[t.job_type_id] || '',
     arrival: tsIn(t.arrival_at), start: tsIn(t.start_job_at), end: tsIn(t.end_job_at),
     status: t.status, synced: !!t.synced, syncedAt: tsIn(t.synced_at),
     ticketNo: t.ticket_number || '', mileage: numIn(t.mileage_one_way),
@@ -4103,7 +4106,13 @@ function rowTicket(t, idByName, idByClient, idByJob) {
     field_name: clampLoc('field', t.field || ''),
     well_no: clampLoc('well', t.well || ''),
     rig_name: clampLoc('rig', t.rig || ''),
+    // The catalog link is best-effort — idByJob only knows the office's pre-registered
+    // names, and the suggestion feature composes phrasings ("PKR FOR CSG TEST & ACID
+    // JOB") nobody registered anywhere. job_type_text carries the actual words regardless
+    // of whether this lookup finds anything, so a phrasing the catalog has never seen
+    // still round-trips intact instead of silently becoming null (MK-JOBTYPE-TEXT).
     job_type_id: idByJob[t.jobType] || null,
+    job_type_text: t.jobType || null,
     arrival_at: tsOut(t.arrival), start_job_at: tsOut(t.start), end_job_at: tsOut(t.end),
     status: t.status, synced: !!t.synced, synced_at: tsOut(t.syncedAt),
     ticket_number: t.ticketNo || null, mileage_one_way: numOut(t.mileage),
@@ -7851,26 +7860,40 @@ class Component extends DCLogic {
       // asked directly instead: does this device's own idea of who holds the numbering
       // claim actually agree with what the server has? A device can show "You" for a
       // week while the real row never moved, with nothing on screen to say so.
-      guard('Numbering claim', () => c.from('numbering_claim').select('holder_id').eq('id', true).single().then(
-        (r) => {
-          if (r.error) { add('Numbering claim', false, r.error.message); return; }
-          const serverHolderId = (r.data || {}).holder_id || null;
-          const users = this.state.data.users || [];
-          const serverHolder = users.find((u) => u.id === serverHolderId);
-          const serverLabel = serverHolder ? serverHolder.name
-            : (serverHolderId ? '(a user not on this device — sync it)' : 'nobody');
-          const local = this.state.data.numbering || {};
-          const idx = buildUserIndex(users);
-          const localEmail = String(local.holderEmail || '').toLowerCase();
-          const localId = (localEmail && idx.idByEmail[localEmail])
-            || (local.holderName && idx.idByName[local.holderName]) || null;
-          const agrees = localId === serverHolderId;
-          add('Numbering claim', agrees, agrees
-            ? serverLabel + ' holds it, and this device agrees'
-            : 'this device shows ' + (local.holderName || 'nobody') + ', the server shows '
-              + serverLabel + ' — sync this device, or the claim on screen is not real');
-        },
-        (e) => add('Numbering claim', false, e.message))),
+      //
+      // Only asked of a role that can actually read the row. numbering_claim's own SELECT
+      // policy is is_staff() OR founder (ops_manager, admin, founder) — a technician or
+      // observer gets zero rows back from RLS, not an error, and .single() on zero rows
+      // throws "Cannot coerce the result to a single JSON object." That is not a fault to
+      // report; it is the policy working as designed, surfaced as a red line on every
+      // technician's Self-check for a row they were never meant to see. Mirrors the same
+      // guard 'Price lists complete' already uses for the same shape of problem.
+      guard('Numbering claim', () => {
+        if (this.state.role !== 'mgr' && this.state.role !== 'admin' && this.state.role !== 'founder') {
+          add('Numbering claim', true, 'office-only — not held by this account');
+          return;
+        }
+        return c.from('numbering_claim').select('holder_id').eq('id', true).single().then(
+          (r) => {
+            if (r.error) { add('Numbering claim', false, r.error.message); return; }
+            const serverHolderId = (r.data || {}).holder_id || null;
+            const users = this.state.data.users || [];
+            const serverHolder = users.find((u) => u.id === serverHolderId);
+            const serverLabel = serverHolder ? serverHolder.name
+              : (serverHolderId ? '(a user not on this device — sync it)' : 'nobody');
+            const local = this.state.data.numbering || {};
+            const idx = buildUserIndex(users);
+            const localEmail = String(local.holderEmail || '').toLowerCase();
+            const localId = (localEmail && idx.idByEmail[localEmail])
+              || (local.holderName && idx.idByName[local.holderName]) || null;
+            const agrees = localId === serverHolderId;
+            add('Numbering claim', agrees, agrees
+              ? serverLabel + ' holds it, and this device agrees'
+              : 'this device shows ' + (local.holderName || 'nobody') + ', the server shows '
+                + serverLabel + ' — sync this device, or the claim on screen is not real');
+          },
+          (e) => add('Numbering claim', false, e.message));
+      }),
       // The capability map, straight from the database function the gates read.
       step('Capabilities', () => c.rpc('my_permissions'),
         (r) => (r.data ? Object.keys(r.data).length : 0) + ' capability keys resolved'),

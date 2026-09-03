@@ -309,6 +309,41 @@ function db(itemsPerClient) {
       verdict.detail);
   }
 
+  // ── A technician is never asked the question at all ──────────────────────
+  //
+  // numbering_claim's own SELECT policy is is_staff() OR founder — a technician gets zero
+  // rows back from RLS, not an error, and .single() on zero rows throws "Cannot coerce the
+  // result to a single JSON object." The fake server has no RLS to reproduce that with, so
+  // this proves the actual fix instead: a technician's Self-check never fires the query in
+  // the first place, and says why in plain words rather than surfacing that error live.
+  {
+    const DB = db(30);
+    const ctx = await b.newContext({ viewport: { width: 1200, height: 950 }, serviceWorkers: 'block' });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+    await p.route('**/vendor/supabase.umd.js', r => r.fulfill({
+      status: 200, contentType: 'application/javascript', body: STUB(DB) }));
+    await p.route('**/functions/v1/admin-actions', r => r.fulfill({ status: 401, body: 'no' }));
+    await p.addInitScript(() => {
+      window.MAKAMAN_CONFIG = { authMode: 'cloud', supabaseUrl: 'https://stub.test', supabaseKey: 'stub' };
+      window.__DRAIN_TEST_MS = 120;
+    });
+    await p.goto(URL, { waitUntil: 'networkidle' });
+    await p.waitForTimeout(300);
+    await p.evaluate(() => localStorage.clear());
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(700);
+    const i = p.locator('input');
+    await i.nth(0).fill('yousef@makaman.ly'); await i.nth(1).fill('whatever');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(2200);
+    const rows = await p.evaluate(() => window.__mkApp.runSelfCheck());
+    await ctx.close();
+    const verdict = find(rows, 'Numbering claim');
+    check('a technician is told it is office-only, not asked a question RLS will refuse',
+      verdict.ok === true && /office-only/.test(verdict.detail), verdict.detail);
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);
