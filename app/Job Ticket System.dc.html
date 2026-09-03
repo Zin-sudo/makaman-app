@@ -1132,7 +1132,7 @@
   </sc-if>
 
   <!-- ══ TECHNICIAN ══ -->
-  <sc-if value="{{ isTech }}" hint-placeholder-val="{{ true }}">
+  <sc-if value="{{ showTechShell }}" hint-placeholder-val="{{ true }}">
     <!-- The technician's app, at whatever size the device is.
          This was a 398px phone drawn inside a bezel with an explainer beside it — a
          design-review prop, useful when the only question was "what will this look like
@@ -10275,6 +10275,13 @@ class Component extends DCLogic {
       },
 
       isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
+      // Excludes an open admin subpage the same way showMgrPage does, below. The phone
+      // frame's own tab body already stops offering its four tabs once adminTab is set
+      // (navTickets and friends), but the frame itself — flex:1, min-height calc(100vh -
+      // 58px) — kept mounted regardless, so an open Self-check or Reports rendered as an
+      // empty full-screen box above the real (shared, showAdminPage) content sitting right
+      // after it: the gap the owner reported from a technician's own phone (2026-09-03).
+      showTechShell: S.role === 'tech' && !S.adminTab,
       // While swapped the corner must not read plainly "Technician" — that is the one
       // reading which would make the swap invisible, and an invisible swap is how
       // somebody forgets they are in it and wonders where their approve button went.
@@ -10290,8 +10297,8 @@ class Component extends DCLogic {
       swapBack: () => this.swapRole('back'),
       // The office roles' own dashboards are what the Tickets destination shows; the
       // other three destinations replace the page rather than nesting inside it.
-      // (The technician's tabs live inside the phone frame instead, so isTech is
-      // unconditional and the switching happens one level further in.)
+      // (The technician's tabs live inside the phone frame instead, gated by
+      // showTechShell above — the same admin-subpage exclusion this binding uses.)
       // Tickets means the work, for every office role. The Admin's toolbox is a
       // thing you open from Account, not the meaning of a tab on the bottom bar.
       showMgrPage: ((S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab)
