@@ -3124,10 +3124,16 @@
     </div>
   </sc-if>
 
-  <!-- The office roles have no phone frame for the bar to sit inside, so it is
-       pinned to the viewport at every width. -->
+  <!-- The office roles have no phone frame for the bar to sit inside, so it needs to
+       reach the viewport bottom on a long page (Price Lists, a big Numbering table) —
+       which is what sent this to `fixed`. But `fixed` pins it to the literal viewport
+       edge regardless of content, so a short page (Self-check before it has run, Reports
+       on an empty month) left a dead gap between the content and a nav floating far below
+       it. deskNavPosition swaps in `sticky` on just those two screens — sits in normal
+       flow directly under short content there, with `fixed`'s zero extra render cost kept
+       everywhere else, the ticket inbox included. -->
   <sc-if value="{{ showDeskNav }}" hint-placeholder-val="{{ false }}">
-    <div style="position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface);padding-bottom:env(safe-area-inset-bottom)">
+    <div style="position:{{ deskNavPosition }};left:0;right:0;bottom:0;z-index:40;display:flex;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface);padding-bottom:env(safe-area-inset-bottom)">
       <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
         <button onClick="{{ n.pick }}" class="{{ n.cls }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
           {{ n.glyph }}
@@ -10159,6 +10165,14 @@ class Component extends DCLogic {
       // for a phone card, inside the technician frame.
       deskTabs: S.role !== 'tech' && S.roleTab !== 'tickets',
       showDeskNav: S.role !== 'tech',
+      // `sticky` (sits under short content, no gap) instead of `fixed` (pinned to the
+      // viewport edge regardless of content) only on the two screens routinely short
+      // enough to show the gap in the first place — Self-check before it has run, and
+      // Reports on a month with nothing in it. Everywhere else stays `fixed`: a sticky
+      // element costs the browser an ongoing scroll-position check that a fixed one
+      // does not, and the ticket inbox is exactly the screen A3's render-time budget
+      // was written for — no reason to spend any of it on a nav bar.
+      deskNavPosition: (S.adminTab === 'check' || S.adminTab === 'reports') ? 'sticky' : 'fixed',
 
       // ── Bottom navigation ──────────────────────────────────────────────────
       // Four destinations, the same for every role: the work itself, what has been
