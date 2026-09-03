@@ -3266,6 +3266,25 @@ function sb() {
   return _sb;
 }
 
+// getSession() serialises against a Web Locks mutex so two tabs never restore a session at
+// once — sound in principle, but a PWA does not always get a clean unload. An app killed by
+// the OS while backgrounded, rather than closed by the person using it, can leave that lock
+// held by a tab that is never coming back; the next launch's getSession() then waits on a
+// lock that will never release. Nothing throws, nothing logs — the boot-time hydrate this
+// gates (see componentDidMount) simply never fires, so the screen shows whatever was already
+// cached, or nothing, for ever, until a full close clears whatever held it. That is the
+// "no tickets, closing and reopening brings them back" report this exists to close off:
+// racing the wait against a timeout means a stuck lock costs a few seconds, not the session.
+const AUTH_RESTORE_TIMEOUT_MS = 4000;
+function withTimeout(promise, ms, fallback) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (v) => { if (!settled) { settled = true; resolve(v); } };
+    promise.then(finish, () => finish(fallback));
+    setTimeout(() => finish(fallback), ms);
+  });
+}
+
 // ── Passwords ───────────────────────────────────────────────────────────────
 //
 // Supabase's own leaked-password protection is a paid feature on this project's plan, so
@@ -6391,9 +6410,15 @@ class Component extends DCLogic {
     // (rather than on the flag alone) closes the race. Nothing about the boot itself
     // changes — the cached replica is already on screen either way — only the network
     // call waits an extra tick.
+    //
+    // Capped with withTimeout (see above sb()): getSession() can itself hang, not just be
+    // slow, when a previous tab's session-restore lock was never released. Four seconds is
+    // long enough for a real restore on a poor connection and short enough that a stuck
+    // lock reads as a brief delay rather than the empty screen this was reported as.
     if (USE_CLOUD && this.state.session) {
       const c = sb();
-      (c ? c.auth.getSession().catch(() => null) : Promise.resolve(null))
+      (c ? withTimeout(c.auth.getSession().catch(() => null), AUTH_RESTORE_TIMEOUT_MS, null)
+          : Promise.resolve(null))
         .then(() => this.refresh());
     }
 

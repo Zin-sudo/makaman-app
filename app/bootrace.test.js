@@ -90,6 +90,28 @@ assertStubParses(DB);
     fast.events.length > 0, JSON.stringify(fast.events));
   check('still signed in', fast.signedIn === true);
 
+  // The failure this was actually built to close off: not a slow restore but one that
+  // never settles at all, the way a stuck Web Locks mutex from a killed tab leaves the
+  // real client's getSession() waiting forever. Before withTimeout this hung the boot-time
+  // hydrate for the rest of the session — the exact "no tickets, closing and reopening
+  // brings them back" report — since nothing about a promise that never resolves ever
+  // throws for runLatest, componentDidMount, or anything downstream to catch.
+  await p.addInitScript(() => { window.__sessionRestoreHang = true; });
+  await p.reload({ waitUntil: 'domcontentloaded' });
+  await p.waitForTimeout(5200);
+  const hung = await p.evaluate((ticketId) => ({
+    events: (window.__events || []).map(e => e.what),
+    signedIn: !!(window.__mkApp && window.__mkApp.state.session
+      && window.__mkApp.state.session.name),
+    ticketOnScreen: (window.__mkApp.state.data.tickets || []).some(t => t.id === ticketId),
+  }), TICKET);
+  check('a getSession() that never settles does not block the boot forever',
+    hung.events.length > 0, JSON.stringify(hung.events));
+  check('the app is still on screen and signed in despite the hang',
+    hung.signedIn === true);
+  check('and the cached replica is still there — a stuck lock costs a delay, not the data',
+    hung.ticketOnScreen === true);
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await ctx.close();
   await b.close();

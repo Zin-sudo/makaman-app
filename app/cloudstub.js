@@ -335,7 +335,14 @@ window.supabase = {
         // than going out anon. window.__sessionRestoreMs simulates how long that restore
         // takes; window.__sessionRestoredAt records when it settled, so a suite can assert
         // ordering (nothing in window.__events should start before this).
+        //
+        // window.__sessionRestoreHang simulates the real failure this was built to catch:
+        // not a slow restore but one that never settles at all, the way a stuck Web Locks
+        // mutex from a killed tab leaves the real client's getSession() waiting forever.
+        // Returns a promise nothing ever resolves or rejects, so the only way the app's own
+        // boot proceeds is its own timeout giving up on this call — never this stub.
         getSession: function () {
+          if (window.__sessionRestoreHang) return new Promise(function () {});
           var s = window.__stubUser ? { user: { id: window.__stubUser } } : null;
           var ms = window.__sessionRestoreMs || 0;
           var finish = function () {
