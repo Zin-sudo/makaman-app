@@ -146,6 +146,92 @@ const geoOf = (page) => page.evaluate(() => {
     await page.close();
   }
 
+  // ---- an unanswered permission prompt does not disable location forever ----
+  //
+  // A bare context with geolocation never explicitly granted or denied does not make
+  // getCurrentPosition's error callback fire — it never resolves at all, discovered
+  // live while writing this: geoBusy stayed stuck true from the very first attempt,
+  // before this test ever touched anything. That is a real, worse-than-denial failure
+  // mode (nothing to reset — geoDenied is never even set) and exactly the shape of a
+  // Save-to-Home-Screen PWA's least reliable moment, where the standalone permission
+  // broker has a real history of never resolving the session's first request at all.
+  // geoFix's own backstop (GEO_FIX_BACKSTOP_MS) is what turns that into an ordinary,
+  // recoverable failure instead of a permanent one.
+  {
+    const deniedCtx = await browser.newContext({ viewport: { width: 430, height: 950 } });
+    const dpage = await boot(deniedCtx, errs);
+    // Sped up for the test; stacks on top of boot()'s own init script and takes effect
+    // on the reload below, same pattern bootrace.test.js uses for its own slow-restore hook.
+    await dpage.addInitScript(() => { window.__GEO_BACKSTOP_TEST_MS = 700; });
+    await dpage.reload({ waitUntil: 'networkidle' });
+    await dpage.waitForTimeout(600);
+    await login(dpage, 'yousef@makaman.ly');
+    await dpage.getByRole('button', { name: /New Job Ticket/i }).click();
+    await dpage.waitForTimeout(400);
+    await dpage.locator('select').first().selectOption({ index: 1 });
+    await dpage.locator('input').nth(0).fill('DeniedFld');
+    await dpage.locator('input').nth(1).fill('DN-1');
+    await dpage.locator('input').nth(2).fill('RIG-D');
+    await dpage.getByRole('button', { name: /Start Logging/i }).click();
+    // The opening attempt's own getCurrentPosition never answers in this context; only
+    // the backstop timer (700ms, sped up) frees it, which is the thing under test.
+    await dpage.waitForTimeout(1200);
+
+    let dg = await geoOf(dpage);
+    check('an unanswered permission prompt leaves the ticket with no geo.open, not a hang',
+      !(dg && dg.geo && dg.geo.open), JSON.stringify(dg));
+    // geoTick's own periodic retry (still due — nothing has landed yet) means geoBusy
+    // cycles true/false roughly every backstop interval rather than settling once, so
+    // this polls for a free moment instead of sampling a single instant that could land
+    // on either side of that cycle.
+    let everFree = false;
+    for (let i = 0; i < 6 && !everFree; i++) {
+      everFree = (await dpage.evaluate(() => window.__mkApp.geoBusy)) === false;
+      if (!everFree) await dpage.waitForTimeout(200);
+    }
+    check('and the backstop actually releases geoBusy rather than leaving it stuck', everFree);
+
+    // Backdate the arrival past the missing-pin threshold instead of waiting 20 real
+    // seconds — the binding only reads the elapsed time, not the wall clock it ran on.
+    await dpage.evaluate(() => {
+      window.__mkApp.mutate((d) => {
+        const t = d.tickets.find((x) => x.field === 'DeniedFld');
+        t.arrival = new Date(Date.now() - 25000).toISOString();
+      });
+    });
+    await dpage.waitForTimeout(300);
+    const retryBtn = dpage.getByRole('button', { name: /Well location not captured/i });
+    check('the missing pin is surfaced on the ticket itself, with a retry action',
+      await retryBtn.isVisible());
+
+    // Standing in for the moment a real technician taps Allow on the prompt the retry
+    // itself provokes — a resolved position handed straight to the callback the app
+    // itself registered, the same technique this file already uses to count calls.
+    await dpage.evaluate(([lat, lon]) => {
+      navigator.geolocation.getCurrentPosition = function (ok) {
+        ok({ coords: { latitude: lat, longitude: lon, accuracy: 10 }, timestamp: Date.now() });
+      };
+    }, [A.latitude, A.longitude]);
+    // geoTick's own periodic retry is still due and can be mid-flight (on the old
+    // hanging behaviour, with its own backstop still counting down) at the instant this
+    // clicks — wait for a free moment first so the click's own call is the one that
+    // actually reaches getCurrentPosition, now that the stub answers instantly.
+    for (let i = 0; i < 6; i++) {
+      if ((await dpage.evaluate(() => window.__mkApp.geoBusy)) === false) break;
+      await dpage.waitForTimeout(200);
+    }
+    await retryBtn.click();
+    await dpage.waitForTimeout(800);
+    dg = await geoOf(dpage);
+    check('tapping the retry pins the well location once permission is actually granted',
+      !!(dg && dg.geo && dg.geo.open), JSON.stringify(dg && dg.geo));
+    check('and the missing-pin line clears once it lands',
+      !(await retryBtn.isVisible().catch(() => false)));
+
+    await dpage.close();
+    await deniedCtx.close();
+  }
+
   // ---- consent toggle honoured ----
   page = await boot(ctx, errs);
   await page.evaluate(() => {

@@ -86,6 +86,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1d2d3d">
 <link rel="apple-touch-icon" href="uploads/icon-192.png">
+<!-- iOS still leans on this specific tag, not just display:standalone in the manifest, to
+     treat a Save-to-Home-Screen launch as a real standalone web app rather than a bookmark
+     opened in Safari chrome — and that distinction is exactly what governs how reliably
+     navigator.geolocation prompts at all. Missing this was one real contributor to "share
+     my location" not working for people who saved the app to their home screen. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Job Tickets">
 <link rel="stylesheet" href="vendor/fonts.css">
 <style>
   /* ══ THEME TOKENS ══
@@ -1304,6 +1311,12 @@
                   <div style="font-size:12px">{{ cur.endShort }}</div>
                 </div>
               </div>
+              <sc-if value="{{ arrivalGeoMissing }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ retryArrivalGeo }}" style="display:flex;align-items:center;gap:7px;width:100%;margin:6px 0 0;padding:8px 10px;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;background:rgba(var(--warning-rgb),0.1);border:1px solid rgba(var(--warning-rgb),0.3);color:var(--ink-dim)">
+                  <span style="flex:none;color:var(--warning-ink)">⚠</span>
+                  <span>Well location not captured on arrival — tap to try again</span>
+                </button>
+              </sc-if>
               <div style="margin:14px 0 4px">
                 <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Job type (objective)</label>
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
@@ -5641,10 +5654,19 @@ const GEO_TICK_MS = (typeof window !== 'undefined' && window.__GEO_TICK_TEST_MS)
 // tapped a button, so a position from the last half-minute is where they are, and
 // reusing it answers instantly instead of waiting on a cold GPS lock.
 const GEO_MAX_AGE_MS = 30000;
+// A few seconds past the 15000ms/20000ms `timeout` options geoFix and selfGeoTick pass to
+// getCurrentPosition — the browser's own promise about the GPS-acquisition phase, not
+// about how long it will wait on a permission prompt nobody ever answers. See geoFix.
+const GEO_FIX_BACKSTOP_MS = (typeof window !== 'undefined' && window.__GEO_BACKSTOP_TEST_MS) || 25000;
 // How stale the technician's own readout may get before it is taken again. Shorter than
 // the hourly office ping because this one is read off the screen in the moment, but not
 // so short that it keeps the GPS awake.
 const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO_TEST_MS) || 120000;
+// Covers the full two-attempt sequence in selfGeoTick (15s high-accuracy, then 20s coarse
+// fallback), not either attempt's own `timeout` option alone — see geoFix for why a
+// browser's own timeout is a promise about GPS acquisition, not about an unanswered
+// permission prompt.
+const SELF_GEO_FIX_BACKSTOP_MS = (typeof window !== 'undefined' && window.__SELF_GEO_BACKSTOP_TEST_MS) || 40000;
 // A confirmation of something the user just did, so it goes as soon as it is read.
 const COPY_TOAST_MS = 2000;
 
@@ -6669,6 +6691,17 @@ class Component extends DCLogic {
       this.geoBusy = false;
       cb(fix);
     };
+    // The `timeout` option below is a promise to the GPS-acquisition phase, not to how
+    // long the browser will wait on an unanswered permission prompt — and a prompt
+    // nobody ever answers is exactly the failure a Save-to-Home-Screen PWA is most prone
+    // to (standalone iOS has a real history of the permission broker never resolving on
+    // a session's first request). Without a backstop of its own, that leaves geoBusy
+    // stuck true forever: not merely this fix failing, but every later one — the opening
+    // pin on the next ticket, the periodic ping, a deliberate retry — silently doing
+    // nothing for the rest of the session, worse than a real denial because there is
+    // nothing to reset. Never latches geoDenied: a call that never answered is not the
+    // same fact as one that was refused.
+    setTimeout(() => done(null), GEO_FIX_BACKSTOP_MS);
     try {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -6731,6 +6764,12 @@ class Component extends DCLogic {
       if (f) this.setState({ selfFix: f, selfFixFailed: false, selfFixWhy: '', selfFixSeeking: false });
       else this.setState({ selfFixFailed: true, selfFixWhy: why || 'unavailable', selfFixSeeking: false });
     };
+    // Same backstop as geoFix, sized for the full two-attempt sequence below (15s then
+    // 20s) rather than either attempt alone — a permission prompt nobody answers can
+    // leave both native callbacks silent, and without this selfGeoBusy would stay stuck
+    // true for the rest of the session, same failure as geoFix's, just for the
+    // technician's own safety readout instead of a ticket's arrival pin.
+    setTimeout(() => done(null, 'unavailable'), SELF_GEO_FIX_BACKSTOP_MS);
     const take = (pos) => {
       const c = pos.coords || {};
       done({ lat: c.latitude, lon: c.longitude, ts: iso(new Date(pos.timestamp || Date.now())) });
@@ -11217,6 +11256,33 @@ class Component extends DCLogic {
       isHolder: !!t && holderOf(t) === myName,
       notHolder: !!t && holderOf(t) !== myName,
       holderName: t ? holderOf(t) : '',
+      // geoPinOpen fires silently on ticket creation and stays silent if it fails —
+      // deliberately, so a slow or refused fix never blocks the technician. But a refusal
+      // latches this.geoDenied for the rest of the session with nothing on screen to say
+      // so, and a Save-to-Home-Screen PWA is exactly where that first request is least
+      // reliable: iOS's standalone launch context has a real history of the very first
+      // navigator.geolocation call of a session coming back denied before the person has
+      // even seen a permission prompt to answer, which then permanently skips every
+      // later attempt too. The only way back was the Account "Share my position" toggle,
+      // off then on — a setting nobody would think to touch to fix a missing arrival pin
+      // on a specific ticket. This surfaces it on the ticket that actually needs it, with
+      // a tap that does the exact same reset. Waited a beat past the opening attempt's own
+      // timeout (15s) so a fix already in flight is not reported as missing while it is
+      // still just running.
+      // Deliberately not geoEnabled() — that also checks !this.geoDenied, and the one
+      // time this line needs to appear is exactly when geoDenied just got set. Checking
+      // the setting directly, the way geoEnabled() does everything BUT the denial flag,
+      // is what lets the retry below actually have something to retry.
+      arrivalGeoMissing: !!t && S.role === 'tech' && t.status === 'logging'
+        && holderOf(t) === myName && (D.settings || {}).shareLocation !== false
+        && typeof navigator !== 'undefined' && !!navigator.geolocation
+        && !(t.geo && t.geo.open)
+        && (Date.now() - new Date(t.arrival).getTime()) > 20000,
+      retryArrivalGeo: () => {
+        if (!t) return;
+        this.geoDenied = false;
+        this.geoPinOpen(t.id);
+      },
       // While a job is merely awaiting review it is still the technician's to correct,
       // even though he closed it himself. Once the office has closed it or approved it,
       // it is not — corrections go through the Ops Manager from there.
