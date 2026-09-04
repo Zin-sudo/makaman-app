@@ -87,12 +87,19 @@ async function open(ctx, cfg) {
       // suffixing rule, acctKey(currentAccount()). Miss any of them and outboxRead's own
       // try/catch turns the ReferenceError into an empty queue, which reads as "nothing to
       // send" and passes half the assertions below for entirely the wrong reason.
+      // withTimeout came with outboxDrain when the drain was made to wait for a settled
+      // session before its first send — same fix as hydrate's own boot race, on the write
+      // side. AUTH_RESTORE_TIMEOUT_MS is a `const`, not a `function`, so grab()'s brace
+      // matching cannot pull it out; hardcoded below alongside the other constants this
+      // block already carries in by hand for the same reason.
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
                      'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
-                     'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain']
+                     'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain',
+                     'withTimeout']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
+      const AUTH_RESTORE_TIMEOUT_MS = 4000;
       // window.__mkApp inside this Function IS the real page's running app (a `new
       // Function` still shares the page's global window) and nobody has signed in on it
       // here — so currentErrlogAccount() reads a null session and errlogKey() falls back
@@ -110,6 +117,10 @@ async function open(ctx, cfg) {
               ? { error: { message: 'new row violates row-level security policy' } }
               : (goodSent++, { error: null })),
         }),
+        // outboxDrain now waits on this before its first send of each pass — a settled
+        // session, immediately, is what every real run looks like once boot has actually
+        // finished; the race this waits out is not what this suite is testing.
+        auth: { getSession: () => Promise.resolve({ data: { session: {} }, error: null }) },
       };
       // SK is passed in rather than left to fall over: currentAccount() reads it when the
       // running component has no session, and an undefined SK would raise a ReferenceError
@@ -117,10 +128,10 @@ async function open(ctx, cfg) {
       // for the wrong reason. Correct answer here either way, but not by accident.
       const SK = 'makaman.jobtickets.session.v1';
       const fn = new Function('OUTBOX_K', 'DEADLETTER_K', 'OUTBOX_TRIES', 'ERRLOG_K',
-                              'ERRLOG_MAX', 'SK', 'sb', `
+                              'ERRLOG_MAX', 'SK', 'AUTH_RESTORE_TIMEOUT_MS', 'sb', `
         ${parts}
         return outboxDrain;
-      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, SK, () => stub);
+      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, SK, AUTH_RESTORE_TIMEOUT_MS, () => stub);
 
       const runs = [];
       // What is STILL queued after each pass, so "held its place" can be asserted as the

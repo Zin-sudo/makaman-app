@@ -4933,6 +4933,22 @@ function outboxDrain() {
   // advancing past it would delete somebody's unsent work. Recording each settled op by
   // seq says exactly what happened to each one. For every path that existed before this,
   // the set and the prefix agree.
+  // The same race hydrate() was fixed for once (see componentDidMount's getSession wait,
+  // and AUTH_RESTORE_TIMEOUT_MS above), on the write side instead of the read side. A
+  // ticket created and closed within seconds of signing in schedules its first drain
+  // before the Supabase client has necessarily finished attaching that fresh session's
+  // token to its own internal state — the write goes out effectively anonymous, and
+  // every RLS check comparing against auth.uid() (changed_by = auth.uid(), and the same
+  // shape everywhere else this pattern appears) refuses it exactly as it would refuse a
+  // stranger. Confirmed live: two technician tickets' "Marked Job Done" / "Uploaded from
+  // field device" audit_log rows each logged MK-SYNC-RLS once, then landed correctly a
+  // few seconds later on outboxDrain's own retry — same row, same content, the only
+  // thing that changed between the two attempts was whether the session was attached
+  // yet. Waiting here, once per drain, costs nothing once a session is already settled —
+  // getSession() answers from the client's own cache — and closes the window instead of
+  // relying on OUTBOX_TRIES to paper over it a few seconds later.
+  const sessionReady = withTimeout(c.auth.getSession().catch(() => null), AUTH_RESTORE_TIMEOUT_MS, null);
+  const send = () => {
   const settled = {};
   const settle = (op) => { if (op && op.seq) settled[op.seq] = true; };
   // Which jobs have already had a write refused on this pass. A ticket's rows must still go
@@ -5035,7 +5051,7 @@ function outboxDrain() {
       }
     );
   };
-  const run = step(0).catch((err) => {
+  return step(0).catch((err) => {
     // Reached only by the no-signal path above. Nothing was lost; the queue keeps
     // whatever it had and the next drain picks up where this one stopped.
     if (errorKind(err) !== 'NET') throw err;
@@ -5072,6 +5088,8 @@ function outboxDrain() {
       .map((op) => (op && op.seq && mine[op.seq]) ? mine[op.seq] : op));
     return sent;
   });
+  };
+  const run = sessionReady.then(send);
   const clear = () => { outboxDrain.inflight = null; };
   const settledRun = run.then((v) => { clear(); return v; }, (e) => { clear(); throw e; });
   outboxDrain.inflight = settledRun;
