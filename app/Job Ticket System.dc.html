@@ -1429,9 +1429,12 @@
                 </div>
               </div>
               <sc-if value="{{ arrivalGeoMissing }}" hint-placeholder-val="{{ false }}">
-                <button onClick="{{ retryArrivalGeo }}" style="display:flex;align-items:center;gap:7px;width:100%;margin:6px 0 0;padding:8px 10px;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;background:rgba(var(--warning-rgb),0.1);border:1px solid rgba(var(--warning-rgb),0.3);color:var(--ink-dim)">
+                <!-- align-items:flex-start, not center: the blocked-permission wording
+                     below can run three or four lines, and a centred icon floats loose
+                     in the middle of a paragraph instead of marking its first line. -->
+                <button onClick="{{ retryArrivalGeo }}" style="display:flex;align-items:flex-start;gap:7px;width:100%;margin:6px 0 0;padding:8px 10px;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;background:rgba(var(--warning-rgb),0.1);border:1px solid rgba(var(--warning-rgb),0.3);color:var(--ink-dim)">
                   <span style="flex:none;color:var(--warning-ink)">⚠</span>
-                  <span>Well location not captured on arrival — tap to try again</span>
+                  <span>{{ arrivalGeoMessage }}</span>
                 </button>
               </sc-if>
               <div style="margin:14px 0 4px">
@@ -5788,6 +5791,19 @@ const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO
 // browser's own timeout is a promise about GPS acquisition, not about an unanswered
 // permission prompt.
 const SELF_GEO_FIX_BACKSTOP_MS = (typeof window !== 'undefined' && window.__SELF_GEO_BACKSTOP_TEST_MS) || 40000;
+// Once a browser's OWN permission state for this origin is "denied" — not this app's own
+// this.geoDenied flag, the real one the browser holds — no web API can make it show the
+// native prompt again. That is deliberate, on every browser: a site is not allowed to
+// badger someone into a permission they already refused. The only way back is the person
+// opening their OWN settings and clearing it by hand, and the exact place to look differs
+// by whether they are in an ordinary browser tab or the installed, Save-to-Home-Screen
+// app — iOS in particular tracks the two separately, so clearing one does not clear the
+// other. This is read once per arrival-pin refusal, to say which set of steps applies.
+function isStandaloneApp() {
+  if (typeof window === 'undefined') return false;
+  return !!(window.navigator && window.navigator.standalone)
+    || !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
 // Every job on this system happens in Libya, and every timestamp on a ticket is evidence
 // of when someone was on a wellhead. That makes the operating zone a fact about the
 // company rather than a preference of the device: a technician whose phone is set to
@@ -6068,6 +6084,11 @@ class Component extends DCLogic {
       priceDelete: null,
       actingAs: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
+      // Whether a technician's OWN deliberate retry of the arrival pin came back denied
+      // a second time — see geoFix. State rather than an instance property because the
+      // arrival banner has to repaint the instant this changes, not wait for whatever
+      // unrelated render happens to come along next.
+      geoDeniedConfirmed: false,
       // No customer until one is picked. It used to open on whichever client happened to
       // be first, which reads as "here is Waha's price list" to somebody who came to look
       // at Zueitina's — and, while the paging bug was live, showed an empty table for a
@@ -6836,6 +6857,13 @@ class Component extends DCLogic {
     try {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          // A fix means the browser's own permission is genuinely open again — clears
+          // both flags, so a technician who fixed it in Settings is not still shown
+          // instructions for a problem that is over. State, not a bare instance
+          // property, and only written when it is actually changing: see the comment
+          // on the error branch below for why a plain instance flag was not enough.
+          if (this.state.geoDeniedConfirmed) this.setState({ geoDeniedConfirmed: false });
+          this.geoManualRetry = false;
           const c = pos.coords || {};
           done({
             // Latitude and longitude answer the question being asked — was someone
@@ -6851,7 +6879,29 @@ class Component extends DCLogic {
           // A refusal is permanent for the session — retrying a denied permission
           // every minute would badger the technician with prompts on some browsers
           // and burn battery on all of them.
-          if (err && err.code === 1) this.geoDenied = true;
+          //
+          // geoManualRetry is set only by retryArrivalGeo, right before it deliberately
+          // clears geoDenied and asks again — the one case this project's own iOS
+          // history says should NOT be trusted as final (the first call of a session
+          // has come back denied before the person ever saw a prompt to answer). A
+          // SECOND denial, on a call the person themselves asked for, is not that
+          // glitch — it is the browser's own permission state, and no code here can
+          // make it prompt again. geoDeniedConfirmed is what tells the banner to stop
+          // offering a retry that cannot work and explain what actually will instead.
+          //
+          // Real state, not a bare instance property like geoDenied and geoManualRetry
+          // are — this one has to repaint the banner the instant it changes, and an
+          // instance property changes with nothing to notice: the app went on showing
+          // "tap to try again" until whatever NEXT unrelated render happened to come
+          // along (in practice the 30-second clock tick), which is not "the instant a
+          // technician's own deliberate retry proves the permission is really blocked".
+          if (err && err.code === 1) {
+            this.geoDenied = true;
+            if (this.geoManualRetry && !this.state.geoDeniedConfirmed) {
+              this.setState({ geoDeniedConfirmed: true });
+            }
+          }
+          this.geoManualRetry = false;
           done(null);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: maxAgeMs === undefined ? GEO_MAX_AGE_MS : maxAgeMs }
@@ -11411,9 +11461,25 @@ class Component extends DCLogic {
         && typeof navigator !== 'undefined' && !!navigator.geolocation
         && !(t.geo && t.geo.open)
         && (Date.now() - new Date(t.arrival).getTime()) > 20000,
+      // "Tap to try again" is only ever true advice once — the browser's own permission
+      // state, not this.geoDenied, decides whether that tap can do anything at all. A
+      // SECOND denial, on a call this button itself asked for, means the browser has it
+      // switched off and no tap here will ever change that; geoDeniedConfirmed (set in
+      // geoFix's error handler, only on a manual retry) is what tells the two apart, so
+      // the message stops promising a retry that cannot work and says what will instead.
+      arrivalGeoBlocked: !!S.geoDeniedConfirmed,
+      arrivalGeoMessage: S.geoDeniedConfirmed
+        ? (isStandaloneApp()
+          ? 'Location is blocked for this app, not just this ticket. Open the phone\'s Settings, find this app in the list below the regular apps, open Location and allow it — then come back and tap here.'
+          : 'Location is blocked for this site, not just this ticket. On iPhone: Settings → Safari → Settings for Websites → Location, find this site and set it to Ask. On Android: tap the icon beside the address bar → Permissions → Location → Ask, then reload the page and tap here.')
+        : 'Well location not captured on arrival — tap to try again',
       retryArrivalGeo: () => {
         if (!t) return;
         this.geoDenied = false;
+        // Marks this specific attempt as one the person themselves asked for, so a
+        // second refusal is trusted as the browser's real permission state rather than
+        // the known first-call-of-the-session glitch. See the comment on geoFix.
+        this.geoManualRetry = true;
         this.geoPinOpen(t.id);
       },
       // While a job is merely awaiting review it is still the technician's to correct,

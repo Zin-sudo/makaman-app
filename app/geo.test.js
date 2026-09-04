@@ -232,6 +232,75 @@ const geoOf = (page) => page.evaluate(() => {
     await deniedCtx.close();
   }
 
+  // ---- a genuine platform denial stops offering a retry that cannot work ----
+  //
+  // Reported live: "tap to try again" kept reappearing with no way through it, on both
+  // a browser tab and the Save-to-Home-Screen app. Once the browser's OWN permission
+  // state is denied, nothing in JS can make it prompt again — the FIRST refusal is kept
+  // as an ordinary retry (this project's own history says a session's first call can
+  // come back denied before anyone saw a prompt at all), but a SECOND refusal, on a call
+  // the person themselves asked for by tapping retry, is trusted as real and the message
+  // has to stop suggesting a tap will fix it.
+  for (const standalone of [false, true]) {
+    const who = standalone ? 'the installed app' : 'a browser tab';
+    const dCtx = await browser.newContext({ viewport: { width: 430, height: 950 } });
+    const dpage = await boot(dCtx, errs);
+    await dpage.addInitScript((sa) => {
+      if (sa) {
+        try { Object.defineProperty(window.navigator, 'standalone', { value: true, configurable: true }); } catch (e) {}
+        const origMM = window.matchMedia ? window.matchMedia.bind(window) : null;
+        window.matchMedia = (q) => {
+          if (/display-mode:\s*standalone/.test(q)) return { matches: true, media: q };
+          return origMM ? origMM(q) : { matches: false, media: q };
+        };
+      }
+      // Denies immediately, the way a browser with the permission already switched off
+      // actually behaves — no delay, no prompt, straight to the error callback.
+      navigator.geolocation.getCurrentPosition = function (ok, err) {
+        err({ code: 1, message: 'User denied Geolocation' });
+      };
+    }, standalone);
+    await dpage.reload({ waitUntil: 'networkidle' });
+    await dpage.waitForTimeout(600);
+    await login(dpage, 'yousef@makaman.ly');
+    await dpage.getByRole('button', { name: /New Job Ticket/i }).click();
+    await dpage.waitForTimeout(400);
+    await dpage.locator('select').first().selectOption({ index: 1 });
+    await dpage.locator('input').nth(0).fill('BlockedFld');
+    await dpage.locator('input').nth(1).fill('BK-1');
+    await dpage.locator('input').nth(2).fill('RIG-B');
+    await dpage.getByRole('button', { name: /Start Logging/i }).click();
+    await dpage.waitForTimeout(500);
+
+    await dpage.evaluate(() => {
+      window.__mkApp.mutate((d) => {
+        const t = d.tickets.find((x) => x.field === 'BlockedFld');
+        t.arrival = new Date(Date.now() - 25000).toISOString();
+      });
+    });
+    await dpage.waitForTimeout(300);
+    const firstDenial = dpage.getByRole('button', { name: /Well location not captured/i });
+    check(`${who}: a first, automatic denial is still offered as an ordinary retry`,
+      await firstDenial.isVisible());
+
+    await firstDenial.click();
+    const blocked = dpage.getByText(/Location is blocked/i);
+    // The state change is a real setState round trip (geoFix's error callback, then a
+    // re-render), not instant — waits for the actual DOM change rather than a fixed
+    // sleep guessed to be long enough, which is what made this flaky the first time.
+    await blocked.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    check(`${who}: a second denial, on the tap the person made themselves, is not offered as a retry any more`,
+      !(await dpage.getByRole('button', { name: /Well location not captured/i }).isVisible().catch(() => false)));
+    check(`${who}: it explains the block instead`, await blocked.isVisible().catch(() => false));
+    const said = await blocked.textContent().catch(() => '');
+    check(`${who}: and points at the right place to fix it`,
+      standalone ? /below the regular apps/.test(said) : /Settings for Websites|address bar/.test(said),
+      said);
+
+    await dpage.close();
+    await dCtx.close();
+  }
+
   // ---- consent toggle honoured ----
   page = await boot(ctx, errs);
   await page.evaluate(() => {
