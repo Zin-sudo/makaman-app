@@ -3221,9 +3221,23 @@
                   <div class="mk-dev-jobs">
                     <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px">Open jobs</div>
                     <sc-for list="{{ d.openJobs }}" as="j" hint-placeholder-count="2">
-                      <div style="margin-bottom:7px;min-width:0">
+                      <div style="margin-bottom:11px;min-width:0">
                         <div style="font-size:13px;font-weight:600;overflow-wrap:anywhere">{{ j.customer }}</div>
                         <div style="font-size:12px;color:var(--ink-faint);overflow-wrap:anywhere">{{ j.locLine }}</div>
+                        <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;overflow-wrap:anywhere">{{ j.lastLogText }}</div>
+                        <div class="mk-hint">{{ j.lastLogTime }}</div>
+                        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px">
+                          <div style="min-width:0">
+                            <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">Well location</div>
+                            <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ j.wellLocDim }};overflow-wrap:anywhere">{{ j.wellLocText }}</div>
+                            <div class="mk-hint">{{ j.wellLocStamp }}</div>
+                          </div>
+                          <div style="min-width:0">
+                            <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">Current location</div>
+                            <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ j.curLocDim }};overflow-wrap:anywhere">{{ j.curLocText }}</div>
+                            <div class="mk-hint">{{ j.curLocStamp }}</div>
+                          </div>
+                        </div>
                       </div>
                     </sc-for>
                   </div>
@@ -5799,8 +5813,11 @@ const DRAIN_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__DRAIN_TEST_
 // scheduleDrain() is: one row's own write touches the ticket and several children in
 // the same moment, and Postgres Changes fires once per row, not once per edit.
 const REALTIME_REFRESH_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__REALTIME_TEST_MS) || 1200;
-// How often a ticket that is still being logged re-pins where the device is.
-const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 3600000;
+// How often a ticket that is still being logged re-pins where the device is. Two hours
+// rather than one (2026-09-04, owner's request): the office reads this as "still on
+// site," not live tracking, and the wider spacing costs the field device fewer GPS
+// wake-ups over a shift.
+const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 7200000;
 // How often the app *checks* whether a ping is due. Checking often and pinging rarely is
 // what keeps a device that was asleep or offline from owing a burst of catch-up fixes:
 // the check finds one ping due, not six.
@@ -5814,8 +5831,8 @@ const GEO_MAX_AGE_MS = 30000;
 // about how long it will wait on a permission prompt nobody ever answers. See geoFix.
 const GEO_FIX_BACKSTOP_MS = (typeof window !== 'undefined' && window.__GEO_BACKSTOP_TEST_MS) || 25000;
 // How stale the technician's own readout may get before it is taken again. Shorter than
-// the hourly office ping because this one is read off the screen in the moment, but not
-// so short that it keeps the GPS awake.
+// the office ping because this one is read off the screen in the moment, but not so
+// short that it keeps the GPS awake.
 const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO_TEST_MS) || 120000;
 // Covers the full two-attempt sequence in selfGeoTick (15s high-accuracy, then 20s coarse
 // fallback), not either attempt's own `timeout` option alone — see geoFix for why a
@@ -6579,7 +6596,7 @@ class Component extends DCLogic {
     // from sleep on the same network is the case that needs it), and it is harmless now
     // that an empty sync writes nothing.
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
-    // Checks every minute whether an hourly pin is due; see geoTick.
+    // Checks every minute whether the two-hourly pin is due; see geoTick.
     this.geoTimer = setInterval(() => this.geoTick(), GEO_TICK_MS);
     // Registers sw.js so the app is a real installable PWA on any device (see the
     // <link rel="manifest"> in <helmet>). Swallows failures silently — e.g. when run
@@ -7097,8 +7114,8 @@ class Component extends DCLogic {
       // Scheduled from when the device was last *asked*, not from the age of the fix
       // it came back with. The browser is allowed to answer with a recent cached fix,
       // which carries its own older timestamp; scheduling from that timestamp would
-      // leave the ticket permanently overdue and re-ask on every single tick — an
-      // hourly ping turning into a once-a-minute one.
+      // leave the ticket permanently overdue and re-ask on every single tick — a
+      // two-hourly ping turning into a once-a-minute one.
       const askedAt = g.pingedAt || (g.last && g.last.ts);
       if (!askedAt) return true;
       return Date.now() - new Date(askedAt).getTime() >= GEO_PING_INTERVAL_MS;
@@ -10829,11 +10846,33 @@ class Component extends DCLogic {
             posStamp: fix ? F.stamp(fix.ts) : '',
             posDim: fix ? 'var(--ink-dim)' : 'var(--ink-faint)',
             // What each open job actually is, so the office can act on a position
-            // without opening the ticket first.
-            openJobs: open.slice().reverse().map(x => ({
-              customer: x.customer,
-              locLine: [x.field, x.well, x.rig].filter(Boolean).join(' · ') || '—',
-            })),
+            // without opening the ticket first. Two coordinates rather than the one
+            // above, because they answer different questions: Well location is the
+            // opening fix, taken once and never overwritten — the site itself, which
+            // does not move (same reasoning as geoNote(), used on the printed sheet).
+            // Current location is the periodic re-pin (geoTick, every
+            // GEO_PING_INTERVAL_MS) — whether the device, and so presumably the
+            // technician, is still there. The last log line is the same shorthand
+            // liveTickets already gives the Observer feed for "what's actually
+            // happening" without opening the ticket (2026-09-04, owner's request).
+            openJobs: open.slice().reverse().map(x => {
+              const events = x.events || [];
+              const lastEvent = events[events.length - 1];
+              const wellFix = (x.geo || {}).open;
+              const curFix = (x.geo || {}).last;
+              return {
+                customer: x.customer,
+                locLine: [x.field, x.well, x.rig].filter(Boolean).join(' · ') || '—',
+                lastLogText: lastEvent ? lastEvent.text : 'No log lines yet.',
+                lastLogTime: lastEvent ? F.stamp(lastEvent.ts) : '',
+                wellLocText: wellFix ? geoText(wellFix) : NO_LOCATION,
+                wellLocStamp: wellFix ? F.stamp(wellFix.ts) : '',
+                wellLocDim: wellFix ? 'var(--ink-dim)' : 'var(--ink-faint)',
+                curLocText: curFix ? geoText(curFix) : NO_LOCATION,
+                curLocStamp: curFix ? F.stamp(curFix.ts) : '',
+                curLocDim: curFix ? 'var(--ink-dim)' : 'var(--ink-faint)',
+              };
+            }),
             hasOpenJobs: open.length > 0,
           };
         }).sort((a, b) => a.sortKey - b.sortKey); // longest out of contact first
