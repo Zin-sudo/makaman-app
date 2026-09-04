@@ -768,6 +768,93 @@
     80% { transform:rotate(-2deg); }
     90% { transform:rotate(2deg); }
   }
+
+  /* ── Repeated inline styles, consolidated ──────────────────────────────────
+     Each of these was a literal `style="..."` string duplicated five or more
+     times across the phone and desk copies of the same screens — every repeat
+     one more place a change to, say, the hint-text colour had to be found and
+     edited by hand instead of in one rule. Named for what the pattern IS, not
+     for the one screen it was first seen on, since most of these already show
+     up in several. None of the elements they replace carried a `class`
+     alongside the `style` before (checked, not assumed), so this only ever
+     adds a class — it does not merge onto or compete with an existing one. */
+  .mk-flex1, .mk-flex1-bare { flex:1; }
+  .mk-flex1 { min-width:0; }
+  .mk-clickable { cursor:pointer; }
+  .mk-col-gap10 { display:flex; flex-direction:column; gap:10px; }
+  .mk-row-wrap { display:flex; gap:8px; flex-wrap:wrap; }
+
+  /* Table heads and cells — the office tables' own column heads and rows. */
+  .mk-th-10, .mk-th-10-lg {
+    text-align:left; font-size:10px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-faint); border-bottom:1px solid rgba(var(--ink-rgb),0.16);
+  }
+  .mk-th-10 { padding:7px 6px; }
+  .mk-th-10-lg { padding:8px 10px; }
+  .mk-th-11 {
+    text-align:left; font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-faint); padding:9px 12px; border-bottom:1px solid rgba(var(--ink-rgb),0.16);
+  }
+  .mk-td-pad6 { padding:6px; border-bottom:1px solid rgba(var(--ink-rgb),0.08); }
+  .mk-td-pad8 { padding:8px 6px; border-bottom:1px solid rgba(var(--ink-rgb),0.08); }
+  .mk-td-pad11 { padding:11px 12px; border-bottom:1px solid rgba(var(--ink-rgb),0.08); }
+  .mk-table-plain { width:100%; border-collapse:collapse; font-size:13px; }
+
+  /* Form field labels, and the inputs at the sizes actually used. */
+  .mk-field-label { display:block; font-size:12px; margin-bottom:5px; color:var(--ink-dim); }
+  .mk-input-42, .mk-input-42-mb {
+    width:100%; min-height:42px; padding:8px 11px; font-size:15px;
+    background:var(--field); border:1px solid rgba(var(--ink-rgb),0.16); color:var(--ink);
+  }
+  .mk-input-42-mb { margin-bottom:14px; }
+  .mk-input-38-mb {
+    width:100%; min-height:38px; padding:7px 10px; font-size:14px;
+    background:var(--field); border:1px solid rgba(var(--ink-rgb),0.16); color:var(--ink);
+    margin-bottom:12px;
+  }
+  .mk-input-32 {
+    width:100%; min-height:32px; padding:5px 8px; font-size:13px;
+    background:var(--field); border:1px solid rgba(var(--ink-rgb),0.12); color:var(--ink);
+  }
+
+  /* Muted hint text, at the sizes and trailing positions actually used. */
+  .mk-hint, .mk-hint-mb, .mk-hint-end { font-size:11px; color:var(--ink-faint); }
+  .mk-hint-mb { margin-bottom:10px; }
+  .mk-hint-end { margin-left:auto; }
+  .mk-error-text { font-size:13px; color:var(--danger); margin-bottom:10px; }
+  .mk-muted-mb20 { font-size:13px; color:var(--ink-faint); margin-bottom:20px; }
+  .mk-text-13 { font-size:13px; color:var(--ink); }
+  .mk-eyebrow {
+    font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:10px;
+  }
+
+  /* Section labels — the small uppercase headings that break a page or panel
+     into named groups, in the two weights and the one accent colour the app
+     actually uses for them. */
+  .mk-section-label, .mk-section-label-sm {
+    font-weight:600; letter-spacing:0.04em; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:4px;
+  }
+  .mk-section-label { font-size:12px; }
+  .mk-section-label-sm { font-size:11px; }
+  .mk-accent-heading, .mk-accent-label {
+    font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:600;
+    font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--accent-deep);
+  }
+  .mk-accent-heading { margin-bottom:12px; }
+  .mk-page-title {
+    font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:600;
+    font-size:34px; margin:0 0 4px;
+  }
+  .mk-section-title {
+    font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif; font-weight:600;
+    font-size:22px; margin:0 0 18px;
+  }
+
+  /* Bordered panel padding, with and without the trailing gap to the next one. */
+  .mk-panel-pad, .mk-panel-pad-mb { border:1px solid rgba(var(--ink-rgb),0.16); padding:16px; }
+  .mk-panel-pad-mb { margin-bottom:16px; }
 }
 
 /* ══ THE A4 SHEETS ══
@@ -846,61 +933,61 @@
 
       <sc-if value="{{ authIsLogin }}" hint-placeholder-val="{{ true }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Makaman Job Tickets</h2>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Password</div>
+          <h2 class="mk-section-title">Makaman Job Tickets</h2>
+          <div class="mk-section-label">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" class="mk-input-42-mb">
+          <div class="mk-section-label">Password</div>
           <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
+            <div class="mk-error-text">{{ authError }}</div>
           </sc-if>
           <button onClick="{{ doLogin }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ loginLabel }}</button>
           <div style="text-align:center;font-size:13px;margin-top:14px"><a onClick="{{ goToForgot }}" style="cursor:pointer;color:var(--ink-dim)">Forgot your password?</a></div>
-          <div style="text-align:center;font-size:13px;margin-top:10px;color:var(--ink-faint)">New field technician? <a onClick="{{ goToSignup }}" style="cursor:pointer">Sign up</a></div>
+          <div style="text-align:center;font-size:13px;margin-top:10px;color:var(--ink-faint)">New field technician? <a onClick="{{ goToSignup }}" class="mk-clickable">Sign up</a></div>
           <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:var(--ink-faint);margin-top:16px">BUILD {{ buildStamp }}</div>
         </div>
       </sc-if>
 
       <sc-if value="{{ authIsSignup }}" hint-placeholder-val="{{ false }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Sign up as Field Technician</h2>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Full name</div>
-          <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
+          <h2 class="mk-section-title">Sign up as Field Technician</h2>
+          <div class="mk-section-label">Full name</div>
+          <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" class="mk-input-42-mb">
+          <div class="mk-section-label">Email</div>
           <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" placeholder="{{ signupPlaceholder }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:5px">
           <!-- The requirement said before the attempt, not after it: a rule a person only
                meets by failing is a rule the form kept to itself. -->
           <div style="font-size:11px;line-height:1.4;color:var(--ink-faint);margin-bottom:14px">{{ signupDomainHint }}</div>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Password</div>
-          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Confirm password</div>
+          <div class="mk-section-label">Password</div>
+          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" class="mk-input-42-mb">
+          <div class="mk-section-label">Confirm password</div>
           <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
           <div class="mk-note" style="margin:12px 0 4px;padding:9px 11px;font-size:12px;line-height:1.45;background:var(--accent-wash);border-left:3px solid var(--accent-deep);color:var(--accent-ink)">Accounts are created as Field Technician. If you should be an Operations Manager or an Observer, the office will change it after approving you.</div>
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
+            <div class="mk-error-text">{{ authError }}</div>
           </sc-if>
           <button onClick="{{ doSignup }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Request account</button>
-          <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)">Already have an account? <a onClick="{{ goToLogin }}" style="cursor:pointer">Log in</a></div>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)">Already have an account? <a onClick="{{ goToLogin }}" class="mk-clickable">Log in</a></div>
         </div>
       </sc-if>
 
       <sc-if value="{{ authIsForgot }}" hint-placeholder-val="{{ false }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Reset your password</h2>
+          <h2 class="mk-section-title">Reset your password</h2>
           <p style="font-size:13px;color:var(--ink-dim);line-height:1.5;margin:0 0 16px">We'll mail you a link. Open it on this device and you can set a new password straight away.</p>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div class="mk-section-label">Email</div>
+          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" class="mk-input-42-mb">
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ authError }}</div>
+            <div class="mk-error-text">{{ authError }}</div>
           </sc-if>
           <button onClick="{{ doForgot }}" disabled="{{ authBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ authBusyDim }}">{{ forgotLabel }}</button>
-          <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)"><a onClick="{{ goToLogin }}" style="cursor:pointer">Back to login</a></div>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)"><a onClick="{{ goToLogin }}" class="mk-clickable">Back to login</a></div>
         </div>
       </sc-if>
 
       <sc-if value="{{ authForgotSent }}" hint-placeholder-val="{{ false }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px;text-align:center">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Check your mail</h2>
+          <h2 class="mk-section-title">Check your mail</h2>
           <!-- Worded so it says the same thing whether or not the address belongs to
                anybody. Confirming which addresses are real is how somebody learns who
                works here, which is the same reason a wrong password and an unknown
@@ -912,17 +999,17 @@
 
       <sc-if value="{{ authIsRecover }}" hint-placeholder-val="{{ false }}">
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
-          <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:22px;margin:0 0 18px">Choose a new password</h2>
+          <h2 class="mk-section-title">Choose a new password</h2>
           <p style="font-size:13px;color:var(--ink-dim);line-height:1.5;margin:0 0 16px">{{ passwordRule }}</p>
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">New password</div>
-          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
-          <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Confirm new password</div>
-          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
+          <div class="mk-section-label">New password</div>
+          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" class="mk-input-42-mb">
+          <div class="mk-section-label">Confirm new password</div>
+          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" class="mk-input-42-mb">
           <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
-            <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ pwError }}</div>
+            <div class="mk-error-text">{{ pwError }}</div>
           </sc-if>
           <button onClick="{{ doRecover }}" disabled="{{ pwBusy }}" style="width:100%;padding:12px;margin-top:8px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--brand);color:var(--on-accent-strong);border:1px solid var(--brand);opacity:{{ pwBusyDim }}">{{ recoverLabel }}</button>
-          <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)"><a onClick="{{ goToLogin }}" style="cursor:pointer">Back to login</a></div>
+          <div style="text-align:center;font-size:13px;margin-top:16px;color:var(--ink-faint)"><a onClick="{{ goToLogin }}" class="mk-clickable">Back to login</a></div>
         </div>
       </sc-if>
 
@@ -1037,7 +1124,7 @@
       <sc-for list="{{ notifyRows }}" as="n" hint-placeholder-count="3">
         <button onClick="{{ n.open }}" style="width:100%;display:flex;gap:10px;padding:11px 14px;text-align:start;cursor:pointer;background:transparent;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
           <span style="width:3px;flex:none;background:{{ n.edge }}"></span>
-          <span style="flex:1;min-width:0">
+          <span class="mk-flex1">
             <span style="display:block;font-size:13px;line-height:1.4;color:var(--ink-strong)">{{ n.text }}</span>
             <span style="display:block;font-size:11px;color:var(--ink-faint);margin-top:3px">{{ n.where }} · {{ n.stamp }}</span>
           </span>
@@ -1058,7 +1145,7 @@
         <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
 
         <div style="margin-bottom:28px">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">Appearance</div>
+          <div class="mk-eyebrow">Appearance</div>
           <div class="mk-seg" style="display:flex;border:1px solid rgba(var(--ink-rgb),0.22);margin-bottom:16px">
             <sc-for list="{{ themeOptions }}" as="o" hint-placeholder-count="3">
               <button onClick="{{ o.pick }}" style="flex:1;padding:9px 0;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;border:0;border-left:1px solid rgba(var(--ink-rgb),0.15);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
@@ -1068,7 +1155,7 @@
         </div>
 
         <div style="margin-bottom:28px">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">Date &amp; time</div>
+          <div class="mk-eyebrow">Date &amp; time</div>
           <div style="padding:10px 12px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface);margin-bottom:12px;font-size:13px">
             All times are <strong>Libya time (UTC+2)</strong> on every device.
           </div>
@@ -1091,7 +1178,7 @@
 
         <sc-if value="{{ settingsIsMgr }}" hint-placeholder-val="{{ false }}">
           <div style="margin-bottom:28px">
-            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">Storage &amp; export</div>
+            <div class="mk-eyebrow">Storage &amp; export</div>
             <!-- S9, dropped rather than built. This panel offered OneDrive and Google
                  Drive, and the Connect button was a mock: it flipped a stored flag and
                  filled in a plausible account address, so Settings then read "Connected
@@ -1118,15 +1205,15 @@
              a technician who thinks somebody watched him type it should not have to ask
              the office to fix that. -->
         <div style="margin-bottom:28px">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">Password</div>
+          <div class="mk-eyebrow">Password</div>
           <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
             <div style="font-size:12px;color:var(--ink-faint);line-height:1.45;margin-bottom:12px">{{ passwordRule }} Your password is never sent anywhere to be checked — only a fragment of its fingerprint is.</div>
-            <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">New password</div>
+            <div class="mk-section-label">New password</div>
             <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-            <div style="font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Confirm new password</div>
+            <div class="mk-section-label">Confirm new password</div>
             <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
             <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ pwError }}</div>
+              <div class="mk-error-text">{{ pwError }}</div>
             </sc-if>
             <sc-if value="{{ pwDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Password changed. It applies the next time you sign in.</div>
@@ -1197,7 +1284,7 @@
                 </button>
               </sc-if>
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:16px 0 8px">On this device</div>
-              <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
+              <div class="mk-card-grid mk-col-gap10">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
                   <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -1208,11 +1295,11 @@
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
                         <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-faint)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
                       </sc-if>
-                      <span style="margin-left:auto;font-size:11px;color:var(--ink-faint)">{{ t.syncLabel }}</span>
+                      <span class="mk-hint-end">{{ t.syncLabel }}</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:11px">
                       <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
-                      <div style="flex:1;min-width:0">
+                      <div class="mk-flex1">
                         <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
                         <div style="font-size:13px;color:var(--ink-dim)">{{ t.locLine }}</div>
                       </div>
@@ -1239,13 +1326,13 @@
               </div>
               <div style="display:flex;flex-direction:column;gap:13px">
                 <div>
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Technician</label>
+                  <label class="mk-field-label">Technician</label>
                   <div class="mk-readonly" style="width:100%;min-height:46px;padding:12px 11px;font-size:15px;background:rgba(var(--ink-rgb),0.06);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink-dim)">{{ d.tech }}</div>
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--accent-wash);color:var(--accent-deep)">{{ icCustomer }}</div>
-                    <label style="font-size:13px;color:var(--ink)">Customer</label>
+                    <label class="mk-text-13">Customer</label>
                   </div>
                   <select value="{{ d.customer }}" onChange="{{ f.customer }}" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                     <option value="">Select customer…</option>
@@ -1257,21 +1344,21 @@
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:rgba(var(--warning-rgb),0.16);color:var(--warning-ink)">{{ icField }}</div>
-                    <label style="font-size:13px;color:var(--ink)">Field Name</label>
+                    <label class="mk-text-13">Field Name</label>
                   </div>
                   <input dir="auto" value="{{ d.field }}" onChange="{{ f.field }}" maxLength="10" placeholder="e.g. Burgan North" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
-                    <label style="font-size:13px;color:var(--ink)">Well No.</label>
+                    <label class="mk-text-13">Well No.</label>
                   </div>
                   <input dir="auto" value="{{ d.well }}" onChange="{{ f.well }}" maxLength="10" placeholder="e.g. BG-214" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
                 <div>
                   <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-indigo-wash);color:var(--hue-indigo)">{{ icRig }}</div>
-                    <label style="font-size:13px;color:var(--ink)">Rig Name</label>
+                    <label class="mk-text-13">Rig Name</label>
                   </div>
                   <input dir="auto" value="{{ d.rig }}" onChange="{{ f.rig }}" maxLength="10" placeholder="e.g. WS-11" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                 </div>
@@ -1294,7 +1381,7 @@
                 <div class="mk-note" style="margin:8px 0 4px;padding:10px 12px;font-size:12px;line-height:1.5;background:rgba(var(--warning-rgb),0.14);border-left:3px solid var(--warning);color:var(--ink)"><strong>This job was called off.</strong> {{ cancelledLine }}. {{ cancelledWhy }}</div>
               </sc-if>
               <div style="display:flex;align-items:flex-start;gap:8px">
-                <div style="flex:1">
+                <div class="mk-flex1-bare">
                   <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:23px;line-height:1.15">{{ cur.customer }}</div>
                   <div style="font-size:12px;color:var(--ink-dim)">{{ cur.locLine }}</div>
                 </div>
@@ -1321,7 +1408,7 @@
                 </button>
               </sc-if>
               <div style="margin:14px 0 4px">
-                <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Job type (objective)</label>
+                <label class="mk-field-label">Job type (objective)</label>
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
                 <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
                   <!-- Proposed from the job log, never written without a tap. The objectives
@@ -1427,16 +1514,16 @@
                 <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-top:16px">
                   <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                     <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)">Notes</div>
-                    <div style="font-size:11px;color:var(--ink-faint)">{{ notesSummary }}</div>
+                    <div class="mk-hint">{{ notesSummary }}</div>
                   </div>
-                  <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">Anything on this job that needs someone's attention.</div>
+                  <div class="mk-hint-mb">Anything on this job that needs someone's attention.</div>
                   <sc-if value="{{ notesEmpty }}" hint-placeholder-val="{{ true }}">
                     <div style="padding:12px 0;text-align:center;font-size:12px;color:var(--ink-faint)">No notes on this ticket.</div>
                   </sc-if>
                   <sc-for list="{{ noteRows }}" as="n" hint-placeholder-count="2">
                     <div style="display:flex;gap:10px;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
                       <span style="width:3px;flex:none;background:{{ n.edge }}"></span>
-                      <div style="flex:1;min-width:0">
+                      <div class="mk-flex1">
                         <div style="font-size:13px;line-height:1.45;color:{{ n.ink }}">{{ n.body }}</div>
                         <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ n.meta }}</div>
                       </div>
@@ -1455,26 +1542,26 @@
               </sc-if>
 
               <sc-if value="{{ showAttachments }}" hint-placeholder-val="{{ true }}">
-                <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+                <div class="mk-panel-pad-mb">
                   <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                     <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)">Signed paperwork</div>
                     <div style="font-size:11px;color:{{ attachSummaryColor }}">{{ attachSummary }}</div>
                   </div>
-                  <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
+                  <div class="mk-hint-mb">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
                   <sc-if value="{{ attachLocked }}" hint-placeholder-val="{{ false }}">
                     <div class="mk-note" style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ attachLockedNote }}</div>
                   </sc-if>
                   <sc-for list="{{ attachDocRows }}" as="d" hint-placeholder-count="2">
                     <div style="display:flex;gap:10px;padding:11px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
                       <span style="width:3px;flex:none;background:{{ d.edge }}"></span>
-                      <div style="flex:1;min-width:0">
+                      <div class="mk-flex1">
                         <div style="display:flex;align-items:baseline;gap:8px">
                           <div style="flex:1;font-size:13px;font-weight:600;color:var(--ink-strong)">{{ d.label }}</div>
                           <div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:{{ d.stateColor }}">{{ d.stateText }}</div>
                         </div>
                         <sc-for list="{{ d.files }}" as="a" hint-placeholder-count="1">
                           <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
-                            <div style="flex:1;min-width:0">
+                            <div class="mk-flex1">
                               <div style="font-size:12px;line-height:1.4;color:var(--ink);overflow-wrap:anywhere">{{ a.filename }}</div>
                               <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">{{ a.meta }}</div>
                             </div>
@@ -1514,7 +1601,7 @@
                   <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="6">
                     <button onClick="{{ a.open }}" style="width:100%;display:flex;gap:11px;padding:11px 0;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);background:transparent;text-align:left;cursor:pointer">
                       <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
-                      <div style="flex:1;min-width:0">
+                      <div class="mk-flex1">
                         <div style="font-size:13px;line-height:1.4;color:var(--ink)">{{ a.text }}</div>
                         <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
                       </div>
@@ -1546,7 +1633,7 @@
                     <div class="mk-ticket-card" style="padding:11px;border-left-color:{{ t.edge }}">
                       <div style="display:flex;align-items:center;gap:10px">
                         <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
-                        <div style="flex:1;min-width:0">
+                        <div class="mk-flex1">
                           <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.customer }}</div>
                           <div style="font-size:12px;color:var(--ink-dim)">{{ t.locLine }}</div>
                         </div>
@@ -1578,11 +1665,11 @@
                   </div>
                 </div>
               </sc-if>
-              <div class="mk-card-grid" style="display:flex;flex-direction:column;gap:10px">
+              <div class="mk-card-grid mk-col-gap10">
                 <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="2">
                   <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:12px;padding:13px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                     <div class="mk-icon-chip" style="background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.glyph }}</div>
-                    <div style="flex:1;min-width:0">
+                    <div class="mk-flex1">
                       <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:17px">{{ m.label }}</div>
                       <div style="font-size:12px;color:var(--ink-faint)">{{ m.hint }}</div>
                     </div>
@@ -1600,12 +1687,12 @@
               <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-top:12px">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
                   <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:{{ errBadgeBg }};color:{{ errBadgeFg }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">MD</div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Error log</div>
+                  <div class="mk-flex1">
+                    <div class="mk-accent-label">Error log</div>
                     <div style="font-size:12px;color:{{ errTone }};margin-top:2px">{{ errState }}</div>
                   </div>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <div class="mk-row-wrap">
                   <button onClick="{{ downloadErrors }}" disabled="{{ errEmpty }}" style="flex:1;min-width:130px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download .md</button>
                   <button onClick="{{ askClearErrors }}" disabled="{{ errEmpty }}" style="min-width:100px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Clear</button>
                 </div>
@@ -1677,13 +1764,13 @@
           <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:14px">
             <thead>
               <tr>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Field / Well / Rig</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Technician</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Job dates</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Lines</th>
-                <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Status</th>
+                <th class="mk-th-11">Ticket No.</th>
+                <th class="mk-th-11">Customer</th>
+                <th class="mk-th-11">Field / Well / Rig</th>
+                <th class="mk-th-11">Technician</th>
+                <th class="mk-th-11">Job dates</th>
+                <th class="mk-th-11">Lines</th>
+                <th class="mk-th-11">Status</th>
                 <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
               </tr>
             </thead>
@@ -1691,22 +1778,22 @@
               <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
                 <tr>
                   <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                  <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                  <td data-label="Customer" class="mk-td-pad11">
                     <div style="display:flex;align-items:center;gap:9px">
                       <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
                       <span>{{ t.customer }}</span>
                     </div>
                   </td>
                   <td data-label="Field / Well / Rig" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ t.locLine }}</td>
-                  <td data-label="Technician" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                  <td data-label="Technician" class="mk-td-pad11">
                     {{ t.crewLabel }}
                     <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
                       <div style="font-size:10px;letter-spacing:0.05em;color:var(--hue-indigo);margin-top:2px">CO-OP</div>
                     </sc-if>
                   </td>
                   <td data-label="Job dates" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:var(--ink-dim)">{{ t.dateRange }}</td>
-                  <td data-label="Lines" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.eventCount }}</td>
-                  <td data-label="Status" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                  <td data-label="Lines" class="mk-td-pad11">{{ t.eventCount }}</td>
+                  <td data-label="Status" class="mk-td-pad11">
                     <div style="display:flex;align-items:center;gap:8px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
@@ -1737,7 +1824,7 @@
             <div style="padding:10px 14px;border-bottom:1px solid rgba(var(--ink-rgb),0.12);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)">{{ withdrawnHeading }}</div>
             <sc-for list="{{ withdrawnRows }}" as="w" hint-placeholder-count="2">
               <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-top:1px solid rgba(var(--ink-rgb),0.08)">
-                <div style="flex:1;min-width:0">
+                <div class="mk-flex1">
                   <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }} · {{ w.customer }}</div>
                   <div style="font-size:12px;color:var(--ink-faint);margin-top:2px">{{ w.who }}</div>
                   <div style="font-size:12px;color:var(--ink);margin-top:4px;overflow-wrap:anywhere">{{ w.why }}</div>
@@ -1751,12 +1838,12 @@
 
       <sc-if value="{{ mgrNew }}" hint-placeholder-val="{{ false }}">
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
-        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">New ticket</h2>
-        <div style="font-size:13px;color:var(--ink-faint);margin-bottom:20px">For work called in to the office. The technician picks it up on their device.</div>
+        <h2 class="mk-page-title">New ticket</h2>
+        <div class="mk-muted-mb20">For work called in to the office. The technician picks it up on their device.</div>
         <div style="max-width:520px;display:flex;flex-direction:column;gap:14px">
           <div>
-            <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Customer</label>
-            <input dir="auto" value="{{ md.customer }}" onChange="{{ fm.customer }}" list="customers" placeholder="Start typing to find an existing customer…" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <label class="mk-field-label">Customer</label>
+            <input dir="auto" value="{{ md.customer }}" onChange="{{ fm.customer }}" list="customers" placeholder="Start typing to find an existing customer…" class="mk-input-42">
             <datalist id="customers">
               <sc-for list="{{ customerOptions }}" as="c" hint-placeholder-count="3">
                 <option value="{{ c.name }}"></option>
@@ -1770,22 +1857,22 @@
             </sc-if>
           </div>
           <div>
-            <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Field name</label>
-            <input dir="auto" value="{{ md.field }}" onChange="{{ fm.field }}" maxLength="10" placeholder="e.g. Defa" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <label class="mk-field-label">Field name</label>
+            <input dir="auto" value="{{ md.field }}" onChange="{{ fm.field }}" maxLength="10" placeholder="e.g. Defa" class="mk-input-42">
           </div>
           <div style="display:flex;gap:12px">
-            <div style="flex:1">
-              <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Well No.</label>
-              <input dir="auto" value="{{ md.well }}" onChange="{{ fm.well }}" maxLength="10" placeholder="e.g. DF-12" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <div class="mk-flex1-bare">
+              <label class="mk-field-label">Well No.</label>
+              <input dir="auto" value="{{ md.well }}" onChange="{{ fm.well }}" maxLength="10" placeholder="e.g. DF-12" class="mk-input-42">
             </div>
-            <div style="flex:1">
-              <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Rig name</label>
-              <input dir="auto" value="{{ md.rig }}" onChange="{{ fm.rig }}" maxLength="10" placeholder="e.g. RIG-4" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <div class="mk-flex1-bare">
+              <label class="mk-field-label">Rig name</label>
+              <input dir="auto" value="{{ md.rig }}" onChange="{{ fm.rig }}" maxLength="10" placeholder="e.g. RIG-4" class="mk-input-42">
             </div>
           </div>
           <div>
-            <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Assign to</label>
-            <select value="{{ md.tech }}" onChange="{{ fm.tech }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <label class="mk-field-label">Assign to</label>
+            <select value="{{ md.tech }}" onChange="{{ fm.tech }}" class="mk-input-42">
               <option value="">Select a technician…</option>
               <sc-for list="{{ techOptions }}" as="o" hint-placeholder-count="2">
                 <option value="{{ o.name }}">{{ o.label }}</option>
@@ -1798,39 +1885,39 @@
 
       <sc-if value="{{ mgrTeam }}" hint-placeholder-val="{{ false }}">
         <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
-        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Team</h2>
-        <div style="font-size:13px;color:var(--ink-faint);margin-bottom:20px">Approve signups and create technician accounts directly.</div>
+        <h2 class="mk-page-title">Team</h2>
+        <div class="mk-muted-mb20">Approve signups and create technician accounts directly.</div>
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <div class="mk-accent-heading">Users &amp; roles</div>
+            <table class="mk-table-plain">
               <thead>
                 <tr>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Name</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Sync</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last position</th>
+                  <th class="mk-th-10">Name</th>
+                  <th class="mk-th-10">Role</th>
+                  <th class="mk-th-10">Base</th>
+                  <th class="mk-th-10">Sync</th>
+                  <th class="mk-th-10">Last position</th>
                   <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <td class="mk-td-pad8">
                       {{ u.name }}
                       <sc-if value="{{ u.showAsked }}" hint-placeholder-val="{{ false }}">
                         <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">{{ u.askedFor }}</div>
                       </sc-if>
                     </td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
+                    <td class="mk-td-pad8"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px">
                       <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
                     </td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <td class="mk-td-pad8">
                       <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ u.posDim }};overflow-wrap:anywhere">{{ u.posText }}</div>
-                      <div style="font-size:11px;color:var(--ink-faint)">{{ u.posStamp }}</div>
+                      <div class="mk-hint">{{ u.posStamp }}</div>
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
@@ -1861,16 +1948,16 @@
               </tbody>
             </table>
           </div>
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Full name</div>
-            <input dir="auto" value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
-            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Temporary password (8+ characters)</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Create a Technician account</div>
+            <div class="mk-section-label-sm">Full name</div>
+            <input dir="auto" value="{{ newTechName }}" onChange="{{ f.newTechName }}" class="mk-input-38-mb">
+            <div class="mk-section-label-sm">Email</div>
+            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" class="mk-input-38-mb">
+            <div class="mk-section-label-sm">Temporary password (8+ characters)</div>
             <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
             <sc-if value="{{ newTechError }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ newTechError }}</div>
+              <div class="mk-error-text">{{ newTechError }}</div>
             </sc-if>
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Account created — they can log in now.</div>
@@ -1911,16 +1998,16 @@
         <div class="mk-2col" style="display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start">
           <div style="display:flex;flex-direction:column;gap:22px">
 
-            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div class="mk-panel-pad">
               <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">1 · Ticket number &amp; mileage</div>
+                <div class="mk-accent-label">1 · Ticket number &amp; mileage</div>
                 <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
                   <!-- Who holds the claim stays here, because it is the reason the
                        controls below are live or inert. Handing it over does not: it is
                        a shift-level decision about every future ticket, not something to
                        do from inside whichever one happens to be open. It lives in
                        Account now. -->
-                  <span style="font-size:11px;color:var(--ink-faint)">{{ numberingHolderLabel }}</span>
+                  <span class="mk-hint">{{ numberingHolderLabel }}</span>
                 </div>
               </div>
               <sc-if value="{{ numberingBlocked }}" hint-placeholder-val="{{ false }}">
@@ -1931,20 +2018,20 @@
               </sc-if>
               <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
                 <div style="width:210px">
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Ticket No. (unique)</label>
+                  <label class="mk-field-label">Ticket No. (unique)</label>
                   <input dir="auto" value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ numberingBlocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
                 </div>
-                <div style="flex:1">
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Take next from series</label>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <div class="mk-flex1-bare">
+                  <label class="mk-field-label">Take next from series</label>
+                  <div class="mk-row-wrap">
                     <sc-for list="{{ seriesBtns }}" as="s" hint-placeholder-count="3">
                       <button onClick="{{ s.take }}" disabled="{{ s.disabled }}" style="padding:7px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.03em;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ s.label }} → {{ s.next }}</button>
                     </sc-for>
                   </div>
                 </div>
                 <div style="width:230px">
-                  <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Mileage one way (KM)</label>
+                  <label class="mk-field-label">Mileage one way (KM)</label>
                   <input dir="auto" value="{{ cur.mileage }}" onChange="{{ f.mileage }}" onFocus="{{ onMileageFocus }}" onBlur="{{ onMileageBlur }}" disabled="{{ ticketLocked }}" placeholder="0" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:var(--ink-faint)">{{ mileageNote }}</div>
                 </div>
@@ -1959,7 +2046,7 @@
                      customerEditable. -->
                 <sc-if value="{{ customerEditable }}" hint-placeholder-val="{{ false }}">
                   <div style="width:260px">
-                    <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Customer</label>
+                    <label class="mk-field-label">Customer</label>
                     <select value="{{ cur.customer }}" onChange="{{ pickReviewCustomer }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
                       <sc-for list="{{ customerOptions }}" as="co" hint-placeholder-count="3">
                         <option value="{{ co.name }}">{{ co.name }}</option>
@@ -1973,8 +2060,8 @@
 
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">2 · Charged items</div>
-                <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">Price list: {{ cur.customer }}</div>
+                <div class="mk-accent-label">2 · Charged items</div>
+                <div class="mk-hint-end">Price list: {{ cur.customer }}</div>
               </div>
               <sc-if value="{{ ticketEditable }}" hint-placeholder-val="{{ true }}">
                 <div style="position:relative;margin-bottom:12px">
@@ -1984,7 +2071,7 @@
                       <sc-for list="{{ searchResults }}" as="sr" hint-placeholder-count="8">
                         <button onClick="{{ sr.add }}" style="width:100%;text-align:left;padding:8px 10px;border:0;background:transparent;color:var(--ink);cursor:pointer;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;display:block">
                           <div style="font-weight:600;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif">{{ sr.code }}</div>
-                          <div style="font-size:11px;color:var(--ink-faint)">{{ sr.desc }} · {{ sr.detail }}</div>
+                          <div class="mk-hint">{{ sr.desc }} · {{ sr.detail }}</div>
                         </button>
                       </sc-for>
                     </div>
@@ -2008,12 +2095,12 @@
                   <span style="flex:none">🔒</span><span>{{ lockedNote }}</span>
                 </div>
               </sc-if>
-              <table class="mk-items" style="width:100%;border-collapse:collapse;font-size:13px">
+              <table class="mk-items mk-table-plain">
                 <thead>
                   <tr>
                     <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:26px"></th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Item No.</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Description</th>
+                    <th class="mk-th-10">Item No.</th>
+                    <th class="mk-th-10">Description</th>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:74px">Qty</th>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:74px">U/M</th>
                     <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:104px">Unit cost</th>
@@ -2030,20 +2117,20 @@
                         </sc-if>
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;white-space:nowrap">{{ it.code }}</td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <td class="mk-td-pad6">
                         <input dir="auto" value="{{ it.desc }}" onChange="{{ it.onDesc }}" onFocus="{{ it.onDescFocus }}" onBlur="{{ it.onDescBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.descBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                        <input dir="auto" value="{{ it.qty }}" onChange="{{ it.onQty }}" onFocus="{{ it.onQtyFocus }}" onBlur="{{ it.onQtyBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                      <td class="mk-td-pad6">
+                        <input dir="auto" value="{{ it.qty }}" onChange="{{ it.onQty }}" onFocus="{{ it.onQtyFocus }}" onBlur="{{ it.onQtyBlur }}" disabled="{{ it.locked }}" class="mk-input-32">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <td class="mk-td-pad6">
                         <input dir="auto" value="{{ it.uom }}" onChange="{{ it.onUom }}" onFocus="{{ it.onUomFocus }}" onBlur="{{ it.onUomBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.uomBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <td class="mk-td-pad6">
                         <input dir="auto" value="{{ it.cost }}" onChange="{{ it.onCost }}" onFocus="{{ it.onCostFocus }}" onBlur="{{ it.onCostBlur }}" disabled="{{ it.locked }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:{{ it.costBg }};border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
                       </td>
                       <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ it.total }}</td>
-                      <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <td class="mk-td-pad6">
                         <sc-if value="{{ it.showRemove }}" hint-placeholder-val="{{ true }}">
                           <button onClick="{{ it.remove }}" class="mk-rowdel" title="Remove this charged line" aria-label="Remove this charged line">×</button>
                         </sc-if>
@@ -2053,19 +2140,19 @@
                 </tbody>
               </table>
               <div style="display:flex;align-items:baseline;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16)">
-                <div style="font-size:11px;color:var(--ink-faint)">Overridden cells are tinted — price-list value kept in the audit trail.</div>
+                <div class="mk-hint">Overridden cells are tinted — price-list value kept in the audit trail.</div>
                 <div style="margin-left:auto;font-size:11px;letter-spacing:0.09em;text-transform:uppercase;color:var(--ink-faint)">Ticket total</div>
                 <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--ink-strong);font-variant-numeric:tabular-nums">{{ grandTotal }}</div>
               </div>
             </div>
 
-            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div class="mk-panel-pad">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">3 · Job log from the field</div>
-                <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">Line timestamps editable — every change is written to the audit trail</div>
+                <div class="mk-accent-label">3 · Job log from the field</div>
+                <div class="mk-hint-end">Line timestamps editable — every change is written to the audit trail</div>
               </div>
               <div style="margin-bottom:12px;max-width:420px">
-                <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Job type (objective)</label>
+                <label class="mk-field-label">Job type (objective)</label>
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
                 <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
                   <!-- Proposed from the job log, never written without a tap. The objectives
@@ -2097,10 +2184,10 @@
                  order and easy to miss entirely. What leaves the base with someone is
                  its own subject. -->
             <sc-if value="{{ assetsEditable }}" hint-placeholder-val="{{ false }}">
-              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+              <div class="mk-panel-pad">
                 <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
-                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Tools &amp; crossovers allocated</div>
-                  <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">{{ assetHolderLabel }}</div>
+                  <div class="mk-accent-label">Tools &amp; crossovers allocated</div>
+                  <div class="mk-hint-end">{{ assetHolderLabel }}</div>
                 </div>
                 <sc-for list="{{ assetRows }}" as="a" hint-placeholder-count="2">
                   <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
@@ -2114,7 +2201,7 @@
                 <div style="font-size:11px;color:var(--ink-faint);margin-top:6px;line-height:1.4">The technician is asked to account for these when they close the job.</div>
               </div>
             </sc-if>
-            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div class="mk-panel-pad">
               <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket header</div>
               <sc-for list="{{ headerFields }}" as="h" hint-placeholder-count="7">
                 <div class="mk-kv" style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;align-items:center">
@@ -2140,19 +2227,19 @@
                   <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px">Device position</div>
                   <div style="display:flex;gap:9px;margin-bottom:9px">
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
-                    <div style="flex:1;min-width:0">
+                    <div class="mk-flex1">
                       <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">When opened</div>
                       <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoOpenText }}</div>
-                      <div style="font-size:11px;color:var(--ink-faint)">{{ cur.geoOpenStamp }}</div>
+                      <div class="mk-hint">{{ cur.geoOpenStamp }}</div>
                     </div>
                   </div>
                   <sc-if value="{{ cur.geoLastShow }}" hint-placeholder-val="{{ false }}">
                     <div style="display:flex;gap:9px">
                       <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--accent-wash);color:var(--accent-deep)">{{ icWell }}</div>
-                      <div style="flex:1;min-width:0">
+                      <div class="mk-flex1">
                         <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">{{ cur.geoLastLabel }}</div>
                         <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoLastText }}</div>
-                        <div style="font-size:11px;color:var(--ink-faint)">{{ cur.geoLastStamp }}</div>
+                        <div class="mk-hint">{{ cur.geoLastStamp }}</div>
                       </div>
                     </div>
                   </sc-if>
@@ -2163,10 +2250,10 @@
               </sc-if>
             </div>
 
-            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div class="mk-panel-pad">
               <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
-                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">4 · Approval</div>
-                <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">{{ checksHeading }}</div>
+                <div class="mk-accent-label">4 · Approval</div>
+                <div class="mk-hint-end">{{ checksHeading }}</div>
               </div>
               <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px">
                 <sc-for list="{{ checks }}" as="c" hint-placeholder-count="3">
@@ -2224,19 +2311,19 @@
             </div>
 
             <sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
-              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+              <div class="mk-panel-pad-mb">
                 <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                   <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)">Notes</div>
-                  <div style="font-size:11px;color:var(--ink-faint)">{{ notesSummary }}</div>
+                  <div class="mk-hint">{{ notesSummary }}</div>
                 </div>
-                <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">Anything on this job that needs someone's attention.</div>
+                <div class="mk-hint-mb">Anything on this job that needs someone's attention.</div>
                 <sc-if value="{{ notesEmpty }}" hint-placeholder-val="{{ true }}">
                   <div style="padding:12px 0;text-align:center;font-size:12px;color:var(--ink-faint)">No notes on this ticket.</div>
                 </sc-if>
                 <sc-for list="{{ noteRows }}" as="n" hint-placeholder-count="2">
                   <div style="display:flex;gap:10px;padding:10px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
                     <span style="width:3px;flex:none;background:{{ n.edge }}"></span>
-                    <div style="flex:1;min-width:0">
+                    <div class="mk-flex1">
                       <div style="font-size:13px;line-height:1.45;color:{{ n.ink }}">{{ n.body }}</div>
                       <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ n.meta }}</div>
                     </div>
@@ -2255,26 +2342,26 @@
             </sc-if>
 
             <sc-if value="{{ showAttachments }}" hint-placeholder-val="{{ true }}">
-              <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+              <div class="mk-panel-pad-mb">
                 <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
                   <div style="flex:1;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)">Signed paperwork</div>
                   <div style="font-size:11px;color:{{ attachSummaryColor }}">{{ attachSummary }}</div>
                 </div>
-                <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
+                <div class="mk-hint-mb">The Service Ticket and Job Log the client signs and stamps and sends back.</div>
                 <sc-if value="{{ attachLocked }}" hint-placeholder-val="{{ false }}">
                   <div class="mk-note" style="padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ attachLockedNote }}</div>
                 </sc-if>
                 <sc-for list="{{ attachDocRows }}" as="d" hint-placeholder-count="2">
                   <div style="display:flex;gap:10px;padding:11px 0;border-top:1px solid rgba(var(--ink-rgb),0.08)">
                     <span style="width:3px;flex:none;background:{{ d.edge }}"></span>
-                    <div style="flex:1;min-width:0">
+                    <div class="mk-flex1">
                       <div style="display:flex;align-items:baseline;gap:8px">
                         <div style="flex:1;font-size:13px;font-weight:600;color:var(--ink-strong)">{{ d.label }}</div>
                         <div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:{{ d.stateColor }}">{{ d.stateText }}</div>
                       </div>
                       <sc-for list="{{ d.files }}" as="a" hint-placeholder-count="1">
                         <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
-                          <div style="flex:1;min-width:0">
+                          <div class="mk-flex1">
                             <div style="font-size:12px;line-height:1.4;color:var(--ink);overflow-wrap:anywhere">{{ a.filename }}</div>
                             <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">{{ a.meta }}</div>
                           </div>
@@ -2302,13 +2389,13 @@
               </div>
             </sc-if>
 
-            <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
+            <div class="mk-panel-pad">
               <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px">Audit trail</div>
-              <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">{{ curAuditScope }}</div>
+              <div class="mk-hint-mb">{{ curAuditScope }}</div>
               <sc-if value="{{ curAuditEmpty }}" hint-placeholder-val="{{ false }}">
                 <div style="padding:14px 0;text-align:center;font-size:12px;color:var(--ink-faint)">Nothing recorded on this ticket yet.</div>
               </sc-if>
-              <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="mk-col-gap10">
                 <sc-for list="{{ curAudit }}" as="a" hint-placeholder-count="3">
                   <div style="font-size:12px;line-height:1.45;padding-bottom:9px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
@@ -2514,13 +2601,13 @@
       <!-- The tools are chosen from the Account tab, which shows what is inside each
            one. A strip of four equal words here said less and said it twice. -->
       <button onClick="{{ backToAccount }}" class="back-btn">‹ Account</button>
-      <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">{{ adminToolTitle }}</h2>
+      <h2 class="mk-page-title">{{ adminToolTitle }}</h2>
       <div style="font-size:13px;color:var(--ink-faint);margin-bottom:18px">{{ adminToolHint }}</div>
 
       <sc-if value="{{ adminPrice }}" hint-placeholder-val="{{ true }}">
         <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-bottom:14px">
           <div style="width:280px;max-width:100%">
-            <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Customer price list</label>
+            <label class="mk-field-label">Customer price list</label>
             <select value="{{ adminClient }}" onChange="{{ f.adminClient }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
               <option value="">Select customer to show price list…</option>
               <sc-for list="{{ clientNames }}" as="c" hint-placeholder-count="3">
@@ -2539,11 +2626,11 @@
         </sc-if>
         <sc-if value="{{ hasPriceClient }}" hint-placeholder-val="{{ true }}">
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <table class="mk-table-plain">
             <thead>
               <tr>
                 <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:130px">Item No.</th>
-                <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Description</th>
+                <th class="mk-th-10">Description</th>
                 <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:100px">U/M</th>
                 <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:130px">Unit cost</th>
                 <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:30px"></th>
@@ -2552,11 +2639,11 @@
             <tbody>
               <sc-for list="{{ priceRows }}" as="p" hint-placeholder-count="5">
                 <tr>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
-                  <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6">
                     <sc-if value="{{ canDeletePrices }}" hint-placeholder-val="{{ true }}">
                       <button onClick="{{ p.remove }}" class="mk-rowdel" title="Remove this line from the price list" aria-label="Remove this line from the price list">×</button>
                     </sc-if>
@@ -2572,12 +2659,12 @@
       <sc-if value="{{ adminNumbers }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Numbering series</div>
+            <div class="mk-accent-heading">Numbering series</div>
             <div style="font-size:12px;color:var(--ink-dim);margin-bottom:14px">Enter the last number you reached on paper. The system continues from there and refuses any number already used.</div>
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <table class="mk-table-plain">
               <thead>
                 <tr>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Series</th>
+                  <th class="mk-th-10">Series</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:96px">Prefix</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:120px">Last used</th>
                   <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16);width:100px">Next</th>
@@ -2586,9 +2673,9 @@
               <tbody>
                 <sc-for list="{{ seriesRows }}" as="s" hint-placeholder-count="3">
                   <tr>
-                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ s.label }}</td>
+                    <td class="mk-td-pad6">{{ s.label }}</td>
                     <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600">{{ s.prefix }}</td>
-                    <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><input dir="auto" value="{{ s.last }}" onChange="{{ s.onLast }}" style="width:100%;min-height:32px;padding:5px 8px;font-size:13px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)"></td>
+                    <td class="mk-td-pad6"><input dir="auto" value="{{ s.last }}" onChange="{{ s.onLast }}" class="mk-input-32"></td>
                     <td style="padding:6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;color:var(--accent-deep)">{{ s.next }}</td>
                   </tr>
                 </sc-for>
@@ -2596,8 +2683,8 @@
             </table>
             <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.16);font-size:12px;color:var(--ink-faint)">Numbers in use: {{ usedNumbers }}</div>
           </div>
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Job types</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Job types</div>
             <div style="display:flex;gap:8px;margin-bottom:12px">
               <input dir="auto" value="{{ newJobType }}" onChange="{{ f.newJobType }}" placeholder="e.g. COMBINATION FOR LOCATE LEAK" style="flex:1;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
               <button onClick="{{ addJobType }}" style="padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Add</button>
@@ -2615,35 +2702,35 @@
       <sc-if value="{{ adminPeople }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Users &amp; roles</div>
-            <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <div class="mk-accent-heading">Users &amp; roles</div>
+            <table class="mk-table-plain">
               <thead>
                 <tr>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Name</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Role</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Base</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Sync</th>
-                  <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Last position</th>
+                  <th class="mk-th-10">Name</th>
+                  <th class="mk-th-10">Role</th>
+                  <th class="mk-th-10">Base</th>
+                  <th class="mk-th-10">Sync</th>
+                  <th class="mk-th-10">Last position</th>
                   <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:7px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                 </tr>
               </thead>
               <tbody>
                 <sc-for list="{{ users }}" as="u" hint-placeholder-count="4">
                   <tr>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <td class="mk-td-pad8">
                       {{ u.name }}
                       <sc-if value="{{ u.showAsked }}" hint-placeholder-val="{{ false }}">
                         <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">{{ u.askedFor }}</div>
                       </sc-if>
                     </td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
+                    <td class="mk-td-pad8"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ u.base }}</td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px">
                       <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
                     </td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <td class="mk-td-pad8">
                       <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ u.posDim }};overflow-wrap:anywhere">{{ u.posText }}</div>
-                      <div style="font-size:11px;color:var(--ink-faint)">{{ u.posStamp }}</div>
+                      <div class="mk-hint">{{ u.posStamp }}</div>
                     </td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
@@ -2674,14 +2761,14 @@
               </tbody>
             </table>
           </div>
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Customers, fields &amp; rigs</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Customers, fields &amp; rigs</div>
             <div style="display:flex;flex-direction:column;gap:12px">
               <sc-for list="{{ clientCards }}" as="c" hint-placeholder-count="2">
                 <div style="border:1px solid rgba(var(--ink-rgb),0.12);padding:12px">
                   <div style="display:flex;align-items:baseline;gap:8px">
                     <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px">{{ c.name }}</div>
-                    <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">{{ c.itemCount }} priced items</div>
+                    <div class="mk-hint-end">{{ c.itemCount }} priced items</div>
                   </div>
                   <div style="font-size:12px;color:var(--ink-dim);margin-top:6px">Fields: {{ c.fields }}</div>
                   <div style="font-size:12px;color:var(--ink-dim)">Rigs: {{ c.rigs }}</div>
@@ -2692,16 +2779,16 @@
               <div style="font-size:12px;color:var(--ink-dim)">Excel output cell maps — fills the real Service Ticket and Job Log templates, downloaded from the app; each field's target cell is configured here once the layouts are supplied.</div>
             </div>
           </div>
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Create a Technician account</div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Full name</div>
-            <input dir="auto" value="{{ newTechName }}" onChange="{{ f.newTechName }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Email</div>
-            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Temporary password (8+ characters)</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Create a Technician account</div>
+            <div class="mk-section-label-sm">Full name</div>
+            <input dir="auto" value="{{ newTechName }}" onChange="{{ f.newTechName }}" class="mk-input-38-mb">
+            <div class="mk-section-label-sm">Email</div>
+            <input type="email" value="{{ newTechEmail }}" onChange="{{ f.newTechEmail }}" class="mk-input-38-mb">
+            <div class="mk-section-label-sm">Temporary password (8+ characters)</div>
             <input type="password" value="{{ newTechPassword }}" onChange="{{ f.newTechPassword }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
             <sc-if value="{{ newTechError }}" hint-placeholder-val="{{ false }}">
-              <div style="font-size:13px;color:var(--danger);margin-bottom:10px">{{ newTechError }}</div>
+              <div class="mk-error-text">{{ newTechError }}</div>
             </sc-if>
             <sc-if value="{{ newTechDone }}" hint-placeholder-val="{{ false }}">
               <div style="font-size:13px;color:var(--success-ink);margin-bottom:10px">Account created — they can log in now.</div>
@@ -2766,8 +2853,8 @@
            tool (2026-09-03). -->
       <sc-if value="{{ adminReports }}" hint-placeholder-val="{{ false }}">
         <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px;max-width:900px">
-          <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:10px">{{ reportsTitle }}</div>
-          <label style="display:block;font-size:12px;margin-bottom:5px;color:var(--ink-dim)">Month — counted by End Job date</label>
+          <div class="mk-eyebrow">{{ reportsTitle }}</div>
+          <label class="mk-field-label">Month — counted by End Job date</label>
           <select value="{{ reportMonth }}" onChange="{{ pickReportMonth }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:14px">
             <sc-for list="{{ reportMonths }}" as="m" hint-placeholder-count="3">
               <option value="{{ m.key }}">{{ m.label }}</option>
@@ -2778,14 +2865,14 @@
 
           <sc-if value="{{ hasReportRows }}" hint-placeholder-val="{{ true }}">
             <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto;margin-bottom:12px">
-              <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:13px">
+              <table class="mk-stack mk-table-plain">
                 <thead>
                   <tr>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Technician</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Field / Well / Rig</th>
-                    <th style="text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Date</th>
+                    <th class="mk-th-10-lg">Ticket No.</th>
+                    <th class="mk-th-10-lg">Technician</th>
+                    <th class="mk-th-10-lg">Customer</th>
+                    <th class="mk-th-10-lg">Field / Well / Rig</th>
+                    <th class="mk-th-10-lg">Date</th>
                     <th style="text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:8px 10px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
                   </tr>
                 </thead>
@@ -2820,12 +2907,12 @@
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px;max-width:900px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
               <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(var(--success-rgb),0.16);color:var(--success-ink);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">XLS</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Master file — approved jobs</div>
+              <div class="mk-flex1">
+                <div class="mk-accent-label">Master file — approved jobs</div>
                 <div style="font-size:12px;color:{{ masterTone }};margin-top:2px">{{ masterState }}</div>
               </div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div class="mk-row-wrap">
               <button onClick="{{ downloadMaster }}" disabled="{{ masterCannotDownload }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download</button>
               <button onClick="{{ refreshMaster }}" disabled="{{ masterBusy }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Rebuild now</button>
             </div>
@@ -2857,14 +2944,14 @@
             </sc-for>
             <div style="border:1px solid rgba(var(--ink-rgb),0.12)"></div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="mk-row-wrap">
             <input dir="auto" type="email" value="{{ newPaperworkEmail }}" onChange="{{ f.newPaperworkEmail }}" placeholder="name@makaman.ly" style="flex:1;min-width:200px;min-height:42px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
             <button onClick="{{ addPaperworkRecipient }}" style="padding:9px 18px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ Add</button>
           </div>
           <div style="font-size:11px;color:var(--ink-faint);margin-top:10px;line-height:1.45">New addresses start switched off — test one at a time before turning the rest on.</div>
 
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:20px;padding-top:16px">
-            <div style="flex:1;min-width:0">
+            <div class="mk-flex1">
               <div style="font-size:14px;font-weight:600">Delete from Supabase once emailed</div>
               <div style="font-size:12px;color:var(--ink-faint);margin-top:2px;line-height:1.4">Off by default. Once the emails have held up, turn this on to keep the Supabase bucket free — the two files leave Storage right after the email is confirmed sent; the record that they arrived stays on the ticket.</div>
             </div>
@@ -2875,30 +2962,30 @@
 
       <sc-if value="{{ adminSystem }}" hint-placeholder-val="{{ false }}">
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Charging &amp; export rules</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Charging &amp; export rules</div>
             <div style="display:flex;flex-direction:column;gap:12px">
               <sc-for list="{{ systemRows }}" as="s" hint-placeholder-count="4">
                 <div style="display:flex;gap:12px;align-items:center;padding-bottom:10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                  <div style="flex:1">
+                  <div class="mk-flex1-bare">
                     <div style="font-size:14px">{{ s.label }}</div>
-                    <div style="font-size:11px;color:var(--ink-faint)">{{ s.hint }}</div>
+                    <div class="mk-hint">{{ s.hint }}</div>
                   </div>
                   <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;color:var(--accent-deep)">{{ s.value }}</div>
                 </div>
               </sc-for>
             </div>
           </div>
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Ticket defaults</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Ticket defaults</div>
             <div style="font-size:12px;color:var(--ink-faint);margin-bottom:14px">Pre-filled onto every new ticket. Stays constant unless the Ops Manager changes it for one specific ticket during review — not technician input, not a formula.</div>
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Base Location</div>
-            <input dir="auto" value="{{ defBaseLocation }}" onChange="{{ f.defBaseLocation }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:12px">
-            <div style="font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px">Customer Rep.</div>
+            <div class="mk-section-label-sm">Base Location</div>
+            <input dir="auto" value="{{ defBaseLocation }}" onChange="{{ f.defBaseLocation }}" class="mk-input-38-mb">
+            <div class="mk-section-label-sm">Customer Rep.</div>
             <input dir="auto" value="{{ defCustomerRep }}" onChange="{{ f.defCustomerRep }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
           </div>
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px">
-            <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">Danger zone</div>
+          <div class="mk-panel-pad">
+            <div class="mk-accent-heading">Danger zone</div>
             <div style="font-size:12px;color:var(--ink-dim);margin-bottom:12px">Resets this prototype's local data back to the seeded demo tickets and price lists.</div>
             <button onClick="{{ resetAll }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Reset demo data</button>
           </div>
@@ -2916,7 +3003,7 @@
             <sc-for list="{{ permPeople }}" as="u" hint-placeholder-count="4">
               <div onClick="{{ u.pick }}" style="padding:10px 16px;cursor:pointer;border-top:1px solid rgba(var(--ink-rgb),0.08);background:{{ u.rowBg }}">
                 <div style="font-size:14px">{{ u.name }}</div>
-                <div style="font-size:11px;color:var(--ink-faint)">{{ u.role }}</div>
+                <div class="mk-hint">{{ u.role }}</div>
               </div>
             </sc-for>
           </div>
@@ -2938,10 +3025,10 @@
 
               <sc-for list="{{ permGroups }}" as="g" hint-placeholder-count="3">
                 <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:14px">
-                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:12px">{{ g.name }}</div>
+                  <div class="mk-accent-heading">{{ g.name }}</div>
                   <sc-for list="{{ g.rows }}" as="p" hint-placeholder-count="4">
                     <div style="display:flex;gap:12px;align-items:flex-start;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
-                      <div style="flex:1;min-width:0">
+                      <div class="mk-flex1">
                         <div style="font-size:14px">{{ p.name }}</div>
                         <div style="font-size:11px;color:var(--ink-faint);line-height:1.45">{{ p.description }}</div>
                         <div style="font-size:11px;color:{{ p.exceptionTone }};margin-top:3px">{{ p.exception }}</div>
@@ -2979,11 +3066,11 @@
       <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:24px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <span style="width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite"></span>
-          <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Live activity — in the field right now</div>
-          <div style="margin-left:auto;font-size:11px;color:var(--ink-faint)">Read-only · refreshes automatically</div>
+          <div class="mk-accent-label">Live activity — in the field right now</div>
+          <div class="mk-hint-end">Read-only · refreshes automatically</div>
         </div>
         <sc-if value="{{ hasLiveTickets }}" hint-placeholder-val="{{ true }}">
-          <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="mk-col-gap10">
             <sc-for list="{{ liveTickets }}" as="lt" hint-placeholder-count="2">
               <div class="mk-live-row">
                 <div class="mk-live-head">
@@ -2994,7 +3081,7 @@
                   <div class="mk-live-presence"><span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}</div>
                 </div>
                 <div class="mk-live-log">
-                  <div style="font-size:13px;color:var(--ink)">{{ lt.lastLogText }}</div>
+                  <div class="mk-text-13">{{ lt.lastLogText }}</div>
                   <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ lt.lastLogTime }} · {{ lt.eventCount }} log lines</div>
                 </div>
               </div>
@@ -3012,20 +3099,20 @@
         <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:14px">
           <thead>
             <tr>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Ticket No.</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Customer</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Well</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Job type</th>
-              <th style="text-align:left;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Dates</th>
+              <th class="mk-th-11">Ticket No.</th>
+              <th class="mk-th-11">Customer</th>
+              <th class="mk-th-11">Well</th>
+              <th class="mk-th-11">Job type</th>
+              <th class="mk-th-11">Dates</th>
               <th style="text-align:right;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);padding:9px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.16)">Value</th>
             </tr>
           </thead>
           <tbody>
             <sc-for list="{{ founderRows }}" as="t" hint-placeholder-count="3">
-              <tr onClick="{{ t.open }}" style="cursor:pointer">
+              <tr onClick="{{ t.open }}" class="mk-clickable">
                 <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                <td data-label="Customer" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.customer }}</td>
-                <td data-label="Well" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">{{ t.well }}</td>
+                <td data-label="Customer" class="mk-td-pad11">{{ t.customer }}</td>
+                <td data-label="Well" class="mk-td-pad11">{{ t.well }}</td>
                 <td data-label="Job type" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim);font-size:13px">{{ t.jobType }}</td>
                 <td data-label="Dates" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:var(--ink-dim)">{{ t.dateRange }}</td>
                 <td data-label="Value" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right;font-variant-numeric:tabular-nums">{{ t.value }}</td>
@@ -3044,8 +3131,8 @@
     <div class="mk-page" style="padding:26px 30px 96px;max-width:900px;margin:0 auto">
 
       <sc-if value="{{ navActivity }}" hint-placeholder-val="{{ false }}">
-        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Activity</h2>
-        <div style="font-size:13px;color:var(--ink-faint);margin-bottom:20px">{{ activityScope }} · newest first</div>
+        <h2 class="mk-page-title">Activity</h2>
+        <div class="mk-muted-mb20">{{ activityScope }} · newest first</div>
         <sc-if value="{{ showActivityChips }}" hint-placeholder-val="{{ true }}">
           <div style="display:flex;gap:8px;margin-bottom:18px">
             <sc-for list="{{ activityChips }}" as="c" hint-placeholder-count="3">
@@ -3058,7 +3145,7 @@
             <sc-for list="{{ activityFeed }}" as="a" hint-placeholder-count="8">
               <button onClick="{{ a.open }}" style="width:100%;display:flex;gap:12px;padding:12px 0;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
                 <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
-                <div style="flex:1;min-width:0">
+                <div class="mk-flex1">
                   <div style="font-size:14px;line-height:1.45">{{ a.text }}</div>
                   <div style="font-size:12px;color:var(--ink-faint);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
                 </div>
@@ -3075,15 +3162,15 @@
            device: an office user never creates tickets, so their own pending list is
            permanently empty and tells them nothing. -->
       <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
-        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Field devices</h2>
-        <div style="font-size:13px;color:var(--ink-faint);margin-bottom:20px">Longest out of contact first. Positions refresh only while a job is open.</div>
+        <h2 class="mk-page-title">Field devices</h2>
+        <div class="mk-muted-mb20">Longest out of contact first. Positions refresh only while a job is open.</div>
         <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
-          <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="mk-col-gap10">
             <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
               <div class="mk-dev-card">
                 <div class="mk-dev-top">
                   <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:7px"></span>
-                  <div style="flex:1;min-width:0">
+                  <div class="mk-flex1">
                     <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
                     <div style="font-size:13px;color:var(--ink-dim)">{{ d.base }} · {{ d.tollLabel }}</div>
                   </div>
@@ -3098,7 +3185,7 @@
                 <div class="mk-dev-pos">
                   <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Latest position</div>
                   <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.posDim }};overflow-wrap:anywhere">{{ d.posText }}</div>
-                  <div style="font-size:11px;color:var(--ink-faint)">{{ d.posStamp }}</div>
+                  <div class="mk-hint">{{ d.posStamp }}</div>
                 </div>
                 <sc-if value="{{ d.hasOpenJobs }}" hint-placeholder-val="{{ true }}">
                   <div class="mk-dev-jobs">
@@ -3118,14 +3205,14 @@
       </sc-if>
 
       <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ true }}">
-        <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0 0 4px">Account</h2>
-        <div style="font-size:13px;color:var(--ink-faint);margin-bottom:20px">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
+        <h2 class="mk-page-title">Account</h2>
+        <div class="mk-muted-mb20">Signed in as {{ sessionName }} · {{ currentRoleLabel }}</div>
         <sc-if value="{{ showClaimPanel }}" hint-placeholder-val="{{ false }}">
-          <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+          <div class="mk-panel-pad-mb">
             <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:10px">Ticket numbering claim</div>
             <div style="font-size:14px;font-weight:600;margin-bottom:2px">{{ claimHolderName }}</div>
             <div style="font-size:12px;color:var(--ink-faint);margin-bottom:4px">{{ claimSinceLabel }}</div>
-            <div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px">{{ claimLastMove }}</div>
+            <div class="mk-hint-mb">{{ claimLastMove }}</div>
             <div style="font-size:12px;line-height:1.5;color:var(--ink-dim);margin-bottom:12px">One person allocates ticket numbers at a time. Whoever holds the claim numbers every job from the moment they receive it until they hand it on — that is what stops two managers issuing the same number onto two clients' sheets.</div>
             <sc-if value="{{ claimAdminOverride }}" hint-placeholder-val="{{ false }}">
               <div class="mk-note" style="margin-bottom:12px;padding:9px 11px;font-size:12px;line-height:1.45;background:rgba(var(--warning-rgb),0.12);border-left:3px solid var(--warning);color:var(--ink)">{{ claimAdminOverrideText }}</div>
@@ -3138,11 +3225,11 @@
             </sc-if>
           </div>
         </sc-if>
-        <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="mk-col-gap10">
           <sc-for list="{{ accountTiles }}" as="m" hint-placeholder-count="5">
             <button onClick="{{ m.pick }}" style="width:100%;display:flex;align-items:center;gap:13px;padding:15px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
               <div class="mk-icon-chip" style="background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.glyph }}</div>
-              <div style="flex:1;min-width:0">
+              <div class="mk-flex1">
                 <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px">{{ m.label }}</div>
                 <div style="font-size:13px;color:var(--ink-faint)">{{ m.hint }}</div>
               </div>
@@ -3158,15 +3245,15 @@
              together anyway: both are "something is wrong, get help", and the failures
              most worth reading are the ones a technician hits at a wellhead, where he is
              least able to stop and describe them. -->
-        <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;margin-bottom:16px">
+        <div class="mk-panel-pad-mb">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <div style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;background:{{ errBadgeBg }};color:{{ errBadgeFg }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em">MD</div>
-            <div style="flex:1;min-width:0">
-              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep)">Error log</div>
+            <div class="mk-flex1">
+              <div class="mk-accent-label">Error log</div>
               <div style="font-size:12px;color:{{ errTone }};margin-top:2px">{{ errState }}</div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="mk-row-wrap">
             <button onClick="{{ downloadErrors }}" disabled="{{ errEmpty }}" style="flex:1;min-width:140px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Download .md</button>
             <button onClick="{{ askClearErrors }}" disabled="{{ errEmpty }}" style="min-width:120px;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Clear</button>
           </div>
@@ -3223,8 +3310,8 @@
           <textarea dir="auto" value="{{ reasonText }}" onChange="{{ f.reason }}" rows="3" placeholder="{{ dialog.reasonHint }}" style="width:100%;padding:8px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
         </sc-if>
         <sc-if value="{{ dialog.needsPassword }}" hint-placeholder-val="{{ false }}">
-          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" placeholder="New password — at least 8 characters" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
-          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" placeholder="Confirm it" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" placeholder="New password — at least 8 characters" class="mk-input-42">
+          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" placeholder="Confirm it" class="mk-input-42">
           <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
             <div style="font-size:13px;color:var(--danger)">{{ pwError }}</div>
           </sc-if>
