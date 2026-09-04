@@ -6605,18 +6605,31 @@ class Component extends DCLogic {
     if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
   }
   componentDidUpdate(prevProps, prevState) {
-    // The runtime's own StreamableComponent calls this during boot without a prevState
-    // (caught live in geo.test.js's console, silently — nothing here failed a check,
-    // it just threw once into the void on every affected run). Treat a missing prevState
-    // as "everything changed": one extra scroll-to-top on that first update is harmless,
-    // a thrown TypeError on every update from here on is not.
-    const P = prevState || {};
+    // prevState is not "usually there, missing only on the odd boot-time call" — it is
+    // NEVER there. The runtime's own wrapper (support.js) declares
+    // componentDidUpdate(prevProps) and calls this.logic.componentDidUpdate(prevProps)
+    // with that one argument; it does not track or hand back a prevState at all. So
+    // `prevState || {}` was not a rare fallback, it was the ONLY value this ever ran
+    // with — {} on every single update, forever. {}.roleTab (undefined) !== the
+    // screen's actual current roleTab reads as "the screen changed" on every update
+    // there has ever been, which is why typing one character into any field, on any
+    // page, called scrollToTop(): every keystroke IS an update, and this had no way to
+    // tell "the screen changed" apart from "something on the same screen changed".
+    //
+    // Tracked by hand instead, in a plain instance field the runtime cannot fail to
+    // hand back because nothing but this method ever touches it. Read before this
+    // update's values are known, compared, then rewritten to this update's values —
+    // exactly what prevState would have given if the runtime actually provided one.
     const S = this.state;
-    if (P.roleTab !== S.roleTab || P.mgrScreen !== S.mgrScreen
-      || P.techScreen !== S.techScreen || P.adminTab !== S.adminTab
-      || P.activeId !== S.activeId) {
+    const nav = { roleTab: S.roleTab, mgrScreen: S.mgrScreen, techScreen: S.techScreen,
+      adminTab: S.adminTab, activeId: S.activeId };
+    const P = this.__lastNav || {};
+    if (P.roleTab !== nav.roleTab || P.mgrScreen !== nav.mgrScreen
+      || P.techScreen !== nav.techScreen || P.adminTab !== nav.adminTab
+      || P.activeId !== nav.activeId) {
       this.scrollToTop();
     }
+    this.__lastNav = nav;
   }
   componentWillUnmount() {
     if (typeof window !== 'undefined') {
