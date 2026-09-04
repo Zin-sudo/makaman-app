@@ -166,6 +166,27 @@ const refreshCount = (p) => p.evaluate(() => window.__mkApp.__refreshCount);
       after === before + 1, `${before} -> ${after}`);
   }
 
+  // ── Swept for every other timer with the same "suspended while backgrounded" shape:
+  // ── autoSyncTimer has it too, and 'online' already calls autoSync() alongside refresh()
+  // ── and reconnectRealtime() for exactly this reason — but a backgrounded PWA can go
+  // ── stale without the network ever actually dropping, so visibilitychange (which fires
+  // ── either way) had refresh() and reconnectRealtime() but not autoSync(), leaving a
+  // ── closed-but-unsynced ticket waiting on the next fifteen-minute tick instead of going
+  // ── out the moment the app reopened.
+  {
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      if (!app.__origAutoSync) app.__origAutoSync = app.autoSync.bind(app);
+      app.__autoSyncCount = 0;
+      app.autoSync = () => { app.__autoSyncCount += 1; return app.__origAutoSync(); };
+    });
+    await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await p.waitForTimeout(500);
+    const n = await p.evaluate(() => window.__mkApp.__autoSyncCount);
+    check('the page coming back into view also pushes anything still queued, not only pulling',
+      n === 1, n + ' call(s)');
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await ctx.close();
   await browser.close();

@@ -328,6 +328,66 @@ const geoOf = (page) => page.evaluate(() => {
     !/"lat"\s*:/.test(stored), '(gps calls=' + offCalls + ')');
   await page.close();
 
+  // ---- a backgrounded PWA catches up the moment it is reopened ----
+  //
+  // 2026-09-04, owner's request: geoTick's own setInterval has the same weakness the
+  // realtime channel had — a JS context the OS actually suspended (a backgrounded tab, a
+  // Home-Screen PWA) does not keep firing timers on schedule, so a technician who left
+  // the app backgrounded past the two-hourly interval never gets asked for a fresh fix,
+  // and the office reads a stale "Latest/current location" on both the Team tile and
+  // Field Devices — they read the same x.geo.last this never updated. Proven here with
+  // the tick interval set absurdly long (so the ordinary timer provably cannot be what
+  // fires) and the ping interval set to zero (so a fix is due the instant one is asked
+  // for): nothing happens on its own, and dispatching visibilitychange is what actually
+  // gets a fresh fix — the same event the realtime reconnect fix already listens for.
+  {
+    const vctx = await browser.newContext({ viewport: { width: 430, height: 950 }, permissions: ['geolocation'], geolocation: A });
+    const vpage = await vctx.newPage();
+    vpage.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
+    await vpage.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
+    await vpage.addInitScript(() => {
+      window.__GEO_PING_TEST_MS = 0;
+      // Longer than this whole test block could ever run — if a fresh fix shows up, it
+      // was not this timer, because this timer will not have fired yet.
+      window.__GEO_TICK_TEST_MS = 999999;
+      window.__geoCalls = 0;
+      const orig = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+      navigator.geolocation.getCurrentPosition = function (ok, err, opts) {
+        window.__geoCalls++;
+        return orig(ok, err, opts);
+      };
+    });
+    await vpage.goto(URL, { waitUntil: 'networkidle' });
+    await vpage.waitForTimeout(300);
+    await vpage.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
+    await vpage.reload({ waitUntil: 'networkidle' });
+    await vpage.waitForTimeout(600);
+    await login(vpage, 'yousef@makaman.ly');
+    await vpage.getByRole('button', { name: /New Job Ticket/i }).click();
+    await vpage.waitForTimeout(400);
+    await vpage.locator('select').first().selectOption({ index: 1 });
+    await vpage.locator('input').nth(0).fill('Test Field');
+    await vpage.locator('input').nth(1).fill('TG-1');
+    await vpage.locator('input').nth(2).fill('RIG-9');
+    await vpage.getByRole('button', { name: /Start Logging/i }).click();
+    await vpage.waitForTimeout(1200); // the opening fix, unrelated to what is under test
+
+    const before = await vpage.evaluate(() => window.__geoCalls);
+    await vpage.waitForTimeout(800);
+    const stillIdle = await vpage.evaluate(() => window.__geoCalls);
+    check('with the tick interval effectively disabled, nothing asks for a fix on its own',
+      stillIdle === before, `${before} -> ${stillIdle}`);
+
+    await vpage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await vpage.waitForTimeout(800);
+    const afterVisible = await vpage.evaluate(() => window.__geoCalls);
+    check('the page coming back into view asks for a fresh fix on its own',
+      afterVisible > stillIdle, `${stillIdle} -> ${afterVisible}`);
+
+    await vpage.close();
+    await vctx.close();
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`);
   console.log('errors:', errs.length ? JSON.stringify(errs, null, 1) : 'none');
   await browser.close();

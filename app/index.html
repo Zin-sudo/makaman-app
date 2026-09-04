@@ -6866,10 +6866,38 @@ class Component extends DCLogic {
     // visibilitychange fires when the page comes back either way, network blip or not,
     // which 'online' alone does not cover — the socket can die while the OS still
     // considers the device "online" the whole time.
+    // geoTick's own setInterval has the identical weakness — a suspended JS context does
+    // not keep firing timers on schedule, so a technician's PWA sitting backgrounded for
+    // the two-hourly interval simply never asks for a fix, and the office reads a stale
+    // "Latest/current location" indefinitely on both the Team tile and Field Devices,
+    // since they read the same x.geo.last this never updated. geoTick() is already safe
+    // to call opportunistically — it no-ops unless a fix is actually overdue — so coming
+    // back into view is the same moment worth checking as the realtime channel above.
+    //
+    // 2026-09-04, swept for every OTHER timer with the same shape rather than leaving the
+    // next one to be found live: autoSyncTimer has the identical weakness, and — unlike
+    // geoTick — the fix already exists one event over. netListener's own 'online' handler
+    // already calls refresh(), autoSync() AND reconnectRealtime() together, on exactly
+    // this reasoning (see its own comment: "Coming back is the moment everything queued
+    // while away goes out"). But 'online' only fires on a genuine network transition, and
+    // a backgrounded PWA can go stale without the connection ever actually dropping — the
+    // OS suspends the tab, not the network. So a technician's closed-but-unsynced ticket
+    // sat waiting for the next AUTO_SYNC_INTERVAL_MS tick (fifteen minutes, itself just as
+    // capable of having been suspended) instead of going out the moment the app reopened.
+    // autoSync() already runs through runLatest, so calling it here cannot double up with
+    // the interval's own next tick or with 'online' firing moments later.
+    //
+    // The 30-second `tick` timer (componentDidMount, just above) exists purely to force a
+    // re-render so "in contact" / "last heard" labels stay current without a data change —
+    // bumped here too, so returning to the app updates those the instant it happens
+    // rather than waiting up to 30 more seconds for the interval's own next fire.
     this.visListener = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.setState({ tick: Date.now() });
         this.refresh();
+        this.autoSync();
         this.reconnectRealtime();
+        this.geoTick();
       }
     };
     if (typeof document !== 'undefined') {
@@ -13103,21 +13131,41 @@ class Component extends DCLogic {
       },
       users: (D.users || []).map(u => {
         const fix = this.lastFixFor(u);
+        // 2026-09-04, owner's request: this dot used to read `u.lastSync === 'live'` —
+        // seed text nothing in the app ever wrote back to, so it never once changed after
+        // boot and could not actually tell an active technician from an idle one. Same
+        // honest measure the ticket-level presence dot already uses (ticketRow, above):
+        // newest of this person's latest position fix or the most recent sync across any
+        // ticket they are on the crew of. This device can only ever know when someone
+        // else was last heard from, never whether they are online at this instant — so
+        // that is the only claim made, in those words, for everyone but the person
+        // actually looking at the screen.
+        const theirTickets = (D.tickets || []).filter(x => inCrew(x, u.name, u.email));
+        const syncTs = theirTickets.map(x => x.syncedAt).filter(Boolean)
+          .sort((a, b) => new Date(b) - new Date(a))[0] || '';
+        const contactTs = [fix && fix.ts, syncTs].filter(Boolean)
+          .sort((a, b) => new Date(b) - new Date(a))[0] || '';
+        const FRESH_MS = 15 * 60 * 1000;
+        const freshContact = !!contactTs && (Date.now() - new Date(contactTs).getTime()) < FRESH_MS;
+        const isMe = !!u.email && u.email === ((this.state.session || {}).email || '');
+        const onlineNow = isMe ? !!this.state.online : freshContact;
         return {
         // A disabled account stays in the list and says so. Hiding it would look like a
         // deletion, which is exactly the thing this is not.
         name: u.name,
         role: ({ pending: 'Pending approval', disabled: 'Disabled — no access' })[u.status] || u.role,
-        base: u.base, lastSync: u.lastSync,
+        base: u.base,
+        lastSync: isMe
+          ? (this.state.online ? 'Online' : 'No signal')
+          : (contactTs ? (freshContact ? 'In contact' : 'Last heard ' + F.stamp(contactTs)) : 'Not heard from'),
         isPending: u.status === 'pending',
         rowDim: u.status === 'disabled' ? '0.55' : '1',
         posText: fix ? geoText(fix) : NO_LOCATION,
         posStamp: fix ? F.stamp(fix.ts) : '',
         posDim: fix ? 'var(--ink-dim)' : 'var(--ink-faint)',
-        // Green means connected right now, and nothing else. Matching on the exact
-        // word is the point: an earlier version excluded anything containing "ago",
-        // which let "yesterday" through as though that user were online.
-        syncDot: (u.status === 'active' && u.lastSync === 'live') ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
+        // Green means actually heard from recently (or truly online, for your own row),
+        // never a fixed word that stopped meaning anything the moment it was seeded.
+        syncDot: (u.status === 'active' && onlineNow) ? 'var(--success)' : 'rgba(var(--ink-rgb),0.3)',
         // Signing up no longer asks what you want to be — everyone joins as a Field
         // Technician and the office promotes from the dropdown beside this row. The
         // binding stays so an account created before that change still shows what it
