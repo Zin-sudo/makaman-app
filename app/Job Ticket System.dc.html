@@ -521,7 +521,17 @@
   }
   /* The office roles' pages scroll under a bar pinned to the viewport, so the last
      row of every dashboard needs room to clear it. */
-  .mk-page { padding-bottom:96px; }
+  .mk-page { padding-bottom:96px; flex:1 0 auto; }
+  /* flex:1 turns the root wrapper (min-height:100vh, now display:flex column — see the
+     opening <div>) into a proper sticky footer: this page fills whatever room a short
+     screen leaves, pushing showDeskNav's bar down to sit flush at the bottom edge instead
+     of stopping wherever the content happens to end. Without it, deskNavPosition:'sticky'
+     (Self-check, Reports) rendered the bar right after short content as a plain block
+     sibling — correct in isolation, but the outer min-height:100vh still had to be filled
+     from somewhere, and with no flex to distribute it that somewhere was a second dead
+     gap, now BELOW the bar instead of above it. Long content is unaffected: flex items
+     default to min-height:auto in a column, so this never compresses a tall page — it
+     only ever grows a short one. */
   /* The signed-out screens — login, sign-up, forgot, sent, recover, pending — were
      seven copies of one style string. One class, so the shape is decided once. */
   .mk-auth-card {
@@ -824,7 +834,7 @@
 </style>
 </helmet>
 
-<div style="min-height:100vh;background:var(--ground)">
+<div style="min-height:100vh;background:var(--ground);display:flex;flex-direction:column">
 
   <!-- ══ LOGIN / SIGNUP (logged out) ══ -->
   <sc-if value="{{ loggedOut }}" hint-placeholder-val="{{ false }}">
