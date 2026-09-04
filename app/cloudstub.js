@@ -113,6 +113,16 @@ window.__writes = [];
 window.__uploads = [];
 window.__removed = [];
 window.__signed = [];
+// Stands in for a Postgres Changes event actually arriving over the wire — invokes
+// every callback registered on the n-th subscribed channel (default the first, since
+// this app only ever opens one). See channel()/subscribe() on the auth client below.
+window.__fireRealtime = function (n) {
+  var chs = window.__realtimeChannels || [];
+  var ch = chs[n || 0];
+  if (!ch) return false;
+  (ch.subs || []).forEach(function (s) { if (s.cb) s.cb({}); });
+  return true;
+};
 window.__db = ${JSON.stringify(db)};
 // Preset by an init script when a suite needs the app to boot with no signal at all.
 // Plain assignment overwrote that before the app had run a single line, so "start
@@ -369,6 +379,26 @@ window.supabase = {
           return Promise.resolve({ data: { user: p ? { id: p.id, email: p.email } : null }, error: null });
         },
         signUp: function () { return Promise.resolve({ data: {}, error: null }); },
+      },
+      // Fires nothing on its own — there is no real socket here, and reproducing one
+      // would test Playwright's network stack, not this app's code. What a suite can
+      // exercise instead: does subscribeRealtime() open exactly one channel on the
+      // right table, does the callback it registers get invoked, and does logging out
+      // (or unmounting) call removeChannel() on the same object it was handed. Every
+      // subscribed channel and every removeChannel() call is recorded on window so a
+      // test can read them back; window.__fireRealtime(n) invokes the n-th channel's
+      // registered postgres_changes callback, standing in for a change actually
+      // arriving over the wire.
+      channel: function (name) {
+        window.__realtimeChannels = window.__realtimeChannels || [];
+        var ch = { name: name, subs: [] };
+        ch.on = function (event, filter, cb) { ch.subs.push({ event: event, filter: filter, cb: cb }); return ch; };
+        ch.subscribe = function () { window.__realtimeChannels.push(ch); return ch; };
+        return ch;
+      },
+      removeChannel: function (ch) {
+        window.__realtimeRemoved = window.__realtimeRemoved || [];
+        window.__realtimeRemoved.push(ch);
       },
       storage: {
         from: function (bucket) {

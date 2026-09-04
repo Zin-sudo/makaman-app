@@ -5786,6 +5786,19 @@ const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SY
 // that typing a field is one write rather than twenty; short enough that the office sees
 // a change while the technician is still looking at it.
 const DRAIN_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__DRAIN_TEST_MS) || 1200;
+// Reported live: the office's Save-to-Home-Screen app did not show a technician's
+// "Job Done" until the app was relaunched — AUTO_SYNC_INTERVAL_MS is fifteen minutes,
+// and nothing else was pulling in between. This is how the gap closes without polling
+// every few seconds on every signed-in device: a live channel on the one table whose
+// changes matter for "does the office see this" (tickets — a new one, a status change,
+// a reassignment), and a change on it schedules an ordinary refresh() a moment later
+// rather than merging the change in directly. refresh() already re-pulls, re-shapes and
+// re-hydrates correctly for every role; a second, parallel path that tried to patch a
+// realtime payload into local state would have to reproduce all of that by hand and
+// drift from it the first time hydrate() changed. Debounced for the same reason
+// scheduleDrain() is: one row's own write touches the ticket and several children in
+// the same moment, and Postgres Changes fires once per row, not once per edit.
+const REALTIME_REFRESH_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__REALTIME_TEST_MS) || 1200;
 // How often a ticket that is still being logged re-pins where the device is.
 const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 3600000;
 // How often the app *checks* whether a ping is due. Checking often and pinging rarely is
@@ -6607,7 +6620,7 @@ class Component extends DCLogic {
       const c = sb();
       (c ? withTimeout(c.auth.getSession().catch(() => null), AUTH_RESTORE_TIMEOUT_MS, null)
           : Promise.resolve(null))
-        .then(() => this.refresh());
+        .then(() => { this.refresh(); this.subscribeRealtime(); });
     }
 
     // Connectivity is a fact about the device, not a preference. It used to be a
@@ -6678,6 +6691,7 @@ class Component extends DCLogic {
     clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
     if (this.toastTimer) clearTimeout(this.toastTimer);
     if (this.drainTimer) clearTimeout(this.drainTimer);
+    this.unsubscribeRealtime();
     if (this.netListener && typeof window !== 'undefined') {
       window.removeEventListener('online', this.netListener);
       window.removeEventListener('offline', this.netListener);
@@ -6792,6 +6806,58 @@ class Component extends DCLogic {
         if (n) this.setState({ tick: Date.now() });
       }, () => undefined));
     }, DRAIN_DEBOUNCE_MS);
+  }
+  // A live channel on `tickets`, so the office sees a new ticket or a status change
+  // without waiting on AUTO_SYNC_INTERVAL_MS (fifteen minutes) or a relaunch. One per
+  // signed-in session — subscribeRealtime() is a no-op if a channel already exists, so
+  // calling it from both componentDidMount (a restored session) and doLogin (a fresh
+  // one) cannot open two. Postgres Changes on `public.tickets` are filtered server-side
+  // by the same RLS the table's own SELECT policy already enforces — a technician's
+  // channel receives events for exactly the tickets a technician's own refresh() would
+  // have pulled anyway, nothing more, so this adds no new exposure of its own.
+  //
+  // Deliberately just a nudge to refresh(), not a second data path. Patching a realtime
+  // payload into local state would mean re-deriving job types, price lists, paging and
+  // every other shape hydrate() already gets right — a second implementation of the
+  // same rules, guaranteed to drift the first time one of them changes and not the
+  // other. refresh() already exists, is already tested, and already does this correctly
+  // for every role; the channel's only job is to say "now" instead of "in fifteen
+  // minutes".
+  subscribeRealtime() {
+    if (!USE_CLOUD || this.realtimeChannel) return;
+    const c = sb();
+    if (!c || typeof c.channel !== 'function') return;
+    try {
+      this.realtimeChannel = c.channel('mk-tickets-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' },
+          () => this.scheduleRealtimeRefresh())
+        .subscribe();
+    } catch (e) {
+      // A browser with no WebSocket support, or a network that blocks one, loses the
+      // instant update and keeps the fifteen-minute one — degrading to the behaviour
+      // that shipped before this existed, not to a broken app.
+      this.realtimeChannel = null;
+    }
+  }
+  unsubscribeRealtime() {
+    if (this.realtimeTimer) { clearTimeout(this.realtimeTimer); this.realtimeTimer = null; }
+    if (!this.realtimeChannel) return;
+    try {
+      const c = sb();
+      if (c && typeof c.removeChannel === 'function') c.removeChannel(this.realtimeChannel);
+    } catch (e) { /* the channel is being torn down either way */ }
+    this.realtimeChannel = null;
+  }
+  // Debounced for the same reason scheduleDrain() is: closing a job writes the ticket
+  // header and several child rows in the same moment, and Postgres Changes fires once
+  // per row that changed, not once per action a person took — a bare Job Done can
+  // trigger this several times within the same second.
+  scheduleRealtimeRefresh() {
+    if (this.realtimeTimer) clearTimeout(this.realtimeTimer);
+    this.realtimeTimer = setTimeout(() => {
+      this.realtimeTimer = null;
+      this.refresh();
+    }, REALTIME_REFRESH_DEBOUNCE_MS);
   }
   // Transient edit buffer for the inline fields that write to the audit trail (ticket
   // header stamps, Base Location, Customer Rep., job-log line timestamps).
@@ -10368,6 +10434,7 @@ class Component extends DCLogic {
           // someone signed in and looking at yesterday's tickets, not bounced back to
           // the login screen with a network error.
           this.refresh();
+          this.subscribeRealtime();
         })
         .catch(err => {
           logError('auth', err, { doing: 'sign in', email: email });
@@ -10457,6 +10524,10 @@ class Component extends DCLogic {
       // leave you out, never in.
       this.persistSession(null);
       this.setState({ session: null, showSettings: false, dialog: null });
+      // The channel belongs to the session that opened it — an anonymous connection has
+      // nothing left to receive under RLS anyway, but leaving it open is a live socket
+      // this device no longer has any use for.
+      this.unsubscribeRealtime();
       if (USE_CLOUD) {
         // The replica goes with the session. Devices are shared here — one phone in a
         // truck, whoever is on shift — and the next person signing in must not find the
