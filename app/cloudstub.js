@@ -128,6 +128,12 @@ window.__db = ${JSON.stringify(db)};
 // Plain assignment overwrote that before the app had run a single line, so "start
 // offline" was impossible and any test of the boot path raced the first drain.
 window.__offline = window.__offline || false;
+// Its own knob rather than __stubLatency, on purpose: __stubLatency already drives every
+// read's timing assertions across the other suites, and reusing it for writes too would
+// change what those already measure. Defaults to 0 -- no existing suite's write timing
+// moves unless it opts in -- so a suite that wants to watch a busy ring animate while an
+// upsert or insert is in flight can ask for that without touching anything else.
+window.__stubWriteLatency = 0;
 // Fault knobs, so the failure paths can be driven rather than reasoned about.
 window.__failUpload = false;
 window.__failInsert = '';
@@ -250,6 +256,14 @@ window.supabase = {
           };
           return chain;
         },
+        // Applies __stubWriteLatency, when set, to whatever body upsert/insert already
+        // decided on — success or refusal alike, since a slow connection is slow either
+        // way and a suite watching a busy ring needs the delay on both paths.
+        settle: function (body) {
+          var ms = window.__stubWriteLatency || 0;
+          if (!ms) return Promise.resolve(body);
+          return new Promise(function (r) { setTimeout(function () { r(body); }, ms); });
+        },
         upsert: function (row, opts) {
           if (window.__offline) return fail();
           // Refusable too, and it has to be: upsert is the app's main write path — every
@@ -257,9 +271,9 @@ window.supabase = {
           // and insert() is reached only for an attachment row. A fault knob that covers
           // insert alone can only break the one path the app almost never takes.
           var multi = window.__failTables && window.__failTables[table];
-          if (multi) return Promise.resolve({ data: null, error: { message: multi } });
+          if (multi) return api.settle({ data: null, error: { message: multi } });
           if (window.__failInsert === table) {
-            return Promise.resolve({ data: null, error: {
+            return api.settle({ data: null, error: {
               message: window.__failMessage || 'row refused by the database' } });
           }
           window.__writes.push({ table: table, action: 'upsert', n: 1 });
@@ -267,14 +281,14 @@ window.supabase = {
           var at = -1;
           for (var i = 0; i < rows.length; i++) if (rows[i][key] === row[key]) { at = i; break; }
           if (at >= 0) rows[at] = Object.assign({}, rows[at], row); else rows.push(row);
-          return Promise.resolve({ data: [row], error: null });
+          return api.settle({ data: [row], error: null });
         },
         insert: function (rs) {
           if (window.__offline) return fail();
           var multi = window.__failTables && window.__failTables[table];
-          if (multi) return Promise.resolve({ data: null, error: { message: multi } });
+          if (multi) return api.settle({ data: null, error: { message: multi } });
           if (window.__failInsert === table) {
-            return Promise.resolve({ data: null, error: {
+            return api.settle({ data: null, error: {
               message: window.__failMessage || 'row refused by the database' } });
           }
           // supabase-js takes a single row or an array. This took only an array, so the
@@ -284,7 +298,7 @@ window.supabase = {
           var list = Array.isArray(rs) ? rs : [rs];
           window.__writes.push({ table: table, action: 'insert', n: list.length });
           list.forEach(function (r) { rows.push(r); });
-          return Promise.resolve({ data: list, error: null });
+          return api.settle({ data: list, error: null });
         },
         delete: function () {
           return { eq: function (col, val) {

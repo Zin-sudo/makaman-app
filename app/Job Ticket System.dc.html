@@ -480,6 +480,19 @@
        rather than another card in it. */
     border-radius:var(--radius-notice);
   }
+  .mk-busy {
+    position:fixed; top:68px; inset-inline:0; margin-inline:auto;
+    z-index:46; width:max-content; max-width:min(320px, calc(100vw - 24px));
+    display:flex; align-items:center; gap:12px;
+    padding:9px 16px 9px 10px; border:1px solid rgba(var(--ink-rgb),0.16);
+    background:var(--surface); color:var(--ink);
+    box-shadow:0 6px 20px rgba(0,0,0,0.28);
+    animation:bounce-bottom 0.9s both;
+    border-radius:var(--radius-notice);
+  }
+  /* The ring redraws every BUSY_TICK_MS (100ms by default) — a step transition here
+     would visibly stutter at that rate, so it eases smoothly between steps instead. */
+  .mk-busy-arc { transition:stroke-dashoffset 0.15s linear; }
   /* Reduced motion, honoured across the whole app rather than on one element.
      This used to cover the toast alone, while three `pulse 2s infinite` declarations
      ran regardless — and one of those sits inside a repeating row, so it was one
@@ -3212,10 +3225,17 @@
                     </sc-if>
                   </div>
                 </div>
-                <div class="mk-dev-pos">
-                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Latest position</div>
-                  <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.posDim }};overflow-wrap:anywhere">{{ d.posText }}</div>
-                  <div class="mk-hint">{{ d.posStamp }}</div>
+                <div class="mk-dev-pos" style="display:flex;gap:18px;flex-wrap:wrap">
+                  <div style="min-width:0">
+                    <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Well location</div>
+                    <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.wellLocDim }};overflow-wrap:anywhere">{{ d.wellLocText }}</div>
+                    <div class="mk-hint">{{ d.wellLocStamp }}</div>
+                  </div>
+                  <div style="min-width:0">
+                    <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Latest/Current location</div>
+                    <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.curLocDim }};overflow-wrap:anywhere">{{ d.curLocText }}</div>
+                    <div class="mk-hint">{{ d.curLocStamp }}</div>
+                  </div>
                 </div>
                 <sc-if value="{{ d.hasOpenJobs }}" hint-placeholder-val="{{ true }}">
                   <div class="mk-dev-jobs">
@@ -3226,18 +3246,6 @@
                         <div style="font-size:12px;color:var(--ink-faint);overflow-wrap:anywhere">{{ j.locLine }}</div>
                         <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;overflow-wrap:anywhere">{{ j.lastLogText }}</div>
                         <div class="mk-hint">{{ j.lastLogTime }}</div>
-                        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px">
-                          <div style="min-width:0">
-                            <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">Well location</div>
-                            <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ j.wellLocDim }};overflow-wrap:anywhere">{{ j.wellLocText }}</div>
-                            <div class="mk-hint">{{ j.wellLocStamp }}</div>
-                          </div>
-                          <div style="min-width:0">
-                            <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">Current location</div>
-                            <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ j.curLocDim }};overflow-wrap:anywhere">{{ j.curLocText }}</div>
-                            <div class="mk-hint">{{ j.curLocStamp }}</div>
-                          </div>
-                        </div>
                       </div>
                     </sc-for>
                   </div>
@@ -3326,6 +3334,26 @@
           <span style="font-size:10px;letter-spacing:0.03em;font-weight:{{ n.weight }}">{{ n.label }}</span>
         </button>
       </sc-for>
+    </div>
+  </sc-if>
+
+  <!-- ══ BUSY RING ══ -->
+  <!-- For a live round trip, not the offline-first writes that already land instantly —
+       see runBusy(). Same fixed-and-centred placement as the toast below it, since the
+       two never show at once: a busy ring either clears into nothing (success) or
+       hands off to a toast naming the reason (failure), never both on screen together. -->
+  <sc-if value="{{ hasBusy }}" hint-placeholder-val="{{ false }}">
+    <div class="mk-busy" role="status" aria-live="polite">
+      <svg width="34" height="34" viewBox="0 0 36 36" style="flex:none">
+        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(var(--ink-rgb),0.14)" stroke-width="4"></circle>
+        <circle cx="18" cy="18" r="16" fill="none" stroke="{{ busyRingColor }}" stroke-width="4" stroke-linecap="round"
+          stroke-dasharray="{{ busyRingC }}" stroke-dashoffset="{{ busyRingOffset }}"
+          transform="rotate(-90 18 18)" class="mk-busy-arc"></circle>
+      </svg>
+      <div style="min-width:0">
+        <div style="font-size:13px;font-weight:600;overflow-wrap:anywhere">{{ busyLabel }}</div>
+        <div style="font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums">{{ busyPctLabel }}</div>
+      </div>
     </div>
   </sc-if>
 
@@ -3977,6 +4005,10 @@ const ERRLOG_MAX = 400;
 function errorKind(err) {
   const raw = String((err && (err.message || err.details || err.hint || err.error)) || err || '');
   if (/MK_STALE/.test(raw)) return 'STALE';
+  // Raised by enforce_ticket_update_rules() (migration 0039) and marked terminal at the
+  // send site for the same reason MK_STALE is: the ticket does not go back to
+  // unapproved, so this exact refusal will never turn into success on a later try.
+  if (/already approved and can no longer be edited/i.test(raw)) return 'LOCKED';
   if (/invalid input syntax|invalid input value|out of range/i.test(raw)) return 'TYPE';
   if (/duplicate key|already exists|unique constraint/i.test(raw)) return 'DUP';
   // BEFORE the policy test, not after it. Postgres says "violates foreign key constraint",
@@ -4044,6 +4076,7 @@ const ERROR_KIND = {
   TYPE: 'A value had the wrong type or shape for its column.',
   DUP: 'Something with that key already exists.',
   STALE: 'Somebody else changed it first, so this version was not written over theirs.',
+  LOCKED: 'The office had already approved this ticket by the time the change reached the server, and an approved ticket cannot be edited this way — permanently, not just for now. Nothing to retry; if the change still needs to happen, it has to be made from the review screen in the office.',
   AUTH: 'The session was not accepted.',
   CLOCK: "This device's clock is wrong. The server refused a token that looked like it was issued in the future — check the date and time in the device's own settings, then try again.",
   QUOTA: 'The device is out of room.',
@@ -4828,7 +4861,18 @@ function outboxSend(c, op) {
     delete row.version;
     return c.from('tickets').update(row).eq('id', row.id).eq('version', base).select('id,version')
       .then((r) => {
-        if (r.error) throw r.error;
+        if (r.error) {
+          // enforce_ticket_update_rules() (migration 0039) raises exactly this text for a
+          // technician editing a ticket the office has already approved, and it is
+          // permanent in the same sense MK_STALE below is: the ticket does not go back to
+          // unapproved, so an edit this rule already refused will be refused again on
+          // every future retry, forever — confirmed live, 2026-09-04, as the cause of an
+          // outbox that never cleared even though the job itself had fully synced.
+          if (/already approved and can no longer be edited/i.test(r.error.message || '')) {
+            r.error.mkTerminal = true;
+          }
+          throw r.error;
+        }
         if (r.data && r.data.length) { echoVersion(row.id, r.data[0].version); return; }
         // No row matched. Two very different reasons, and guessing between them is how a
         // new ticket would get thrown away as a conflict: either the ticket does not
@@ -4849,7 +4893,19 @@ function outboxSend(c, op) {
         });
       });
   }
-  if (op.action === 'upsert') return c.from(op.table).upsert(op.row).then((r) => { if (r.error) throw r.error; });
+  // audit_log is append-only by nature (see where these ops are queued) and carries no
+  // UPDATE policy at all — checked live, 2026-09-04. An upsert is INSERT ... ON CONFLICT
+  // DO UPDATE, so a redundant resend of a row that already landed (the write succeeded,
+  // the response was what got lost) tries to update a row nothing may ever update, and is
+  // refused by RLS every single retry — proof the entry made it, read back as proof it
+  // never did, and the queue never clears. ignoreDuplicates turns that branch into ON
+  // CONFLICT DO NOTHING, which touches nothing and so never asks the UPDATE policy
+  // anything. Scoped to audit_log alone: ticket_lines and the rest genuinely are edited
+  // (the office corrects a logged timestamp, for one) and keep their real upsert.
+  if (op.action === 'upsert') {
+    const opts = op.table === 'audit_log' ? { onConflict: 'id', ignoreDuplicates: true } : undefined;
+    return c.from(op.table).upsert(op.row, opts).then((r) => { if (r.error) throw r.error; });
+  }
   // A row that already exists and must not be created by a client.
   //
   // PostgREST's upsert is INSERT ... ON CONFLICT DO UPDATE, so it has to pass the INSERT
@@ -5758,6 +5814,19 @@ function monthKey(s, tz) {
 // How long a drop banner holds before it retires itself. Overridable for tests, which
 // cannot afford to wait six seconds per assertion.
 const TOAST_MS = (typeof window !== 'undefined' && window.__TOAST_TEST_MS) || 6000;
+// The busy ring's own timing. 2026-09-04, owner's request: an action that waits on a live
+// round trip — not the offline-first, queued-and-instant kind — used to give no sign it
+// was doing anything at all until it either finished or the request timed out; on a weak
+// connection that silence is indistinguishable from a hang. EASE_MS is how quickly the
+// ring eases toward 90% — an honest curve, not a promise: it never claims completion
+// before the real answer arrives, so it keeps climbing (slower and slower) for as long as
+// the request actually takes, rather than sitting at a number that stopped meaning
+// anything. TICK_MS is how often it's redrawn — smooth without repainting on every frame.
+const BUSY_EASE_MS = (typeof window !== 'undefined' && window.__BUSY_EASE_TEST_MS) || 4000;
+const BUSY_TICK_MS = (typeof window !== 'undefined' && window.__BUSY_TICK_TEST_MS) || 100;
+// Circumference of the ring drawn in the template below (r=16) — computed once rather
+// than re-derived by hand in two places that would then have to agree with each other.
+const BUSY_RING_C = 2 * Math.PI * 16;
 // What the office hands a technician for a job, written straight onto the ticket. No
 // catalogue, no register, no lifecycle — a line of text, a count and a note is what
 // actually gets written on a whiteboard at base, and anything heavier goes unused.
@@ -6130,6 +6199,9 @@ class Component extends DCLogic {
       // See reviewContent: the ticket as it was found, so leaving can offer to put it back.
       reviewSnap: null, reviewSaving: false, serverBusy: false,
       priceDelete: null,
+      // { key, label, pct, startedAt, tone } while an action from runBusy() is in
+      // flight; null the rest of the time. See runBusy() for what drives it.
+      busy: null,
       actingAs: null,
       activeId: 't3', online: typeof navigator === 'undefined' || navigator.onLine !== false, draft: null, newEventText: '', pickItem: '', itemSearch: '',
       // Whether a technician's OWN deliberate retry of the arrival pin came back denied
@@ -6707,6 +6779,7 @@ class Component extends DCLogic {
     }
     clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
     if (this.toastTimer) clearTimeout(this.toastTimer);
+    if (this.busyTimer) clearInterval(this.busyTimer);
     if (this.drainTimer) clearTimeout(this.drainTimer);
     this.unsubscribeRealtime();
     if (this.netListener && typeof window !== 'undefined') {
@@ -6749,6 +6822,64 @@ class Component extends DCLogic {
   dismissToast() {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.setState({ toast: null });
+  }
+
+  // A visible ring for the actions that are NOT offline-first — a permission grant, a
+  // price correction, an admin action — the ones that genuinely wait on a live round
+  // trip before they can say what happened, instead of writing to the replica first and
+  // syncing after (see mutate(), directly above, for why most of the app never needs
+  // this at all). 2026-09-04, owner's request, after "Raise a note" looked stuck on a
+  // weak connection with nothing on screen to say so — that particular action is already
+  // instant (it goes through mutate()); this is for the ones that are not, so the same
+  // silence never happens somewhere real.
+  //
+  // `run` is a function returning the promise, not the promise itself — called only once
+  // the ring is already showing, so there is never a gap between "the button was pressed"
+  // and "something on screen moved". Every caller keeps its own .then()/.catch() for what
+  // the result actually does; this only ever wraps the waiting.
+  //
+  // opts.toastOnError (default true) names the reason itself, for a caller that had no
+  // failure message of its own. A caller that already crafts a more specific one — "it
+  // may already be on the list", say, which no generic classifier can know — passes
+  // false and keeps saying that instead of this repeating a plainer version underneath.
+  runBusy(key, label, run, opts) {
+    const toastOnError = !opts || opts.toastOnError !== false;
+    const startedAt = Date.now();
+    if (this.busyTimer) clearInterval(this.busyTimer);
+    this.setState({ busy: { key: key, label: label, pct: 4, startedAt: startedAt, tone: 'run' } });
+    this.busyTimer = setInterval(() => {
+      const b = this.state.busy;
+      // A later call already replaced this one — stop animating a ring nobody is
+      // looking at rather than fight the newer one for the same state slot.
+      if (!b || b.startedAt !== startedAt) { clearInterval(this.busyTimer); this.busyTimer = null; return; }
+      const elapsed = Date.now() - startedAt;
+      const pct = 90 - 86 * Math.exp(-elapsed / BUSY_EASE_MS);
+      this.setState({ busy: Object.assign({}, b, { pct: Math.min(90, pct) }) });
+    }, BUSY_TICK_MS);
+    const stop = () => {
+      if (this.busyTimer) { clearInterval(this.busyTimer); this.busyTimer = null; }
+    };
+    return run().then((result) => {
+      stop();
+      if (this.state.busy && this.state.busy.startedAt === startedAt) {
+        this.setState({ busy: { key: key, label: label, pct: 100, startedAt: startedAt, tone: 'ok' } });
+        setTimeout(() => {
+          if (this.state.busy && this.state.busy.startedAt === startedAt) this.setState({ busy: null });
+        }, 500);
+      }
+      return result;
+    }, (err) => {
+      stop();
+      if (this.state.busy && this.state.busy.startedAt === startedAt) this.setState({ busy: null });
+      if (toastOnError) {
+        // The same classifier the error log already uses, so "weak connection" and every
+        // other reason read the same plain language here as they do everywhere else in
+        // the app rather than inventing a second vocabulary for the same faults.
+        const reason = ERROR_KIND[errorKind(err)] || (err && err.message) || 'Something went wrong.';
+        this.toast('busy:' + key, label + ' — ' + reason, 'warn');
+      }
+      throw err;
+    });
   }
 
   mutate(fn) {
@@ -6847,6 +6978,16 @@ class Component extends DCLogic {
     try {
       this.realtimeChannel = c.channel('mk-tickets-live')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' },
+          () => this.scheduleRealtimeRefresh())
+        // Reported live, 2026-09-04: a permission grant took a full relaunch to reach an
+        // already-open session — the same gap this closed for tickets, one table over
+        // (migration 0057). No user_id filter here on purpose: Postgres Changes filters
+        // by the subscriber's own SELECT policy exactly as an ordinary read already does
+        // (see the tickets comment above and 0057's own), and
+        // user_permissions_select_own already restricts a non-staff subscriber to their
+        // own row — building a filter string would also have needed CLOUD_IDS.me, which
+        // is not guaranteed set yet at the point this runs.
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_permissions' },
           () => this.scheduleRealtimeRefresh())
         .subscribe();
     } catch (e) {
@@ -7492,8 +7633,14 @@ class Component extends DCLogic {
         granted: granted, set_by: CLOUD_IDS.me || null,
       });
     }
-    Promise.resolve(q)
-      .then((r) => { if (r && r.error) throw r.error; })
+    // The error check has to live INSIDE the wrapped call, not chained after runBusy()
+    // returns — Supabase resolves an upsert/delete with { error } set rather than
+    // rejecting, so a check placed after runBusy() would run only once runBusy had
+    // already decided this was a success and put the ring at 100%. Thrown here instead,
+    // runBusy sees the real rejection and the ring answers correctly the first time.
+    this.runBusy(key, 'Saving permission',
+      () => Promise.resolve(q).then((r) => { if (r && r.error) throw r.error; return r; }),
+      { toastOnError: false })
       .then(() => this.refresh())
       .then(() => this.toast(key, permissionId === null
         ? user.name + ' is back on their role defaults.'
@@ -8612,10 +8759,13 @@ class Component extends DCLogic {
     }
     const c = sb();
     if (!c) { this.toast('paperwork', 'This needs a connection to the office.', 'warn'); return; }
-    c.from('paperwork_email_recipients').insert({ email: email, enabled: false, added_by: CLOUD_IDS.me })
-      .select().single()
+    // See setPermissionOverride() for why the error check has to run inside the wrapped
+    // call rather than after runBusy() returns.
+    this.runBusy('paperwork-add', 'Adding ' + email,
+      () => c.from('paperwork_email_recipients').insert({ email: email, enabled: false, added_by: CLOUD_IDS.me }).select().single()
+        .then((r) => { if (r.error) throw r.error; return r; }),
+      { toastOnError: false })
       .then((r) => {
-        if (r.error) throw r.error;
         this.setState({
           paperworkRecipients: (this.state.paperworkRecipients || []).concat([r.data]),
           newPaperworkEmail: '',
@@ -10691,23 +10841,41 @@ class Component extends DCLogic {
       // thing you open from Account, not the meaning of a tab on the bottom bar.
       showMgrPage: ((S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab)
         || (S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen === 'review'),
-      // The Admin tools page is Admin's, with one exception: the price lists, which the
-      // ops manager now reaches through the same screen. It is a single tool page keyed
-      // by adminTab with its own back button, so arriving on 'price' shows the price
-      // tool and nothing else — there is no tab strip to wander off down.
-      // The Admin tools page is Admin's, with two exceptions. The price lists, which the
-      // ops manager reaches through the same screen. And the self-check, which belongs to
+      // The Admin tools page is Admin's, with exceptions. The price lists, which the
+      // ops manager reaches through the same screen. The self-check, which belongs to
       // everybody: it exists so that whoever hits a problem can run it and send the
       // result to somebody who can act on it, and a diagnostic only the admin can run is
-      // a diagnostic that is never there when it is needed.
+      // a diagnostic that is never there when it is needed. And the paperwork email
+      // list, whenever hasPermission() says so — same gate accountTiles already uses to
+      // decide whether to offer the tile at all.
+      //
+      // 2026-09-04, reported live: accountTiles was fixed to offer this tile to anyone
+      // holding paperwork_email.manage, but this condition was not — an ops manager
+      // granted the override could now SEE the tile and tap it, land on adminTab:
+      // 'paperwork', and match no top-level screen at all (not this one — role !==
+      // 'admin' and adminTab isn't 'check'/'reports'/'price' — and not showMgrPage
+      // either, since that requires !S.adminTab). Nothing rendered but the app bar,
+      // which is exactly what a template mismatch looks like from the outside: not an
+      // error, just silence. The lesson generalises — a permission that unlocks a TILE
+      // has to unlock the SCREEN the tile leads to as the same edit, not two.
       showAdminPage: S.roleTab === 'tickets' && !!S.adminTab
         && (S.role === 'admin' || S.adminTab === 'check' || S.adminTab === 'reports'
-            || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))),
+            || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))
+            || (S.adminTab === 'paperwork' && this.hasPermission('paperwork_email.manage'))),
       showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review',
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
       deskTabs: S.role !== 'tech' && S.roleTab !== 'tickets',
-      showDeskNav: S.role !== 'tech',
+      // A technician on showAdminPage (Self-check, Reports, or anything else adminTab
+      // reaches) is not covered by either nav: showTechShell's own bottom nav requires
+      // !adminTab, so it is gone the moment one of these tools is open, and this used to
+      // require role !== 'tech', so nothing replaced it — the bar just disappeared
+      // (2026-09-04, reported live). Every adminTab value is set together with roleTab:
+      // 'tickets' and cleared together with it (backToAccount, the tab strip itself), so
+      // !!S.adminTab is exactly the technician's half of showAdminPage's own condition —
+      // this never doubles up with showTechShell's nav, which is false whenever this is
+      // the reason showDeskNav is true.
+      showDeskNav: S.role !== 'tech' || !!S.adminTab,
       // `sticky` (sits under short content, no gap) instead of `fixed` (pinned to the
       // viewport edge regardless of content) only on the two screens routinely short
       // enough to show the gap in the first place — Self-check before it has run, and
@@ -10826,12 +10994,23 @@ class Component extends DCLogic {
           const open = mine.filter(x => x.status === 'logging');
           const closed = mine.filter(x => x.status !== 'logging');
           const pending = mine.filter(x => x.status !== 'logging' && !x.synced).length;
-          // Newest position across their tickets. Only refreshes while they have a
-          // job open, so it is where they last were on a job — not live tracking.
-          // Shown once for the person rather than repeated under every open job.
-          const fixes = mine.map(x => (x.geo || {}).last || (x.geo || {}).open).filter(Boolean)
+          // Two coordinates, not one blended "whichever is newest" — 2026-09-04, owner's
+          // request, after an earlier pass put both under every open job and put a
+          // third, redundant reading here too. Well location is the opening fix, taken
+          // once per ticket and never overwritten — the site itself, which does not move
+          // (same reasoning as geoNote(), used on the printed sheet); when someone holds
+          // more than one open job, the most recently opened one stands for the pair,
+          // same as "last contact" above already stands for the device as a whole.
+          // Latest/current location is the periodic re-pin (geoTick, every
+          // GEO_PING_INTERVAL_MS) — whether the device, and so presumably the
+          // technician, is still there. Both shown once for the person, not repeated
+          // under every open job.
+          const openFixes = mine.map(x => (x.geo || {}).open).filter(Boolean)
             .sort((a, b) => new Date(b.ts) - new Date(a.ts));
-          const fix = fixes[0];
+          const wellFix = openFixes[0];
+          const lastFixes = mine.map(x => (x.geo || {}).last).filter(Boolean)
+            .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+          const curFix = lastFixes[0];
           const hours = lastAt === null ? Infinity : (now - lastAt) / 3600000;
           return {
             name: u.name, base: u.base || '—',
@@ -10842,35 +11021,24 @@ class Component extends DCLogic {
             tollLabel: open.length + ' open · ' + closed.length + ' closed',
             pendingLabel: pending ? (pending === 1 ? '1 not uploaded' : pending + ' not uploaded') : '',
             showPending: pending > 0,
-            posText: fix ? geoText(fix) : NO_LOCATION,
-            posStamp: fix ? F.stamp(fix.ts) : '',
-            posDim: fix ? 'var(--ink-dim)' : 'var(--ink-faint)',
-            // What each open job actually is, so the office can act on a position
-            // without opening the ticket first. Two coordinates rather than the one
-            // above, because they answer different questions: Well location is the
-            // opening fix, taken once and never overwritten — the site itself, which
-            // does not move (same reasoning as geoNote(), used on the printed sheet).
-            // Current location is the periodic re-pin (geoTick, every
-            // GEO_PING_INTERVAL_MS) — whether the device, and so presumably the
-            // technician, is still there. The last log line is the same shorthand
-            // liveTickets already gives the Observer feed for "what's actually
-            // happening" without opening the ticket (2026-09-04, owner's request).
+            wellLocText: wellFix ? geoText(wellFix) : NO_LOCATION,
+            wellLocStamp: wellFix ? F.stamp(wellFix.ts) : '',
+            wellLocDim: wellFix ? 'var(--ink-dim)' : 'var(--ink-faint)',
+            curLocText: curFix ? geoText(curFix) : NO_LOCATION,
+            curLocStamp: curFix ? F.stamp(curFix.ts) : '',
+            curLocDim: curFix ? 'var(--ink-dim)' : 'var(--ink-faint)',
+            // What each open job actually is, so the office can act on it without
+            // opening the ticket first — the last line the technician actually wrote,
+            // same shorthand liveTickets already gives the Observer feed (2026-09-04,
+            // owner's request).
             openJobs: open.slice().reverse().map(x => {
               const events = x.events || [];
               const lastEvent = events[events.length - 1];
-              const wellFix = (x.geo || {}).open;
-              const curFix = (x.geo || {}).last;
               return {
                 customer: x.customer,
                 locLine: [x.field, x.well, x.rig].filter(Boolean).join(' · ') || '—',
                 lastLogText: lastEvent ? lastEvent.text : 'No log lines yet.',
                 lastLogTime: lastEvent ? F.stamp(lastEvent.ts) : '',
-                wellLocText: wellFix ? geoText(wellFix) : NO_LOCATION,
-                wellLocStamp: wellFix ? F.stamp(wellFix.ts) : '',
-                wellLocDim: wellFix ? 'var(--ink-dim)' : 'var(--ink-faint)',
-                curLocText: curFix ? geoText(curFix) : NO_LOCATION,
-                curLocStamp: curFix ? F.stamp(curFix.ts) : '',
-                curLocDim: curFix ? 'var(--ink-dim)' : 'var(--ink-faint)',
               };
             }),
             hasOpenJobs: open.length > 0,
@@ -12658,7 +12826,7 @@ class Component extends DCLogic {
             return;
           }
           if (!u.id) { this.toast('approve:' + u.email, 'That account has not reached the server yet.', 'warn'); return; }
-          adminAction('approve_signup', { userId: u.id })
+          this.runBusy('approve:' + u.email, 'Approving ' + u.name, () => adminAction('approve_signup', { userId: u.id }), { toastOnError: false })
             .then(() => this.refresh())
             .then(() => this.toast('approve:' + u.email, u.name + ' can now sign in.', 'ok'))
             .catch(err => this.toast('approve:' + u.email, err.message, 'warn'));
@@ -12680,7 +12848,8 @@ class Component extends DCLogic {
             return;
           }
           if (!u.id) { this.toast('promote:' + u.email, 'That account has not reached the server yet.', 'warn'); return; }
-          adminAction('promote_role', { userId: u.id, role: ROLE_TO_DB[val] })
+          this.runBusy('promote:' + u.email, 'Changing ' + u.name + '’s role',
+            () => adminAction('promote_role', { userId: u.id, role: ROLE_TO_DB[val] }), { toastOnError: false })
             .then(() => this.refresh())
             .then(() => this.toast('promote:' + u.email, u.name + ' is now ' + (ROLE_LABEL[val] || val) + '.', 'ok'))
             // The dropdown is showing the role the admin picked; the database never took
@@ -12817,6 +12986,19 @@ class Component extends DCLogic {
       toastFg: { warn: 'var(--warning-ink)', ok: 'var(--success)' }[(S.toast || {}).tone] || 'var(--accent-ink)',
       toastBorder: { warn: 'var(--warning)', ok: 'var(--success)' }[(S.toast || {}).tone] || 'var(--accent)',
       dismissToast: () => this.dismissToast(),
+
+      // The busy ring. Only ever one at a time — the same reasoning the toast and the
+      // dialog already use, and true so far in practice: this app does not offer two
+      // network-waiting actions from the same screen at once.
+      hasBusy: !!S.busy,
+      busyLabel: (S.busy || {}).label || '',
+      busyPctLabel: Math.round((S.busy || {}).pct || 0) + '%',
+      busyRingC: BUSY_RING_C,
+      // Circumference minus the drawn arc: the standard SVG trick for a ring that fills
+      // clockwise as a percentage, rotated -90deg in the template so 0% starts at 12
+      // o'clock rather than 3.
+      busyRingOffset: BUSY_RING_C * (1 - Math.min(100, Math.max(0, (S.busy || {}).pct || 0)) / 100),
+      busyRingColor: (S.busy || {}).tone === 'ok' ? 'var(--success)' : 'var(--accent)',
 
       hasDialog: !!S.dialog,
       dialog: Object.assign({

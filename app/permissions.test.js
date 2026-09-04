@@ -246,6 +246,19 @@ const login = async (p, email) => {
     check('granted: Omar\'s own Account tab now offers Paperwork Email',
       /Paperwork Email/.test(grantedView));
 
+    // The tile is not the feature — 2026-09-04, reported live: accountTiles was fixed to
+    // offer the tile to anyone holding the permission, but showAdminPage (the gate on
+    // the SCREEN it leads to) was not, so tapping it landed on a page matching no
+    // top-level block at all: nothing rendered but the app bar. Proven here by actually
+    // following the tile, not just reading that it exists.
+    await p.getByText('Paperwork Email', { exact: false }).first().click();
+    await p.waitForTimeout(700);
+    const screen = await p.evaluate(() => document.body.innerText);
+    check('tapping it actually opens the screen, not a blank page behind the app bar',
+      /Who (gets|receives) the signed service ticket/i.test(screen), screen.slice(0, 200));
+    check('the add-recipient control is there to use, not just a title with nothing under it',
+      /name@makaman\.ly/i.test(screen) || /\+ Add/i.test(screen));
+
     // Revoke it and confirm the tile leaves exactly as reliably as it arrived.
     await logout();
     await login(p, 'lateri@makaman.ly');

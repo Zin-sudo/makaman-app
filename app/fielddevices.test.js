@@ -5,9 +5,11 @@
 // showed only the customer and field/well/rig — nothing said what the technician had
 // actually just done, and the one "latest position" line collapsed two different
 // questions (where is the well, where is the device right now) into whichever fix
-// happened to be newest. This proves both additions land under the right job: the last
-// job-log line, and the two coordinates kept separately — Well location (the opening
-// fix, never overwritten) and Current location (the periodic re-pin).
+// happened to be newest. An earlier pass put the split coordinates under every open job
+// AND left the old blended line above it — three readings where the owner asked for two.
+// This is the corrected shape: the last job-log line under each open job, and exactly
+// two coordinates, once per person — Well location (the opening fix, never overwritten)
+// beside Latest/Current location (the periodic re-pin), not a third anywhere.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
@@ -43,15 +45,18 @@ const tab = async (p, name) => {
   let body = await tab(p, 'Sync');
   check('the last job-log line shows under the open job',
     /Rigging up combination string, function tested surface equipment\./.test(body));
-  check('with no fix yet, both coordinates say so rather than showing nothing',
-    (body.match(/No Location Shared/g) || []).length >= 2,
+  // Two technicians show by default (Yousef and Mahmoud), each with exactly two
+  // coordinate fields and neither with a fix yet — four, not the six a stray third
+  // reading per card would produce.
+  check('with no fix yet, exactly two header coordinates per technician — no third reading',
+    (body.match(/No Location Shared/g) || []).length === 4,
     (body.match(/No Location Shared/g) || []).length + ' occurrence(s)');
-  check('the two locations are labelled separately, not folded into one line',
-    /well location/i.test(body) && /current location/i.test(body));
+  check('the two locations are labelled Well location and Latest/Current location',
+    /well location/i.test(body) && /latest\/current location/i.test(body));
 
-  // Distinct fixes for the opening pin and the periodic re-pin — proving the screen
-  // reads geo.open and geo.last separately rather than "whichever is newest" (the old
-  // behaviour, still correct for the single summary line above the job list).
+  // Distinct fixes for the opening pin and the periodic re-pin — proving the header
+  // reads geo.open and geo.last separately rather than "whichever is newest" (the
+  // original, pre-2026-09-04 behaviour).
   await p.evaluate(() => window.__mkApp.mutate(d => {
     const t = d.tickets.find(x => x.id === 't3');
     t.geo = {
@@ -63,10 +68,15 @@ const tab = async (p, name) => {
   await p.waitForTimeout(400);
   body = await tab(p, 'Sync');
   check('Well location reads the opening fix', /27\.111111, 47\.222222/.test(body));
-  check('Current location reads the periodic re-pin, a different coordinate',
+  check('Latest/Current location reads the periodic re-pin, a different coordinate',
     /27\.333333, 47\.444444/.test(body));
-  check('the two fixes never merge into a single reading',
-    !/27\.111111, 47\.222222.*27\.111111, 47\.222222/.test(body));
+  check('each coordinate appears exactly once — no duplicate reading under the job below',
+    (body.match(/27\.111111, 47\.222222/g) || []).length === 1
+    && (body.match(/27\.333333, 47\.444444/g) || []).length === 1,
+    JSON.stringify({
+      well: (body.match(/27\.111111, 47\.222222/g) || []).length,
+      cur: (body.match(/27\.333333, 47\.444444/g) || []).length,
+    }));
   await p.close();
 
   // The last log line updates the moment a new one is written, same as anything else

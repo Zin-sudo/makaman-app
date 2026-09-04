@@ -69,10 +69,18 @@ const refreshCount = (p) => p.evaluate(() => window.__mkApp.__refreshCount);
     })));
     check('exactly one channel is opened on sign-in', chans.length === 1, JSON.stringify(chans));
     check('it watches public.tickets, every event',
-      chans[0] && chans[0].subs.length === 1 && chans[0].subs[0].kind === 'postgres_changes'
-        && chans[0].subs[0].table === 'tickets' && chans[0].subs[0].schema === 'public'
-        && chans[0].subs[0].event === '*',
+      chans[0] && chans[0].subs.some(s => s.kind === 'postgres_changes'
+        && s.table === 'tickets' && s.schema === 'public' && s.event === '*'),
       JSON.stringify(chans[0]));
+    // 2026-09-04: a permission grant took a full relaunch to reach an already-open
+    // session, the same gap this file's own tickets subscription closed one table over
+    // (migration 0057) — same channel, one more subscription, not a second channel.
+    check('it also watches public.user_permissions, every event, on the same channel',
+      chans[0] && chans[0].subs.some(s => s.kind === 'postgres_changes'
+        && s.table === 'user_permissions' && s.schema === 'public' && s.event === '*'),
+      JSON.stringify(chans[0]));
+    check('still exactly one channel — the second subscription did not open a second one',
+      chans[0] && chans[0].subs.length === 2, JSON.stringify(chans[0]));
   }
 
   // ── A change notification refreshes, not a second data path ──────────────

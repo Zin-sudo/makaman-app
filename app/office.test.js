@@ -70,7 +70,12 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   const reused = (d.tickets || []).find(t => t.well === 'Y');
   check('ticket uses the register spelling', !!reused && reused.customer === 'Kuwait Oil Group', reused && reused.customer);
 
-  // ---- field devices show the latest position ----
+  // ---- field devices show both coordinates, kept apart ----
+  // 2026-09-04, owner's request: the single "latest position" line used to collapse the
+  // opening fix and the periodic re-pin into whichever was newest, so the older of the
+  // two never showed at all. Both show now, labelled Well location and Latest/Current
+  // location — the point of this block flipped from "the older fix is hidden" to "the
+  // older fix is exactly as visible as the newer one, under its own name".
   await p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));
     const t = s.tickets.find(x => x.tech === 'Yousef Al-Harbi');
@@ -86,8 +91,9 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   await p.getByRole('button', { name: /^Sync$/i }).last().click();
   await p.waitForTimeout(700);
   body = await p.innerText('body');
-  check('field devices show the latest position', /32\.901544, 13\.205871/.test(body));
-  check('field devices show the older fix instead', !/32\.887209/.test(body));
+  check('field devices show the periodic re-pin, as Latest/Current location', /32\.901544, 13\.205871/.test(body));
+  check('field devices show the opening fix too, as Well location — not hidden by the newer one',
+    /32\.887209/.test(body));
 
   // ---- settings and tools are reachable from one place only ----
   body = await p.innerText('body');
