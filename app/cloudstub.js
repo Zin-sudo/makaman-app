@@ -356,6 +356,13 @@ window.supabase = {
         // a different question from who the app believes. Remembers whoever last signed
         // in, so a report can be checked against the account that produced it.
         getUser: function () {
+          // window.__failGetUser simulates the server-side session refusals Self-check's
+          // 'Signed in (server)' line has to tell apart — a wrong password reads nothing
+          // like a device with the wrong clock, and a suite needs to hand back the exact
+          // sentence PostgREST/gotrue actually say to prove the two are told apart.
+          if (window.__failGetUser) {
+            return Promise.resolve({ data: { user: null }, error: { message: window.__failGetUser } });
+          }
           var p = window.__stubUser
             ? db.profiles.filter(function (r) { return r.id === window.__stubUser; })[0]
             : null;

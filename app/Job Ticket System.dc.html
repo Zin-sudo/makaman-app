@@ -3943,6 +3943,14 @@ function errorKind(err) {
   // at a job the server no longer has — sat unnamed in the same sentence.
   if (/foreign key|violates foreign/i.test(raw)) return 'LINK';
   if (/row-level security|permission denied|not allowed|violates/i.test(raw)) return 'RLS';
+  // BEFORE the general JWT test below, for the same reason LINK runs before RLS: "JWT
+  // issued at future" also contains the word "JWT", so without this it silently became
+  // MK-*-AUTH — "the session was not accepted" — about a token the server refused for a
+  // completely different reason. AUTH sends someone to check their password; this is the
+  // device's own clock reading wrong relative to the server, which a password cannot fix.
+  // Seen twice live, 2026-09-03 into 2026-09-04, both on the same device within a few
+  // hours — consistent with a phone's clock drifting while it had no signal to correct it.
+  if (/issued.*future|clock skew/i.test(raw)) return 'CLOCK';
   if (/JWT|invalid session|not authenticated|refresh token/i.test(raw)) return 'AUTH';
   if (/quota|exceeded the storage|QuotaExceeded/i.test(raw)) return 'QUOTA';
   if (/failed to fetch|network|offline|timeout|load failed/i.test(raw)) return 'NET';
@@ -3993,6 +4001,7 @@ const ERROR_KIND = {
   DUP: 'Something with that key already exists.',
   STALE: 'Somebody else changed it first, so this version was not written over theirs.',
   AUTH: 'The session was not accepted.',
+  CLOCK: "This device's clock is wrong. The server refused a token that looked like it was issued in the future — check the date and time in the device's own settings, then try again.",
   QUOTA: 'The device is out of room.',
   NET: 'The server could not be reached.',
   MISSING: 'The row or file was not there.',
@@ -7896,15 +7905,43 @@ class Component extends DCLogic {
       step('Reachable', () => c.from('clients').select('id').limit(1),
         (r) => 'answered, ' + (r.data || []).length + ' row(s)'),
       // Who does the server think this is? Not who the app thinks.
+      //
+      // A rejected session usually means the password or the account, so that is what this
+      // reported for every case — until "JWT issued at future" turned up twice in one
+      // device's error log and read exactly like every other refusal here, with nothing to
+      // tell a reader it meant the phone's clock rather than its credentials. errorKind()
+      // now knows the difference (see the comment on MK-LOAD-CLOCK); this is the one place
+      // a technician or the office actually reads the words, so it is the one place that
+      // has to say the true cause rather than the raw Postgres text.
+      //
+      // gotrue-js's real getUser() does not reject for an ordinary auth refusal — it
+      // resolves with { data: { user: null }, error }, the same shape a good result comes
+      // back in, and only rejects for something it does not recognise as an auth error at
+      // all (a network failure, say). Both are read here; checking only one silently
+      // swallowed the one this was written for.
       (c.auth && typeof c.auth.getUser === 'function'
         ? c.auth.getUser()
         : Promise.resolve({ data: {} })).then(
         (r) => {
           const u = r && r.data && r.data.user;
+          const err = r && r.error;
+          if (!u && err) {
+            add('Signed in (server)', false, errorKind(err) === 'CLOCK'
+              ? "this device's clock is wrong — the server refused the session as issued in "
+                + "the future. Check the date and time in the device's own settings, then try again."
+              : err.message);
+            return null;
+          }
           add('Signed in (server)', !!u, u ? u.email + ' · ' + u.id : 'no Supabase session — the app may be on a stored local session');
           return u;
         },
-        (e) => { add('Signed in (server)', false, e.message); return null; }),
+        (e) => {
+          add('Signed in (server)', false, errorKind(e) === 'CLOCK'
+            ? "this device's clock is wrong — the server refused the session as issued in "
+              + "the future. Check the date and time in the device's own settings, then try again."
+            : e.message);
+          return null;
+        }),
       // What is sitting unsent on THIS device, and whether it looks stuck.
       //
       // A week of numbering-claim handovers going nowhere, and sixteen dead rows retried

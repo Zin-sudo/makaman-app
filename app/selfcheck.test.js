@@ -45,6 +45,7 @@ function db(itemsPerClient) {
       window.MAKAMAN_CONFIG = { authMode: 'cloud', supabaseUrl: 'https://stub.test', supabaseKey: 'stub' };
       window.__DRAIN_TEST_MS = 120;
       if (o && o.cap) window.__maxRows = o.cap;
+      if (o && o.failGetUser) window.__failGetUser = o.failGetUser;
     }, opts || {});
     await p.goto(URL, { waitUntil: 'networkidle' });
     await p.waitForTimeout(300);
@@ -99,6 +100,34 @@ function db(itemsPerClient) {
     check('an unreachable edge function is reported as a failure',
       find(rows, 'Edge function').ok === false, find(rows, 'Edge function').detail);
     check('and the rest of the report still completes', rows.length > 5, rows.length + ' lines');
+  }
+
+  // ── A rejected session names its real cause, not just "not accepted" ─────
+  //
+  // MK-LOAD-AUTH, twice, one device, five hours apart: "JWT issued at future". The report
+  // used to say only "the session was not accepted" for this — indistinguishable from a
+  // wrong password or an expired login, which sends a reader to check credentials rather
+  // than the one thing that would actually have fixed it: the phone's own clock.
+  {
+    const rows = await run(db(30), { failGetUser: 'JWT issued at future' });
+    const verdict = find(rows, 'Signed in (server)');
+    check('a clock-skew refusal is caught, not read as a generic auth failure',
+      verdict.ok === false, verdict.detail);
+    check('and it says the actual cause in plain words',
+      /clock is wrong/.test(verdict.detail) && /check the date and time/i.test(verdict.detail),
+      verdict.detail);
+    // The raw Postgres/gotrue sentence is not what a technician acts on — the plain-words
+    // rewrite is what belongs on screen, not "JWT issued at future" verbatim.
+    check('and does not just parrot the raw server sentence back',
+      !/JWT issued at future/.test(verdict.detail), verdict.detail);
+  }
+  // An ordinary rejected session — nothing about the clock — must still read exactly as it
+  // always did. This is the case the rewrite above must NOT touch.
+  {
+    const rows = await run(db(30), { failGetUser: 'invalid session' });
+    const verdict = find(rows, 'Signed in (server)');
+    check('an ordinary session refusal is still reported, unchanged',
+      verdict.ok === false && verdict.detail === 'invalid session', verdict.detail);
   }
 
   // ── And it would have caught the bug that was actually reported ──────────
