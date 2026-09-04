@@ -129,6 +129,43 @@ const refreshCount = (p) => p.evaluate(() => window.__mkApp.__refreshCount);
       chans === 2, chans + ' channel(s) ever opened this session');
   }
 
+  // ── Reported live, 2026-09-04: two accounts testing "does the other one's change ──
+  // ── show up live" always needed a reload or a PWA relaunch — the socket a backgrounded
+  // ── tab or Home-Screen app was holding had died, and subscribeRealtime()'s own "already
+  // ── have a channel" guard meant nothing ever asked for a new one. The fix: both
+  // ── 'online' and visibilitychange now tear down whatever channel exists and open a
+  // ── fresh one, on the theory that there is no cheap way to ask a channel object
+  // ── whether its socket actually survived — proven here as a torn-down-and-replaced
+  // ── pair, not merely "a channel exists" (which the stale one already satisfied).
+  {
+    const before = await p.evaluate(() => ({
+      chans: window.__realtimeChannels.length,
+      removed: (window.__realtimeRemoved || []).length,
+      staleName: window.__realtimeChannels[window.__realtimeChannels.length - 1].name,
+    }));
+    await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await p.waitForTimeout(500);
+    const after = await p.evaluate(() => ({
+      chans: window.__realtimeChannels.length,
+      removedNames: (window.__realtimeRemoved || []).map((c) => c.name),
+    }));
+    check('the page coming back into view opens a fresh channel',
+      after.chans === before.chans + 1, `${before.chans} -> ${after.chans}`);
+    check('...and actually tears down the one that was there before, not just adding a second',
+      after.removedNames.indexOf(before.staleName) >= 0, JSON.stringify(after.removedNames));
+  }
+
+  // ── The same reconnect happens when the browser reports coming back online — a ──
+  // ── network blip, not necessarily a page that was ever hidden, closes the same gap ──
+  {
+    const before = await p.evaluate(() => window.__realtimeChannels.length);
+    await p.evaluate(() => window.dispatchEvent(new Event('online')));
+    await p.waitForTimeout(500);
+    const after = await p.evaluate(() => window.__realtimeChannels.length);
+    check('coming back online also opens a fresh channel, not just re-pulling data',
+      after === before + 1, `${before} -> ${after}`);
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await ctx.close();
   await browser.close();

@@ -2557,7 +2557,7 @@
                 </sc-if>
                 <sc-if value="{{ sh.showTotal }}" hint-placeholder-val="{{ true }}">
                   <div style="display:flex;border:1px solid rgba(29,31,32,0.3);border-top:0;background:#e9e9ea">
-                    <div style="flex:1;padding:6px 8px;text-align:right;font-weight:700">Total =</div>
+                    <div style="flex:1;padding:6px 8px;text-align:right;font-weight:700">{{ sh.totalLabel }}</div>
                     <div style="width:110px;flex:none;padding:6px 8px;text-align:right;font-weight:700;border-left:1px solid rgba(29,31,32,0.3)">{{ sh.total }}</div>
                   </div>
                 </sc-if>
@@ -5503,20 +5503,48 @@ function diffOps(before, after) {
   // Notes are append-and-answer, never a list to be replaced. The other ticket children
   // go through `replace`, which deletes every row for the ticket and re-inserts them —
   // and ticket_notes' insert policy requires raised_by to be the caller, so a technician
-  // syncing a ticket the office had also noted on would be refused outright. One upsert
-  // per note, keyed by the note's own id, so the coalescer collapses repeated edits into
-  // one write and nobody ever re-inserts somebody else's row.
+  // syncing a ticket the office had also noted on would be refused outright. One op per
+  // note, keyed by the note's own id, so the coalescer collapses repeated edits into one
+  // write and nobody ever re-inserts somebody else's row.
+  //
+  // A brand new note is always raised in the CURRENT device's own name (see addNote —
+  // `who` is always this.state.session.name), so its raised_by is always the sender's
+  // own id and an upsert's implicit insert check passes cleanly. Kept as an upsert for
+  // exactly that case, deliberately: a note raised and then resolved before either has
+  // ever synced (fully offline) queues two edits under the same key, the coalescer keeps
+  // only the newer one, and if that newer one were sent as a plain update it would match
+  // no row at all — the row was never actually inserted.
+  //
+  // Editing somebody ELSE's note is the one shape that is never that case, and it is
+  // also the one Postgres refuses as an upsert: confirmed live, 2026-09-04, staff
+  // resolving a note the field raised was refused as an RLS violation on every retry for
+  // hours, even though ticket_notes_update_staff (is_staff() only) plainly allows it.
+  // Postgres checks INSERT's WITH CHECK (raised_by = auth.uid()) for
+  // INSERT ... ON CONFLICT DO UPDATE before it ever reaches the update branch — the same
+  // gotcha numbering_claim's handover already worked around above, one table over. Sent
+  // as a real update instead, which only has to satisfy is_staff(). Safe to key off
+  // "somebody else raised it" alone: the only way this device could know about a note
+  // someone ELSE raised is by having synced it down from the server already, so the row
+  // is guaranteed to already exist there — unlike a note this same device raised, whose
+  // insert this device itself might still be holding, unsent.
   (after.tickets || []).forEach((t) => {
     const was = oldT[t.id];
     (t.notes || []).forEach((n) => {
       const had = was && (was.notes || []).find((x) => x.id === n.id);
       if (had && same(had, n)) return;
-      ops.push({ key: 'ticket_notes:' + n.id, table: 'ticket_notes', action: 'upsert', row: {
-        id: n.id, ticket_id: t.id, body: n.body || '',
+      const fields = {
+        body: n.body || '',
         raised_by: idByName[n.by] || CLOUD_IDS.me || null, raised_at: tsOut(n.at),
         resolved_by: n.resolvedBy ? (idByName[n.resolvedBy] || null) : null,
         resolved_at: n.resolvedAt ? tsOut(n.resolvedAt) : null,
-      } });
+      };
+      const raisedByOther = CLOUD_IDS.me && idByName[n.by] && idByName[n.by] !== CLOUD_IDS.me;
+      if (raisedByOther) {
+        ops.push({ key: 'ticket_notes:' + n.id, table: 'ticket_notes', action: 'update', id: n.id, row: fields });
+      } else {
+        ops.push({ key: 'ticket_notes:' + n.id, table: 'ticket_notes', action: 'upsert',
+          row: Object.assign({ id: n.id, ticket_id: t.id }, fields) });
+      }
     });
   });
 
@@ -6721,11 +6749,32 @@ class Component extends DCLogic {
       // Coming back is the moment everything queued while away goes out — and the moment
       // to find out what the office did in the meantime. Both go through the coalescer,
       // so a flapping connection cannot start a second round while the first is running.
-      if (up) { this.refresh(); this.autoSync(); }
+      if (up) { this.refresh(); this.autoSync(); this.reconnectRealtime(); }
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('online', this.netListener);
       window.addEventListener('offline', this.netListener);
+    }
+
+    // 2026-09-04, reported live: two accounts, each testing the other's changes arriving
+    // live, and neither ever did without a reload or a PWA relaunch. subscribeRealtime()
+    // only ever ran once, at sign-in — and 'online' above only re-pulled data, it never
+    // touched the channel. Neither covers the actual failure: a backgrounded tab or a
+    // Home-Screen PWA gets its socket dropped by the OS (iOS is aggressive about this
+    // for a PWA specifically, but a browser tab left in a background tab group can hit
+    // the same thing), and the realtime-js client does not reliably notice and reconnect
+    // on its own from a JS context that was itself frozen rather than merely idle.
+    // visibilitychange fires when the page comes back either way, network blip or not,
+    // which 'online' alone does not cover — the socket can die while the OS still
+    // considers the device "online" the whole time.
+    this.visListener = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.refresh();
+        this.reconnectRealtime();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.visListener);
     }
   }
   // Start every page at the top. Not called from each place a screen changes — there are
@@ -6785,6 +6834,9 @@ class Component extends DCLogic {
     if (this.netListener && typeof window !== 'undefined') {
       window.removeEventListener('online', this.netListener);
       window.removeEventListener('offline', this.netListener);
+    }
+    if (this.visListener && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.visListener);
     }
     if (this.mq && this.mqListener) {
       if (this.mq.removeEventListener) this.mq.removeEventListener('change', this.mqListener);
@@ -7005,6 +7057,18 @@ class Component extends DCLogic {
       if (c && typeof c.removeChannel === 'function') c.removeChannel(this.realtimeChannel);
     } catch (e) { /* the channel is being torn down either way */ }
     this.realtimeChannel = null;
+  }
+  // subscribeRealtime() is a no-op once this.realtimeChannel is set, which is exactly
+  // right for "don't open a second channel on top of a working one" and exactly wrong
+  // for "the socket died while nobody was looking" — the one case that actually matters
+  // on 'online' and on visibilitychange (see componentDidMount). Torn down and rebuilt
+  // rather than trusted to still be live: there is no cheap way from here to ask a
+  // channel object whether its own socket survived a suspend, so this always gets a
+  // fresh one instead of gambling that the old one did.
+  reconnectRealtime() {
+    if (!USE_CLOUD || !this.state.session) return;
+    this.unsubscribeRealtime();
+    this.subscribeRealtime();
   }
   // Debounced for the same reason scheduleDrain() is: closing a job writes the ticket
   // header and several child rows in the same moment, and Postgres Changes fires once
@@ -9133,7 +9197,7 @@ class Component extends DCLogic {
         const tw = 110;
         box(0, y, G.PX - tw, G.totalRow, LABEL_BG);
         box(G.PX - tw, y, tw, G.totalRow, LABEL_BG);
-        txt('Total =', 0, y, G.PX - tw, G.totalRow, { size: 12, weight: 700, align: 'right', padX: 8 });
+        txt(String(page.totalLabel || 'Total ='), 0, y, G.PX - tw, G.totalRow, { size: 12, weight: 700, align: 'right', padX: 8 });
         txt(String(page.total || ''), G.PX - tw, y, tw, G.totalRow, { size: 12, weight: 700, align: 'right', padX: 8 });
         y += G.totalRow;
       }
@@ -9642,7 +9706,15 @@ class Component extends DCLogic {
         showSubTotal: multiPage,
         subTotalLabel: 'Sub-total, page ' + (idx + 1) + ' of ' + itemPages.length,
         subTotal: money(pageSum, t ? this.ticketCurrency(t) : undefined),
-        showTotal: isLast, total: grandTotalStr,
+        // 2026-09-04, owner's request: every page, not only the last — a page separated
+        // from the others (photocopied, filed, or just read on its own) used to carry a
+        // sub-total with nothing to check it against unless it happened to be the last
+        // one. rowsFor('service') already budgets exactly one totalRow band into "above"
+        // and leaves signFoot as slack below the item table — the same margin the last
+        // page already spends on drawing both bands together, so a second band on every
+        // other page fits the identical way, not a new layout to prove out.
+        showTotal: true, totalLabel: multiPage ? 'Grand Total (all pages) =' : 'Total =',
+        total: grandTotalStr,
         showSignature: isLast, isContinued: !isLast, signee2: 'MAKAMAN LIBYA',
       };
     });

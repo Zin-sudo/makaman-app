@@ -30,6 +30,7 @@ async function sheets(p, itemCount) {
       rows: SH.svcOriginal.map(pg => ({
         showSub: pg.showSubTotal, label: pg.subTotalLabel,
         sub: num(pg.subTotal), showTotal: pg.showTotal, total: num(pg.total),
+        totalLabel: pg.totalLabel,
         realRows: pg.items.filter(r => r.code).length,
         // What this page actually prints, added up from the printed cells.
         ownRows: pg.items.filter(r => r.code).reduce((n, r) => n + num(r.total), 0),
@@ -64,6 +65,8 @@ async function sheets(p, itemCount) {
       JSON.stringify(r.rows.map(x => x.showSub)));
     check('just the Total', r.rows[0].showTotal && r.rows[0].total === r.grand,
       r.rows[0].total + ' vs ' + r.grand);
+    check('labelled plainly — one page, no "all pages" qualifier needed',
+      r.rows[0].totalLabel === 'Total =', r.rows[0].totalLabel);
   }
 
   // ── Over one page: a sub-total on every page, and they add up ────────────
@@ -75,8 +78,17 @@ async function sheets(p, itemCount) {
     check('each one says which page it is', r.rows.every((x, n) =>
       x.label === 'Sub-total, page ' + (n + 1) + ' of ' + r.pages),
       JSON.stringify(r.rows.map(x => x.label)));
-    check('only the last page carries the Total',
-      r.rows.filter(x => x.showTotal).length === 1 && r.rows[r.rows.length - 1].showTotal);
+    // 2026-09-04, owner's request: a page separated from the others used to carry a
+    // sub-total with nothing to check it against unless it happened to be the last one —
+    // every page now repeats the running Grand Total alongside its own sub-total.
+    check('every page carries the Total now, not only the last',
+      r.rows.every(x => x.showTotal), JSON.stringify(r.rows.map(x => x.showTotal)));
+    check('and it is the same grand figure on every page, not a per-page running sum',
+      r.rows.every(x => Math.abs(x.total - r.grand) < 0.005),
+      JSON.stringify(r.rows.map(x => x.total)));
+    check('labelled as covering every page, since it now appears on more than one',
+      r.rows.every(x => x.totalLabel === 'Grand Total (all pages) ='),
+      JSON.stringify(r.rows.map(x => x.totalLabel)));
 
     // The claim that matters.
     const sum = r.rows.reduce((n, x) => n + x.sub, 0);
