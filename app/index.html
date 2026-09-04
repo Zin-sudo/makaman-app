@@ -307,11 +307,6 @@
     .mk-kv input { min-width:0 !important; max-width:100% !important; }
     .mk-items input { padding-left:5px !important; padding-right:5px !important; font-size:12px !important; }
     .mk-phone-frame { max-width:100% !important; }
-    /* A small fixed set of options (tabs, segmented controls) should stay fully visible
-       and tappable, never partially hidden behind a horizontal scroll — that's reserved
-       for genuinely long lists (data tables). Wrap into an even 2-column grid instead of
-       squeezing 4 tabs into one unreadable scrollable row. */
-    .mk-tabbar-btn { flex-basis:50% !important; font-size:11px !important; padding:8px 6px !important; }
   }
   /* The technician's navigation, at every size. It used to be pinned to the viewport
      only on phones, because on anything wider it sat at the bottom edge of a phone
@@ -620,7 +615,6 @@
   }
   /* The shared shapes. Kept few and named for what they are, so the tokens above have
      somewhere real to land instead of being decoration in :root. */
-  .mk-panel { border-radius:var(--radius); }
 
   /* The pending-sync bar: 12px like the toast, because it is the same kind of thing —
      a notice that appears because something happened and leaves once it is dealt with.
@@ -764,7 +758,6 @@
     80% { transform:rotate(-2deg); }
     90% { transform:rotate(2deg); }
   }
-  .mk-soft, .mk-chip { border-radius:var(--radius); }
 }
 
 /* ══ THE A4 SHEETS ══
@@ -3558,11 +3551,6 @@ function suggestJobTypes(jobType, events) {
   });
   return out;
 }
-// The first reading, for callers that want one answer rather than the choice.
-function suggestJobType(jobType, events) {
-  return suggestJobTypes(jobType, events)[0] || '';
-}
-
 // Who may ask for an account.
 //
 // The real control is migration 0046, in the database: handle_new_user refuses anything
@@ -5667,9 +5655,6 @@ const SELF_GEO_INTERVAL_MS = (typeof window !== 'undefined' && window.__SELF_GEO
 // browser's own timeout is a promise about GPS acquisition, not about an unanswered
 // permission prompt.
 const SELF_GEO_FIX_BACKSTOP_MS = (typeof window !== 'undefined' && window.__SELF_GEO_BACKSTOP_TEST_MS) || 40000;
-// A confirmation of something the user just did, so it goes as soon as it is read.
-const COPY_TOAST_MS = 2000;
-
 // Every job on this system happens in Libya, and every timestamp on a ticket is evidence
 // of when someone was on a wellhead. That makes the operating zone a fact about the
 // company rather than a preference of the device: a technician whose phone is set to
@@ -6807,32 +6792,6 @@ class Component extends DCLogic {
       navigator.geolocation.getCurrentPosition(take, (err) => fail(err, false),
         { enableHighAccuracy: true, timeout: 15000, maximumAge: force ? 0 : SELF_GEO_INTERVAL_MS });
     } catch (e) { done(null, 'unavailable'); }
-  }
-  // The async clipboard API is the right one and needs a secure context, which the PWA
-  // always has. The execCommand fallback is for the browsers that still refuse it — an
-  // off-screen textarea is ugly but it is the only thing that works there, and a copy
-  // that silently does nothing would be worse than ugly.
-  copyText(text, key, okMsg) {
-    if (!text) return;
-    const done = () => this.toast(key, okMsg, 'ok', COPY_TOAST_MS);
-    const fallback = () => {
-      try {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand && document.execCommand('copy');
-        document.body.removeChild(ta);
-        if (ok) done(); else this.toast(key, 'Could not copy — select the text instead.', 'warn');
-      } catch (e) { this.toast(key, 'Could not copy — select the text instead.', 'warn'); }
-    };
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, fallback);
-      } else fallback();
-    } catch (e) { fallback(); }
   }
   // The opening pin. Written once and never overwritten — it is the record of where
   // the job was started, so a later fix must not be able to rewrite history.
