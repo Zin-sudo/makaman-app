@@ -925,7 +925,19 @@
 
   <!-- ══ LOGIN / SIGNUP (logged out) ══ -->
   <sc-if value="{{ loggedOut }}" hint-placeholder-val="{{ false }}">
-    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
+    <!-- Reported: the card visibly jumps up and down as the password is typed. Plain vh
+         is defined to hold the LARGE viewport (browser chrome collapsed) and stay fixed —
+         but a phone's on-screen keyboard brings its own accessory bar (autofill/password
+         suggestions), and that bar's height can change with every keystroke as the match
+         against saved credentials comes and goes. Each change moves how much of the page
+         the keyboard actually covers, and centering vertically against min-height:100vh
+         recomputes the card's position every time that changes — a bar toggling on and
+         off, once per character, reads exactly as "the page jumps after each letter".
+         100svh is pinned to the SMALLEST the viewport could ever be — it does not move
+         when a toolbar or accessory bar comes and goes, so the centering math has nothing
+         left to recompute. Declared after the vh fallback: a browser that does not know
+         svh drops only that one declaration and keeps the line above it. -->
+    <div style="min-height:100vh;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px">
       <div class="mk-wordmark" style="height:44px;margin-bottom:34px">
         <img src="uploads/makaman-logo-mark.png" alt="">
         <span style="font-size:30px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
@@ -935,9 +947,13 @@
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
           <h2 class="mk-section-title">Makaman Job Tickets</h2>
           <div class="mk-section-label">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" class="mk-input-42-mb">
+          <input type="email" autocomplete="username" value="{{ authEmail }}" onChange="{{ f.authEmail }}" class="mk-input-42-mb">
           <div class="mk-section-label">Password</div>
-          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
+          <!-- autocomplete tells the browser exactly what this field is instead of it
+               guessing from a bare type="password" — the guess is what makes a phone's
+               password-manager bar match and unmatch as you type, which is the accessory
+               bar behind the jump this screen used to have. -->
+          <input type="password" autocomplete="current-password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div class="mk-error-text">{{ authError }}</div>
           </sc-if>
@@ -952,16 +968,16 @@
         <div class="mk-auth-card" style="width:100%;max-width:360px;padding:26px">
           <h2 class="mk-section-title">Sign up as Field Technician</h2>
           <div class="mk-section-label">Full name</div>
-          <input dir="auto" value="{{ authFullName }}" onChange="{{ f.authFullName }}" class="mk-input-42-mb">
+          <input dir="auto" autocomplete="name" value="{{ authFullName }}" onChange="{{ f.authFullName }}" class="mk-input-42-mb">
           <div class="mk-section-label">Email</div>
-          <input type="email" value="{{ authEmail }}" onChange="{{ f.authEmail }}" placeholder="{{ signupPlaceholder }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:5px">
+          <input type="email" autocomplete="username" value="{{ authEmail }}" onChange="{{ f.authEmail }}" placeholder="{{ signupPlaceholder }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:5px">
           <!-- The requirement said before the attempt, not after it: a rule a person only
                meets by failing is a rule the form kept to itself. -->
           <div style="font-size:11px;line-height:1.4;color:var(--ink-faint);margin-bottom:14px">{{ signupDomainHint }}</div>
           <div class="mk-section-label">Password</div>
-          <input type="password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" class="mk-input-42-mb">
+          <input type="password" autocomplete="new-password" value="{{ authPassword }}" onChange="{{ f.authPassword }}" class="mk-input-42-mb">
           <div class="mk-section-label">Confirm password</div>
-          <input type="password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
+          <input type="password" autocomplete="new-password" value="{{ authConfirm }}" onChange="{{ f.authConfirm }}" style="width:100%;min-height:42px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);margin-bottom:6px">
           <div class="mk-note" style="margin:12px 0 4px;padding:9px 11px;font-size:12px;line-height:1.45;background:var(--accent-wash);border-left:3px solid var(--accent-deep);color:var(--accent-ink)">Accounts are created as Field Technician. If you should be an Operations Manager or an Observer, the office will change it after approving you.</div>
           <sc-if value="{{ authError }}" hint-placeholder-val="{{ false }}">
             <div class="mk-error-text">{{ authError }}</div>
@@ -1002,9 +1018,9 @@
           <h2 class="mk-section-title">Choose a new password</h2>
           <p style="font-size:13px;color:var(--ink-dim);line-height:1.5;margin:0 0 16px">{{ passwordRule }}</p>
           <div class="mk-section-label">New password</div>
-          <input type="password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" class="mk-input-42-mb">
+          <input type="password" autocomplete="new-password" value="{{ pwNew }}" onChange="{{ f.pwNew }}" class="mk-input-42-mb">
           <div class="mk-section-label">Confirm new password</div>
-          <input type="password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" class="mk-input-42-mb">
+          <input type="password" autocomplete="new-password" value="{{ pwConfirm }}" onChange="{{ f.pwConfirm }}" class="mk-input-42-mb">
           <sc-if value="{{ pwError }}" hint-placeholder-val="{{ false }}">
             <div class="mk-error-text">{{ pwError }}</div>
           </sc-if>
