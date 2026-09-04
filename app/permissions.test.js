@@ -190,6 +190,81 @@ const login = async (p, email) => {
     await ctx.close();
   }
 
+  // ── A granted override actually changes what Account offers, not just what
+  //    hasPermission() answers ──
+  // 2026-09-04, reported live: an admin granted an ops manager `paperwork_email.manage`
+  // and "the option did not exist" on that account afterward. The database side was
+  // correct — hasPermission() read the override fine — but the Paperwork Email tile was
+  // built inside the admin-only branch of accountTiles, a hardcoded role check no
+  // override could ever reach. This drives the exact reported scenario end to end: grant
+  // it, sign in as the person, see the tile; revoke it, sign in again, the tile is gone.
+  {
+    const ctx = await b.newContext();
+    const p = await open(ctx);
+    await login(p, 'lateri@makaman.ly');
+    await p.getByText('Account', { exact: true }).first().click();
+    await p.waitForTimeout(500);
+    await p.getByText('Permissions', { exact: false }).first().click();
+    await p.waitForTimeout(600);
+    await p.getByText('Omar Al-Saleh', { exact: false }).first().click();
+    await p.waitForTimeout(600);
+
+    // paperwork_email.manage has no prose in the demo catalogue (it is generated from
+    // PERMISSION_DEFAULTS, not written out by hand — see the comment above that table),
+    // so its row's description falls back to the id itself, which is what's unique to
+    // match on: several other capabilities share its generated name, "Manage".
+    const clickByDesc = (desc) => p.evaluate((want) => {
+      const row = Array.from(document.querySelectorAll('div'))
+        .find(d => d.querySelector(':scope > button')
+          && (d.querySelector(':scope > div > div:nth-child(2)') || {}).textContent === want);
+      if (!row) return null;
+      const btn = row.querySelector(':scope > button');
+      const was = btn.textContent.trim();
+      btn.click();
+      return was;
+    }, desc);
+
+    const before = await clickByDesc('paperwork_email.manage');
+    check('Omar (ops manager) starts without the override', before === 'No', 'read: ' + before);
+    await p.waitForTimeout(700);
+
+    const logout = async () => {
+      await p.getByRole('button', { name: /^Account$/i }).last().click();
+      await p.waitForTimeout(400);
+      await p.getByRole('button', { name: /^Log out$/ }).first().click();
+      await p.waitForTimeout(600);
+    };
+    const loggedInAs = async (email) => {
+      await logout();
+      await login(p, email);
+      await p.getByText('Account', { exact: true }).first().click();
+      await p.waitForTimeout(500);
+      return p.evaluate(() => document.body.innerText);
+    };
+
+    const grantedView = await loggedInAs('omar@makaman.ly');
+    check('granted: Omar\'s own Account tab now offers Paperwork Email',
+      /Paperwork Email/.test(grantedView));
+
+    // Revoke it and confirm the tile leaves exactly as reliably as it arrived.
+    await logout();
+    await login(p, 'lateri@makaman.ly');
+    await p.getByText('Account', { exact: true }).first().click();
+    await p.waitForTimeout(500);
+    await p.getByText('Permissions', { exact: false }).first().click();
+    await p.waitForTimeout(600);
+    await p.getByText('Omar Al-Saleh', { exact: false }).first().click();
+    await p.waitForTimeout(600);
+    const wasYes = await clickByDesc('paperwork_email.manage');
+    check('the row read Yes just before revoking', wasYes === 'Yes', 'read: ' + wasYes);
+    await p.waitForTimeout(700);
+
+    const revokedView = await loggedInAs('omar@makaman.ly');
+    check('revoked: the tile is gone again, not left behind once granted',
+      !/Paperwork Email/.test(revokedView));
+    await ctx.close();
+  }
+
   // ── hasPermission reads the registry, not the role ──
   {
     const ctx = await b.newContext();

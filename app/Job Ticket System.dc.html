@@ -7513,6 +7513,18 @@ class Component extends DCLogic {
     if (mine && Object.prototype.hasOwnProperty.call(mine, key)) return !!mine[key];
     // Cloud mode with a hydrated map: absent means the database said no.
     if (mine && Object.keys(mine).length) return false;
+    // Local/offline demo store never hydrates myPermissions — there is no server round
+    // trip to fill it — so without this, the signed-in person's OWN overrides were only
+    // ever visible to the admin screen reading them back for someone else; the person
+    // they were granted to never actually got them (2026-09-04: the same class of bug as
+    // the Paperwork Email tile, one layer lower — the map an override writes into and the
+    // map hasPermission() reads were never the same map in this mode).
+    if (!USE_CLOUD) {
+      const overrides = (this.state.data || {}).permissionOverrides || {};
+      const email = (this.state.session || {}).email;
+      const ovKey = email ? email + '|' + key : null;
+      if (ovKey && Object.prototype.hasOwnProperty.call(overrides, ovKey)) return !!overrides[ovKey];
+    }
     const roles = PERMISSION_DEFAULTS[key];
     return !!roles && roles.indexOf(this.state.role) >= 0;
   }
@@ -10853,6 +10865,15 @@ class Component extends DCLogic {
           : 'Bundles, ZIPs and the master file', 'activity',
           'rgba(var(--success-rgb),0.16)', 'var(--success)',
           () => this.setState({ adminTab: 'reports', roleTab: 'tickets' }));
+        // Gated by the permission itself, not by role — an admin can hand this to any
+        // other role from the Permissions screen, and a revoked override has to hide it
+        // just as reliably as a granted one has to show it (2026-09-04: the tile used to
+        // live only inside the admin branch below, so a granted override changed what
+        // has_permission() answered without ever changing what the office could reach).
+        const paperworkTile = this.hasPermission('paperwork_email.manage')
+          ? tile('Paperwork Email', 'Who gets the signed service ticket and job log', 'people', 'var(--accent-wash)', 'var(--accent)',
+              () => { this.setState({ adminTab: 'paperwork', roleTab: 'tickets' }); this.loadPaperworkRecipients(); })
+          : null;
         if (S.role === 'admin') {
           const go = (t) => () => this.setState({ adminTab: t, roleTab: 'tickets' });
           return [
@@ -10861,15 +10882,14 @@ class Component extends DCLogic {
             tile('Users & Customers', (D.users || []).length + ' users · ' + D.clients.length + ' customers', 'people', 'var(--accent-wash)', 'var(--accent)', go('people')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
             tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
-            tile('Paperwork Email', 'Who gets the signed service ticket and job log', 'people', 'var(--accent-wash)', 'var(--accent)',
-              () => { this.setState({ adminTab: 'paperwork', roleTab: 'tickets' }); this.loadPaperworkRecipients(); }),
+            paperworkTile,
             // Reports, then the trailing utility trio every role ends on — System,
             // Self-check, Settings — kept together on purpose (owner's request, 2026-09-03).
             reports,
             tile('System', 'Charging rules · danger zone', 'system', 'rgba(var(--danger-rgb),0.16)', 'var(--danger)', go('system')),
             selfCheck,
             settings,
-          ];
+          ].filter(Boolean);
         }
         if (S.role === 'mgr') {
           const mine = [
@@ -10880,12 +10900,13 @@ class Component extends DCLogic {
               'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)',
               () => this.setState({ adminTab: 'price', roleTab: 'tickets' })));
           }
+          if (paperworkTile) mine.push(paperworkTile);
           mine.push(reports);
           mine.push(selfCheck);
           mine.push(settings);
           return mine;
         }
-        return [reports, selfCheck, settings];
+        return [paperworkTile, reports, selfCheck, settings].filter(Boolean);
       })(),
       // The signed-in user's own record, for the technician's Account tab. Identity
       // rather than statistics: their numbers belong on Tickets, where the tickets are.
