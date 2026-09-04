@@ -695,6 +695,19 @@
   .mk-rowdel:hover { color:var(--danger); border-color:rgba(var(--danger-rgb),0.35); background:rgba(var(--danger-rgb),0.08); }
   .mk-rowdel:active { background:rgba(var(--danger-rgb),0.18); }
   .mk-rowdel:disabled { opacity:0.4; cursor:default; background:none; border-color:transparent; color:var(--ink-faint); }
+  /* One line's own sync status, read off its own outbox key rather than the account-wide
+     banner (opStatus() in the x-dc script) — 2026-09-04, owner's request, so a person can
+     tell whether a refusal shown elsewhere is even about the thing they just did. Pending
+     pulses the same way the app's other "still working" dots already do; failed is a
+     static, titled "!" a person can point at — the tooltip carries the same sentence the
+     banner would, worded for one row instead of the whole account. Settled draws neither:
+     no lingering checkmark to time out, matching the rest of the row states in this file. */
+  .mk-sync-dot {
+    flex:none; display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border-radius:50%; font-size:11px; font-weight:700; line-height:1;
+  }
+  .mk-sync-pending { background:var(--accent); animation:pulse 1.4s infinite; }
+  .mk-sync-failed { background:var(--warning); color:var(--warning-ink); cursor:help; }
   /* The counter tiles. They were divs; one of them now filters the inbox, and a thing
      that responds to a tap has to be a button — hidden affordance is the fault, not the
      styling. The non-acting ones get cursor:default and no action line, so the row still
@@ -1476,6 +1489,12 @@
                   <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
                     <div style="width:74px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:var(--ink-faint)">{{ e.timeLine }}</span></div>
                     <textarea dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
+                    <sc-if value="{{ e.syncPending }}" hint-placeholder-val="{{ false }}">
+                      <span class="mk-sync-dot mk-sync-pending" title="Still sending to the office"></span>
+                    </sc-if>
+                    <sc-if value="{{ e.syncFailed }}" hint-placeholder-val="{{ false }}">
+                      <span class="mk-sync-dot mk-sync-failed" title="{{ e.syncTitle }}">!</span>
+                    </sc-if>
                     <button onClick="{{ e.remove }}" class="mk-rowdel" title="Delete this job-log line" aria-label="Delete this job-log line">×</button>
                   </div>
                 </sc-for>
@@ -1570,6 +1589,12 @@
                         <div style="font-size:13px;line-height:1.45;color:{{ n.ink }}">{{ n.body }}</div>
                         <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ n.meta }}</div>
                       </div>
+                      <sc-if value="{{ n.syncPending }}" hint-placeholder-val="{{ false }}">
+                        <span class="mk-sync-dot mk-sync-pending" style="align-self:flex-start;margin-top:2px" title="Still sending to the office"></span>
+                      </sc-if>
+                      <sc-if value="{{ n.syncFailed }}" hint-placeholder-val="{{ false }}">
+                        <span class="mk-sync-dot mk-sync-failed" style="align-self:flex-start;margin-top:2px" title="{{ n.syncTitle }}">!</span>
+                      </sc-if>
                       <sc-if value="{{ n.canResolve }}" hint-placeholder-val="{{ false }}">
                         <button onClick="{{ n.resolve }}" style="flex:none;align-self:flex-start;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">ANSWERED</button>
                       </sc-if>
@@ -2211,9 +2236,15 @@
               </div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
-                  <div style="display:flex;flex-wrap:wrap;gap:12px;padding:8px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:8px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
                     <input type="datetime-local" value="{{ e.tsInput }}" onChange="{{ e.onTimeChange }}" onBlur="{{ e.onTimeCommit }}" disabled="{{ e.locked }}" style="width:190px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);padding:6px 7px;background:var(--accent-wash-2);border:1px solid rgba(var(--accent-deep-rgb),0.35)">
                     <input dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" onFocus="{{ e.onTextFocus }}" onBlur="{{ e.onTextBlur }}" disabled="{{ e.locked }}" style="flex:1;min-width:160px;min-height:34px;padding:6px 9px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink)">
+                    <sc-if value="{{ e.syncPending }}" hint-placeholder-val="{{ false }}">
+                      <span class="mk-sync-dot mk-sync-pending" title="Still sending to the office"></span>
+                    </sc-if>
+                    <sc-if value="{{ e.syncFailed }}" hint-placeholder-val="{{ false }}">
+                      <span class="mk-sync-dot mk-sync-failed" title="{{ e.syncTitle }}">!</span>
+                    </sc-if>
                   </div>
                 </sc-for>
               </div>
@@ -2370,6 +2401,12 @@
                       <div style="font-size:13px;line-height:1.45;color:{{ n.ink }}">{{ n.body }}</div>
                       <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ n.meta }}</div>
                     </div>
+                    <sc-if value="{{ n.syncPending }}" hint-placeholder-val="{{ false }}">
+                      <span class="mk-sync-dot mk-sync-pending" style="align-self:flex-start;margin-top:2px" title="Still sending to the office"></span>
+                    </sc-if>
+                    <sc-if value="{{ n.syncFailed }}" hint-placeholder-val="{{ false }}">
+                      <span class="mk-sync-dot mk-sync-failed" style="align-self:flex-start;margin-top:2px" title="{{ n.syncTitle }}">!</span>
+                    </sc-if>
                     <sc-if value="{{ n.canResolve }}" hint-placeholder-val="{{ false }}">
                       <button onClick="{{ n.resolve }}" style="flex:none;align-self:flex-start;padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">ANSWERED</button>
                     </sc-if>
@@ -5084,6 +5121,20 @@ function outboxDrain() {
         // is the shape the deleted test tickets left behind — audit entries belonging to
         // jobs the office had removed on purpose — and retrying them was five chances per
         // drain for a permanent failure to be mistaken for a flaky connection.
+        //
+        // A plain row-level-security refusal is deliberately NOT in this bucket, even
+        // though a specific instance of one (2026-09-04: an ops manager resolving someone
+        // else's ticket note) turned out to be exactly this kind of dead end. The
+        // difference is what "RLS" actually covers: some refusals are permanent because
+        // the OP ITSELF can never satisfy the policy (that note case — fixed at the root
+        // in diffOps now, so it cannot recur), and some are a row or a permission that is
+        // temporarily not there yet, exactly the shape retryloop.test.js's "a policy an
+        // admin has since corrected" case is built around, and A6 added Retry for in the
+        // first place. Postgres's own error text does not distinguish the two, so blanket-
+        // terminal-ing every RLS refusal would quietly disable the second case to fix the
+        // first — trading one bug for another. A structurally-impossible refusal earns its
+        // own terminal check by name (see LOCKED and MK_STALE above); a bare "RLS" one does
+        // not get to assume it is one just because a single occurrence once was.
         const terminal = (err && err.mkTerminal) || errorKind(err) === 'LINK';
         if (!terminal && q[n].tries < OUTBOX_TRIES) {
           // Still queued, so it will be tried again — and anything about the same job has
@@ -5106,10 +5157,23 @@ function outboxDrain() {
         // are not sixteen problems. They are one job that is gone, and saying it sixteen
         // times is how a diagnostic becomes noise.
         //
-        // Only when the JOB ITSELF is what was refused, and refused terminally. A single
-        // child row failing says nothing about the others.
+        // Only when the JOB ITSELF cannot be resolved at all — a foreign key with nothing
+        // at the far end of it — do the other rows queued against it share the same fate:
+        // none of them can point at a ticket that plainly is not there either. That is
+        // `errorKind === 'LINK'` specifically, not `terminal` generally. A header refusal
+        // can be terminal for two other reasons, and both mean the ticket exists just
+        // fine: MK_STALE (right ticket, wrong version) and LOCKED (right ticket, already
+        // approved). Neither says anything about whether an unrelated child row — a
+        // job-log line keyed by its own id, checked only against the ticket's existence —
+        // can still be written on its own merits. This used to fire on any terminal
+        // header refusal, and reproduced live, 2026-09-04: a technician's brand-new
+        // job-log line, queued behind a stale mileage edit for the SAME ticket, was
+        // silently destroyed as collateral of a version conflict that had nothing to do
+        // with it — never sent, never retried, and no trace of it left anywhere. Proven
+        // against the real outboxDrain with a stub server before this line changed.
+        const jobIsGone = errorKind(err) === 'LINK';
         const alsoRetired = [];
-        if (terminal && String(q[n].key || '').indexOf('tickets:') === 0) {
+        if (jobIsGone && String(q[n].key || '').indexOf('tickets:') === 0) {
           const job = groupOf(q[n]);
           for (let j = 0; j < q.length; j++) {
             if (j === n || !q[j] || (q[j].seq && settled[q[j].seq])) continue;
@@ -5301,6 +5365,33 @@ function outboxRetryableCount() {
     return JSON.parse(localStorage.getItem(deadletterKey()) || '[]')
       .filter((e) => e && !e.terminal).length;
   } catch (e) { return 0; }
+}
+// What became of one specific queued change — read fresh off the outbox and dead-letter
+// piles on every render, never cached, since either can change under a screen that stays
+// open (a background drain settling it, a later edit re-queueing it under the same key).
+//
+// 2026-09-04, owner's request: the account-wide "N changes were refused" banner could
+// only ever say a refusal happened somewhere, never whether it was the line just typed or
+// something from hours ago sitting in the same pile — reported live as exactly that
+// ambiguity, right after a job-log line she had just logged showed the banner and there
+// was no way to tell if the banner was even about that line. This answers the question
+// for one row instead of the whole account: still queued (pending), given up on (failed,
+// with the same reason refusalText already gives the banner), or neither — settled, and
+// nothing to show. A row with nothing pending and nothing failed against its key returns
+// null on purpose, so a settled row draws no marker at all rather than a stale checkmark
+// that has to be timed out.
+function opStatus(key) {
+  if (!key) return null;
+  try {
+    const q = outboxRead();
+    if (q.some((o) => o && o.key === key)) return { pending: true, failed: false };
+  } catch (e) { /* nothing pending is knowable without the queue */ }
+  try {
+    const dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]');
+    const hit = dead.find((d) => d && d.op && d.op.key === key);
+    if (hit) return { pending: false, failed: true, reason: hit.why, terminal: !!hit.terminal };
+  } catch (e) { /* nothing failed is knowable without the pile */ }
+  return null;
 }
 
 // ── Turning a change in the replica into ops ─────────────────────────────────
@@ -8387,10 +8478,14 @@ class Component extends DCLogic {
             + (maxTries > 0 ? ', one retried ' + maxTries + ' time(s) already' : ''));
       }),
       // What has already been given up on, split the way the banner now splits it — a
-      // terminal refusal (a job that is no longer on the server) is a Dismiss, not a
-      // Retry, and reporting sixteen rows as sixteen problems is how a diagnostic becomes
-      // noise. This names the jobs, the same information an error-log export had to be
-      // read by hand to recover tonight.
+      // terminal refusal is a Dismiss, not a Retry, and reporting sixteen rows as sixteen
+      // problems is how a diagnostic becomes noise. This names the jobs, the same
+      // information an error-log export had to be read by hand to recover tonight.
+      //
+      // "Terminal" no longer means only "the job is gone" (a foreign key) — a plain
+      // permission refusal is terminal too (2026-09-04), and the job is very much still on
+      // the server in that case. The line below names which jobs are affected without
+      // guessing at why; the reason for each is in the error log.
       guard('Set aside', () => {
         let dead = [];
         try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); } catch (e) { /* none */ }
@@ -8401,8 +8496,8 @@ class Component extends DCLogic {
         terminal.forEach((d) => { const t = d.op && opTicket(d.op); if (t) jobs[t] = true; });
         const bits = [];
         if (terminal.length) {
-          bits.push(terminal.length + ' terminal — ' + Object.keys(jobs).length
-            + ' job(s) no longer on the server, Dismiss is the only action');
+          bits.push(terminal.length + ' terminal across ' + Object.keys(jobs).length
+            + ' job(s) — Dismiss is the only action');
         }
         if (retryable.length) bits.push(retryable.length + ' worth pressing Retry on');
         // Reached only when dead.length > 0 (the empty case returned above), so this is
@@ -8957,6 +9052,12 @@ class Component extends DCLogic {
     const S = this.state;
     const entries = errorLogRead().slice().sort((a, b) => (b.n - a.n) || (a.first < b.first ? -1 : 1));
     const total = entries.reduce((n, e) => n + (e.n || 1), 0);
+    // `F` was never defined in this function — every call fell into the catch and printed
+    // the raw UTC ISO string, the one place in the app still showing bare UTC instead of
+    // Tripoli time (B2). Reported live, 2026-09-04: a log exported at 00:25 Tripoli time
+    // read "Last seen 22:11", which is only fourteen minutes old, not the two-hours-stale
+    // reading it looks like without the timezone the rest of the app already commits to.
+    const F = this.fmt();
     const stamp = (iso) => { try { return F.stamp(iso); } catch (e) { return iso; } };
     const L = [];
     L.push('# Makaman Job Tickets — error log');
@@ -11401,10 +11502,17 @@ class Component extends DCLogic {
         // still on its way. Counted in JOBS, not rows: sixteen refusals about three deleted
         // jobs is three things to know about, and phrasing it as sixteen sends somebody
         // looking for thirteen problems that do not exist.
+        //
+        // "The job is no longer on the server" used to be the only sentence here, because a
+        // deleted job's foreign key was the only refusal ever marked terminal. A plain
+        // permission refusal is terminal now too (2026-09-04), and it is not that — the job
+        // is right there, the account just cannot write this row — so the headline says
+        // only what is always true (retrying this exact change will not help) and leaves
+        // the actual reason to refusedWhy, read right beside it, rather than guessing at a
+        // cause that fits only one of the terminal kinds.
         : (outboxSetAsideCount() === 1
-          ? 'One change cannot be saved — the job it belongs to is no longer on the server.'
-          : outboxSetAsideCount() + ' changes cannot be saved — the jobs they belong to are '
-            + 'no longer on the server.'),
+          ? 'One change cannot be saved as it stands.'
+          : outboxSetAsideCount() + ' changes cannot be saved as they stand.'),
       refusedWhy: outboxSetAsideLatest(),
       // RETRY is offered only when something could actually succeed on a second attempt.
       //
@@ -11478,7 +11586,9 @@ class Component extends DCLogic {
         if (!open) return all.length + ' · all answered';
         return open + ' open of ' + all.length;
       })(),
-      noteRows: ((t && t.notes) || []).slice().reverse().map((n) => ({
+      noteRows: ((t && t.notes) || []).slice().reverse().map((n) => {
+        const sync = opStatus('ticket_notes:' + n.id);
+        return {
         body: n.body,
         edge: n.resolvedAt ? 'var(--success)' : 'var(--warning)',
         ink: n.resolvedAt ? 'rgba(var(--ink-rgb),0.55)' : 'var(--ink-strong)',
@@ -11487,7 +11597,10 @@ class Component extends DCLogic {
           : (n.by || 'Someone') + ' · ' + F.stamp(n.at),
         canResolve: !n.resolvedAt && this.hasPermission('note.resolve'),
         resolve: () => this.resolveNote(t.id, n.id),
-      })),
+        syncPending: !!(sync && sync.pending),
+        syncFailed: !!(sync && sync.failed),
+        syncTitle: sync && sync.failed ? sync.reason : '',
+      };}),
       addNote: () => this.addNote(t && t.id, S.noteDraft),
 
       // ── Awaiting signed paperwork ──
@@ -11796,9 +11909,17 @@ class Component extends DCLogic {
             + ' → ' + whole + '.', 'edit');
         },
       })),
-      curEvents: t ? (t.events || []).map((e, i) => ({
+      curEvents: t ? (t.events || []).map((e, i) => {
+        // Read against THIS line's own outbox key, not the account-wide pile — the
+        // question a person actually has right after logging a line is "did THIS one go
+        // through", and the generic banner elsewhere cannot answer it.
+        const sync = opStatus('ticket_lines:' + e.id);
+        return {
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
+        syncPending: !!(sync && sync.pending),
+        syncFailed: !!(sync && sync.failed),
+        syncTitle: sync && sync.failed ? sync.reason : '',
         locked: locked,
         onChange: ev => { if (locked) return; const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
         // Same commit-on-blur rule as the charged lines: the wording of a field log line
@@ -11842,7 +11963,7 @@ class Component extends DCLogic {
             + ': "' + e.text + '" (' + F.stamp(e.ts) + ').', 'edit');
           this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); });
         },
-      })) : [],
+      };}) : [],
       newEventText: S.newEventText,
       addEvent: () => {
         const text = (S.newEventText || '').trim(); if (!text || !t) return;

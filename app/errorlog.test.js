@@ -152,6 +152,18 @@ const openAccount = async (p) => {
       /\*\*table:\*\* `audit_log`/.test(md) && /\*\*action:\*\*/.test(md));
     check('there is a summary table to read first', /\| Code \| Times \|/.test(md));
 
+    // 2026-09-04, reported live: every timestamp in this file read as raw UTC ("Last seen
+    // 2026-09-04T22:11:...Z") even though the rest of the app is pinned to Tripoli time
+    // (B2) — a report exported at 00:25 Tripoli read like its newest entry was two hours
+    // stale when it was fourteen minutes old. Cause: errorReport()'s own `stamp()` called
+    // `F.stamp()` with no `F` ever defined in scope, so every call silently threw and fell
+    // into the catch that returns the raw ISO string untouched.
+    check('no raw UTC timestamp leaks into the file — every stamp went through Tripoli time',
+      !/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(md), md.match(/\d{4}-\d{2}-\d{2}T[\d:.]+Z?/) || 'none found');
+    check('and it reads as an actual Tripoli-formatted date and time, not a fallback string',
+      /\d{1,2} \w+ \d{4}\s*·\s*\d{1,2}:\d{2}/.test(md),
+      (md.match(/\*\*Exported:\*\*[^\n]*/) || [''])[0]);
+
     // What must NOT be in it. This file gets emailed and pasted around.
     check('no password reaches the file', !/makaman2026|"password"/i.test(md));
     check('and no customer or price does either',
