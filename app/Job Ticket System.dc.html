@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Makaman Job Tickets</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
 <script>
 // Zoom policy, decided before first paint.
 //
@@ -25,7 +25,18 @@
     var s = window.screen || {};
     var small = Math.min(s.width || window.innerWidth, s.height || window.innerHeight);
     var phone = small <= PHONE_MAX;
-    var content = 'width=device-width, initial-scale=1, viewport-fit=cover'
+    // interactive-widget=resizes-visual: reported after the svh fix below still did not
+    // stop it — the phone's keyboard brings a password-suggestion accessory bar whose
+    // height changes as the typed prefix matches or stops matching a saved credential,
+    // and viewport-fit=cover (needed for the safe-area insets the bottom nav and toast
+    // rely on) makes some browsers' default response to that resize the LAYOUT viewport
+    // itself — the thing every vh/svh/dvh unit and every fixed-position element is
+    // measured against — once per keystroke, not just the visual one. No CSS length unit
+    // can sit still while what it is measured against is what is moving. This opts back
+    // into the classical behaviour: the keyboard overlaps the page instead of resizing
+    // it, the browser still scrolls the focused field into view once on focus, and
+    // nothing above the keyboard moves again until the field changes.
+    var content = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual'
       + (phone ? ', maximum-scale=1, user-scalable=no' : '');
     var metas = document.querySelectorAll('meta[name="viewport"]');
     for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', content);
@@ -79,7 +90,7 @@
 <x-dc>
 <helmet>
 <!-- Kept in step with the tag in <head>; the script there rewrites both. -->
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
 <!-- PWA installability — lets any role add this to a phone/tablet/laptop home screen
      and open it like a native app on whatever device they have on hand, not just their
      usual one. manifest.webmanifest + sw.js are sibling files next to this .dc.html. -->
