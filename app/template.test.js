@@ -170,7 +170,126 @@ async function office(ctx) {
     await ctx.close();
   }
 
-  // ── A ticket bigger than the template says so ──
+  // ── A ticket bigger than the template says so gets a real second page ──
+  //
+  // S11, 2026-09-04, owner's request: this workbook is what comes back signed, so a
+  // ticket too long for one page must not point elsewhere for the missing lines — it
+  // gets a genuine extra worksheet, cloned from the same template sheet, carrying its
+  // own slice of the items and its own sub-total. The claim that matters is the same one
+  // subtotal.test.js already holds the PDF/preview to: the sub-totals printed on every
+  // page add up to the Grand Total also printed on every page — not merely that a
+  // sub-total row exists.
+  {
+    const ctx = await b.newContext();
+    const p = await office(ctx);
+    const r = await p.evaluate(async () => {
+      const app = window.__mkApp;
+      const t = (app.state.data.tickets || []).find(x => x.status === 'approved') || app.state.data.tickets[0];
+      const one = (t.items || [])[0];
+      const evt0 = (t.events || [])[0] || { ts: new Date().toISOString(), text: 'x' };
+      app.mutate((d) => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.items = [];
+        for (let n = 0; n < 55; n++) x.items.push(Object.assign({}, one, { code: 'X-' + n, cost: 10 + n, qty: 1, kind: 'unit' }));
+        x.events = [];
+        for (let n = 0; n < 60; n++) x.events.push(Object.assign({}, evt0, { text: 'Log line ' + n, ts: new Date(Date.now() + n * 60000).toISOString() }));
+      });
+      const big = app.state.data.tickets.find(y => y.id === t.id);
+      const out = await app.fillWorkbook(big);
+      const wholeBlob = await out.blob.arrayBuffer();
+      const c = await window.JSZip.loadAsync(wholeBlob);
+      // Bounded to THIS cell's own closing tag — `/>` for an empty cell, `</c>` for a
+      // filled one — rather than scanning forward for the next `<t>`/`<v>` anywhere in
+      // the document, which an empty self-closed cell would otherwise happily match on a
+      // completely unrelated LATER cell.
+      const cell = (xml, ref) => {
+        const m = xml.match(new RegExp('<c r="' + ref + '"[^>]*?(?:/>|>([\\s\\S]*?)</c>)'));
+        const body = m ? (m[1] || '') : '';
+        const inline = body.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+        const v = body.match(/<v>([\s\S]*?)<\/v>/);
+        return { text: inline ? inline[1] : null, num: v ? Number(v[1]) : null };
+      };
+      const num = (xml, ref) => cell(xml, ref).num;
+      const cellText = (xml, ref) => cell(xml, ref).text;
+      const wbXml = await c.file('xl/workbook.xml').async('string');
+      const sheetNames = Array.from(wbXml.matchAll(/<sheet name="([^"]*)"/g)).map(m => m[1]);
+      // Every part the new sheets need — worksheet, drawing, both .rels — has to actually
+      // be in the zip, not merely named in workbook.xml, or Excel opens to a repair
+      // prompt for a sheet it cannot find.
+      const svcClonePages = ['xl/worksheets/sheet1_p2.xml', 'xl/worksheets/sheet1_p3.xml'];
+      const partsPresent = {};
+      for (const part of svcClonePages.concat([
+        'xl/drawings/drawing1_p2.xml', 'xl/worksheets/_rels/sheet1_p2.xml.rels',
+        'xl/drawings/_rels/drawing1_p2.xml.rels',
+      ])) partsPresent[part] = !!c.files[part];
+      const svcPageXml = [];
+      for (const part of ['xl/worksheets/sheet1.xml'].concat(svcClonePages)) {
+        svcPageXml.push(await c.file(part).async('string'));
+      }
+      const svcPages = svcPageXml.map((xml, i) => ({
+        title: cellText(xml, 'A6'),
+        subLabel: cellText(xml, 'B39'), sub: num(xml, 'F39'),
+        totalLabel: cellText(xml, 'A40'), total: num(xml, 'F40'),
+        realRows: Array.from({ length: 23 }, (_, n) => 16 + n).filter(row => cellText(xml, 'A' + row) !== null).length,
+      }));
+      const logClonePages = ['xl/worksheets/sheet3_p2.xml', 'xl/worksheets/sheet3_p3.xml'];
+      const logPageXml = [];
+      for (const part of ['xl/worksheets/sheet3.xml'].concat(logClonePages)) {
+        logPageXml.push(await c.file(part).async('string'));
+      }
+      const logPages = logPageXml.map((xml) => ({
+        title: cellText(xml, 'A6'),
+        realRows: Array.from({ length: 25 }, (_, n) => 20 + n).filter(row => cellText(xml, 'E' + row) !== null).length,
+      }));
+      const wholeText = new TextDecoder().decode(new Uint8Array(wholeBlob));
+      return {
+        overflow: out.overflow, svcPagesOut: out.svcPages, logPagesOut: out.logPages,
+        sheetCount: sheetNames.length, sheetNames: sheetNames,
+        partsPresent: partsPresent, svcPages: svcPages, logPages: logPages,
+        appTotal: Number(app.ticketTotal(big).toFixed(2)),
+        // The old "itemised on the signed PDF" carry line pointed away from this file for
+        // the very data this file is now supposed to hold in full.
+        mentionsSignedPdfElsewhere: /itemised on the signed PDF|further item\(s\)|further log line/i.test(wholeText),
+      };
+    });
+    check('a 55-item, 60-event ticket is reported as needing extra pages', r.overflow);
+    check('three service pages, matching mkSvcPages\' own 23-per-page reserve',
+      r.svcPagesOut === 3, String(r.svcPagesOut));
+    check('three job-log pages, at 25 real lines each with no row reserved',
+      r.logPagesOut === 3, String(r.logPagesOut));
+    check('the workbook actually carries all 12 sheets (4 base + 4 extra service + 4 extra log)',
+      r.sheetCount === 12, r.sheetCount + ': ' + r.sheetNames.join(', '));
+    check('every part a cloned sheet needs is really in the zip, not just named in workbook.xml',
+      Object.values(r.partsPresent).every(Boolean), JSON.stringify(r.partsPresent));
+
+    check('each service page names itself in its own title', r.svcPages.every((x, i) =>
+      new RegExp('Page ' + (i + 1) + ' of 3$').test(x.title || '')), JSON.stringify(r.svcPages.map(x => x.title)));
+    check('each service page carries its own sub-total, worded with its page number',
+      r.svcPages.every((x, i) => x.subLabel === 'Sub-total, page ' + (i + 1) + ' of 3'),
+      JSON.stringify(r.svcPages.map(x => x.subLabel)));
+    check('every service page shows the SAME grand total, not a per-page running sum',
+      r.svcPages.every(x => x.total === r.appTotal), JSON.stringify(r.svcPages.map(x => x.total)) + ' vs ' + r.appTotal);
+    check('labelled as covering every page once there is more than one',
+      r.svcPages.every(x => x.totalLabel === ' Grand Total (all pages) ='), JSON.stringify(r.svcPages.map(x => x.totalLabel)));
+    // The claim that matters: the sub-totals actually add up to the total beside them.
+    const subSum = Number(r.svcPages.reduce((n, x) => n + x.sub, 0).toFixed(2));
+    check('the three sub-totals add up to the Grand Total', subSum === r.appTotal, subSum + ' vs ' + r.appTotal);
+    check('page 1 and 2 are full (23 real rows, the last saved for the sub-total) and page 3 is not',
+      r.svcPages[0].realRows === 23 && r.svcPages[1].realRows === 23 && r.svcPages[2].realRows < 23,
+      r.svcPages.map(x => x.realRows).join(' + '));
+
+    check('each job-log page names itself in its own title', r.logPages.every((x, i) =>
+      new RegExp('Page ' + (i + 1) + ' of 3$').test(x.title || '')), JSON.stringify(r.logPages.map(x => x.title)));
+    check('the job log spends no row on a sub-total — 25 real lines on the first two pages',
+      r.logPages[0].realRows === 25 && r.logPages[1].realRows === 25 && r.logPages[2].realRows === 10,
+      r.logPages.map(x => x.realRows).join(' + '));
+
+    check('no page points elsewhere for the lines that did not fit — everything is IN this file',
+      !r.mentionsSignedPdfElsewhere);
+    await ctx.close();
+  }
+
+  // ── The template's own one-page capacity is still exactly one page, unchanged ──
   {
     const ctx = await b.newContext();
     const p = await office(ctx);
@@ -180,44 +299,22 @@ async function office(ctx) {
       const one = (t.items || [])[0];
       app.mutate((d) => {
         const x = d.tickets.find(y => y.id === t.id);
-        x.items = [];
-        for (let n = 0; n < 30; n++) x.items.push(Object.assign({}, one, { code: 'X-' + n }));
+        x.items = Array.from({ length: 24 }, (_, n) => Object.assign({}, one, { code: 'Y-' + n }));
       });
-      const big = app.state.data.tickets.find(y => y.id === t.id);
-      const out = await app.fillWorkbook(big);
-      const c = await window.JSZip.loadAsync(await out.blob.arrayBuffer());
-      const s1 = await c.file('xl/worksheets/sheet1.xml').async('string');
-      // Read every amount in the item column and the total cell, so the balance can be
-      // checked as arithmetic rather than asserted as an intention.
-      const num = (ref) => {
-        const m = s1.match(new RegExp('<c r="' + ref + '"[^>]*?><v>([-0-9.eE]+)</v></c>'));
-        return m ? Number(m[1]) : null;
-      };
-      const amounts = [];
-      for (let row = 16; row <= 39; row++) { const v = num('F' + row); if (v !== null) amounts.push(v); }
-      const b23 = s1.match(/<c r="B38"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/);
-      const carry = s1.match(/<c r="B39"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/);
-      return {
-        overflow: out.overflow, carriedItems: out.carriedItems,
-        lastRealRowFilled: !!(b23 && b23[0].length > 30),
-        carryText: carry ? carry[0] : '',
-        sum: Number(amounts.reduce((n, v) => n + v, 0).toFixed(2)),
-        total: num('F40'),
-        appTotal: Number(app.ticketTotal(big).toFixed(2)),
-      };
+      const t24 = app.state.data.tickets.find(y => y.id === t.id);
+      const out24 = await app.fillWorkbook(t24);
+      app.mutate((d) => {
+        const x = d.tickets.find(y => y.id === t.id);
+        x.items = Array.from({ length: 25 }, (_, n) => Object.assign({}, one, { code: 'Y-' + n }));
+      });
+      const t25 = app.state.data.tickets.find(y => y.id === t.id);
+      const out25 = await app.fillWorkbook(t25);
+      return { pages24: out24.svcPages, pages25: out25.svcPages };
     });
-    check('more lines than the template holds is reported, not silently dropped', r.overflow);
-    check('and the rows it does hold are all filled', r.lastRealRowFilled);
-    // S10. The workbook used to carry the whole job's total above only the first 24 lines,
-    // so a client's form did not add up to its own printed figure. The last row now
-    // carries what did not fit.
-    check('the overflow is named in the file, not only in a toast that disappears',
-      /further item\(s\)/.test(r.carryText), r.carryText.slice(0, 120));
-    check('and it says how many were carried', r.carriedItems === 7, String(r.carriedItems));
-    check('the visible amounts add up to the total printed beside them',
-      r.sum === r.total, r.sum + ' vs ' + r.total);
-    check('and that total is still the whole job, not a truncated one',
-      r.total === r.appTotal, r.total + ' vs ' + r.appTotal);
+    check('exactly 24 items still fits the template\'s one page, no sub-total spent',
+      r.pages24 === 1, String(r.pages24));
+    check('one item past that boundary is what actually forces a second page',
+      r.pages25 === 2, String(r.pages25));
     await ctx.close();
   }
 

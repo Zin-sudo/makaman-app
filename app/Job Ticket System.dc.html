@@ -5634,11 +5634,19 @@ const SHEET = {
 // Location / F14 Customer Rep.", which is the same map.
 const TEMPLATE = {
   file: './uploads/service-ticket-template.xlsx',
+  // `title` is read verbatim off the template's own A6 cell (S11 below appends a page
+  // label to it, never invents new wording) and `drawing`/`printArea` off workbook.xml
+  // and the sheet's own definedNames entry — same "read off the template, not invented"
+  // rule the rest of this map already follows.
   sheets: [
-    { part: 'xl/worksheets/sheet1.xml', kind: 'service' },  // Service Ticket (Original)
-    { part: 'xl/worksheets/sheet2.xml', kind: 'service' },  // Service Ticket (Copy)
-    { part: 'xl/worksheets/sheet3.xml', kind: 'log' },      // Job Log (Original)
-    { part: 'xl/worksheets/sheet4.xml', kind: 'log' },      // Job Log (Copy)
+    { part: 'xl/worksheets/sheet1.xml', drawing: 'xl/drawings/drawing1.xml',
+      kind: 'service', title: 'Service Ticket (Original)', printArea: '$A$1:$F$50' },
+    { part: 'xl/worksheets/sheet2.xml', drawing: 'xl/drawings/drawing2.xml',
+      kind: 'service', title: 'Service Ticket (Copy)', printArea: '$A$1:$F$50' },
+    { part: 'xl/worksheets/sheet3.xml', drawing: 'xl/drawings/drawing3.xml',
+      kind: 'log', title: 'Job Log (Original)', printArea: '$A$1:$I$48' },
+    { part: 'xl/worksheets/sheet4.xml', drawing: 'xl/drawings/drawing4.xml',
+      kind: 'log', title: 'Job Log (Copy)', printArea: '$A$1:$I$48' },
   ],
   service: {
     customer: 'B8',  ticketNo: 'E8',
@@ -5648,7 +5656,7 @@ const TEMPLATE = {
     mileage: 'B12',  end: 'E12',
     baseLocation: 'B13',
     jobType: 'A14',
-    total: 'F40',
+    total: 'F40',    totalLabel: 'A40',
   },
   log: {
     ticketNo: 'H6',
@@ -9339,28 +9347,37 @@ class Component extends DCLogic {
   fillWorkbook(ticket) {
     const t = ticket;
     const cur = this.ticketCurrency(t);
-    // S10. The template holds 24 item rows and 25 log rows, and a bigger ticket used to
-    // be cut to fit while the total cell still carried the WHOLE job's figure. That gave a
-    // client a form whose visible lines did not add up to its own stated total, with
-    // nothing in the file to say why — the same class of defect as the template's
-    // inherited formulas, and worse, because a warning toast disappears and the file does
-    // not.
+    // S10, then S11 (2026-09-04, owner's request): the template holds 24 item rows and 25
+    // log rows, and a bigger ticket used to be cut to fit while the total cell still
+    // carried the WHOLE job's figure, with the dropped lines named only by a text pointer
+    // to "the signed PDF". That was backwards — this workbook, printed and signed, IS the
+    // document that comes back in the upload; a reference to some other file is not an
+    // acceptable stand-in for the missing lines. So a ticket too long for one page now
+    // gets a genuine second (third, ...) page instead: an extra worksheet cloned from the
+    // same template sheet, carrying its own slice of the items and its own sub-total, the
+    // same shape mkSvcPages already gives the PDF/preview. Nothing is truncated and
+    // nothing points elsewhere; every line the customer signed is somewhere in this file.
     //
-    // So an overflowing sheet spends its last row saying so. The carry line holds the
-    // money that did not fit, which makes the visible column sum to the printed total
-    // again, and names where the itemised detail is. Nothing is invented: the amount is
-    // the arithmetic remainder of the lines that were dropped.
+    // Item pages reserve their own last row for the sub-total once there is more than one
+    // page (23 real items + 1 sub-total row, the same "sacrifice the last ruled line"
+    // trick the old carry line already used) — a single-page ticket still gets the full
+    // 24 real rows and no sub-total, unchanged from before. The job log carries no money,
+    // so its pages need no reserved row: 25 real lines per page throughout.
     const allItems = t.items || [];
     const allEvents = t.events || [];
-    const itemCap = TEMPLATE.itemRows.length, eventCap = TEMPLATE.eventRows.length;
-    const itemsOver = allItems.length > itemCap, eventsOver = allEvents.length > eventCap;
-    const items = itemsOver ? allItems.slice(0, itemCap - 1) : allItems.slice(0, itemCap);
-    const events = eventsOver ? allEvents.slice(0, eventCap - 1) : allEvents.slice(0, eventCap);
-    // What the carry line is worth: the printed total less everything actually listed.
-    // Derived by subtraction rather than by re-summing the dropped lines, so it can never
-    // disagree with the total cell beside it.
-    const carriedItems = itemsOver ? allItems.length - items.length : 0;
-    const carriedEvents = eventsOver ? allEvents.length - events.length : 0;
+    const itemRows = TEMPLATE.itemRows, eventRows = TEMPLATE.eventRows;
+    const paginate = (arr, cap) => {
+      if (arr.length <= cap) return [arr];
+      const pages = []; for (let i = 0; i < arr.length; i += cap) pages.push(arr.slice(i, i + cap));
+      return pages;
+    };
+    // A ticket that fits the template's own 24-row capacity still gets the full 24 real
+    // rows and no sub-total, exactly as before — the row is only sacrificed once a second
+    // page is actually needed.
+    const itemPages = allItems.length <= itemRows.length ? [allItems]
+      : paginate(allItems, itemRows.length - 1);
+    const eventPages = paginate(allEvents, eventRows.length);
+    const svcMultiPage = itemPages.length > 1;
 
     // Excel counts days from 1899-12-30, with its 1900 leap-year bug baked in. Read off
     // the Tripoli wall clock the whole app is pinned to, so a job never files a day early.
@@ -9407,7 +9424,17 @@ class Component extends DCLogic {
       return xml.slice(0, m.index) + cell + xml.slice(m.index + m[0].length);
     };
 
-    const svc = (xml) => {
+    // Escaping an XML *attribute* value needs the quote handled too, unlike the element
+    // text esc() above already covers — kept separate rather than widened, since a `"` in
+    // element text would not need escaping and the extra replace would be dead work on
+    // every one of the hundreds of setCell() calls above.
+    const escAttr = (s) => esc(s).replace(/"/g, '&quot;');
+    const grand = Number(this.ticketTotal(t).toFixed(2));
+
+    // pageItems/pageNo/totalPages describe ONE page of the service sheet; svc() itself
+    // never sees the whole ticket's item list, so it cannot fill a page with anything
+    // that did not fit on it.
+    const svc = (xml, pageItems, pageNo, totalPages, title) => {
       const M = TEMPLATE.service;
       let x = xml;
       x = setCell(x, M.customer, t.customer || '');
@@ -9421,21 +9448,23 @@ class Component extends DCLogic {
       x = setCell(x, M.end, xDate(t.end));
       x = setCell(x, M.baseLocation, t.baseLocation || '');
       x = setCell(x, M.jobType, t.jobType || '');
-      const grand = Number(this.ticketTotal(t).toFixed(2));
-      const listed = items.reduce((n, i) => n + this.itemTotal(i, t), 0);
-      const carriedValue = Number((grand - listed).toFixed(2));
-      TEMPLATE.itemRows.forEach((row, n) => {
-        // The carry line, when there is one, is the last row of the block.
-        if (carriedItems && n === TEMPLATE.itemRows.length - 1) {
+      // The last ruled row is spent on the sub-total once this ticket needed more than
+      // one page — the same row the old carry line used to spend on a text pointer, now
+      // spent on a real, checkable number instead.
+      const reserveSubtotal = totalPages > 1;
+      const usableRows = reserveSubtotal ? itemRows.length - 1 : itemRows.length;
+      const pageSum = pageItems.reduce((n, i) => n + this.itemTotal(i, t), 0);
+      itemRows.forEach((row, n) => {
+        if (reserveSubtotal && n === itemRows.length - 1) {
           x = setCell(x, 'A' + row, '');
-          x = setCell(x, 'B' + row, '+ ' + carriedItems + ' further item(s) — itemised on the signed PDF');
+          x = setCell(x, 'B' + row, 'Sub-total, page ' + pageNo + ' of ' + totalPages);
           x = setCell(x, 'C' + row, '');
           x = setCell(x, 'D' + row, '');
           x = setCell(x, 'E' + row, '');
-          x = setCell(x, 'F' + row, carriedValue);
+          x = setCell(x, 'F' + row, Number(pageSum.toFixed(2)));
           return;
         }
-        const i = items[n];
+        const i = n < usableRows ? pageItems[n] : undefined;
         const pc = i && i.kind === 'percent';
         x = setCell(x, 'A' + row, i ? (i.code || '') : '');
         x = setCell(x, 'B' + row, i ? (i.desc || '') : '');
@@ -9444,10 +9473,19 @@ class Component extends DCLogic {
         x = setCell(x, 'E' + row, i ? (pc ? i.cost + '%' : Number(i.cost)) : '');
         x = setCell(x, 'F' + row, i ? Number(this.itemTotal(i, t).toFixed(2)) : '');
       });
-      return setCell(x, M.total, grand);
+      x = setCell(x, M.total, grand);
+      // 2026-09-04, owner's request: this workbook is the document that comes back
+      // signed, so every page carries the Grand Total beside its own sub-total, worded
+      // the same way as the PDF/preview once there is more than one page to distinguish
+      // it from a single page's plain "Total =".
+      if (reserveSubtotal) x = setCell(x, M.totalLabel, ' Grand Total (all pages) =');
+      if (totalPages > 1) x = setCell(x, 'A6', title + ' · Page ' + pageNo + ' of ' + totalPages);
+      return x;
     };
 
-    const log = (xml) => {
+    // pageEvents/pageNo/totalPages: same shape as svc() above, but the log carries no
+    // money, so there is no row to reserve — every page gets the full 25 real lines.
+    const log = (xml, pageEvents, pageNo, totalPages, title) => {
       const M = TEMPLATE.log;
       let x = xml;
       // Written as values rather than left to the cross-sheet formulas the template uses
@@ -9466,37 +9504,115 @@ class Component extends DCLogic {
       x = setCell(x, M.startJob, xDate(t.start));
       x = setCell(x, M.endJob, xDate(t.end));
       x = setCell(x, M.arrived, xDate(t.arrival || t.start));
-      TEMPLATE.eventRows.forEach((row, n) => {
-        // No money on this sheet, so the carry line is a marker rather than a balance —
-        // but a job log that simply stops is a job log that reads as complete.
-        if (carriedEvents && n === TEMPLATE.eventRows.length - 1) {
-          x = setCell(x, 'A' + row, '');
-          x = setCell(x, 'B' + row, '');
-          x = setCell(x, 'C' + row, '');
-          x = setCell(x, 'D' + row, '');
-          x = setCell(x, 'E' + row, '+ ' + carriedEvents + ' further log line(s) — on the signed PDF');
-          return;
-        }
-        const e = events[n];
+      eventRows.forEach((row, n) => {
+        const e = pageEvents[n];
         x = setCell(x, 'A' + row, e ? xDate(e.ts) : '');
         x = setCell(x, 'B' + row, e ? xTime(e.ts) : '');
         x = setCell(x, 'C' + row, e ? '-' : '');
         x = setCell(x, 'D' + row, e ? '-' : '');
         x = setCell(x, 'E' + row, e ? (e.text || '') : '');
       });
+      if (totalPages > 1) x = setCell(x, 'A6', title + ' · Page ' + pageNo + ' of ' + totalPages);
       return x;
     };
+
+    // One "role" per physical sheet in the template — the two service pages and the two
+    // log pages — each possibly spread over more than one worksheet once its own list of
+    // pages runs past what the template's ruled rows hold. sheet.title stands in for
+    // svc()'s own local `title` parameter above; both `svc` and `log` read it the same
+    // way, just named differently in each signature to match what each already took.
+    const roles = TEMPLATE.sheets.map((sheet) => Object.assign({}, sheet, {
+      pages: sheet.kind === 'service' ? itemPages : eventPages,
+      fill: sheet.kind === 'service'
+        ? (xml, page, no, tot) => svc(xml, page, no, tot, sheet.title)
+        : (xml, page, no, tot) => log(xml, page, no, tot, sheet.title),
+    }));
 
     return this.loadExporters()
       .then(() => fetch(TEMPLATE.file))
       .then((r) => { if (!r.ok) throw new Error('template ' + r.status); return r.arrayBuffer(); })
       .then((buf) => window.JSZip.loadAsync(buf))
       .then((zip) => {
-        const jobs = TEMPLATE.sheets.map((sh) =>
-          zip.file(sh.part).async('string').then((xml) => {
-            zip.file(sh.part, sh.kind === 'service' ? svc(xml) : log(xml));
-          }));
+        // Every new part this ticket needs beyond the template's original four sheets —
+        // one clone of the sheet's own worksheet+drawing pair per extra page — collected
+        // here so workbook.xml, its own .rels and [Content_Types].xml can be patched once
+        // at the end rather than once per role, which is what "still exactly one workbook
+        // edit, however many pages" actually requires.
+        const newSheets = []; // { name, rId, sheetId, part, drawingPart, printArea }
+        let nextSheetId = 100;
+        const jobs = roles.map((role) => {
+          const relsPart = role.part.replace('worksheets/', 'worksheets/_rels/') + '.rels';
+          const drawingRelsPart = role.drawing.replace('drawings/', 'drawings/_rels/') + '.rels';
+          const totalPages = role.pages.length;
+          // Read every pristine part exactly once. Page 1 is filled and written straight
+          // back over the template's own part; pages 2+ clone from these SAME strings —
+          // never from whatever page 1 just wrote — so a clone can never race page 1's
+          // in-place edit and pick up a partly-filled copy depending on scheduling.
+          return Promise.all([
+            zip.file(role.part).async('string'),
+            zip.file(relsPart).async('string'),
+            zip.file(role.drawing).async('string'),
+            zip.file(drawingRelsPart).async('string'),
+          ]).then(([sheetXml, relsXml, drawingXml, drawingRelsXml]) => {
+            zip.file(role.part, role.fill(sheetXml, role.pages[0], 1, totalPages));
+            for (let k = 1; k < totalPages; k++) {
+              const pageNo = k + 1;
+              const suffix = ' p' + pageNo;
+              const name = (role.title.length + suffix.length <= 31 ? role.title
+                : role.title.slice(0, 31 - suffix.length)) + suffix;
+              const newPart = role.part.replace(/\.xml$/, '_p' + pageNo + '.xml');
+              const newRels = relsPart.replace(/\.xml\.rels$/, '_p' + pageNo + '.xml.rels');
+              const newDrawing = role.drawing.replace(/\.xml$/, '_p' + pageNo + '.xml');
+              const newDrawingRels = drawingRelsPart.replace(/\.xml\.rels$/, '_p' + pageNo + '.xml.rels');
+              zip.file(newDrawing, drawingXml);
+              zip.file(newDrawingRels, drawingRelsXml);
+              // The clone's own .rels needs to point at ITS OWN drawing, not the
+              // original's — the printerSettings relationship is left as-is, since a
+              // read-only print-settings part can be the target of more than one sheet.
+              const drawingTargetRe = new RegExp('Target="[^"]*' +
+                role.drawing.split('/').pop() + '"');
+              zip.file(newRels, relsXml.replace(drawingTargetRe,
+                'Target="../drawings/' + newDrawing.split('/').pop() + '"'));
+              zip.file(newPart, role.fill(sheetXml, role.pages[k], pageNo, totalPages));
+              newSheets.push({
+                name: name, rId: 'rIdX' + (newSheets.length + 1), sheetId: nextSheetId++,
+                part: newPart, drawingPart: newDrawing, printArea: role.printArea,
+              });
+            }
+          });
+        });
         return Promise.all(jobs).then(() => {
+          if (!newSheets.length) return;
+          return Promise.all([
+            zip.file('xl/workbook.xml').async('string'),
+            zip.file('xl/_rels/workbook.xml.rels').async('string'),
+            zip.file('[Content_Types].xml').async('string'),
+          ]).then(([wbXml, relsXml, ctXml]) => {
+            const baseSheetCount = TEMPLATE.sheets.length;
+            const sheetTags = newSheets.map((s) =>
+              '<sheet name="' + escAttr(s.name) + '" sheetId="' + s.sheetId + '" r:id="' + s.rId + '"/>'
+            ).join('');
+            wbXml = wbXml.replace('</sheets>', sheetTags + '</sheets>');
+            const defTags = newSheets.map((s, i) =>
+              '<definedName name="_xlnm.Print_Area" localSheetId="' + (baseSheetCount + i) + '">\'' +
+              s.name.replace(/'/g, "''") + '\'!' + s.printArea + '</definedName>'
+            ).join('');
+            wbXml = wbXml.replace('</definedNames>', defTags + '</definedNames>');
+            const relTags = newSheets.map((s) =>
+              '<Relationship Id="' + s.rId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="' +
+              s.part.replace(/^xl\//, '') + '"/>'
+            ).join('');
+            relsXml = relsXml.replace('</Relationships>', relTags + '</Relationships>');
+            const ctTags = newSheets.map((s) =>
+              '<Override PartName="/' + s.part + '" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+              '<Override PartName="/' + s.drawingPart + '" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'
+            ).join('');
+            ctXml = ctXml.replace('</Types>', ctTags + '</Types>');
+            zip.file('xl/workbook.xml', wbXml);
+            zip.file('xl/_rels/workbook.xml.rels', relsXml);
+            zip.file('[Content_Types].xml', ctXml);
+          });
+        }).then(() => {
           // Every formula in the filled region has just been replaced by a value, so the
           // cached dependency chain now points at cells that no longer compute anything.
           // Excel rebuilds it from nothing; leaving a stale one is what makes a patched
@@ -9508,8 +9624,8 @@ class Component extends DCLogic {
           });
         });
       })
-      .then((blob) => ({ blob: blob, overflow: itemsOver || eventsOver,
-        carriedItems: carriedItems, carriedEvents: carriedEvents }));
+      .then((blob) => ({ blob: blob, overflow: svcMultiPage || eventPages.length > 1,
+        svcPages: itemPages.length, logPages: eventPages.length }));
   }
 
   // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF and
@@ -12619,11 +12735,15 @@ class Component extends DCLogic {
           .then((out) => {
             const no = (t.ticketNo || 'unnumbered').replace(/[^\w.-]+/g, '-');
             this.saveBlob(out.blob, 'Makaman-' + no + '.xlsx');
-            this.log('4 sheets filled into the workbook and downloaded to this device.', 'lifecycle');
+            const sheetCount = 2 * out.svcPages + 2 * out.logPages;
+            this.log(sheetCount + ' sheet(s) filled into the workbook and downloaded to this device.', 'lifecycle');
+            // S11, 2026-09-04: a ticket too long for one page now gets a genuine extra
+            // worksheet per page, each carrying its own sub-total beside the running
+            // Grand Total — there is no longer a "the rest is on the signed PDF" carry
+            // line, since this workbook IS what comes back signed.
             this.toast('export', out.overflow
-              ? 'Workbook downloaded. This ticket is bigger than the customer form holds, so the last row carries the rest and the total still balances — the itemised detail is on the signed PDF.'
-              : 'The four sheets are filled and downloading to this device.',
-              out.overflow ? 'warn' : 'ok');
+              ? 'Workbook downloaded. This ticket needed extra page(s) — ' + out.svcPages + ' service page(s) and ' + out.logPages + ' job-log page(s), each with its own sub-total, and the total still balances.'
+              : 'The four sheets are filled and downloading to this device.', 'ok');
           })
           .catch((e) => {
             // No audit entry on the way out. Nothing happened, so nothing is recorded.
