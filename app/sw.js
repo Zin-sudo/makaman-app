@@ -64,6 +64,39 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Web Push (0058). send-push posts a plain JSON body — {title, body, url} — no payload
+// encryption scheme of its own to agree on beyond what the browser already handles before
+// this handler ever sees it. A malformed or test payload with no title still shows
+// something rather than nothing: Chrome kills a page that receives a push and shows no
+// notification for it, on the theory that a silent push is a tracking beacon in disguise.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+  const title = data.title || 'Makaman Job Tickets';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: './uploads/icon-192.png',
+    badge: './uploads/icon-192.png',
+    data: { url: data.url || './' },
+  }));
+});
+
+// Tapping the notification focuses an already-open tab if there is one, rather than
+// piling up a second copy of the app — the same "one instance" assumption the rest of
+// this file's shell caching makes.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data && event.notification.data.url || './', self.location.href).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if ('focus' in c) { c.navigate(url).catch(() => {}); return c.focus(); }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;

@@ -1229,6 +1229,24 @@
           </div>
         </sc-if>
 
+        <div style="margin-bottom:28px">
+          <div class="mk-eyebrow">Notifications</div>
+          <sc-if value="{{ notifPushSupported }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div style="font-size:14px;font-weight:600">Notify this device</div>
+                <button onClick="{{ toggleNotifPush }}" disabled="{{ notifPushBusy }}" class="mk-switch" role="switch" aria-checked="{{ notifPushOnStr }}" style="background:{{ notifPushBg }}"><span class="mk-switch-knob" style="inset-inline-start:{{ notifPushKnob }}"></span></button>
+              </div>
+              <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;line-height:1.4">{{ notifPushHint }}</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ notifPushUnsupported }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
+              <div style="font-size:12px;color:var(--ink-faint);line-height:1.5">Not available on this device yet. On an iPhone, add this app to the Home Screen first, from the Share button — Safari itself cannot receive notifications, only the installed app can.</div>
+            </div>
+          </sc-if>
+        </div>
+
         <sc-if value="{{ settingsIsMgr }}" hint-placeholder-val="{{ false }}">
           <div style="margin-bottom:28px">
             <div class="mk-eyebrow">Storage &amp; export</div>
@@ -3460,6 +3478,19 @@ const CLOUD_READY = !!(CFG.supabaseUrl && CFG.supabaseKey
   && typeof window !== 'undefined' && window.supabase && window.supabase.createClient);
 const AUTH_MODE = CFG.authMode || 'auto';
 const USE_CLOUD = AUTH_MODE === 'cloud' || (AUTH_MODE === 'auto' && CLOUD_READY);
+
+// Web Push (0058): the VAPID PUBLIC key only — not a secret, safe to ship in this build
+// the way the publishable Supabase key above is. PushManager.subscribe() wants the key as
+// bytes, not the base64url text config.js carries, hence the decode below.
+const VAPID_PUBLIC_KEY = CFG.vapidPublicKey || '';
+function vapidKeyBytes(b64url) {
+  const pad = '='.repeat((4 - b64url.length % 4) % 4);
+  const base64 = (b64url + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
 
 let _sb = null;
 function sb() {
@@ -6336,6 +6367,12 @@ class Component extends DCLogic {
       // arrival banner has to repaint the instant this changes, not wait for whatever
       // unrelated render happens to come along next.
       geoDeniedConfirmed: false,
+      // Web Push (0058), all device-local — never persisted or synced, because whether
+      // THIS browser has a live subscription is not a fact about the account, it is a
+      // fact about this one install. notifPushSupported starts false and is only ever
+      // set true after componentDidMount actually finds the APIs and a VAPID key to use
+      // it with — no switch is ever shown that this device cannot act on.
+      notifPushSupported: false, notifPushOn: false, notifPushBusy: false, notifPushDenied: false,
       // No customer until one is picked. It used to open on whichever client happened to
       // be first, which reads as "here is Waha's price list" to somebody who came to look
       // at Zueitina's — and, while the paging bug was live, showed an empty table for a
@@ -6803,6 +6840,19 @@ class Component extends DCLogic {
     // a progressive enhancement, not something the app depends on to function.
     if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+    // Web Push (0058): only offered when every piece it needs is actually present —
+    // the browser APIs, a VAPID key built into this config, and a real backend to hand
+    // the subscription to. iOS only grants any of this to a PWA saved to the Home
+    // Screen, never a Safari tab, so this reads as unsupported there until installed —
+    // which is honest, not a bug: a subscription made from a tab dies with the tab.
+    if (typeof window !== 'undefined' && USE_CLOUD && VAPID_PUBLIC_KEY
+        && 'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined') {
+      this.setState({ notifPushSupported: true, notifPushDenied: Notification.permission === 'denied' });
+      navigator.serviceWorker.ready
+        .then((reg) => reg.pushManager.getSubscription())
+        .then((sub) => this.setState({ notifPushOn: !!sub }))
+        .catch(() => {});
     }
     // A handle on the running component, so the request coalescer can be exercised
     // directly by tests rather than only inferred from what the UI happens to show.
@@ -7618,6 +7668,68 @@ class Component extends DCLogic {
   updateSettings(patch) {
     this.mutate(d => { d.settings = Object.assign({}, d.settings, patch); });
     if (patch.theme !== undefined) setTimeout(() => this.applyTheme(), 0);
+  }
+  // Web Push (0058). Deliberately NOT routed through the outbox: a subscription is a
+  // conversation with the browser's own push service, which only exists while online —
+  // there is no offline half of "turn notifications on" to queue for later the way a
+  // job-log line has one. push_subscriptions is written to directly, the same way
+  // sessionFromProfile/setNewPassword talk to Supabase directly for the same reason.
+  toggleNotifPush() {
+    if (this.state.notifPushBusy) return;
+    if (this.state.notifPushOn) this.disableNotifPush(); else this.enableNotifPush();
+  }
+  enableNotifPush() {
+    this.setState({ notifPushBusy: true });
+    Notification.requestPermission().then((perm) => {
+      if (perm !== 'granted') {
+        this.setState({ notifPushBusy: false, notifPushDenied: perm === 'denied' });
+        this.toast('notif', perm === 'denied'
+          ? 'Notifications are blocked for this app in your browser or phone settings. Turn them back on there, then try again.'
+          : 'Notifications need your permission to turn on.', 'warn');
+        return null;
+      }
+      return navigator.serviceWorker.ready
+        .then((reg) => reg.pushManager.subscribe({
+          userVisibleOnly: true, applicationServerKey: vapidKeyBytes(VAPID_PUBLIC_KEY),
+        }))
+        .then((sub) => {
+          const j = sub.toJSON();
+          const c = sb();
+          if (!c || !CLOUD_IDS.me) throw new Error('Not signed in to the server yet.');
+          return c.from('push_subscriptions').upsert({
+            user_id: CLOUD_IDS.me, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+          }, { onConflict: 'endpoint' });
+        })
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          this.setState({ notifPushOn: true, notifPushBusy: false, notifPushDenied: false });
+          this.toast('notif', 'Notifications turned on for this device.', 'ok');
+        });
+    }).catch((err) => {
+      this.setState({ notifPushBusy: false });
+      this.toast('notif', (err && err.message) || 'Could not turn notifications on.', 'warn');
+    });
+  }
+  disableNotifPush() {
+    this.setState({ notifPushBusy: true });
+    navigator.serviceWorker.ready
+      .then((reg) => reg.pushManager.getSubscription())
+      .then((sub) => {
+        if (!sub) return null;
+        const endpoint = sub.endpoint;
+        return sub.unsubscribe().then(() => {
+          const c = sb();
+          return c ? c.from('push_subscriptions').delete().eq('endpoint', endpoint) : null;
+        });
+      })
+      .then(() => {
+        this.setState({ notifPushOn: false, notifPushBusy: false });
+        this.toast('notif', 'Notifications turned off for this device.', 'ok');
+      })
+      .catch((err) => {
+        this.setState({ notifPushBusy: false });
+        this.toast('notif', (err && err.message) || 'Could not turn notifications off.', 'warn');
+      });
   }
   // An audit entry is one of two things, and the difference decides who may read it:
   //  · 'lifecycle' — the ticket moved through its official stages, or changed identity.
@@ -11487,6 +11599,22 @@ class Component extends DCLogic {
         // just made, in the direction they wanted, is noise.
         if (!next) this.toast('geo-off', 'Location sharing is off. Your position will read "No Location Shared" — the office cannot reach you by coordinates if something goes wrong on site.', 'warn');
       },
+
+      // Notifications — everyone, not gated by role like the two blocks above: an
+      // approval, a note, or a job ready for review can land on any of them.
+      notifPushSupported: S.notifPushSupported,
+      notifPushUnsupported: !S.notifPushSupported,
+      notifPushOn: S.notifPushOn,
+      notifPushOnStr: S.notifPushOn ? 'true' : 'false',
+      notifPushBg: S.notifPushOn ? 'var(--accent)' : 'var(--field)',
+      notifPushKnob: S.notifPushOn ? '24px' : '3px',
+      notifPushBusy: S.notifPushBusy,
+      notifPushHint: S.notifPushDenied
+        ? 'Blocked in your browser or phone settings — this device will only ever get in-app notices until that is turned back on there.'
+        : (S.notifPushOn
+          ? 'On for this device: approvals, a job sent back, a job ready for review, and notes on jobs you are on.'
+          : 'Off — you will still see everything inside the app, just not outside it.'),
+      toggleNotifPush: () => this.toggleNotifPush(),
 
       // Storage & Export — Ops Manager only.
       settingsIsMgr: S.role === 'mgr',
