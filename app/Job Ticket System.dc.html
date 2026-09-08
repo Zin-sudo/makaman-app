@@ -411,7 +411,11 @@
   /* The bar could not shrink, so on a 320px phone it pushed the page sideways — the
      office bar carries a name and a role the technician's does not, and at 320 the two
      together ran 55px past the edge. Pre-existing: the baseline overflows at 375, and
-     widening the notification bell for gloved thumbs took it to 383.
+     widening the notification bell for gloved thumbs took it to 383. Adding the refresh
+     button beside it widens the same cluster further still — covered by the same fix
+     below (the name ellipsizes, the role drops at the narrowest sizes) rather than a
+     new one, since nothing about a THIRD tappable icon changes why the first two needed
+     min-width:0 in the first place.
      A flex item will not shrink below its content unless it is told it may, which is what
      min-width:0 does; the name then takes the ellipsis rather than the layout taking the
      hit. The role label goes at the narrowest sizes: it is the least load-bearing thing
@@ -762,10 +766,15 @@
      reads as two things happening. The thumb is the feedback. */
   .mk-switch:active { transform:none; }
 
-  /* The bell. No box: the bar already separates it from the page, so an outline around
-     it was drawing a line around something already apart. The tap target stays 40px. */
-  .mk-bell { border-radius:999px; }
-  .mk-bell:hover { background:rgba(var(--on-navbar-rgb),0.08); }
+  /* The bell, and the refresh button beside it — same shape, same hover, on a shared
+     class rather than reusing .mk-bell for both. notify.test.js (and anything else that
+     ever needs to find THE bell specifically) locates it as `.mk-bell` alone; giving the
+     refresh button that same class made it the FIRST .mk-bell in the bar and broke that
+     lookup outright rather than merely finding the wrong element some of the time. No
+     box: the bar already separates both from the page, so an outline was drawing a line
+     around something already apart. The tap target stays 40px. */
+  .mk-bell, .mk-topbar-icon-btn { border-radius:999px; }
+  .mk-bell:hover, .mk-topbar-icon-btn:hover { background:rgba(var(--on-navbar-rgb),0.08); }
 
   /* ── Motion, from Animista ───────────────────────────────────────────────
      Three named animations, applied by class so each one has exactly one trigger:
@@ -805,6 +814,17 @@
     80% { transform:rotate(-2deg); }
     90% { transform:rotate(2deg); }
   }
+  /* The one continuous, indefinite spin on the page — every other animation here is a
+     one-shot. Applied only for the actual duration of a genuine request (see the
+     refreshCurrentTab binding), never for a fixed duration guessed to look right, so its
+     length is itself an honest signal of how long the round trip is taking. Under
+     prefers-reduced-motion the app-wide rule below caps every animation to one
+     iteration rather than turning it off outright (a pulse dot mid-fade would otherwise
+     vanish) — for THIS icon that lands back on a full 360deg turn, which reads
+     identically to 0deg, so a reduced-motion viewer sees a static refresh glyph exactly
+     as if it had never spun, not a service frozen mid-turn. */
+  @keyframes mk-spin { to { transform:rotate(360deg); } }
+  .mk-spin { animation:mk-spin 0.9s linear infinite; }
 
   /* ── Repeated inline styles, consolidated ──────────────────────────────────
      Each of these was a literal `style="..."` string duplicated five or more
@@ -1118,6 +1138,14 @@
          the page. What remains is the bell, the name and the role, spaced rather than
          framed. The tap target is unchanged at 40px; only the outline is gone. -->
     <div style="display:flex;align-items:center;gap:11px;font-size:13px">
+      <!-- Force-refreshes the tab on screen — a real server reach (drain, then pull),
+           never a re-render. Same 40px target and CSS as the bell beside it; the icon
+           itself is the only thing that carries state — it spins for exactly as long as
+           the request is genuinely in flight and stops only at a definitive success or
+           failure, so its own duration doubles as an informal read of the connection. -->
+      <button onClick="{{ refreshCurrentTab }}" disabled="{{ refreshBusy }}" title="{{ refreshTabTitle }}" aria-label="Refresh current tab" aria-busy="{{ refreshBusy }}" class="mk-topbar-icon-btn" style="position:relative;flex:none;width:40px;height:40px;padding:0;cursor:pointer;background:transparent;border:0;color:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">
+        {{ refreshGlyph }}
+      </button>
       <button onClick="{{ toggleNotifications }}" title="{{ notifyTitle }}" class="mk-bell {{ notifyWobble }}" style="position:relative;flex:none;width:40px;height:40px;padding:0;cursor:pointer;background:transparent;border:0;color:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center">
         {{ notifyGlyph }}
         <sc-if value="{{ notifyAny }}" hint-placeholder-val="{{ false }}">
@@ -1738,7 +1766,10 @@
 
             <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
               <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Sync</h2>
-              <div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px">Last upload: {{ syncLastLabel }}</div>
+              <div style="font-size:12px;color:var(--ink-faint);margin-bottom:4px">Last upload: {{ syncLastLabel }}</div>
+              <sc-if value="{{ refreshLastInfoShow }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px">{{ refreshLastInfo }}</div>
+              </sc-if>
               <div style="display:flex;align-items:center;gap:9px;padding:12px;border:1px solid rgba(var(--ink-rgb),0.16);margin-bottom:16px">
                 <span style="width:8px;height:8px;flex:none;border-radius:50%;background:{{ netDot }}"></span>
                 <div style="flex:1;font-size:13px">{{ netLabel }}</div>
@@ -3298,6 +3329,9 @@
       <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
         <h2 class="mk-page-title">Field devices</h2>
         <div class="mk-muted-mb20">Longest out of contact first. Positions refresh only while a job is open.</div>
+        <sc-if value="{{ refreshLastInfoShow }}" hint-placeholder-val="{{ false }}">
+          <div class="mk-muted-mb20" style="margin-top:-12px">{{ refreshLastInfo }}</div>
+        </sc-if>
         <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
           <div class="mk-col-gap10">
             <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
@@ -6119,6 +6153,13 @@ const ICON_D = {
   // set, so it does not read as a paste from another icon family. The clapper is a
   // separate short arc rather than a filled circle: at 18px a filled dot closes up.
   bell:     ['M18 16v-5a6 6 0 10-12 0v5l-1.5 2.5h15L18 16z', 'M10.5 21a2 2 0 003 0'],
+  // Two arcs, each just short of a half circle, each closed off with a short arrowhead
+  // pointing INTO the arc it belongs to — the standard clockwise-refresh shape, and the
+  // one glyph on this grid built to be spun: a full rotation of two point-symmetric arcs
+  // reads identically to its own start, so freezing it under prefers-reduced-motion (one
+  // iteration, landing back on 0deg) shows the same static icon a reduced-motion viewer
+  // would see if it never animated at all.
+  refresh:  ['M4 12a8 8 0 0114.5-4.5', 'M18 4v4h-4', 'M20 12a8 8 0 01-14.5 4.5', 'M6 20v-4h4'],
   // Six dots in two columns — the universal "this is the part you grab".
   grip:     ['M9 6h.01', 'M9 12h.01', 'M9 18h.01', 'M15 6h.01', 'M15 12h.01', 'M15 18h.01'],
   numbering:['M6 3h9l4 4v14H6z', 'M15 3v4h4', 'M9 12h6', 'M9 16h6'],
@@ -6126,12 +6167,13 @@ const ICON_D = {
   system:   ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M12 2v3', 'M12 19v3', 'M2 12h3', 'M19 12h3', 'M4.9 4.9l2.2 2.2', 'M16.9 16.9l2.2 2.2', 'M19.1 4.9l-2.2 2.2', 'M7.1 16.9l-2.2 2.2'],
   chevron:  ['M9 6l6 6-6 6'],
 };
-function icon(name, size) {
+function icon(name, size, className) {
   const d = ICON_D[name];
   if (!d) return null;
   return React.createElement('svg', {
     width: size || 20, height: size || 20, viewBox: '0 0 24 24', fill: 'none',
     stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round',
+    className: className || undefined,
     style: { display: 'block', flex: 'none' },
   }, d.map((path, i) => React.createElement('path', { key: i, d: path })));
 }
@@ -6673,6 +6715,9 @@ class Component extends DCLogic {
       // geoDeniedConfirmed above: never in state.data, or diffOps would try to sync a
       // UI step nobody but this device needs to know about.
       geoAskConfirmFor: null, geoAskDeferred: null,
+      // The top-bar Force Refresh button's own state — never persisted, never synced.
+      // refreshLastMs/refreshLastOk feed the Sync tab's connectivity read-out below.
+      refreshBusy: false, refreshLastMs: null, refreshLastOk: null,
       // Web Push (0058), all device-local — never persisted or synced, because whether
       // THIS browser has a live subscription is not a fact about the account, it is a
       // fact about this one install. notifPushSupported starts false and is only ever
@@ -7448,13 +7493,15 @@ class Component extends DCLogic {
       this.scheduleDrain();
     }
   }
-  // Pull the database's version of everything and adopt it. Deliberately not merged with
-  // what is on the device: the database is the authority, and anything of ours it does
-  // not know about is still in the outbox waiting to be sent — it is not lost by being
-  // overwritten here, it is queued.
-  refresh() {
+  // Drain, then pull, then adopt. Deliberately not merged with what is on the device:
+  // the database is the authority, and anything of ours it does not know about is still
+  // in the outbox waiting to be sent — it is not lost by being overwritten here, it is
+  // queued. Split out from refresh() (below) so a caller that actually needs to KNOW
+  // whether this succeeded — the top-bar Force Refresh button, specifically — can get a
+  // promise that rejects on failure, instead of refresh()'s own swallowed one.
+  refreshCore() {
     if (!USE_CLOUD) return Promise.resolve();
-    return this.runLatest('refresh', () => outboxDrain()
+    return outboxDrain()
       .then(() => hydrate())
       .catch((e) => { logError('load', e, { doing: 'hydrate' }); throw e; })
       .then((data) => {
@@ -7491,8 +7538,65 @@ class Component extends DCLogic {
         }
         this.persist(merged);
         this.setState({ data: merged });
-      })
-      .catch(() => undefined));
+      });
+  }
+  // The passive/background entry point — boot, reconnect, realtime, the 15-minute
+  // autosync tick. All of these fire and forget: nobody is watching this specific
+  // promise for an outcome, so a failure here is recorded (refreshCore's own
+  // logError) and otherwise swallowed rather than thrown at a caller with nothing to
+  // do about it.
+  refresh() {
+    if (!USE_CLOUD) return Promise.resolve();
+    return this.runLatest('refresh', () => this.refreshCore().catch(() => undefined));
+  }
+  // The top-bar Force Refresh button. A deliberate, separate `runLatest` key from the
+  // passive `refresh()` above — not because the two must never overlap (outboxDrain's
+  // own single-flight guard already keeps a concurrent send from doubling up, and two
+  // concurrent hydrates simply mean whichever lands last is what is on screen, which is
+  // harmless) but because runLatest's own contract is that a call arriving while one is
+  // already in flight gets back THAT flight's promise, not a promise for its own —
+  // sharing 'refresh' would mean this button, on the unlucky occasion its tap lands
+  // during a passive background refresh, reports success or failure for a request it
+  // never actually made.
+  //
+  // Marks the outer lifecycle a person can actually observe from the click; `refreshCore`
+  // itself is drain-then-pull as one operation, so "request_started" and
+  // "response_received" are not separable stages worth instrumenting for their own
+  // sake — the marks below are the ones an actual investigation (a slow tab, a report
+  // of "the button does nothing") would need: when it was pressed, when the real
+  // network activity began, and how it ended.
+  refreshCurrentTab() {
+    if (this.state.refreshBusy) return;
+    try { performance.mark('refresh_clicked'); } catch (e) { /* not fatal if unsupported */ }
+    this.setState({ refreshBusy: true });
+    try { performance.mark('refresh_started'); } catch (e) { /* not fatal if unsupported */ }
+    const startedAt = Date.now();
+    const S = this.state;
+    // Scoped extras beyond the whole-dataset pull refreshCore already does: the
+    // sub-panels hydrate() does not feed at all. `force` bypasses ensurePriceList's
+    // normal once-per-session cache — everywhere else that caching is exactly right,
+    // but a button whose entire point is "reach the server again" must not be quietly
+    // answered from a session-old cache.
+    const extra = () => {
+      if (S.roleTab === 'tickets' && S.adminTab === 'price' && S.adminClient) {
+        return this.ensurePriceList(S.adminClient, true);
+      }
+      if (S.roleTab === 'tickets' && S.adminTab === 'paperwork') return this.loadPaperworkRecipients();
+      if (S.adminTab === 'check') return Promise.resolve(this.runSelfCheck());
+      return Promise.resolve();
+    };
+    return this.runLatest('topRefresh', () => this.refreshCore().then(extra)).then(
+      () => {
+        try { performance.mark('refresh_completed'); } catch (e) { /* not fatal */ }
+        this.setState({ refreshBusy: false, refreshLastMs: Date.now() - startedAt, refreshLastOk: true });
+      },
+      (err) => {
+        try { performance.mark('refresh_failed'); } catch (e) { /* not fatal */ }
+        this.setState({ refreshBusy: false, refreshLastMs: Date.now() - startedAt, refreshLastOk: false });
+        const reason = ERROR_KIND[errorKind(err)] || (err && err.message) || 'Something went wrong.';
+        this.toast('refresh-tab', 'Refresh — ' + reason, 'warn');
+      }
+    );
   }
   // Sending is debounced, not immediate. Typing a well number fires mutate once per
   // keystroke; without this, so would the network. The queue coalesces by row, so a
@@ -8180,11 +8284,13 @@ class Component extends DCLogic {
   //     module Map, so a sign-out that rebuilds the store also forgets what it had.
   //   · one request in flight per client. The review screen and the item search can both
   //     want the same list in the same tick.
-  ensurePriceList(name) {
+  // `force`: bypass the once-per-session cache. The top-bar Force Refresh button needs
+  // this — every other caller wants exactly the caching behaviour above.
+  ensurePriceList(name, force) {
     if (!USE_CLOUD || !name) return Promise.resolve();
     if (!this.hasPermission('pricelist.view')) return Promise.resolve();
     const cl = this.client(name);
-    if (!cl || cl.priceListLoaded) return Promise.resolve();
+    if (!cl || (cl.priceListLoaded && !force)) return Promise.resolve();
     const inflight = this._priceInflight || (this._priceInflight = {});
     if (inflight[cl.id]) return inflight[cl.id];
     const c = sb();
@@ -12160,6 +12266,23 @@ class Component extends DCLogic {
       // work the server never received, not just a banner — so it asks first, the same
       // way clearing the error log does.
       askDismissRefused: () => this.setState({ dialog: 'dismissRefused' }),
+
+      // Force Refresh. The icon carries the only state that matters here — spinning for
+      // exactly the duration of a real request, frozen otherwise — so the binding is
+      // just that flag read twice, once for the class and once for the words beside it.
+      refreshBusy: !!S.refreshBusy,
+      refreshGlyph: icon('refresh', 19, S.refreshBusy ? 'mk-spin' : ''),
+      refreshTabTitle: S.refreshBusy ? 'Refreshing…' : 'Refresh current tab',
+      refreshCurrentTab: () => this.refreshCurrentTab(),
+      // The connectivity read-out the spin's own duration only shows WHILE it is
+      // running — this is the same signal, left on screen afterward. Shown on the
+      // Sync tab (both copies — technician and office read different screens here)
+      // rather than folded into the button's own title, so it survives being read
+      // after the fact instead of only flashing past mid-spin.
+      refreshLastInfoShow: S.refreshLastMs != null,
+      refreshLastInfo: S.refreshLastMs == null ? '' : (S.refreshLastOk
+        ? 'Last Force Refresh reached the server in ' + S.refreshLastMs + ' ms.'
+        : 'Last Force Refresh failed after ' + S.refreshLastMs + ' ms.'),
 
       // Notifications. Derived from the audit trail on every render rather than stored,
       // so there is never a count that disagrees with the list beneath it.

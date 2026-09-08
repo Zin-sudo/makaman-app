@@ -62,14 +62,16 @@ async function persist(p) {
       const radii = el => getComputedStyle(el).borderRadius;
       const vis = sel => Array.from(document.querySelectorAll(sel)).filter(e => e.offsetParent !== null);
       const fields = vis('input, select, textarea');
-      // Three deliberate exceptions, and each is a shape that means something rather
-      // than a value somebody forgot. The segmented controls' buttons sit flush inside
-      // one bordered box, so the box carries the shape and they stay square. A switch is
-      // a pill by definition. And the notification bell is a round icon button — a
-      // rounded square around a 19px bell reads as a badge, not a control.
+      // Deliberate exceptions, and each is a shape that means something rather than a
+      // value somebody forgot. The segmented controls' buttons sit flush inside one
+      // bordered box, so the box carries the shape and they stay square. A switch is a
+      // pill by definition. The notification bell — and the Force Refresh button beside
+      // it, sharing its class for exactly this shape — are round icon buttons: a
+      // rounded square around a 19px glyph reads as a badge, not a control.
       const buttons = vis('button').filter(e =>
         !e.closest('.mk-seg') && !e.closest('.mk-switch')
-        && !e.classList.contains('mk-switch') && !e.classList.contains('mk-bell'));
+        && !e.classList.contains('mk-switch') && !e.classList.contains('mk-bell')
+        && !e.classList.contains('mk-topbar-icon-btn'));
       const ro = Array.from(document.querySelectorAll('.mk-readonly'));
       return {
         fieldCount: fields.length,
