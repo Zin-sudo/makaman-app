@@ -1483,13 +1483,39 @@
                 </div>
               </div>
               <sc-if value="{{ arrivalGeoMissing }}" hint-placeholder-val="{{ false }}">
-                <!-- align-items:flex-start, not center: the blocked-permission wording
-                     below can run three or four lines, and a centred icon floats loose
-                     in the middle of a paragraph instead of marking its first line. -->
-                <button onClick="{{ retryArrivalGeo }}" style="display:flex;align-items:flex-start;gap:7px;width:100%;margin:6px 0 0;padding:8px 10px;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;background:rgba(var(--warning-rgb),0.1);border:1px solid rgba(var(--warning-rgb),0.3);color:var(--ink-dim)">
-                  <span style="flex:none;color:var(--warning-ink)">⚠</span>
-                  <span>{{ arrivalGeoMessage }}</span>
-                </button>
+                <div style="margin:6px 0 0;padding:8px 10px;background:rgba(var(--warning-rgb),0.1);border:1px solid rgba(var(--warning-rgb),0.3)">
+                  <!-- align-items:flex-start, not center: the blocked-permission wording
+                       can run three or four lines, and a centred icon floats loose in
+                       the middle of a paragraph instead of marking its first line. -->
+                  <div style="display:flex;align-items:flex-start;gap:7px;font-size:12px;line-height:1.35;color:var(--ink-dim)">
+                    <span style="flex:none;color:var(--warning-ink)">⚠</span>
+                    <span>{{ arrivalGeoMessage }}</span>
+                  </div>
+                  <!-- Blocked at the browser: one button, the same reset as before —
+                       asking "are you there" first would bury the fix that actually
+                       matters here under a question this state cannot act on anyway. -->
+                  <sc-if value="{{ arrivalGeoBlocked }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ retryArrivalGeo }}" style="width:100%;min-height:48px;margin-top:8px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--warning-rgb),0.5)">TRY AGAIN</button>
+                  </sc-if>
+                  <!-- Step 1: offer the choice rather than capturing immediately, so a
+                       technician who is not actually at the well yet is never asked to
+                       pretend he is. -->
+                  <sc-if value="{{ arrivalGeoOfferChoice }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                      <button onClick="{{ arrivalGeoCaptureNow }}" style="flex:1;min-height:48px;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;background:var(--warning-deep);color:var(--on-accent);border:1px solid var(--warning-deep)">CAPTURE NOW</button>
+                      <button onClick="{{ arrivalGeoAskLater }}" style="flex:1;min-height:48px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--warning-rgb),0.5)">ASK AGAIN LATER</button>
+                    </div>
+                  </sc-if>
+                  <!-- Step 2: the actual yes/no, only after Capture Now was tapped. NOT
+                       YET is exactly Ask Again Later under the name that fits the
+                       question it is answering. -->
+                  <sc-if value="{{ arrivalGeoConfirmStep }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:8px;margin-top:8px">
+                      <button onClick="{{ arrivalGeoYes }}" style="flex:1;min-height:48px;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;background:var(--warning-deep);color:var(--on-accent);border:1px solid var(--warning-deep)">YES</button>
+                      <button onClick="{{ arrivalGeoNotYet }}" style="flex:1;min-height:48px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--warning-rgb),0.5)">NOT YET</button>
+                    </div>
+                  </sc-if>
+                </div>
               </sc-if>
               <div style="margin:14px 0 4px">
                 <label class="mk-field-label">Job type (objective)</label>
@@ -6640,6 +6666,13 @@ class Component extends DCLogic {
       // arrival banner has to repaint the instant this changes, not wait for whatever
       // unrelated render happens to come along next.
       geoDeniedConfirmed: false,
+      // The well-location prompt's own two-step flow (Capture Now → Are you there?), and
+      // its deferral. Both hold a TICKET id, not a bare flag — a technician holding two
+      // logging jobs (a coop) must not have tapping Capture Now on one job pop the same
+      // confirm step open on the other the moment they switch screens. Ephemeral like
+      // geoDeniedConfirmed above: never in state.data, or diffOps would try to sync a
+      // UI step nobody but this device needs to know about.
+      geoAskConfirmFor: null, geoAskDeferred: null,
       // Web Push (0058), all device-local — never persisted or synced, because whether
       // THIS browser has a live subscription is not a fact about the account, it is a
       // fact about this one install. notifPushSupported starts false and is only ever
@@ -7808,6 +7841,25 @@ class Component extends DCLogic {
         x.geo = Object.assign({}, x.geo, { open: fix, last: fix, pingedAt: askedAt });
       });
     });
+  }
+  // Shared by the blocked-permission TRY AGAIN button and the Capture Now → YES step:
+  // the actual capture attempt. Marked as a manual retry so a SECOND denial is trusted
+  // as the browser's real permission state rather than the known first-call-of-the-
+  // session glitch (see geoFix's own comment on geoManualRetry).
+  startArrivalGeoCapture(id) {
+    if (!id) return;
+    this.geoDenied = false;
+    this.geoManualRetry = true;
+    this.geoPinOpen(id);
+  }
+  // "Ask Again Later" and "Not Yet" are the same action under two names — the prompt
+  // hides, and re-arms the moment this ticket gets a new log line (see addEvent). If it
+  // never does before the job is marked done, that is fine by design: nothing on the Job
+  // Done path reads a ticket's location, and this is never meant to force a capture that
+  // was not there to take.
+  arrivalGeoDefer(id) {
+    if (!id) return;
+    this.setState({ geoAskDeferred: id, geoAskConfirmFor: null });
   }
   // The periodic pin. Each fix replaces the previous one rather than appending, so a
   // device that was offline for a day arrives with one current position, not a day of
@@ -12568,7 +12620,10 @@ class Component extends DCLogic {
           if (wasFirstLine) (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'First log line — Start Job date recorded.' });
           if (x.status === 'done') x.status = 'logging';
         });
-        this.setState({ newEventText: '' });
+        // A new log line is the well-location prompt's own re-arm signal: Ask Again
+        // Later (or NOT YET) deferred it until "next time something happens on this
+        // job", and a fresh line is exactly that.
+        this.setState({ newEventText: '', geoAskDeferred: S.geoAskDeferred === t.id ? null : S.geoAskDeferred });
       },
       handoverTo: S.handoverTo || '',
       setHandoverTo: e => this.setState({ handoverTo: e.target.value }),
@@ -12676,32 +12731,49 @@ class Component extends DCLogic {
       // time this line needs to appear is exactly when geoDenied just got set. Checking
       // the setting directly, the way geoEnabled() does everything BUT the denial flag,
       // is what lets the retry below actually have something to retry.
+      // `&& S.geoAskDeferred !== (t && t.id)` — Ask Again Later (or NOT YET, its twin
+      // one step in) hides this until the ticket gets a new log line (see addEvent),
+      // which is the only thing that re-arms it. Deferring forever and finishing the
+      // job with no location captured is allowed, by design — nothing here forces it.
       arrivalGeoMissing: !!t && S.role === 'tech' && t.status === 'logging'
         && holderOf(t) === myName && (D.settings || {}).shareLocation !== false
         && typeof navigator !== 'undefined' && !!navigator.geolocation
         && !(t.geo && t.geo.open)
-        && (Date.now() - new Date(t.arrival).getTime()) > 20000,
+        && (Date.now() - new Date(t.arrival).getTime()) > 20000
+        && S.geoAskDeferred !== (t && t.id),
       // "Tap to try again" is only ever true advice once — the browser's own permission
       // state, not this.geoDenied, decides whether that tap can do anything at all. A
       // SECOND denial, on a call this button itself asked for, means the browser has it
       // switched off and no tap here will ever change that; geoDeniedConfirmed (set in
       // geoFix's error handler, only on a manual retry) is what tells the two apart, so
       // the message stops promising a retry that cannot work and says what will instead.
+      // The blocked case keeps its own single "try again" affordance below — a browser-
+      // level permission fix is a different question from "are you there right now",
+      // and asking the second question first would just hide the button that matters.
       arrivalGeoBlocked: !!S.geoDeniedConfirmed,
+      // Two steps, neither shown while genuinely blocked: tapping Capture Now turns the
+      // first message into a direct yes/no rather than firing the capture immediately,
+      // so a technician who is not actually AT the well yet is not asked to pretend he
+      // is. `geoAskConfirmFor` holds a ticket id, not a bare flag, so switching to a
+      // second logging job never leaks the first job's confirm step onto it.
+      arrivalGeoConfirmStep: !S.geoDeniedConfirmed && !!t && S.geoAskConfirmFor === t.id,
+      arrivalGeoOfferChoice: !S.geoDeniedConfirmed && !!t && S.geoAskConfirmFor !== t.id,
       arrivalGeoMessage: S.geoDeniedConfirmed
         ? (isStandaloneApp()
           ? 'Location is blocked for this app, not just this ticket. Open the phone\'s Settings, find this app in the list below the regular apps, open Location and allow it — then come back and tap here.'
           : 'Location is blocked for this site, not just this ticket. On iPhone: Settings → Safari → Settings for Websites → Location, find this site and set it to Ask. On Android: tap the icon beside the address bar → Permissions → Location → Ask, then reload the page and tap here.')
-        : 'Well location not captured on arrival — tap to try again',
-      retryArrivalGeo: () => {
+        : (!!t && S.geoAskConfirmFor === t.id
+          ? 'Are you in the well location right now?'
+          : 'Well location not captured on arrival — tap to try again'),
+      retryArrivalGeo: () => this.startArrivalGeoCapture(t && t.id),
+      arrivalGeoCaptureNow: () => { if (t) this.setState({ geoAskConfirmFor: t.id }); },
+      arrivalGeoYes: () => {
         if (!t) return;
-        this.geoDenied = false;
-        // Marks this specific attempt as one the person themselves asked for, so a
-        // second refusal is trusted as the browser's real permission state rather than
-        // the known first-call-of-the-session glitch. See the comment on geoFix.
-        this.geoManualRetry = true;
-        this.geoPinOpen(t.id);
+        this.setState({ geoAskConfirmFor: null });
+        this.startArrivalGeoCapture(t.id);
       },
+      arrivalGeoNotYet: () => this.arrivalGeoDefer(t && t.id),
+      arrivalGeoAskLater: () => this.arrivalGeoDefer(t && t.id),
       // While a job is merely awaiting review it is still the technician's to correct,
       // even though he closed it himself. Once the office has closed it or approved it,
       // it is not — corrections go through the Ops Manager from there.

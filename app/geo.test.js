@@ -200,13 +200,28 @@ const geoOf = (page) => page.evaluate(() => {
       });
     });
     await dpage.waitForTimeout(300);
-    const retryBtn = dpage.getByRole('button', { name: /Well location not captured/i });
-    check('the missing pin is surfaced on the ticket itself, with a retry action',
-      await retryBtn.isVisible());
+    // Isolated from geoTick's own periodic recovery: this ticket has never had a fix at
+    // all, so geoTick's own "never asked" branch (see its own comment on `!askedAt`)
+    // treats it as due on every single firing, sped up to every __GEO_TICK_TEST_MS
+    // (500ms) in this file. Once getCurrentPosition is redefined below to succeed, a
+    // periodic tick landing in the gap between Capture Now and YES backfills geo.open
+    // on its own (geoTick's own comment: "if (!x.geo.open) x.geo.open = fix") and wins
+    // the race — a REAL and correct behaviour (the ticket's need is satisfied either
+    // way), just not what this check is testing, which is the manual confirm flow
+    // itself. Disabled for the rest of this scenario rather than raced against.
+    await dpage.evaluate(() => { window.__mkApp.geoTick = () => {}; });
+    // Capture Now / Ask Again Later, then Are you here? / YES / NOT YET — the missing
+    // pin is no longer one button, it is a message plus a two-step choice, so nothing
+    // captures on the first tap any more.
+    const missingMsg = dpage.getByText(/Well location not captured/i);
+    check('the missing pin is surfaced on the ticket itself, with a way to act on it',
+      await missingMsg.isVisible());
+    const captureNowBtn = dpage.getByRole('button', { name: 'CAPTURE NOW' });
+    const yesBtn = dpage.getByRole('button', { name: 'YES' });
 
-    // Standing in for the moment a real technician taps Allow on the prompt the retry
-    // itself provokes — a resolved position handed straight to the callback the app
-    // itself registered, the same technique this file already uses to count calls.
+    // Standing in for the moment a real technician taps Allow on the prompt YES
+    // provokes — a resolved position handed straight to the callback the app itself
+    // registered, the same technique this file already uses to count calls.
     await dpage.evaluate(([lat, lon]) => {
       navigator.geolocation.getCurrentPosition = function (ok) {
         ok({ coords: { latitude: lat, longitude: lon, accuracy: 10 }, timestamp: Date.now() });
@@ -220,13 +235,17 @@ const geoOf = (page) => page.evaluate(() => {
       if ((await dpage.evaluate(() => window.__mkApp.geoBusy)) === false) break;
       await dpage.waitForTimeout(200);
     }
-    await retryBtn.click();
+    await captureNowBtn.click();
+    await dpage.waitForTimeout(200);
+    check('Capture Now turns the message into a direct question',
+      await dpage.getByText(/Are you in the well location right now/i).isVisible());
+    await yesBtn.click();
     await dpage.waitForTimeout(800);
     dg = await geoOf(dpage);
-    check('tapping the retry pins the well location once permission is actually granted',
+    check('tapping YES pins the well location once permission is actually granted',
       !!(dg && dg.geo && dg.geo.open), JSON.stringify(dg && dg.geo));
     check('and the missing-pin line clears once it lands',
-      !(await retryBtn.isVisible().catch(() => false)));
+      !(await missingMsg.isVisible().catch(() => false)));
 
     await dpage.close();
     await deniedCtx.close();
@@ -279,18 +298,27 @@ const geoOf = (page) => page.evaluate(() => {
       });
     });
     await dpage.waitForTimeout(300);
-    const firstDenial = dpage.getByRole('button', { name: /Well location not captured/i });
+    // Same isolation as the earlier scenario — a never-pinned ticket plus this file's
+    // sped-up geoTick would otherwise be free to interleave its own attempt (denied,
+    // same as this one, but not the one this check is naming) between Capture Now
+    // and YES below.
+    await dpage.evaluate(() => { window.__mkApp.geoTick = () => {}; });
+    const firstDenialMsg = dpage.getByText(/Well location not captured/i);
     check(`${who}: a first, automatic denial is still offered as an ordinary retry`,
-      await firstDenial.isVisible());
+      await firstDenialMsg.isVisible());
 
-    await firstDenial.click();
+    // Capture Now, then YES, is what actually fires the real geolocation call now — the
+    // one this context stubs to deny immediately.
+    await dpage.getByRole('button', { name: 'CAPTURE NOW' }).click();
+    await dpage.waitForTimeout(200);
+    await dpage.getByRole('button', { name: 'YES' }).click();
     const blocked = dpage.getByText(/Location is blocked/i);
     // The state change is a real setState round trip (geoFix's error callback, then a
     // re-render), not instant — waits for the actual DOM change rather than a fixed
     // sleep guessed to be long enough, which is what made this flaky the first time.
     await blocked.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     check(`${who}: a second denial, on the tap the person made themselves, is not offered as a retry any more`,
-      !(await dpage.getByRole('button', { name: /Well location not captured/i }).isVisible().catch(() => false)));
+      !(await dpage.getByText(/Well location not captured/i).isVisible().catch(() => false)));
     check(`${who}: it explains the block instead`, await blocked.isVisible().catch(() => false));
     const said = await blocked.textContent().catch(() => '');
     check(`${who}: and points at the right place to fix it`,
