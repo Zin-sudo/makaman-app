@@ -1148,7 +1148,17 @@
   <sc-if value="{{ refusedAny }}" hint-placeholder-val="{{ false }}">
     <div style="display:flex;align-items:flex-start;gap:11px;padding:11px 22px;background:rgba(var(--warning-rgb),0.16);border-bottom:2px solid var(--warning)">
       <span style="width:9px;height:9px;flex:none;margin-top:5px;background:var(--warning)"></span>
-      <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)"><strong>{{ refusedLabel }}</strong> {{ refusedWhy }}</div>
+      <div style="flex:1;font-size:13px;line-height:1.4;color:var(--ink-strong)">
+        <div><strong>{{ refusedLabel }}</strong></div>
+        <!-- One row per distinct refusal, naming the change and the job — the whole
+             answer to "which change" that a bare count could never give. -->
+        <sc-for list="{{ refusedItems }}" as="item" hint-placeholder-count="1">
+          <div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(var(--ink-rgb),0.14)">
+            <div style="font-weight:600">{{ item.title }}</div>
+            <div style="font-size:12px;color:var(--ink-dim)">{{ item.why }}<sc-if value="{{ item.when }}" hint-placeholder-val="{{ false }}"> · {{ item.when }}</sc-if></div>
+          </div>
+        </sc-for>
+      </div>
       <div style="flex:none;display:flex;gap:8px">
         <!-- Offered only when something in the pile could actually succeed on a second
              attempt. A dropped connection deserves another go; a job that is no longer on
@@ -5386,8 +5396,16 @@ function outboxSetAside(op, why, terminal, alsoRetired) {
   // unconditional, as it always has been. Which job, wherever the op happens to record
   // it — not only when the key starts 'tickets:', which was the one case that needed it
   // least.
+  // `doing` is opDescribe's VERB only, never its preview — the verb is a fixed string
+  // for a given table/action ('Recording an audit entry', 'Logging', …) but the preview
+  // is the actual words typed, which differ on every call even when the FAULT is
+  // identical. `key` was tried here too and had to come back out: it is the one field on
+  // an op that is unique to that exact row, so including it meant "the same fault, on a
+  // second row of the same kind" could never collapse into one counted entry the way
+  // errorlog.test.js's "a fault repeated is counted, not repeated" expects — every retry
+  // of a per-row action (an audit entry, a job-log line) looked like a brand new fault.
   logError('sync', why, {
-    table: op && op.table, action: op && op.action,
+    doing: (opDescribe(op) || {}).verb, table: op && op.table, action: op && op.action,
     ticket: opTicket(op) || undefined,
   });
   try {
@@ -5565,6 +5583,48 @@ function opLabel(op) {
   }
   if (op.action === 'upsert_ticket') return { verb: 'Updating the ticket', preview: '' };
   return null;
+}
+// Every op, named. opLabel above answers a narrower question on purpose — "is this worth
+// a line in the Activity feed a person is watching" — and returns null for anything that
+// is not, so a settings sync or a price-list import does not bury the notes and log lines
+// somebody actually cares about. The banner and the error-log export are asking a
+// different question — "what IS this, whatever it is" — because the whole complaint this
+// exists to answer was a banner and a log that could not say. Falls back to opLabel first
+// so the two never disagree about a shape both of them know.
+function opDescribe(op) {
+  if (!op) return { verb: 'A change', preview: '' };
+  const known = opLabel(op);
+  if (known) return known;
+  const row = op.row || {};
+  const del = op.action === 'delete';
+  switch (op.table) {
+    case 'clients': return { verb: del ? 'Removing a customer' : 'Saving a customer', preview: row.name || '' };
+    case 'price_list_items': return { verb: 'Saving the price list', preview: '' };
+    case 'ticket_items': return { verb: 'Saving the charged items', preview: '' };
+    case 'ticket_assets': return { verb: 'Saving the allocated assets', preview: '' };
+    case 'ticket_crew': return { verb: 'Saving the crew list', preview: '' };
+    case 'audit_log': return { verb: 'Recording an audit entry', preview: row.text || '' };
+    case 'numbering_claim': return { verb: 'Moving the numbering claim', preview: '' };
+    case 'ticket_numbering': return { verb: 'Saving the numbering settings', preview: '' };
+    case 'org_defaults': return { verb: 'Saving office defaults', preview: '' };
+    case 'asset_questions': return { verb: 'Saving an asset question', preview: row.label || '' };
+    case 'user_settings': return { verb: 'Saving device settings', preview: '' };
+    case 'tickets': return { verb: del ? 'Deleting the ticket' : 'Saving the ticket', preview: '' };
+    default: return { verb: 'Saving to ' + op.table, preview: '' };
+  }
+}
+// Every set-aside entry opLabel/opDescribe can name, not only the most recent one — the
+// banner used to show a count and then the LAST entry's reason regardless of how many
+// there were or whether it was even representative of the rest of the pile. `key`s carried
+// through so a caller can resolve a ticket id into whatever it likes (a customer name, a
+// ticket number) without this module needing component state to do it.
+function outboxSetAsideList() {
+  let dead = [];
+  try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); } catch (e) { dead = []; }
+  return dead.map((e) => ({
+    key: e.op && e.op.key, ticketId: opTicket(e.op), describe: opDescribe(e.op),
+    why: e.why, n: e.n || 1, terminal: !!e.terminal, at: e.at, also: e.also || 0,
+  }));
 }
 // Every currently outstanding op that opLabel recognises — queued (pending or, once a
 // retry has actually been attempted, retrying) and set-aside (failed, terminal or not).
@@ -7828,6 +7888,29 @@ class Component extends DCLogic {
     this.setState({ lastAutoSyncAt: now });
   }
   ticket(id) { return this.state.data.tickets.find(t => t.id === (id || this.state.activeId)); }
+  // A ticket id, as a person would actually read it — the job it names, not the uuid
+  // that names it to Postgres. On-screen use only (the refused-changes banner): the
+  // person looking at their own device's banner is, by definition, already looking at
+  // that ticket's customer name somewhere else on the same screen. Falls back to the
+  // bare id for a ticket this device no longer holds (deleted, or synced away before
+  // this device last saw it) — better than nothing, and still something the office CAN
+  // look up even if this device cannot show them the name.
+  jobLabel(id) {
+    if (!id) return '';
+    const t = (this.state.data.tickets || []).find((x) => x.id === id);
+    if (!t) return id;
+    return (t.ticketNo ? '#' + t.ticketNo + ' ' : '') + (t.customer || t.field || id);
+  }
+  // The SAME id, for a file that leaves the device. errorReport()'s own privacy contract
+  // is customer names and prices never reach the export — jobLabel() above prints exactly
+  // the customer name that contract forbids, so the export needs its own resolver that
+  // stops at the ticket number. `errorlog.test.js`'s "no customer or price" check is what
+  // this exists to keep true.
+  ticketRefLabel(id) {
+    if (!id) return '';
+    const t = (this.state.data.tickets || []).find((x) => x.id === id);
+    return (t && t.ticketNo) ? '#' + t.ticketNo : id;
+  }
   patchTicket(patch) {
     const id = this.state.activeId;
     this.mutate(d => { const t = d.tickets.find(x => x.id === id); if (t) Object.assign(t, patch); });
@@ -9525,7 +9608,14 @@ class Component extends DCLogic {
       const c = e.ctx || {};
       Object.keys(c).forEach((k) => {
         if (c[k] === undefined || c[k] === null || c[k] === '') return;
-        L.push('- **' + k + ':** `' + String(c[k]) + '`');
+        // `ticket` is a bare id — the same one the office would have to paste into a
+        // query to find out what it even was. Resolved to its ticket NUMBER wherever
+        // this device has one, so the export answers "which job" without a lookup —
+        // ticketRefLabel(), not jobLabel(): this file gets emailed and pasted around, and
+        // the customer name jobLabel() would print is exactly what this export's own
+        // privacy contract, a few lines up, promises never reaches it.
+        const val = (k === 'ticket') ? this.ticketRefLabel(c[k]) : c[k];
+        L.push('- **' + k + ':** `' + String(val) + '`');
       });
       L.push('- **First seen:** ' + stamp(e.first) + '  ·  **Last seen:** ' + stamp(e.last));
       L.push('');
@@ -11979,7 +12069,26 @@ class Component extends DCLogic {
           ? 'One change has been refused by the server and cannot be saved as it stands.'
           : stuck + ' changes have been refused by the server and cannot be saved as they stand.';
       })(),
-      refusedWhy: outboxSetAsideLatest(),
+      // One line per distinct refusal, naming the job and the change — not only the
+      // count and the last entry's sentence, which is what this used to show. That was
+      // the whole complaint: a banner that could say "12 failures" and nothing else,
+      // leaving the office to read an export by hand to find out which twelve. `n > 1`
+      // means the same change was refused more than once before being set aside (see
+      // outboxSetAside's own dedup) — one line still, with a count, not one line each.
+      // Capped, not truncated silently: refusedLabel already states the true total, so a
+      // pile bigger than this still reads honestly — "12 changes" up top, the six most
+      // recent named below it — rather than a banner that grows without bound the one
+      // time it is actually needed most.
+      refusedItems: outboxSetAsideList().slice(-6).reverse().map((e) => {
+        const d = e.describe || {};
+        const job = this.jobLabel(e.ticketId);
+        return {
+          title: d.verb + (d.preview ? ': "' + d.preview + '"' : '') + (job ? ' — ' + job : '')
+            + (e.n > 1 ? ' (×' + e.n + ')' : ''),
+          why: e.why,
+          when: e.at ? F.stamp(e.at) : '',
+        };
+      }),
       // RETRY is offered only when something could actually succeed on a second attempt.
       //
       // It used to be offered for everything, and that turned a dead job into a loop: press
