@@ -60,7 +60,7 @@ async function open(ctx) {
         return null;
       };
       const parts = ['diffOps', 'rowTicket', 'rowsChildren', 'buildUserIndex', 'clampLoc', 'tsOut', 'tsIn', 'numOut',
-                     'CHILD_TABLES', 'uuid']
+                     'sameVal', 'CHILD_TABLES', 'uuid']
         .map((n) => (n === 'CHILD_TABLES' ? "const CHILD_TABLES = ['ticket_items', 'ticket_assets', 'ticket_crew'];" : grab(n)))
         .filter(Boolean).join('\n');
       const LOCATION_CAPPED_DECL = "const LOCATION_CAPPED = { field: true, well: true, rig: true }; const LOCATION_MAX = 10; const DEFAULT_CURRENCY = 'USD'; const tsOut = (v) => (v ? new Date(v).toISOString() : null); const tsIn = (v) => (v ? new Date(v).toISOString() : ''); const numOut = (v) => (v === '' || v === null || v === undefined ? null : Number(v));";
@@ -109,7 +109,7 @@ async function open(ctx) {
         }
         return null;
       };
-      const parts = ['diffOps', 'rowTicket', 'rowsChildren', 'buildUserIndex', 'clampLoc', 'tsOut', 'tsIn', 'numOut', 'uuid']
+      const parts = ['diffOps', 'rowTicket', 'rowsChildren', 'buildUserIndex', 'clampLoc', 'tsOut', 'tsIn', 'numOut', 'sameVal', 'uuid']
         .map(grab).filter(Boolean).join('\n');
       const CHILD_TABLES_DECL = "const CHILD_TABLES = ['ticket_items', 'ticket_assets', 'ticket_crew'];";
       const LOCATION_CAPPED_DECL = "const LOCATION_CAPPED = { field: true, well: true, rig: true }; const LOCATION_MAX = 10; const DEFAULT_CURRENCY = 'USD'; const tsOut = (v) => (v ? new Date(v).toISOString() : null); const tsIn = (v) => (v ? new Date(v).toISOString() : ''); const numOut = (v) => (v === '' || v === null || v === undefined ? null : Number(v));";

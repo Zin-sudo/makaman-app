@@ -169,19 +169,36 @@ assertStubParses(DB);
   // version-guarded update (S11) and this assertion went red while the behaviour it names
   // was unchanged — a check pinned to a mechanism stops testing the claim the moment the
   // mechanism moves.
-  // Two, not one, and two is correct.
   //
-  // The first write is the edit. The second is the sync stamp — reconnecting marks the
-  // ticket synced, which is a header change and a real thing the server has to be told.
-  // This said `=== 1` and passed only because the drain used to destroy anything queued
-  // while it was in flight, and the sync stamp is queued during exactly that window: the
-  // number encoded the data-loss bug rather than the claim in its own name.
+  // Three writes, not two, and three is correct — found by this exact assertion going
+  // red under S12 (2026-09-08). The first write is the coalesced edit. The second is the
+  // sync stamp — reconnecting marks the ticket synced, a header change queued as its own
+  // op because the first op had already left the outbox by the time autoSyncNow's own
+  // mutate ran. That second op is built against whatever version THIS device last saw,
+  // which a beat earlier was still the version before the first write landed — a version
+  // race against no one but itself. Before S12 that race was terminal: the update matched
+  // zero rows (counted as a write all the same — see cloudstub's update().select()), the
+  // op was read as a lost conflict, and the sync stamp was silently set aside. `synced`
+  // never reached the database and nothing here noticed, because the bound this assertion
+  // used to enforce (`<= 2`) was satisfied by the FAILURE, not by success. S12's rebase
+  // recognises that nothing else touched `synced`/`synced_at` in between and retries with
+  // the server's current version instead of giving up — one more request, and the stamp
+  // that used to vanish now lands. The two assertions below say so directly, rather than
+  // trusting a request count to imply an outcome the way the old bound quietly didn't.
   //
-  // The claim is that ten edits do not become ten requests. Bounded, so a regression that
-  // stopped coalescing would still be caught.
+  // The claim is still that ten edits do not become ten requests, now with the version
+  // race the fix accounts for included. Bounded, so a regression that stopped coalescing
+  // — or a rebase that started looping — would still be caught.
   check('a day of edits did not become a day of requests',
-    w.filter(x => x.table === 'tickets').length <= 2,
+    w.filter(x => x.table === 'tickets').length <= 3,
     w.filter(x => x.table === 'tickets').length + ' ticket writes');
+  check('and the sync stamp this test always meant to prove actually reached the database',
+    await p.evaluate(([id]) => !!(window.__db.tickets.find(r => r.id === id) || {}).synced, [TICKET]));
+  check('with nothing set aside for a race that was never a real conflict',
+    (await p.evaluate(() => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      return JSON.parse(localStorage.getItem('makaman.outbox.refused.v1' + (acct ? '.' + acct.toLowerCase() : '')) || '[]');
+    })).length === 0);
 
   // ── children are replaced, not duplicated, on replay ─────────────────────
   await p.evaluate(() => window.__mkApp.mutate(d => {

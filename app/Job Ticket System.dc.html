@@ -4162,6 +4162,12 @@ function errorLogCount() {
 // Enough attempts to ride out a bad connection, few enough that a write the database
 // will never accept stops blocking the queue within one working session.
 const OUTBOX_TRIES = 5;
+// How many times a single upsert_ticket send will re-read the server row and try again at
+// its current version before giving up and calling it a real conflict. This is bounded
+// re-reads inside ONE send, not outbox retries across drains — it only ever loops here
+// while a header keeps racing against fresh edits from someone else, which ends almost
+// immediately in practice.
+const REBASE_MAX_TRIES = 3;
 
 // Ids are minted on the device, not by the database. An offline technician opening a
 // ticket needs its id immediately — for the ticket's own children, for the audit trail,
@@ -4181,6 +4187,25 @@ const tsOut = (v) => (v ? new Date(v).toISOString() : null);
 const tsIn = (v) => (v ? new Date(v).toISOString() : '');
 const numOut = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
 const numIn = (v) => (v === null || v === undefined ? '' : Number(v));
+// Deep equality that does not care about key order — JSON.stringify does, and a jsonb
+// column (geo_open/geo_last) round-tripped through Postgres is under no obligation to
+// hand keys back in the order the client wrote them in. Used to decide whether a header
+// field genuinely conflicts with someone else's concurrent edit (see outboxSend's
+// upsert_ticket branch) — a false "conflict" there would throw away a real merge for no
+// reason, which is exactly the bug that rebase exists to fix.
+function sameVal(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+  const ak = Object.keys(a), bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  return ak.every((k) => sameVal(a[k], b[k]));
+}
+// Timestamptz columns on `tickets`. Read back from PostgREST they carry a "+00:00"
+// offset; tsOut() always produces "Z". Same instant, different string — comparing them
+// raw would report every untouched timestamp as "changed" and poison every rebase.
+const TICKET_TS_COLUMNS = ['arrival_at', 'start_job_at', 'end_job_at', 'synced_at',
+  'closed_at', 'cancelled_at', 'deleted_at', 'approved_at', 'geo_pinged_at'];
+function normTicketCol(k, v) { return TICKET_TS_COLUMNS.indexOf(k) >= 0 ? tsOut(v) : v; }
 
 // ── DB row → app shape ───────────────────────────────────────────────────────
 // Names, not ids, are what the app has always keyed on: a ticket says its technician is
@@ -4899,7 +4924,29 @@ function outboxPush(ops) {
       // it — including, for a week, a numbering-claim handover. Carried forward, a
       // permanently-refused op ages out in five attempts the way it was always meant to.
       const tries = q[at].tries;
-      q[at] = tries ? Object.assign({}, op, { tries: tries }) : op;
+      let merged = tries ? Object.assign({}, op, { tries: tries }) : op;
+      // `changed`/`base` (upsert_ticket only, see diffOps) belong to the KEY too, the same
+      // reasoning as `tries` just above. Replacing wholesale narrowed `changed` to only
+      // whatever the SECOND edit touched, so a version rebase against the first edit's own
+      // fields silently stopped covering them — the second edit's coalesce would have
+      // re-lost the very field this whole mechanism exists to save. Union what moved
+      // across every edit still in the queue, and take EACH field's base value from
+      // whichever op saw it first — field by field, not the whole object from one or the
+      // other. Whole-object-from-one-side was tried first and is wrong: a field the
+      // SECOND edit newly touched has no entry in the first op's base object at all, so
+      // picking that object wholesale leaves the field's base undefined, and undefined
+      // matches nothing — every rebase on that field would report a conflict that was
+      // never there. Caught live by startjob.test.js before this ever shipped.
+      if (op.changed || q[at].changed) {
+        const priorChanged = q[at].changed || [];
+        const changed = priorChanged.concat(op.changed || []).filter((k, i, a) => a.indexOf(k) === i);
+        const base = {};
+        changed.forEach((k) => {
+          base[k] = (q[at].base && (k in q[at].base)) ? q[at].base[k] : (op.base ? op.base[k] : undefined);
+        });
+        merged = Object.assign({}, merged, { changed: changed, base: base });
+      }
+      q[at] = merged;
     } else q.push(op);
   });
   outboxWrite(q);
@@ -4927,7 +4974,17 @@ function outboxSend(c, op) {
     const row = Object.assign({}, op.row);
     const base = Number(row.version) || 1;
     delete row.version;
-    return c.from('tickets').update(row).eq('id', row.id).eq('version', base).select('id,version')
+    // S12. A lost version race used to be terminal no matter which columns actually
+    // collided — the whole edit thrown away, including fields nobody else had touched.
+    // Proven live on ticket 7922f40c: four separate "Start Job date recorded" edits, each
+    // one racing the SAME concurrent header write (a job-type edit, a handover) that had
+    // nothing to do with start_job_at, and each one discarded whole. `changed`/`base`
+    // (set by diffOps only when this op has a prior version to rebase against — a
+    // brand-new ticket has none) let a genuine non-collision rebase onto the server's
+    // current row instead of failing on principle. `attempt` re-reads and retries WITHIN
+    // this one send, bounded by REBASE_MAX_TRIES; it is not an outbox retry.
+    const attempt = (patchRow, atVersion, rebaseTries) => c.from('tickets').update(patchRow)
+      .eq('id', row.id).eq('version', atVersion).select('id,version')
       .then((r) => {
         if (r.error) {
           // enforce_ticket_update_rules() (migration 0039) raises exactly this text for a
@@ -4942,24 +4999,51 @@ function outboxSend(c, op) {
           throw r.error;
         }
         if (r.data && r.data.length) { echoVersion(row.id, r.data[0].version); return; }
-        // No row matched. Two very different reasons, and guessing between them is how a
-        // new ticket would get thrown away as a conflict: either the ticket does not
-        // exist on the server yet (raised on this device, still its first upload), or it
-        // does and somebody has changed it since.
-        return c.from('tickets').select('id').eq('id', row.id).then((cur) => {
+        // No row matched at this version. Two very different reasons, and guessing between
+        // them is how a new ticket would get thrown away as a conflict: either the ticket
+        // does not exist on the server yet (raised on this device, still its first
+        // upload), or it does and somebody has changed it since.
+        return c.from('tickets').select('*').eq('id', row.id).then((cur) => {
           if (cur.error) throw cur.error;
-          if (cur.data && cur.data.length) {
-            const clash = new Error('MK_STALE');
-            // Terminal: retrying cannot help. The version will never go back.
+          if (!cur.data || !cur.data.length) {
+            return c.from('tickets').insert(row).then((ins) => {
+              if (ins.error) throw ins.error;
+              echoVersion(row.id, 1);
+            });
+          }
+          const server = cur.data[0];
+          if (op.changed && op.changed.length && rebaseTries < REBASE_MAX_TRIES) {
+            // A real conflict is a field THIS edit touched that the server now holds at a
+            // THIRD value — not what this edit was made against, and not what this edit
+            // wants either. Anything else this edit touched but nobody else did is safe to
+            // rebase: send only the columns that actually moved, at the server's current
+            // version, so whatever the other party wrote survives untouched.
+            const clashField = op.changed.find((k) => {
+              const wanted = row[k];
+              const was = (op.base || {})[k];
+              const now = normTicketCol(k, server[k]);
+              return !sameVal(now, was) && !sameVal(now, wanted);
+            });
+            if (!clashField) {
+              const partial = {};
+              op.changed.forEach((k) => { partial[k] = row[k]; });
+              return attempt(partial, server.version, rebaseTries + 1);
+            }
+            const clash = new Error('MK_STALE: ' + clashField);
+            // Terminal: somebody changed the SAME field to something else. Retrying
+            // cannot help — the version this edit was made against will never come back,
+            // and rebasing onto a value that directly contradicts this edit would just be
+            // picking a winner silently instead of admitting there is a real conflict.
             clash.mkTerminal = true;
             throw clash;
           }
-          return c.from('tickets').insert(row).then((ins) => {
-            if (ins.error) throw ins.error;
-            echoVersion(row.id, 1);
-          });
+          const clash = new Error('MK_STALE');
+          // Terminal: retrying cannot help. The version will never go back.
+          clash.mkTerminal = true;
+          throw clash;
         });
       });
+    return attempt(row, base, 0);
   }
   // audit_log is append-only by nature (see where these ops are queued) and carries no
   // UPDATE policy at all — checked live, 2026-09-04. An upsert is INSERT ... ON CONFLICT
@@ -5564,12 +5648,32 @@ function diffOps(before, after) {
     // The header and the children move independently: retyping a well number must not
     // rewrite the job log, and adding a log line must not rewrite the header.
     const head = (x) => rowTicket(x, idByName, idByClient, idByJob);
-    const headerOp = (!was || !same(head(was), head(t)))
+    const headNow = head(t);
+    const headWas = was ? head(was) : null;
+    let headerOp = null;
+    if (!was || !same(headWas, headNow)) {
       // upsert_ticket, not upsert: a ticket header is the one row two people edit at the
       // same time, so it goes through the version guard rather than blindly overwriting
       // whatever is there (S11).
-      ? { key: 'tickets:' + t.id, table: 'tickets', action: 'upsert_ticket', row: head(t) }
-      : null;
+      headerOp = { key: 'tickets:' + t.id, table: 'tickets', action: 'upsert_ticket', row: headNow };
+      if (was) {
+        // S12. Record exactly which columns this edit actually moved, and what they moved
+        // from. A version race used to throw the WHOLE edit away the instant ANY field had
+        // moved on the server since — including fields this edit never touched, which is
+        // how a job-log line's own Start Job stamp kept losing a race against an unrelated
+        // office edit and getting silently discarded, over and over, forever (confirmed
+        // live on ticket 7922f40c, 2026-09-04/05: four "Start Job date recorded" audit
+        // entries, start_job_at NULL every time). `changed`/`base` let outboxSend rebase
+        // onto the server's current row instead — send only what moved, keep the version
+        // guard for the fields that actually collide. `null`/absent for a brand-new ticket:
+        // there is nothing to rebase against, and it cannot hit that code path anyway (no
+        // row exists yet to lose a version race with).
+        const changed = Object.keys(headNow).filter((k) => k !== 'version' && !sameVal(headWas[k], headNow[k]));
+        headerOp.changed = changed;
+        headerOp.base = {};
+        changed.forEach((k) => { headerOp.base[k] = headWas[k]; });
+      }
+    }
     // A brand-new ticket's header has to reach the server FIRST — every child row's own
     // foreign key points at tickets.id, and nothing can point at a row that does not
     // exist there yet. Reproduced live, 2026-09-05: a job's OWN crew list going out before
@@ -7272,6 +7376,26 @@ class Component extends DCLogic {
         // practice. It costs one pass and removes the possibility of a row reaching the
         // diff without identity.
         stampChildIds(merged);
+        // F1. A hydrated ticket that has job-log lines but no Start Job stamp — or one
+        // later than its earliest line — is not a job that never started; it is one
+        // whose header write once lost a version race before either the rebase fix in
+        // outboxSend or the derive-don't-latch fix in addEvent existed, and was
+        // discarded whole. Healed here, once, on every hydrate, so a ticket that already
+        // has every line it will ever get is not left stuck at "—" waiting for a log
+        // line that is never coming. Diffed against a snapshot of `merged` taken before
+        // the heal (not against `data`, which has a different shape before defaults are
+        // applied) so the write this queues is exactly the heal and nothing else.
+        const beforeHeal = JSON.parse(JSON.stringify(merged));
+        let healed = false;
+        (merged.tickets || []).forEach((x) => {
+          if (x.status !== 'logging' && x.status !== 'done') return;
+          const earliest = (x.events || []).reduce((m, e) => (!m || e.ts < m) ? e.ts : m, '');
+          if (earliest && (!x.start || x.start > earliest)) { x.start = earliest; healed = true; }
+        });
+        if (healed) {
+          try { outboxPush(diffOps(beforeHeal, merged)); this.scheduleDrain(); }
+          catch (e) { logError('sync', e, { doing: 'heal start job' }); }
+        }
         this.persist(merged);
         this.setState({ data: merged });
       })
@@ -12312,8 +12436,27 @@ class Component extends DCLogic {
         const now = iso(new Date());
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
+          const wasFirstLine = !(x.events || []).length;
           x.events.push({ id: uuid(), ts: now, text: text });
-          if (!x.start) { x.start = now; (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'First log line — Start Job date recorded.' }); }
+          // S12/F1. Derived from the log, not latched once. `x.start` used to be set only
+          // on the very first line and never touched again, so the one header write that
+          // carried it was a single point of failure — if it ever lost a version race
+          // against some UNRELATED concurrent edit (a job-type change, a hand-over; see
+          // the rebase fix in outboxSend), the whole edit was discarded and `x.start`
+          // stayed empty forever, with nothing on screen to say so. Confirmed live on
+          // ticket 7922f40c: four separate "First log line" audit entries, one per log
+          // line, because `!x.start` kept coming back true — start_job_at stayed NULL on
+          // the server through all four. Deriving it here from the earliest line on every
+          // call heals that automatically: a start that already agrees with the earliest
+          // line triggers no header write at all, and one that is missing or later than
+          // the earliest line is corrected without anyone noticing there was ever a gap.
+          const earliest = x.events.reduce((m, e) => (!m || e.ts < m) ? e.ts : m, '');
+          if (!x.start || x.start > earliest) x.start = earliest;
+          // Only actually the first line this ticket has ever had — not merely the first
+          // one this device currently knows about, and not "start was missing" (which,
+          // per the above, can now be true again later for reasons that have nothing to
+          // do with this being a first anything).
+          if (wasFirstLine) (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'First log line — Start Job date recorded.' });
           if (x.status === 'done') x.status = 'logging';
         });
         this.setState({ newEventText: '' });
