@@ -57,8 +57,14 @@ const deadLetterCount = (p) => p.evaluate(() => {
   const key = 'makaman.outbox.refused.v1' + (acct ? '.' + acct.toLowerCase() : '');
   return JSON.parse(localStorage.getItem(key) || '[]').length;
 });
+// The headline reads one of two honest ways depending on whether the pile holds anything
+// confirmed terminal — "refused by the server" only for that; "has not been confirmed by
+// the server yet" for the ordinary retryable case every scenario below actually produces
+// (2026-09-05: the wording used to say "refused" for both, which is what a false-failure
+// report turned out to trace back to). Either phrasing means the same thing for this
+// file's purposes — a banner is up, about a set-aside change — so both are accepted here.
 const banner = (p) => p.evaluate(() => ({
-  shown: /refused by the server/.test(document.body.innerText),
+  shown: /refused by the server|has not been confirmed by the server/.test(document.body.innerText),
   retryBtn: !!Array.from(document.querySelectorAll('button')).find(x => /^RETRY$/.test(x.innerText || '')),
   dismissBtn: !!Array.from(document.querySelectorAll('button')).find(x => /^DISMISS$/.test(x.innerText || '')),
 }));

@@ -79,8 +79,15 @@ const refreshCount = (p) => p.evaluate(() => window.__mkApp.__refreshCount);
       chans[0] && chans[0].subs.some(s => s.kind === 'postgres_changes'
         && s.table === 'user_permissions' && s.schema === 'public' && s.event === '*'),
       JSON.stringify(chans[0]));
-    check('still exactly one channel — the second subscription did not open a second one',
-      chans[0] && chans[0].subs.length === 2, JSON.stringify(chans[0]));
+    // 2026-09-05: a note raised on one signed-in session was invisible on another until
+    // the fifteen-minute autosync happened to land — this table was never on the channel
+    // at all. Same reasoning as the two above: one more subscription, not a second channel.
+    check('it also watches public.ticket_notes, every event, on the same channel',
+      chans[0] && chans[0].subs.some(s => s.kind === 'postgres_changes'
+        && s.table === 'ticket_notes' && s.schema === 'public' && s.event === '*'),
+      JSON.stringify(chans[0]));
+    check('still exactly one channel — neither extra subscription opened a second one',
+      chans[0] && chans[0].subs.length === 3, JSON.stringify(chans[0]));
   }
 
   // ── A change notification refreshes, not a second data path ──────────────

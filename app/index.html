@@ -4970,8 +4970,21 @@ function outboxSend(c, op) {
   // CONFLICT DO NOTHING, which touches nothing and so never asks the UPDATE policy
   // anything. Scoped to audit_log alone: ticket_lines and the rest genuinely are edited
   // (the office corrects a logged timestamp, for one) and keep their real upsert.
+  //
+  // A brand-new note raised by the CURRENT device's own account (diffOps sets
+  // op.ignoreDup, never op.table) has the identical shape, proven live 2026-09-04 the same
+  // way: an INSERT as a real technician succeeds; the SAME upsert retried against the
+  // now-existing row is refused every time with "new row violates row-level security
+  // policy (USING expression)" — ticket_notes_update_staff is staff-only, and a
+  // technician can never satisfy it, so a lost-response retry of their own note was a
+  // permanent dead end disguised as a transient one. Gated on ignoreDup rather than the
+  // table name because it is NOT safe for every own-note op: one raised and ALSO resolved
+  // by the same device before either has synced (only possible for an ops_manager/admin,
+  // who hold note.resolve) genuinely needs the resolved fields to reach a row that may
+  // already exist without them — ON CONFLICT DO NOTHING would silently drop that.
   if (op.action === 'upsert') {
-    const opts = op.table === 'audit_log' ? { onConflict: 'id', ignoreDuplicates: true } : undefined;
+    const safe = op.table === 'audit_log' || op.ignoreDup;
+    const opts = safe ? { onConflict: 'id', ignoreDuplicates: true } : undefined;
     return c.from(op.table).upsert(op.row, opts).then((r) => { if (r.error) throw r.error; });
   }
   // A row that already exists and must not be created by a client.
@@ -5275,14 +5288,20 @@ function outboxSetAside(op, why, terminal, alsoRetired) {
   // ReferenceError was caught by a `catch` meant for quota — the refusal was dropped and
   // the drain reported success. A catch wide enough to hide a programming error is the
   // same failure this whole file exists to prevent: a record lost in silence.
-  const reason = refusalText(why);
+  const reason = refusalText(why, terminal);
   // The same refusal, twice over and for two different readers. The dead-letter is what
-  // the app shows the person now, in their words; the error log is what gets handed to
-  // somebody who can fix it, with the server's own words and a code.
-  // Which job, wherever the op happens to record it — not only when the key starts
-  // 'tickets:', which was the one case that needed it least. Tonight's export could not say
-  // which job an audit entry belonged to, and that is precisely the question somebody
-  // reading it has to answer.
+  // the app shows the person now, in their words — scoped by whether this is confirmed
+  // terminal (see refusalText) so nobody is told a still-retryable change has been
+  // refused. The error log is a different reader entirely: whoever has to fix the bug,
+  // and for them a write the server has now refused OUTBOX_TRIES times running, in
+  // exactly the same words, is worth a line regardless of whether a later policy fix
+  // could in principle still save it — that uncertainty is real, but errorlog.test.js's
+  // own reason for existing ("does the file that comes out let somebody fix the bug
+  // without asking a single question") does not stop applying to it. What changed for the
+  // person, not the developer, is scoped by `terminal` in refusalText() above; this stays
+  // unconditional, as it always has been. Which job, wherever the op happens to record
+  // it — not only when the key starts 'tickets:', which was the one case that needed it
+  // least.
   logError('sync', why, {
     table: op && op.table, action: op && op.action,
     ticket: opTicket(op) || undefined,
@@ -5315,7 +5334,20 @@ function outboxSetAside(op, why, terminal, alsoRetired) {
   } catch (e) { /* quota */ }
 }
 // Postgres speaks in constraint names. The office speaks in tickets.
-function refusalText(err) {
+//
+// `terminal` decides the one thing that actually matters to the person reading this:
+// whether "refused" is a fact or a guess. MK_STALE and a foreign key are terminal by
+// construction — the version will never come back, the job will never reappear — so they
+// keep their definite wording regardless of the flag. A bare row-level-security refusal
+// and anything unclassified are NOT terminal by construction (see outboxDrain's own
+// comment on why a blanket rule there would be wrong): most of the time this function is
+// called for one of those, the honest answer is "not yet", not "no" — proven live,
+// 2026-09-05: a technician's own note upsert was refused by RLS on a retry that would in
+// fact never succeed for THAT specific shape, but the classifier has no way to tell that
+// shape apart from "an admin is mid-way through fixing a policy", which genuinely does
+// resolve itself on a later try. Saying "refused" for both trained a person to stop
+// trusting the word, which is worse than saying nothing.
+function refusalText(err, terminal) {
   const raw = (err && (err.message || err.details || err.hint)) || '';
   if (/MK_STALE/.test(raw)) {
     return 'Someone in the office changed this job while you were out of signal, so your version of it was not saved over theirs. Open the ticket to see where it stands now and make the change again if it is still needed.';
@@ -5332,9 +5364,14 @@ function refusalText(err) {
       + 'there, so it has been set aside rather than retried.';
   }
   if (/row-level security|permission denied|violates/i.test(raw)) {
-    return 'The server would not accept this change from your account.';
+    return terminal
+      ? 'The server has refused this change under a permissions rule, and asking again will not change that.'
+      : 'The server has not confirmed this change yet. It will keep trying on its own — no need to do it again.';
   }
-  return raw || 'The server refused this change.';
+  if (raw) return raw;
+  return terminal
+    ? 'The server has refused this change and will not accept it as it stands.'
+    : 'The server has not confirmed this change yet. It will keep trying on its own — no need to do it again.';
 }
 function outboxSetAsideCount() {
   try { return JSON.parse(localStorage.getItem(deadletterKey()) || '[]').length; }
@@ -5424,6 +5461,47 @@ function opStatus(key) {
   } catch (e) { /* nothing failed is knowable without the pile */ }
   return null;
 }
+// What a queued or set-aside op actually IS, in the person's own words. Reused by the
+// Activity feed's pending-operation entries below (2026-09-05) — surfacing every op this
+// device might ever queue there would bury the ones somebody is actually watching for
+// under settings syncs and price-list housekeeping, so this returns null for anything that
+// is not a distinct, nameable action a person took, and only those show up at all.
+function opLabel(op) {
+  if (!op) return null;
+  const row = op.row || {};
+  if (op.table === 'ticket_notes') {
+    return op.action === 'update'
+      ? { verb: 'Answering a note', preview: row.body || '' }
+      : { verb: 'Adding a note', preview: row.body || '' };
+  }
+  if (op.table === 'ticket_lines') {
+    return op.action === 'delete'
+      ? { verb: 'Removing a job-log line', preview: '' }
+      : { verb: 'Logging', preview: row.text || '' };
+  }
+  if (op.action === 'upsert_ticket') return { verb: 'Updating the ticket', preview: '' };
+  return null;
+}
+// Every currently outstanding op that opLabel recognises — queued (pending or, once a
+// retry has actually been attempted, retrying) and set-aside (failed, terminal or not).
+// Reads exactly the same two piles opStatus() reads for one key at a time; this is that
+// same data enumerated, not a second queue kept in step with the first by hand.
+function outboxOutstanding() {
+  const out = [];
+  outboxRead().forEach((op) => {
+    const label = op && opLabel(op);
+    if (!label) return;
+    out.push({ op: op, label: label, state: (op.tries || 0) > 0 ? 'retrying' : 'pending' });
+  });
+  let dead = [];
+  try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); } catch (e) { dead = []; }
+  dead.forEach((e) => {
+    const label = e && opLabel(e.op);
+    if (!label) return;
+    out.push({ op: e.op, label: label, state: 'failed', reason: e.why, terminal: !!e.terminal, at: e.at });
+  });
+  return out;
+}
 
 // ── Turning a change in the replica into ops ─────────────────────────────────
 // mutate() hands over the store before and after. Comparing the two is what makes this
@@ -5486,12 +5564,18 @@ function diffOps(before, after) {
     // The header and the children move independently: retyping a well number must not
     // rewrite the job log, and adding a log line must not rewrite the header.
     const head = (x) => rowTicket(x, idByName, idByClient, idByJob);
-    if (!was || !same(head(was), head(t))) {
+    const headerOp = (!was || !same(head(was), head(t)))
       // upsert_ticket, not upsert: a ticket header is the one row two people edit at the
       // same time, so it goes through the version guard rather than blindly overwriting
       // whatever is there (S11).
-      ops.push({ key: 'tickets:' + t.id, table: 'tickets', action: 'upsert_ticket', row: head(t) });
-    }
+      ? { key: 'tickets:' + t.id, table: 'tickets', action: 'upsert_ticket', row: head(t) }
+      : null;
+    // A brand-new ticket's header has to reach the server FIRST — every child row's own
+    // foreign key points at tickets.id, and nothing can point at a row that does not
+    // exist there yet. Reproduced live, 2026-09-05: a job's OWN crew list going out before
+    // its own header would be refused as a foreign-key violation, retried five times, and
+    // set aside — not what this reordering is for. `was` says which ticket this is.
+    if (!was && headerOp) ops.push(headerOp);
     const kidsNow = rowsChildren(t, idByName);
     const kidsWas = was ? rowsChildren(was, idByName) : null;
     // Items, assets and crew are still replaced wholesale. They have no identity in the
@@ -5504,6 +5588,16 @@ function diffOps(before, after) {
       if (kidsWas && same(bare(kidsWas[tbl]), bare(kidsNow[tbl]))) return;
       ops.push({ key: tbl + ':' + t.id, table: tbl, action: 'replace', ticketId: t.id, rows: kidsNow[tbl] });
     });
+    // An EXISTING ticket's crew, on the other hand, has to go out BEFORE the header when
+    // a hand-over is part of the same edit — holder_id is what a hand-over moves, and
+    // ticket_crew's own RLS (0060) is written against "the current holder of a still-
+    // logging ticket". Sent after the header, the sender is no longer that (the new
+    // holder is), and both the delete and the re-insert of the crew list are refused —
+    // the delete silently (RLS hides rows it has no policy to touch, which is not an
+    // error), the insert loudly. Sent first, while the header on the server still names
+    // the sender as holder, both succeed, and the header follows once the crew that
+    // reflects its new holder is already there.
+    if (was && headerOp) ops.push(headerOp);
 
     // S19. The job log and the audit trail are the two things two people write to at the
     // same time, and `replace` deletes every row for the ticket before re-inserting the
@@ -5664,7 +5758,17 @@ function diffOps(before, after) {
       if (raisedByOther) {
         ops.push({ key: 'ticket_notes:' + n.id, table: 'ticket_notes', action: 'update', id: n.id, row: fields });
       } else {
+        // ignoreDup is safe exactly when nothing about this row can legitimately need
+        // updating later via this same path: an unresolved note's body/raised_by/raised_at
+        // are fixed the moment addNote() creates it — there is no "edit my own note" screen
+        // — so a retry that finds the row already there is always resending fields that
+        // already match. The moment this SAME device has also resolved it (only an
+        // ops_manager/admin can, holding note.resolve, and only before either half has ever
+        // synced) that stops being true — the resolved fields might still need to reach a
+        // row that landed without them — so ignoreDup is withheld there and this keeps the
+        // plain upsert it already had, unchanged.
         ops.push({ key: 'ticket_notes:' + n.id, table: 'ticket_notes', action: 'upsert',
+          ignoreDup: !n.resolvedAt,
           row: Object.assign({ id: n.id, ticket_id: t.id }, fields) });
       }
     });
@@ -6027,6 +6131,11 @@ const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SY
 // that typing a field is one write rather than twenty; short enough that the office sees
 // a change while the technician is still looking at it.
 const DRAIN_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__DRAIN_TEST_MS) || 1200;
+// The ceiling scheduleDrain's own automatic-retry backoff eases up to — fast for the
+// first few empty passes, never slower than this. Thirty seconds is still well inside
+// "instant" for a job someone is standing at a wellhead waiting on, and short enough that
+// five attempts (OUTBOX_TRIES) cannot silently take an hour to reach the set-aside pile.
+const DRAIN_RETRY_CAP_MS = (typeof window !== 'undefined' && window.__DRAIN_RETRY_CAP_TEST_MS) || 30000;
 // Reported live: the office's Save-to-Home-Screen app did not show a technician's
 // "Job Done" until the app was relaunched — AUTO_SYNC_INTERVAL_MS is fifteen minutes,
 // and nothing else was pulling in between. This is how the gap closes without polling
@@ -7171,7 +7280,14 @@ class Component extends DCLogic {
   // Sending is debounced, not immediate. Typing a well number fires mutate once per
   // keystroke; without this, so would the network. The queue coalesces by row, so a
   // pause of a second turns a burst of edits into one write.
-  scheduleDrain() {
+  //
+  // `delayMs` is only ever passed by this method calling itself (see below) — every other
+  // caller keeps the normal short debounce. Reported live, 2026-09-05: a note that failed
+  // once sat exactly as it was until the NEXT unrelated edit, tab refocus, or the
+  // fifteen-minute autosync happened to come along — nothing here was pursuing it on its
+  // own, so "automatic retry" only ever happened by coincidence. These actions are meant
+  // to feel instant; a failure that might resolve itself should not wait on luck.
+  scheduleDrain(delayMs) {
     if (!USE_CLOUD) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     if (this.drainTimer) clearTimeout(this.drainTimer);
@@ -7181,8 +7297,22 @@ class Component extends DCLogic {
       // one drain rather than two racing over the same queue.
       this.runLatest('drain', () => outboxDrain().then((n) => {
         if (n) this.setState({ tick: Date.now() });
+        // Chases whatever is still queued on its own, rather than waiting for something
+        // else to ask again. Backs off by a STREAK of empty passes, not by any one op's
+        // own `tries` — a genuine connection failure never increments `tries` at all (see
+        // outboxDrain's own NET handling), and without a separate counter that shape would
+        // reschedule at the fastest interval forever instead of easing off, which is
+        // exactly the "aggressive tight loop" this has to avoid. Progress of any kind
+        // resets the streak immediately, so the moment a connection actually works again
+        // everything behind it goes back to full speed rather than staying throttled by
+        // a wall that is no longer there.
+        this.drainAutoRetries = n ? 0 : (this.drainAutoRetries || 0) + 1;
+        if (outboxRead().length && !(typeof navigator !== 'undefined' && navigator.onLine === false)) {
+          this.scheduleDrain(Math.min(
+            DRAIN_DEBOUNCE_MS * Math.pow(2, this.drainAutoRetries), DRAIN_RETRY_CAP_MS));
+        }
       }, () => undefined));
-    }, DRAIN_DEBOUNCE_MS);
+    }, delayMs == null ? DRAIN_DEBOUNCE_MS : delayMs);
   }
   // A live channel on `tickets`, so the office sees a new ticket or a status change
   // without waiting on AUTO_SYNC_INTERVAL_MS (fifteen minutes) or a relaunch. One per
@@ -7217,6 +7347,15 @@ class Component extends DCLogic {
         // own row — building a filter string would also have needed CLOUD_IDS.me, which
         // is not guaranteed set yet at the point this runs.
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_permissions' },
+          () => this.scheduleRealtimeRefresh())
+        // Reported live, 2026-09-05: a note raised on one signed-in session was invisible
+        // on another until the fifteen-minute autosync happened to land — ticket_notes was
+        // never on this channel at all, so a note that reached the server correctly still
+        // had no way to say "now" to anyone but the device that sent it. Same reasoning as
+        // tickets/user_permissions above: filtered server-side by ticket_notes_select_*'s
+        // own policies, so a subscriber sees exactly the notes their own refresh() would
+        // have pulled anyway.
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_notes' },
           () => this.scheduleRealtimeRefresh())
         .subscribe();
     } catch (e) {
@@ -8345,7 +8484,34 @@ class Component extends DCLogic {
           ? (this.setState({ adminTab: 'price', adminClient: a.client, roleTab: 'tickets' }),
              this.ensurePriceList(a.client))
           : null)))
-      .filter((a) => deep || a.kind === 'lifecycle')
+      // An action that has been triggered but not yet confirmed stays visible as an
+      // ongoing operation here, rather than only as an account-wide banner once it fails —
+      // reported live, 2026-09-05: a note that had in fact already reached the server
+      // still read as a flat "refused" with no way to tell it apart from any other queued
+      // change. Own kind ('pending'), not folded into 'lifecycle'/'edit', and never gated
+      // on `deep`: whether you are watching your OWN action resolve has nothing to do with
+      // whether your role sees the edit history.
+      .concat(outboxOutstanding().map((item) => {
+        const ticketId = opTicket(item.op);
+        const t = ticketId && D.tickets.find((x) => x.id === ticketId);
+        const row = item.op.row || {};
+        const ts = row.raised_at || row.logged_at || item.at || new Date().toISOString();
+        const status = item.state === 'pending' ? 'Waiting to sync'
+          : item.state === 'retrying' ? 'Retrying automatically'
+          : item.terminal ? 'The server has refused this'
+          : 'Still trying to reach the server';
+        const preview = String(item.label.preview || '').trim();
+        const text = item.label.verb + (preview
+          ? ': "' + (preview.length > 60 ? preview.slice(0, 60) + '…' : preview) + '"' : '')
+          + ' — ' + status;
+        return entry({ ts: ts, by: (S.session && S.session.name) || '', text: text }, 'pending',
+          t ? ((t.ticketNo ? t.ticketNo + ' · ' : '') + t.customer) : '',
+          () => (item.state === 'failed' && item.terminal) ? 'var(--warning)' : 'var(--accent)',
+          t ? (() => (S.role === 'tech'
+            ? this.setState({ activeId: t.id, techScreen: 'log', roleTab: 'tickets' })
+            : this.openReview(t.id, { roleTab: 'tickets' }))) : null);
+      }))
+      .filter((a) => deep || a.kind === 'lifecycle' || a.kind === 'pending')
       .sort((a, b) => new Date(b.ts) - new Date(a.ts));
   }
 
@@ -11650,25 +11816,45 @@ class Component extends DCLogic {
       // Dismiss deletes it, after asking) is what makes this false now, not a separate
       // bit of state that could fall out of step with what is actually still sitting there.
       refusedAny: outboxSetAsideCount() > 0,
-      refusedLabel: outboxRetryableCount() > 0
-        ? (outboxSetAsideCount() === 1
-          ? 'One change was refused by the server and has not been saved.'
-          : outboxSetAsideCount() + ' changes were refused by the server and have not been saved.')
+      // "Refused" is a fact, not a guess — reserved for what terminal actually means: the
+      // server looked at this exact change and will say no every time. A non-terminal
+      // entry has NOT been refused, it has simply not been confirmed yet, and this used to
+      // say "refused" for that case too — backwards from what terminal itself records,
+      // and the softer wording ("cannot be saved as it stands") went to the entries that
+      // truly are dead ends instead. Fixed 2026-09-05, alongside the same honesty fix in
+      // refusalText() for the per-entry reason shown beside this headline.
+      refusedLabel: (() => {
+        const total = outboxSetAsideCount();
+        const retryable = outboxRetryableCount();
+        const stuck = total - retryable;
+        // Counted in JOBS, not rows: sixteen refusals about three deleted jobs is three
+        // things to know about, and phrasing it as sixteen sends somebody looking for
+        // thirteen problems that do not exist. (outboxSetAside already collapses collateral
+        // rows into one entry's `also` count rather than one entry apiece — see there.)
+        if (retryable > 0 && stuck > 0) {
+          return (retryable === 1 ? 'One change is' : retryable + ' changes are')
+            + ' still trying to reach the server, and '
+            + (stuck === 1 ? 'one change has' : stuck + ' changes have')
+            + ' been refused outright.';
+        }
+        if (retryable > 0) {
+          return retryable === 1
+            ? 'One change has not been confirmed by the server yet — it is still trying on its own.'
+            : retryable + ' changes have not been confirmed by the server yet — they are still trying on their own.';
+        }
         // Nothing here can be sent, ever, so the words say that rather than implying it is
-        // still on its way. Counted in JOBS, not rows: sixteen refusals about three deleted
-        // jobs is three things to know about, and phrasing it as sixteen sends somebody
-        // looking for thirteen problems that do not exist.
+        // still on its way.
         //
         // "The job is no longer on the server" used to be the only sentence here, because a
-        // deleted job's foreign key was the only refusal ever marked terminal. A plain
-        // permission refusal is terminal now too (2026-09-04), and it is not that — the job
-        // is right there, the account just cannot write this row — so the headline says
-        // only what is always true (retrying this exact change will not help) and leaves
-        // the actual reason to refusedWhy, read right beside it, rather than guessing at a
-        // cause that fits only one of the terminal kinds.
-        : (outboxSetAsideCount() === 1
-          ? 'One change cannot be saved as it stands.'
-          : outboxSetAsideCount() + ' changes cannot be saved as they stand.'),
+        // deleted job's foreign key was the only refusal ever marked terminal — a plain
+        // permission refusal can be terminal too (LOCKED, MK_STALE), and the headline says
+        // only what is always true of every terminal kind (retrying this exact change will
+        // not help) and leaves the actual reason to refusedWhy, read right beside it,
+        // rather than guessing at a cause that fits only one of them.
+        return stuck === 1
+          ? 'One change has been refused by the server and cannot be saved as it stands.'
+          : stuck + ' changes have been refused by the server and cannot be saved as they stand.';
+      })(),
       refusedWhy: outboxSetAsideLatest(),
       // RETRY is offered only when something could actually succeed on a second attempt.
       //

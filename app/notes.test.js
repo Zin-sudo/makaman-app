@@ -134,7 +134,14 @@ async function onTicket(ctx, email) {
     const p = await onTicket(ctx, 'omar@makaman.ly');
     const wire = await p.evaluate(() => {
       const src = document.querySelector('script[type="text/x-dc"]').textContent;
-      const seg = src.slice(src.indexOf("ops.push({ key: 'ticket_notes:'"), src.indexOf("ops.push({ key: 'ticket_notes:'") + 460);
+      // Two ops.push({ key: 'ticket_notes:' ... }) calls exist — the raisedByOther branch
+      // (action: 'update', checked separately by notesownership.test.js) comes first in
+      // the source, this own-note upsert branch second. lastIndexOf targets the second
+      // one specifically, rather than a fixed-width slice from the first that happened to
+      // still reach this far — which broke the moment the upsert branch grew a comment
+      // and an `ignoreDup` field (2026-09-05) and the window no longer reached it.
+      const at = src.lastIndexOf("ops.push({ key: 'ticket_notes:'");
+      const seg = src.slice(at, at + 460);
       return {
         perNote: /key: 'ticket_notes:' \+ n\.id/.test(seg),
         upsert: /action: 'upsert'/.test(seg),

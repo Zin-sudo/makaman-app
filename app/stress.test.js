@@ -186,7 +186,11 @@ const freeStorage = (p) => p.evaluate(() => {
     await p.reload({ waitUntil: 'networkidle' });
     await p.waitForTimeout(1200);
     const shown = await p.evaluate(() => ({
-      onScreen: /refused by the server/i.test(document.body.innerText),
+      // "refused" only for a confirmed-terminal pile; this one is not (setAsideForTest
+      // passes no terminal flag, matching a real duplicate-ticket-number refusal, which
+      // stays retryable), so the honest headline reads "has not been confirmed" instead —
+      // 2026-09-05, see notesreliability.test.js for why that split exists.
+      onScreen: /refused by the server|has not been confirmed by the server/i.test(document.body.innerText),
       survived: /ticket number is already used/i.test(document.body.innerText),
     }));
     check('it is on screen after a reload — the change is still missing', shown.onScreen);
