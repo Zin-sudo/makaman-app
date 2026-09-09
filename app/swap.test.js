@@ -71,7 +71,12 @@ const login = async (p, email) => {
     check('the corner says they are acting, not that they are a technician',
       /AS TECHNICIAN/i.test(after.role) && /OPS MANAGER/i.test(after.role), 'corner: ' + after.role);
     check('a way back is offered', /back to ops manager/i.test(after.text));
-    check('the office inbox is gone', !/awaiting review/i.test(after.text));
+    // "Awaiting review" alone stopped being a safe proxy for "the office Inbox is
+    // showing" once My Job Tickets grew its own status filter with an "Awaiting Review"
+    // pill (2026-09-09) — that pill is CORRECTLY present once swapped into the
+    // technician shell. "Ticket Inbox" is the office screen's own page heading and
+    // appears nowhere in the technician shell.
+    check('the office inbox is gone', !/Ticket Inbox/i.test(after.text));
 
     // The capability check that matters: approving is an ops-manager act and must be
     // unavailable while swapped.

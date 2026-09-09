@@ -52,10 +52,14 @@ async function runDrain(p, headerOutcome) {
       }
       return null;
     };
+    // opDescribe/opLabel: same fix as approval.test.js (2026-09-09) — outboxSetAside
+    // calls opDescribe for logError's `doing` field, and this file lifts outboxSetAside
+    // standalone the same way, so it needs the same dependency named here or it throws
+    // a ReferenceError instead of testing anything.
     const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
                    'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
                    'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain',
-                   'withTimeout']
+                   'withTimeout', 'opDescribe', 'opLabel']
       .map(grab).filter(Boolean).join('\n');
     const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
     const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;

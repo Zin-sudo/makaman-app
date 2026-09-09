@@ -77,17 +77,23 @@ const press = (p, pick) => p.evaluate(async (sel) => {
   // remaining buttons were detached and measured 0px wide — a "narrow button that did
   // not shake", which looked like a defect and was an artefact of the test walking the
   // app while testing it.
+  //
+  // .mk-statusfilter joined the exclusion list here 2026-09-09, the same day the app's
+  // own SKIP list grew it: My Job Tickets' new status-filter pills ("Approved" at
+  // exactly 88px) are a selection control, not a momentary action, same category as
+  // mk-seg and the settings switch already excluded above — and one of them happened to
+  // land right on the MAX_WIDTH boundary, which is what actually surfaced this.
   {
     const { ctx, p } = await boot(b, 'yousef@makaman.ly', 412);
     const count = await p.evaluate(() => Array.from(document.querySelectorAll('button'))
-      .filter(x => x.offsetParent && !x.closest('.mk-seg') && !x.closest('.mk-switch') && !x.disabled).length);
+      .filter(x => x.offsetParent && !x.closest('.mk-seg') && !x.closest('.mk-switch') && !x.closest('.mk-statusfilter') && !x.disabled).length);
     const out = [];
     for (let n = 0; n < count; n++) {
       await p.reload({ waitUntil: 'networkidle' });
       await p.waitForTimeout(900);
       const r = await p.evaluate(async (idx) => {
         const btns = Array.from(document.querySelectorAll('button'))
-          .filter(x => x.offsetParent && !x.closest('.mk-seg') && !x.closest('.mk-switch') && !x.disabled);
+          .filter(x => x.offsetParent && !x.closest('.mk-seg') && !x.closest('.mk-switch') && !x.closest('.mk-statusfilter') && !x.disabled);
         const b = btns[idx];
         if (!b) return null;
         const w = Math.round(b.getBoundingClientRect().width);

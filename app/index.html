@@ -1385,8 +1385,12 @@
                    "Awaiting Review" alone is wider than a fifth of a phone screen, and
                    squeezing five labels to fit would either wrap the text or shrink the
                    tap targets below the 40px floor the rest of the app holds to. The
-                   scroll stays inside this one row — the page itself never does. -->
-              <div style="display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px">
+                   scroll stays inside this one row — the page itself never does.
+                   mk-statusfilter joins mk-seg/mk-switch in the shake-on-press SKIP list
+                   below: this is a selection control, not a momentary action, and the
+                   selected pill's own colour change is already the feedback — same
+                   reasoning already applied to mk-seg and the settings toggle. -->
+              <div class="mk-statusfilter" style="display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px">
                 <sc-for list="{{ techStatusOptions }}" as="o" hint-placeholder-count="5">
                   <button onClick="{{ o.pick }}" style="flex:none;white-space:nowrap;min-height:36px;padding:0 14px;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;border:1px solid rgba(var(--ink-rgb),0.22);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
                 </sc-for>
@@ -1570,14 +1574,14 @@
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
                     <div style="width:74px;flex:none;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;color:var(--accent-deep);line-height:1.25">{{ e.dateLine }}<br><span style="color:var(--ink-faint)">{{ e.timeLine }}</span></div>
-                    <textarea dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
+                    <textarea dir="auto" value="{{ e.text }}" onChange="{{ e.onChange }}" rows="2" disabled="{{ e.locked }}" style="flex:1;padding:6px 8px;font-size:14px;line-height:1.4;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.12);color:var(--ink);resize:vertical"></textarea>
                     <sc-if value="{{ e.syncPending }}" hint-placeholder-val="{{ false }}">
                       <span class="mk-sync-dot mk-sync-pending" title="Still sending to the office"></span>
                     </sc-if>
                     <sc-if value="{{ e.syncFailed }}" hint-placeholder-val="{{ false }}">
                       <span class="mk-sync-dot mk-sync-failed" title="{{ e.syncTitle }}">!</span>
                     </sc-if>
-                    <button onClick="{{ e.remove }}" class="mk-rowdel" title="Delete this job-log line" aria-label="Delete this job-log line">×</button>
+                    <button onClick="{{ e.remove }}" disabled="{{ e.locked }}" class="mk-rowdel" title="Delete this job-log line" aria-label="Delete this job-log line">×</button>
                   </div>
                 </sc-for>
               </div>
@@ -12784,14 +12788,23 @@ class Component extends DCLogic {
         // question a person actually has right after logging a line is "did THIS one go
         // through", and the generic banner elsewhere cannot answer it.
         const sync = opStatus('ticket_lines:' + e.id);
+        // 2026-09-09, owner's request: "the cross signs and input fields should all be
+        // greyed out and disabled for them as they are not the holder of that ticket."
+        // Only bites on the technician screen (S.role === 'tech' — true for a real
+        // technician AND for an ops/admin swapped into Work as Technician, since swap-in
+        // sets S.role itself) and only for a ticket someone ELSE holds. On the office
+        // review screen this same curEvents array feeds (role !== 'tech' there by
+        // construction) it collapses to `locked` alone, exactly as it always has —
+        // staff are never "the holder" and were never meant to be gated on it.
+        const rowLockedForViewer = locked || (S.role === 'tech' && holderOf(t) !== myName);
         return {
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
         syncPending: !!(sync && sync.pending),
         syncFailed: !!(sync && sync.failed),
         syncTitle: sync && sync.failed ? sync.reason : '',
-        locked: locked,
-        onChange: ev => { if (locked) return; const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
+        locked: rowLockedForViewer,
+        onChange: ev => { if (rowLockedForViewer) return; const v = ev.target.value; this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events[i].text = v; }); },
         // Same commit-on-blur rule as the charged lines: the wording of a field log line
         // is evidence, so a rewrite is recorded once, with both versions.
         onTextFocus: () => {
@@ -12804,7 +12817,7 @@ class Component extends DCLogic {
           const key = 'evttext:' + t.id + ':' + i;
           const before = this.editBefore[key];
           delete this.editBefore[key];
-          if (before === undefined || locked) return;
+          if (before === undefined || rowLockedForViewer) return;
           const after = ev.target.value;
           if (before === after) return;
           this.log('Log line ' + (i + 1) + ' reworded by ' + (myName || 'Ops Manager')
@@ -12814,7 +12827,7 @@ class Component extends DCLogic {
         onTimeCommit: ev => {
           const raw = ev.target.value;
           this.clearDraft('evt:' + t.id + ':' + i);
-          if (locked || !raw) return;
+          if (rowLockedForViewer || !raw) return;
           const newIso = F.fromInput(raw);
           if (!newIso || newIso === e.ts) return;
           this.mutate(d => {
@@ -12828,7 +12841,7 @@ class Component extends DCLogic {
           });
         },
         remove: () => {
-          if (locked) return;
+          if (rowLockedForViewer) return;
           this.log('Log line ' + (i + 1) + ' deleted by ' + (myName || 'Ops Manager')
             + ': "' + e.text + '" (' + F.stamp(e.ts) + ').', 'edit');
           this.mutate(d => { const x = d.tickets.find(y => y.id === t.id); x.events.splice(i, 1); });
@@ -14341,7 +14354,7 @@ class Component extends DCLogic {
   // 10px on a full-width primary button, where it reads as the layout breaking rather
   // than as feedback. 88px is drawn from the app's own furniture — icon buttons are
   // 40-44px, the smallest labelled buttons are past 100px, nothing sits near the line.
-  var SKIP = '.mk-seg, .mk-sheet, .mk-switch';
+  var SKIP = '.mk-seg, .mk-sheet, .mk-switch, .mk-statusfilter';
   var MAX_WIDTH = 88;
   var FRAMES = [
     { transform: 'rotate(0deg)', offset: 0 },
