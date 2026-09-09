@@ -93,38 +93,29 @@ const tab = async (p, name) => {
     && !/Rigging up combination string, function tested surface equipment\./.test(body));
   await p2.close();
 
-  // The interval itself: 2026-09-04, owner's request — every two hours, not one.
-  const p3 = await signIn(browser, 'omar@makaman.ly');
-  const src = await p3.evaluate(() => document.querySelector('script[type="text/x-dc"]').textContent);
-  check('the periodic re-pin fires every two hours',
-    /const GEO_PING_INTERVAL_MS = \(typeof window[^|]+\|\| 7200000;/.test(src));
-  await p3.close();
-
-  // 2026-09-09, owner's request: most recently active first (not longest out of contact
-  // first), and the dot goes red past the SAME two-hour interval the periodic re-pin
-  // itself runs on — not the old 12h/24h amber-then-red ladder, which let a technician
-  // sit two-plus hours overdue on a two-hourly ping and still read green.
+  // 2026-09-09, owner's request: most recently active first, not longest out of contact
+  // first.
   const p4 = await signIn(browser, 'omar@makaman.ly');
   await p4.evaluate(() => window.__mkApp.mutate(d => {
-    // Yousef's t3 just synced — inside the 2h window. Mahmoud's t2 last synced over a
-    // day ago (the seed value) — well past it. If the sort or the dot ignored this,
-    // the seed order (Yousef listed first in the demo data) would hide the bug.
+    // Yousef's t3 just synced. Mahmoud's t2 last synced over a day ago (the seed value).
+    // If the sort ignored this, the seed order (Yousef listed first in the demo data)
+    // would hide the bug.
     d.tickets.find(t => t.id === 't3').syncedAt = new Date(Date.now() - 5 * 60000).toISOString();
   }));
   await p4.waitForTimeout(400);
   await tab(p4, 'Sync');
   const rows = await p4.evaluate(() => Array.from(document.querySelectorAll('.mk-dev-card')).map(card => ({
     name: card.querySelector('.mk-dev-top .mk-flex1 div').textContent.trim(),
-    dot: card.querySelector('span').style.background,
+    marker: card.querySelector('.mk-dev-top > span').textContent.trim(),
   })));
   check('the most recently active technician sorts first, not the longest out of contact',
     rows[0] && rows[0].name === 'Yousef Al-Harbi', JSON.stringify(rows.map(r => r.name)));
-  check('synced within the two-hour ping interval shows a green dot',
-    (rows.find(r => r.name === 'Yousef Al-Harbi') || {}).dot.includes('success'),
-    (rows.find(r => r.name === 'Yousef Al-Harbi') || {}).dot);
-  check('out of contact past the two-hour ping interval shows a red dot, not green',
-    (rows.find(r => r.name === 'Mahmoud Zaki') || {}).dot.includes('danger'),
-    (rows.find(r => r.name === 'Mahmoud Zaki') || {}).dot);
+  // 2026-09-09, owner's request: the leading marker is a fixed field-technician-view
+  // icon, not a second, redundant status dot beside the Online/Idle badge under Last
+  // Contact — so it reads the same for both technicians regardless of which one is
+  // actually stale.
+  check('the leading marker is the same field-technician icon for everyone, stale or not',
+    rows.every(r => r.marker === '⛑️'), JSON.stringify(rows));
   await p4.close();
 
   await browser.close();

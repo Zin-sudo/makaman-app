@@ -5,11 +5,14 @@
 // active on the app. When they're idle for over 1 hour their badge goes back to Red
 // Idle/Offline."
 //
-// Distinct from the existing coloured dot on the same card, which is about a JOB going
-// quiet (geo/sync freshness) — this is about the ACCOUNT being on the app at all, which
-// matters even for a swapped-in office account with no ticket of its own. One shared
-// derivation (fieldDevices) feeds both the technician's own "Devices on field" and the
-// office's "Field devices" screen, so this only needs to prove the badge itself, once.
+// This is about the ACCOUNT being on the app at all, which matters even for a
+// swapped-in office account with no ticket of its own — and, 2026-09-09, owner's
+// follow-up report, it is now also what "Last contact" itself reads: a device whose
+// position had just updated (a fresh log line, well within the online window) still
+// showed a stale Last Contact, because that field used to come from ticket syncedAt
+// alone, and a geo update is not a "sync" the way Job Done or a manual upload is. One
+// shared derivation (fieldDevices) feeds both the technician's own "Devices on field"
+// and the office's "Field devices" screen, so this only needs to prove it once.
 const { chromium } = require('playwright-core');
 const { TECH, makeDB, STUB, assertStubParses } = require('./cloudstub.js');
 const URL = 'http://localhost:8934/index.html';
@@ -53,6 +56,11 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   let body = await p.innerText('body');
   check('freshly signed in reads as Online on Field Devices',
     /Online/.test(body) && !/Idle\/Offline/.test(body), (body.match(/Online|Idle\/Offline/) || [''])[0]);
+  // The bug this heartbeat was actually asked to fix: this account has never synced a
+  // ticket (cloudstub's fixture starts unsynced), so before folding the heartbeat into
+  // Last Contact this line read "Never synced" even seconds after signing in.
+  check('Last contact reflects the heartbeat too, not just a ticket sync',
+    !/Never synced/.test(body), (body.match(/Last contact\n[^\n]*/i) || [''])[0]);
 
   // Idle past the (sped-up) threshold, with nothing refreshing in between — switching
   // tabs and back forces the render that actually re-evaluates "how long ago was that."

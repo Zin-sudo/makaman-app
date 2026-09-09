@@ -1810,7 +1810,7 @@
                   <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
                     <div class="mk-dev-card">
                       <div class="mk-dev-top">
-                        <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:7px"></span>
+                        <span style="font-size:15px;line-height:1;flex:none;margin-top:4px" aria-hidden="true" title="Field technician view">⛑️</span>
                         <div class="mk-flex1">
                           <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
                           <div style="font-size:13px;color:var(--ink-dim)">{{ d.base }} · {{ d.tollLabel }}</div>
@@ -3425,7 +3425,7 @@
             <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
               <div class="mk-dev-card">
                 <div class="mk-dev-top">
-                  <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:7px"></span>
+                  <span style="font-size:15px;line-height:1;flex:none;margin-top:4px" aria-hidden="true" title="Field technician view">⛑️</span>
                   <div class="mk-flex1">
                     <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
                     <div style="font-size:13px;color:var(--ink-dim)">{{ d.base }} · {{ d.tollLabel }}</div>
@@ -6527,13 +6527,6 @@ const DRAIN_RETRY_CAP_MS = (typeof window !== 'undefined' && window.__DRAIN_RETR
 // scheduleDrain() is: one row's own write touches the ticket and several children in
 // the same moment, and Postgres Changes fires once per row, not once per edit.
 const REALTIME_REFRESH_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__REALTIME_TEST_MS) || 1200;
-// How stale a device's last fix is allowed to look before Field Devices marks it red.
-// Used to be also the clock a periodic re-pin ran on (2026-09-04, owner's request: two
-// hours rather than one). 2026-09-09: the re-pin itself is no longer a timer — see
-// geoLogPing — so this now serves only the one purpose, unchanged in value: past two
-// hours with nothing fresh, the dot reads "we haven't heard from this device in as long
-// as a job actually being worked should ever go quiet."
-const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 7200000;
 // How long a cancelled ticket stays in the ordinary Inbox view before it drops out to
 // "archived" (2026-09-09, owner's request: "stays for a couple of days to allow
 // withdrawal then gets archived"). Withdrawal itself has no deadline — staff can always
@@ -12343,7 +12336,17 @@ class Component extends DCLogic {
           // Crew membership, not the opener's name — a handed-over job is still that
           // technician's open job and still their device reporting a position.
           const mine = LIVE.filter(x => inCrew(x, u.name, u.email));
+          // Last contact used to be ticket syncedAt alone — the last time a JOB reached
+          // the server. 2026-09-09, owner's report: a device plainly online (fresh
+          // position, green Online badge) still read a stale Last Contact, because the
+          // periodic re-pin (geoLogPing) touches a ticket's geo fields without those
+          // counting as a "sync" the way Job Done or a manual Sync does. The presence
+          // heartbeat every refreshCore() writes is folded in here too — whichever is
+          // more recent — so this reads "when did we last hear from this device, by any
+          // means" rather than "when did a job last finish uploading."
+          const seenAt = (D.presenceSeen || {})[u.id];
           const stamps = mine.map(x => x.syncedAt).filter(Boolean).map(s => new Date(s).getTime());
+          if (seenAt) stamps.push(new Date(seenAt).getTime());
           const lastAt = stamps.length ? Math.max.apply(null, stamps) : null;
           const open = mine.filter(x => x.status === 'logging');
           const closed = mine.filter(x => x.status !== 'logging');
@@ -12365,15 +12368,11 @@ class Component extends DCLogic {
           const lastFixes = mine.map(x => (x.geo || {}).last).filter(Boolean)
             .sort((a, b) => new Date(b.ts) - new Date(a.ts));
           const curFix = lastFixes[0];
-          const hours = lastAt === null ? Infinity : (now - lastAt) / 3600000;
-          // Online/idle badge — 2026-09-09, owner's request: distinct from the dot below,
-          // which is about a JOB going quiet, not an ACCOUNT being on the app. Someone
-          // swapped in with no open ticket of their own would otherwise never earn a green
-          // dot at all; this reads the presence heartbeat every refreshCore() writes
-          // instead, so it answers the actual question asked — "are they on the app right
-          // now" — for every row, job or no job. See PRESENCE_ONLINE_MS for the honesty
-          // rule this stays inside.
-          const seenAt = (D.presenceSeen || {})[u.id];
+          // Online/idle badge — 2026-09-09, owner's request. Reads the same presence
+          // heartbeat Last Contact above now also folds in, so it answers "are they on
+          // the app right now" for every row, job or no job — someone swapped in with no
+          // open ticket of their own has no other way to ever read as active. See
+          // PRESENCE_ONLINE_MS for the honesty rule this stays inside.
           const onlineNow = !!seenAt && (now - new Date(seenAt).getTime()) < PRESENCE_ONLINE_MS;
           return {
             name: u.name + (u.roleTag || ''), base: u.base || '—',
@@ -12381,15 +12380,6 @@ class Component extends DCLogic {
             lastLabel: lastAt === null ? 'Never synced' : F.stamp(iso(new Date(lastAt))),
             onlineDot: onlineNow ? 'var(--success)' : 'var(--danger)',
             onlineLabel: onlineNow ? 'Online' : 'Idle/Offline',
-            // Red past the same two hours the ping used to be scheduled on — 2026-09-09,
-            // owner's request. The old ladder (green under 12h, amber under 24h, red
-            // past that) meant a technician could be well overdue and still show green.
-            // The threshold outlived the timer it was borrowed from (see GEO_PING_INTERVAL_MS's
-            // own comment): a job actually being logged writes a line, and so a fix, far
-            // more often than every two hours, so two states, not three, and the dot
-            // going red now means exactly "nothing fresh in longer than a working job
-            // should ever go quiet," nothing more.
-            dot: hours > (GEO_PING_INTERVAL_MS / 3600000) ? 'var(--danger)' : 'var(--success)',
             tollLabel: open.length + ' open · ' + closed.length + ' closed',
             pendingLabel: pending ? (pending === 1 ? '1 not uploaded' : pending + ' not uploaded') : '',
             showPending: pending > 0,
