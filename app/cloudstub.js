@@ -146,6 +146,13 @@ window.__failInsert = '';
 // that -- which is the half that made the cascade look like one isolated fault.
 // Shape: { tickets: 'message', audit_log: 'message' }.
 window.__failTables = window.__failTables || null;
+// The read side of the same idea, separate from __failTables above on purpose — that one
+// is documented and used as a write-path knob (upsert/insert), and a session that has
+// actually died fails EVERY table's plain select too, not just the one being written to.
+// Shape: { tickets: 'message' } for one table, or { '*': 'message' } for all of them —
+// the shape a request running as anon actually produces, since it never knows in advance
+// which table's policy will be the one to call a function it cannot execute.
+window.__failSelect = window.__failSelect || null;
 // What the fake server refuses WITH, when it refuses.
 //
 // A refusal is not one thing. The app now sorts them — a wrong type, a policy, a clashing
@@ -214,6 +221,8 @@ window.supabase = {
             },
             then: function (ok, no) {
               window.__rtt++;
+              var failSel = window.__failSelect && (window.__failSelect[table] || window.__failSelect['*']);
+              if (failSel) return window.__wire({ data: null, error: { message: failSel } }, table).then(ok, no);
               // head:true asks for the tally and no rows. The self-check compares that
               // tally against what the device holds, so a stub that ignored it would
               // hand the app undefined and let it report a shortfall of NaN.

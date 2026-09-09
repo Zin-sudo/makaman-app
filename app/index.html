@@ -4253,6 +4253,17 @@ function errorKind(err) {
   // investigations went at the policies because of it while the real cause — a row pointing
   // at a job the server no longer has — sat unnamed in the same sentence.
   if (/foreign key|violates foreign/i.test(raw)) return 'LINK';
+  // BEFORE the general RLS test below, same reasoning as LINK: current_role(), is_staff(),
+  // my_permissions() and has_permission() are all granted to EXECUTE for `authenticated`
+  // only — not `anon` — on purpose (confirmed live against the real grants). "permission
+  // denied for function X" from any of them is not a policy this account failed, it is
+  // proof the request went out as anon: the session died and nothing downstream can tell
+  // the difference between that and an ordinary RLS refusal without this check. Confirmed
+  // live, 2026-09-09: a technician's own Self-check showed "Auth session missing!" and
+  // every other line failing the exact same way, while the app kept rendering as if she
+  // were still signed in and reported this as MK-SYNC-RLS — "not permitted to write that
+  // row" — about a read, with nothing to retry that could ever fix it.
+  if (/permission denied for function/i.test(raw)) return 'NOSESSION';
   if (/row-level security|permission denied|not allowed|violates/i.test(raw)) return 'RLS';
   // BEFORE the general JWT test below, for the same reason LINK runs before RLS: "JWT
   // issued at future" also contains the word "JWT", so without this it silently became
@@ -4313,6 +4324,7 @@ const ERROR_KIND = {
   STALE: 'Somebody else changed it first, so this version was not written over theirs.',
   LOCKED: 'The office had already approved this ticket by the time the change reached the server, and an approved ticket cannot be edited this way — permanently, not just for now. Nothing to retry; if the change still needs to happen, it has to be made from the review screen in the office.',
   AUTH: 'The session was not accepted.',
+  NOSESSION: "This device's sign-in has expired at the server — everything is being read and written as a stranger until it is fixed. You have been signed out; log in again to keep working.",
   CLOCK: "This device's clock is wrong. The server refused a token that looked like it was issued in the future — check the date and time in the device's own settings, then try again.",
   QUOTA: 'The device is out of room.',
   NET: 'The server could not be reached.',
@@ -7179,6 +7191,28 @@ class Component extends DCLogic {
       }
     }
   }
+  // Called only from errorKind's NOSESSION branch — see its own comment. By the time this
+  // runs, the server has already told us (via a function-permission refusal only `anon`
+  // can hit) that this device's JWT is gone; there is nothing left to retry, so this signs
+  // it out the same way the person's own Log Out button does, rather than leaving them
+  // staring at a screen that still looks signed in and an error message that keeps
+  // blaming a row-level security policy for a session that no longer exists. Guarded on
+  // an already-null session so two concurrent hydrates hitting this at once (the passive
+  // refresh() and a Force Refresh both funnel through refreshCore) only ever run it once.
+  handleSessionLost() {
+    if (this.state.session === null) return;
+    this.persistSession(null);
+    this.unsubscribeRealtime();
+    if (USE_CLOUD) {
+      try { localStorage.removeItem(CACHE_K); } catch (e) { /* quota */ }
+      if (sb()) sb().auth.signOut().catch(() => {});
+    }
+    this.setState({
+      session: null, showSettings: false, dialog: null,
+      data: Object.assign(seed(), { tickets: [], clients: [], users: [] }),
+      authError: ERROR_KIND.NOSESSION,
+    });
+  }
   // Saving the technician's work to the device.
   //
   // This used to be `try { setItem } catch (e) { /* quota */ }`. When the device filled
@@ -7647,7 +7681,16 @@ class Component extends DCLogic {
     if (!USE_CLOUD) return Promise.resolve();
     return outboxDrain()
       .then(() => hydrate())
-      .catch((e) => { logError('load', e, { doing: 'hydrate' }); throw e; })
+      .catch((e) => {
+        logError('load', e, { doing: 'hydrate' });
+        // See handleSessionLost's own comment. Checked here rather than only in the
+        // Force Refresh button's failure handler, because refreshCore is also the
+        // PASSIVE path (boot, reconnect, the background tick) — a session that died
+        // while nobody was looking must not just sit there failing the same way on
+        // every future tick until somebody happens to press the button.
+        if (errorKind(e) === 'NOSESSION') this.handleSessionLost();
+        throw e;
+      })
       .then((data) => {
         CLOUD_IDS.me = (((this.state.session || {}).email && (data.users || [])
           .find((u) => u.email === this.state.session.email)) || {}).id || null;
@@ -7693,7 +7736,10 @@ class Component extends DCLogic {
         }
         this.persist(merged);
         this.setState({ data: merged });
-        this.syncPresence(this.state.actingAs || null);
+        // No argument — see syncPresence's own comment. This device stating its own
+        // (possibly unswapped) actingAs here would overwrite whatever another device
+        // signed into the same account legitimately set, the instant anyone hit Refresh.
+        this.syncPresence();
       });
   }
   // The passive/background entry point — boot, reconnect, realtime, the 15-minute
@@ -8725,19 +8771,34 @@ class Component extends DCLogic {
   // exactly like geoPinOpen: never blocks the caller, never surfaces a failure as anything
   // more than a line in the error log. A missed presence write means Field Devices is a
   // beat behind for one account, not a broken swap or a wrongly-red badge that stays that
-  // way. Called on swap (with the new activeView) and, 2026-09-09 owner's request, from
-  // refreshCore() on every ordinary pull (with whatever activeView already is) purely to
-  // bump updated_at — that second call is the entire online/idle badge on Field Devices:
-  // no separate heartbeat table, just this same upsert running slightly more often.
+  // way.
+  //
+  // Two call shapes, and they must stay different. swapRole() calls this WITH the new
+  // activeView, because a swap is this device stating a fact only it just decided. Every
+  // OTHER caller — refreshCore(), on every ordinary pull, 2026-09-09 owner's request, purely
+  // to bump updated_at for the online/idle badge — calls it with no argument at all, and
+  // `active_view` must not be part of that write. Confirmed live, 2026-09-09: an ops
+  // manager swapped into Work as Technician on one device, then simply refreshed on
+  // ANOTHER device signed into the same account — one that had never itself swapped — and
+  // that second device's own refreshCore() wrote its own (unswapped) `null` over the
+  // first device's `active_view: 'tech'`, silently un-swapping him everywhere the instant
+  // anyone touched Refresh. `active_view` is shared server-side state across every device
+  // signed in as one account; a device that never swapped has no fact to state about it
+  // and must leave the column alone, not overwrite it with what merely LOOKS like the
+  // truth from its own limited, device-local `state.actingAs`.
   syncPresence(activeView) {
     if (!USE_CLOUD) return;
     const c = sb();
     if (!c || !CLOUD_IDS.me) return;
+    const row = { profile_id: CLOUD_IDS.me, updated_at: iso(new Date()) };
+    if (activeView !== undefined) row.active_view = activeView;
     // onConflict named explicitly: presence's primary key is profile_id, not the `id`
     // every other table in this app uses — same reasoning as user_settings' own
     // `user_id`, which the fake server's upsert already special-cases by name because
-    // it has no schema to read a real primary key from.
-    c.from('presence').upsert({ profile_id: CLOUD_IDS.me, active_view: activeView, updated_at: iso(new Date()) }, { onConflict: 'profile_id' })
+    // it has no schema to read a real primary key from. Omitting active_view from `row`
+    // (the heartbeat-only call) means the upsert's own ON CONFLICT UPDATE never mentions
+    // that column, so it is left exactly as it already was, insert or update alike.
+    c.from('presence').upsert(row, { onConflict: 'profile_id' })
       .then((r) => { if (r.error) logError('sync', r.error, { doing: 'presence' }); })
       .catch((e) => logError('sync', e, { doing: 'presence' }));
   }
@@ -9931,6 +9992,10 @@ class Component extends DCLogic {
   // and the cases worth asserting are the shorthand people actually write — which is far
   // easier to enumerate here than to stage a ticket for, one job log at a time.
   suggestJobTypeForTest(jobType, events) { return suggestJobTypes(jobType, events); }
+  // errorKind is a pure function of a message string — reachable directly for the same
+  // reason suggestJobTypeForTest is: asserting the classification itself does not need a
+  // real failing request staged for every kind it distinguishes.
+  errorKindForTest(err) { return errorKind(err); }
   // The downscale, reachable directly on a File built in-page rather than staged through a
   // real upload — the contract worth asserting (smaller, capped dimensions, PDFs and
   // already-small images untouched) is about the function, not about the storage call
