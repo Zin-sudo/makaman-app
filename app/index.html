@@ -1545,26 +1545,15 @@
                   </sc-if>
                 </div>
               </sc-if>
-              <div style="margin:14px 0 4px">
-                <label class="mk-field-label">Job type (objective)</label>
-                <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" list="jobtypes" placeholder="e.g. PKR FOR CSG TEST" style="width:100%;min-height:46px;padding:8px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
-                <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
-                  <!-- Proposed from the job log, never written without a tap. The objectives
-                       come out in the order they were mentioned, joined with &. Usually one
-                       chip; two when the log says "pressure test", which is two different
-                       jobs in this company and not ours to choose between. -->
-                  <div style="display:flex;flex-wrap:wrap;gap:7px">
-                    <sc-for list="{{ objectiveSuggestions }}" as="sg" hint-placeholder-count="1">
-                      <button onClick="{{ sg.accept }}" class="mk-suggest-chip" title="Set the job type to this">↑ {{ sg.label }}</button>
-                    </sc-for>
-                  </div>
-                </sc-if>
-                <datalist id="jobtypes">
-                  <sc-for list="{{ jobTypes }}" as="j" hint-placeholder-count="4">
-                    <option value="{{ j.name }}"></option>
-                  </sc-for>
-                </datalist>
-              </div>
+              <!-- Job type (objective) used to be set here, by the technician. 2026-09-09,
+                   owner's request: the objective is now office-only, entered by ops/admin
+                   on the review screen and mandatory before approval (see the checklist
+                   below and the `checks` array in render() for the enforced side of that;
+                   enforce_ticket_update_rules() refuses the write server-side even if this
+                   screen were somehow bypassed). Nothing for a technician to correctly do
+                   with this field, so it is gone from this screen entirely rather than
+                   merely disabled — a blank, greyed-out field a technician can never fill
+                   would just be a second way to ask the same unanswerable question. -->
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:18px 0 8px">Job events — {{ cur.eventCount }} lines</div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
@@ -2305,8 +2294,11 @@
                 <div class="mk-hint-end">Line timestamps editable — every change is written to the audit trail</div>
               </div>
               <div style="margin-bottom:12px;max-width:420px">
-                <label class="mk-field-label">Job type (objective)</label>
-                <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);text-transform:uppercase">
+                <label class="mk-field-label">Job type (objective) — office only</label>
+                <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid {{ jobTypeBorder }};color:var(--ink);text-transform:uppercase">
+                <sc-if value="{{ jobTypeMissing }}" hint-placeholder-val="{{ false }}">
+                  <div class="mk-jobtype-required" style="font-size:11px;margin-top:5px;color:var(--danger-deep)">{{ jobTypeMsg }}</div>
+                </sc-if>
                 <sc-if value="{{ objectiveSuggested }}" hint-placeholder-val="{{ false }}">
                   <!-- Proposed from the job log, never written without a tap. The objectives
                        come out in the order they were mentioned, joined with &. Usually one
@@ -13273,6 +13265,14 @@ class Component extends DCLogic {
       })() : [],
       noMsg: issue.msg || '', noBorder: issue.bad ? 'var(--danger-deep)' : 'rgba(var(--ink-rgb),0.16)',
       noMsgColor: issue.bad ? 'var(--danger-deep)' : (issue.ok ? 'var(--accent-deep)' : 'var(--ink-faint)'),
+      // Job type is now an office-only, mandatory field (2026-09-09, owner's request) —
+      // the technician's own input for it is gone entirely, and canApprove above already
+      // blocks approval while it's empty. This is the visible half of that same rule,
+      // same red/required convention as the ticket-number field just above: red border
+      // and a stated requirement while empty, both gone the moment it's filled.
+      jobTypeMissing: !!t && !(t.jobType || '').trim(),
+      jobTypeBorder: (t && !(t.jobType || '').trim()) ? 'var(--danger-deep)' : 'rgba(var(--ink-rgb),0.16)',
+      jobTypeMsg: (t && !(t.jobType || '').trim()) ? 'Required before approval — office only.' : '',
       // Guarded on there being an open ticket. These buttons compare candidate numbers
       // against `t.id`, and renderVals() runs for every screen, not only the review
       // one — so if the remembered ticket is not in the data (restored from another
