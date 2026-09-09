@@ -26,6 +26,7 @@ declare
   failures text := '';
   n_before int;
   n_after int;
+  n_expected int;
   expected record;
   actual_cols text[];
   tech_id uuid := '56ca31ce-19b6-49e0-93dd-8d748108e014';   -- techtest2@makaman.ly
@@ -81,14 +82,32 @@ begin
   end;
 
   -------------------------------------------------------------------------------------
-  -- Guard 2 (2026-09-09, d52f9fb, migration 0068): a technician must be able to read
-  -- OTHER technicians' profiles (Field Devices showing "the rest of the team"), and must
-  -- NOT be able to read admin/ops_manager/founder profiles. Before this migration,
-  -- profiles had only "your own row" and "any staff member, every row" — a technician's
-  -- hydrate() of `profiles` came back with exactly one row: themselves, and Field Devices
-  -- had nobody else to show, silently, with no error anywhere.
+  -- Guard 2 (2026-09-09, d52f9fb, migration 0068; widened 2026-09-10, migration 0071): a
+  -- technician must be able to read OTHER technicians' profiles (Field Devices showing
+  -- "the rest of the team"), and — since 0071 — the profile of anyone who is the
+  -- technician_id/holder_id of a ticket the technician can already see, whatever that
+  -- person's real role is (Work-as-Technician: an ops_manager/admin can open and hold a
+  -- job, and a technician reading THAT ticket must be able to name who holds it — live
+  -- incident, ticket 1882, Abobaker Awhida, 2026-09-10). Must NOT be able to read an
+  -- admin/ops_manager/founder profile through any OTHER path — 0071 widened by ticket,
+  -- not by role.
+  --
+  -- Before 0068, profiles had only "your own row" and "any staff member, every row" — a
+  -- technician's hydrate() of `profiles` came back with exactly one row: themselves, and
+  -- Field Devices had nobody else to show, silently, with no error anywhere. Before 0071,
+  -- the same silent gap reopened one level up: a ticket a technician could already read
+  -- rendered with a blank holder name whenever that holder's real role was not
+  -- 'technician'.
   -------------------------------------------------------------------------------------
   begin
+    -- Computed with full visibility, before switching role: every non-technician profile
+    -- that actually holds or opened at least one ticket, in the whole table — the
+    -- authoritative "who 0071 is supposed to expose," independent of the policy under test.
+    select count(distinct p.id) into n_expected
+    from public.profiles p
+    where p.role <> 'technician'
+      and exists (select 1 from public.tickets t where t.technician_id = p.id or t.holder_id = p.id);
+
     execute 'set local role authenticated';
     execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
 
@@ -98,8 +117,8 @@ begin
     end if;
 
     select count(*) into n_after from public.profiles where role <> 'technician';
-    if n_after > 0 then
-      failures := failures || format(E'\n  [profiles RLS] a technician can see %s non-technician profile row(s) — this policy has been widened past what was asked for ("the other technicians", not staff).', n_after);
+    if n_after <> n_expected then
+      failures := failures || format(E'\n  [profiles RLS] a technician sees %s non-technician profile row(s), expected exactly %s (every profile that holds/opened a ticket, migration 0071 — no more, no fewer). Too few means a Work-as-Technician holder''s name goes blank again (ticket 1882''s own incident); too many means the read has widened past "a ticket this technician can see."', n_after, n_expected);
     end if;
 
     execute 'reset role';
