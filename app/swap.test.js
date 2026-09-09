@@ -178,13 +178,21 @@ const login = async (p, email) => {
     const p = await open(ctx);
     await login(p, 'omar@makaman.ly');
     const src = await p.evaluate(() => document.querySelector('script[type="text/x-dc"]').textContent);
-    check('assignment, co-op and handover all read one technician list',
-      (src.match(/this\.activeTechnicians\(\)/g) || []).length >= 4,
+    check('assignment and handover still read the one technician list',
+      (src.match(/this\.activeTechnicians\(\)/g) || []).length >= 2,
       (src.match(/this\.activeTechnicians\(\)/g) || []).length + ' call sites');
     check('the swapped person is added to that list',
       /if \(!this\.state\.actingAs\) return list;/.test(src));
     check('nobody is added twice',
       /list\.some\(u => \(u\.email \|\| ''\)\.toLowerCase\(\) === me\.toLowerCase\(\)\)/.test(src));
+    // Field Devices deliberately reads a DIFFERENT, wider list (2026-09-09) — anyone
+    // else's swap, on another device, should show there but must never become an
+    // assignable crew member here just because their machine says they're "acting as a
+    // technician" right now. fieldDeviceAccounts() calls activeTechnicians() once
+    // internally, so the split does not mean the two lists can silently disagree about
+    // who a REAL technician is — only about who else gets added on top.
+    check('Field Devices reads its own, wider list built on top of the same one',
+      /fieldDeviceAccounts\(\)/.test(src) && /const real = this\.activeTechnicians\(\);/.test(src));
     await ctx.close();
   }
 

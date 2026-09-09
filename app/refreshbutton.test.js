@@ -97,8 +97,12 @@ const rtt = (p) => p.evaluate(() => window.__rtt || 0);
     await p.waitForTimeout(900);
     await p.evaluate(() => { window.__stubLatency = 0; });
     const after = await rtt(p);
+    // The threshold is "one hydrate's worth of requests, not two" — not a magic number.
+    // It has to move whenever hydrate() gains or loses a table (21, as of the presence
+    // table added 2026-09-09); perf.test.js's own "one request per table" check is what
+    // actually pins the real count, this just needs to stay comfortably above it.
     check('duplicate calls collapse to exactly one refresh, not two',
-      after - before <= 20, `${before} -> ${after} (one full hydrate reads several tables)`);
+      after - before <= 21, `${before} -> ${after} (one full hydrate reads several tables)`);
     await ctx.close();
   }
 

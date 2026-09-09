@@ -83,7 +83,13 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
   await p.waitForTimeout(900);
   body = await p.innerText('body');
-  check('the ticket shows where it was opened', /Device position/i.test(body) && /32\.887209/.test(body));
+  // 2026-09-09: ops gained location.edit, so this fix now renders as an editable input
+  // (pre-filled with the value) rather than plain text — same fix as geo.test.js's own
+  // two checks for the identical reason.
+  const coords = await p.evaluate(() => Array.from(document.querySelectorAll('input'))
+    .map(i => i.value).join(' | '));
+  check('the ticket shows where it was opened',
+    /Device position/i.test(body) && (/32\.887209/.test(body) || /32\.887209/.test(coords)));
   await p.close();
 
   // ── Observer ─────────────────────────────────────────────────────────────

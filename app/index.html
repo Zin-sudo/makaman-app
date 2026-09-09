@@ -4746,12 +4746,17 @@ function hydrate() {
     // your own rows unless you are staff, so a technician's device simply sees less
     // rather than being refused.
     all('user_permissions'),
+    // Which view every account is currently showing — 'tech' while somebody is swapped
+    // into Work as Technician, otherwise absent. One small table, readable by anyone
+    // signed in (see migration 0066), written only to your own row. Field Devices reads
+    // this to show a swapped-in ops/admin/observer alongside real technicians.
+    all('presence'),
   ]).then((res) => {
     const bad = res.find((r) => r.error);
     if (bad) throw new Error(bad.error.message || 'Could not load data.');
     const [profiles, clients, jobTypes, numbering, orgDefaults, assetQs,
       claim, settings, tickets, lines, items, assets, crew, audit, notes, attachments,
-      permCatalogue, myPerms, lastExport, permOverrides] = res.map((r) => r.data || []);
+      permCatalogue, myPerms, lastExport, permOverrides, presenceRows] = res.map((r) => r.data || []);
 
     const nameById = {}, emailById = {}, jobById = {};
     profiles.forEach((p) => { nameById[p.id] = p.full_name || p.email; emailById[p.id] = p.email; });
@@ -4796,6 +4801,12 @@ function hydrate() {
       clients: clients.map((cl) => shapeClient(cl, [])),
       jobTypes: jobTypes.map((j) => j.name),
       users: profiles.map(shapeUser),
+      // Keyed by profile id for a cheap lookup — activeTechnicians() below reads this
+      // once per render, not once per row.
+      presence: (presenceRows || []).reduce((acc, r) => {
+        if (r.active_view) acc[r.profile_id] = r.active_view;
+        return acc;
+      }, {}),
       // The catalogue as the admin screen lists it, sorted the way it reads: by
       // category, then by how much damage the capability can do.
       permissions: (permCatalogue || []).slice().sort((a, b) =>
@@ -8608,9 +8619,56 @@ class Component extends DCLogic {
     const mine = (D.users || []).find(u => (u.email || '').toLowerCase() === me.toLowerCase());
     return mine ? list.concat([mine]) : list;
   }
+  // Every account Field Devices should show a card for. 2026-09-09, owner's request:
+  // "Devices in field should also show admins, observers, ops whom are online and which
+  // role they're using... if someone is using a technician account or a view of the
+  // technician account they should show on the Field devices list as well. and show as
+  // inactive if they jump back to their administrative role view."
+  //
+  // Kept separate from activeTechnicians() on purpose — that method also feeds
+  // assignment and handover dropdowns, and "who is on the crew" must stay real
+  // technicians plus THIS device's own swap only. Anyone else's swap, elsewhere, is real
+  // for display (Field Devices) and wrong for assignment (nobody wants to hand a job to
+  // whichever ops account happens to be swapped in on a different machine right now).
+  //
+  // Reads the presence table (migration 0066) rather than local session state, since the
+  // whole point is seeing someone ELSE's device state — "jump back to their
+  // administrative role view" and they simply drop off this list the next time anyone
+  // hydrates, the same way a technician who stops being active already does.
+  fieldDeviceAccounts() {
+    const D = this.state.data || {};
+    const real = this.activeTechnicians();
+    const seen = {};
+    real.forEach(u => { seen[u.id] = true; });
+    const presence = D.presence || {};
+    const swapped = (D.users || []).filter(u => !seen[u.id] && u.status === 'active' && presence[u.id] === 'tech');
+    return real.concat(swapped).map(u => Object.assign({}, u, {
+      // Blank for a real technician — their own name is the whole story. For anyone
+      // else, their real role in parentheses, so the office can tell a technician from
+      // an admin standing in at a glance rather than being quietly misled.
+      roleTag: seen[u.id] ? '' : ' (' + u.role + ')',
+    }));
+  }
   // Going the other way is never gated on a capability. Acting as a technician drops
   // user.act_as_technician along with everything else the office holds, so a permission
   // check here would be a door that locks from the inside.
+  //
+  // syncPresence writes the one fact migration 0066's table exists for — best effort,
+  // exactly like geoPinOpen: fires on swap, never blocks it, never surfaces a failure as
+  // anything more than a line in the error log. A missed presence write means Field
+  // Devices is a beat behind for one account, not a broken swap.
+  syncPresence(activeView) {
+    if (!USE_CLOUD) return;
+    const c = sb();
+    if (!c || !CLOUD_IDS.me) return;
+    // onConflict named explicitly: presence's primary key is profile_id, not the `id`
+    // every other table in this app uses — same reasoning as user_settings' own
+    // `user_id`, which the fake server's upsert already special-cases by name because
+    // it has no schema to read a real primary key from.
+    c.from('presence').upsert({ profile_id: CLOUD_IDS.me, active_view: activeView, updated_at: iso(new Date()) }, { onConflict: 'profile_id' })
+      .then((r) => { if (r.error) logError('sync', r.error, { doing: 'presence' }); })
+      .catch((e) => logError('sync', e, { doing: 'presence' }));
+  }
   swapRole(to) {
     const S = this.state;
     const real = (S.session || {}).roleKey || 'tech';
@@ -8622,6 +8680,7 @@ class Component extends DCLogic {
         session: session, actingAs: 'tech', role: 'tech',
         roleTab: 'tickets', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, activeId: null,
       });
+      this.syncPresence('tech');
       this.toast('swap', 'Working as a technician. Your own name stays on everything you do.', 'ok');
       return;
     }
@@ -8633,6 +8692,7 @@ class Component extends DCLogic {
       session: session, actingAs: null, role: real,
       roleTab: 'tickets', mgrScreen: 'inbox', techScreen: 'list', adminTab: null, activeId: null,
     });
+    this.syncPresence(null);
     this.toast('swap', 'Back to ' + (ROLE_LABEL[real] || real) + '.', 'ok');
   }
   holdsNumbering() {
@@ -12140,7 +12200,7 @@ class Component extends DCLogic {
       // in the app ever updates, so a technician could upload all day and still
       // read "2 h ago".
       fieldDevices: (() => {
-        const techs = this.activeTechnicians();
+        const techs = this.fieldDeviceAccounts();
         const now = Date.now();
         return techs.map(u => {
           // Crew membership, not the opener's name — a handed-over job is still that
@@ -12170,7 +12230,7 @@ class Component extends DCLogic {
           const curFix = lastFixes[0];
           const hours = lastAt === null ? Infinity : (now - lastAt) / 3600000;
           return {
-            name: u.name, base: u.base || '—',
+            name: u.name + (u.roleTag || ''), base: u.base || '—',
             sortKey: lastAt === null ? -Infinity : lastAt,
             lastLabel: lastAt === null ? 'Never synced' : F.stamp(iso(new Date(lastAt))),
             // Red past the same interval the periodic ping itself runs on — 2026-09-09,
@@ -12208,7 +12268,7 @@ class Component extends DCLogic {
           };
         }).sort((a, b) => b.sortKey - a.sortKey); // most recently active first, longest out of contact last
       })(),
-      hasFieldDevices: this.activeTechnicians().length > 0,
+      hasFieldDevices: this.fieldDeviceAccounts().length > 0,
 
       // ── Account ────────────────────────────────────────────────────────────
       // The tools each role can reach from the account tab. Admin's four are the

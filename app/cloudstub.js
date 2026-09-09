@@ -68,6 +68,10 @@ const BASE_DB = {
   audit_log: [],
   ticket_notes: [],
   ticket_attachments: [],
+  // Migration 0066 — who is currently swapped into Work as Technician, read by
+  // fieldDeviceAccounts(). Named out loud rather than left to the generic
+  // db[table] || (db[table] = []) fallback below, per this file's own rule.
+  presence: [],
 };
 
 // A fake client good enough for what the app asks of it: select-all, select-eq-single,
