@@ -11519,8 +11519,12 @@ class Component extends DCLogic {
       // would have filled in has to be there first, because closing is what makes the
       // sheet real — it is not a way to tidy the inbox.
       officeClose: {
-        title: 'Close this job for the technician?',
-        body: 'It moves to Awaiting review and stops being theirs to change. They are told you closed it, and anything still unsent on their device will not overwrite what is here.',
+        // 2026-09-09, owner's request, worded almost verbatim: "This ticket is still
+        // open by {Name of Technician} are you sure you wish to {Action name}." Leading
+        // with the holder's name rather than burying it in the body — it is the one fact
+        // that makes this action different from closing any other ticket.
+        title: (() => 'This ticket is still open by ' + (t ? (holderOf(t) || 'the technician') : 'the technician') + '.')(),
+        body: 'Are you sure you wish to close the job? It moves to Awaiting review and stops being theirs to change. They are told you closed it, and anything still unsent on their device will not overwrite what is here.',
         okLabel: 'Close the job', cancelLabel: 'Cancel', hasCancel: true,
         confirm: () => {
           if (!t) return;
@@ -11536,6 +11540,19 @@ class Component extends DCLogic {
           this.toast('office-closed', 'Job closed. ' + (t.holder || t.tech || 'The technician') + ' has been told.', 'ok');
           this.setState({ dialog: null });
         },
+      },
+      // Same rule as officeClose just above, for the other office-side action that can
+      // land on a ticket somebody is still actively logging: saving a review-screen edit
+      // (mileage, a charged line, the job type) while the technician has not closed the
+      // job yet. 2026-09-09, owner's request: "when the ops try to alter, edit, change,
+      // or force close an in-progress ticket they should be prompted." Gated on the
+      // ticket actually being held by someone (`holderOf(t)` non-empty) — an in-progress
+      // ticket nobody currently holds (a stalled/abandoned one) has nobody to warn.
+      officeSaveOpen: {
+        title: (() => 'This ticket is still open by ' + (t ? (holderOf(t) || 'the technician') : 'the technician') + '.')(),
+        body: 'Are you sure you wish to save these changes? The technician is still logging this job — your edit lands alongside whatever they add next, it does not replace it.',
+        okLabel: 'Save changes', cancelLabel: 'Cancel', hasCancel: true,
+        confirm: () => { this.setState({ dialog: null }); this.saveReview(); },
       },
       // The end of the flow says what happened AND what happens next.
       //
@@ -13251,7 +13268,10 @@ class Component extends DCLogic {
         ? 'Unsaved changes on this ticket.'
         : 'Everything on this ticket is saved.',
       reviewSaveNoteFg: reviewDirty ? 'var(--warning-ink)' : 'var(--ink-faint)',
-      saveReview: () => this.saveReview(),
+      saveReview: () => {
+        if (t && t.status === 'logging' && holderOf(t)) { this.setState({ dialog: 'officeSaveOpen' }); return; }
+        this.saveReview();
+      },
 
       // ── Office-raised tickets ──────────────────────────────────────────────
       // Work does not always start with a technician tapping New Job Ticket. A
