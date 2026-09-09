@@ -14346,18 +14346,24 @@ class Component extends DCLogic {
         // seed text nothing in the app ever wrote back to, so it never once changed after
         // boot and could not actually tell an active technician from an idle one. Same
         // honest measure the ticket-level presence dot already uses (ticketRow, above):
-        // newest of this person's latest position fix or the most recent sync across any
-        // ticket they are on the crew of. This device can only ever know when someone
-        // else was last heard from, never whether they are online at this instant — so
-        // that is the only claim made, in those words, for everyone but the person
-        // actually looking at the screen.
+        // newest of this person's latest position fix, the most recent sync across any
+        // ticket they are on the crew of, OR the presence heartbeat every refreshCore()
+        // writes. 2026-09-09, owner's request: "hooked with the latest system" — this
+        // table used to have no way to show an office account with no ticket of its own
+        // (ops_manager, admin, observer/founder) as active at all, the exact gap Field
+        // Devices had before the heartbeat; folding in presenceSeen and sharing its
+        // PRESENCE_ONLINE_MS threshold closes it here too, so the two screens agree on
+        // what "recently" means instead of two different clocks quietly disagreeing.
+        // This device can only ever know when someone else was last heard from, never
+        // whether they are online at this instant — so that is the only claim made, in
+        // those words, for everyone but the person actually looking at the screen.
         const theirTickets = (D.tickets || []).filter(x => inCrew(x, u.name, u.email));
         const syncTs = theirTickets.map(x => x.syncedAt).filter(Boolean)
           .sort((a, b) => new Date(b) - new Date(a))[0] || '';
-        const contactTs = [fix && fix.ts, syncTs].filter(Boolean)
+        const seenAt = (D.presenceSeen || {})[u.id] || '';
+        const contactTs = [fix && fix.ts, syncTs, seenAt].filter(Boolean)
           .sort((a, b) => new Date(b) - new Date(a))[0] || '';
-        const FRESH_MS = 15 * 60 * 1000;
-        const freshContact = !!contactTs && (Date.now() - new Date(contactTs).getTime()) < FRESH_MS;
+        const freshContact = !!contactTs && (Date.now() - new Date(contactTs).getTime()) < PRESENCE_ONLINE_MS;
         const isMe = !!u.email && u.email === ((this.state.session || {}).email || '');
         const onlineNow = isMe ? !!this.state.online : freshContact;
         return {
