@@ -3328,7 +3328,7 @@
            permanently empty and tells them nothing. -->
       <sc-if value="{{ navSync }}" hint-placeholder-val="{{ false }}">
         <h2 class="mk-page-title">Field devices</h2>
-        <div class="mk-muted-mb20">Longest out of contact first. Positions refresh only while a job is open.</div>
+        <div class="mk-muted-mb20">Most recently active first. Positions refresh only while a job is open.</div>
         <sc-if value="{{ refreshLastInfoShow }}" hint-placeholder-val="{{ false }}">
           <div class="mk-muted-mb20" style="margin-top:-12px">{{ refreshLastInfo }}</div>
         </sc-if>
@@ -11994,8 +11994,14 @@ class Component extends DCLogic {
             name: u.name, base: u.base || '—',
             sortKey: lastAt === null ? -Infinity : lastAt,
             lastLabel: lastAt === null ? 'Never synced' : F.stamp(iso(new Date(lastAt))),
-            // Amber past a shift, red past a day: how overdue a check-in is.
-            dot: hours > 24 ? 'var(--danger)' : (hours > 12 ? 'var(--warning)' : 'var(--success)'),
+            // Red past the same interval the periodic ping itself runs on — 2026-09-09,
+            // owner's request. The old ladder (green under 12h, amber under 24h, red
+            // past that) meant a technician could be two hours overdue on a ping that is
+            // only supposed to be two hours apart and still show green, which read as
+            // "everything's fine" when the actual fact was "we haven't heard from this
+            // device in as long as the ping interval itself." Two states, not three: the
+            // dot going red now means exactly "the next ping is overdue," nothing more.
+            dot: hours > (GEO_PING_INTERVAL_MS / 3600000) ? 'var(--danger)' : 'var(--success)',
             tollLabel: open.length + ' open · ' + closed.length + ' closed',
             pendingLabel: pending ? (pending === 1 ? '1 not uploaded' : pending + ' not uploaded') : '',
             showPending: pending > 0,
@@ -12021,7 +12027,7 @@ class Component extends DCLogic {
             }),
             hasOpenJobs: open.length > 0,
           };
-        }).sort((a, b) => a.sortKey - b.sortKey); // longest out of contact first
+        }).sort((a, b) => b.sortKey - a.sortKey); // most recently active first, longest out of contact last
       })(),
       hasFieldDevices: this.activeTechnicians().length > 0,
 

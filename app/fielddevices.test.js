@@ -100,6 +100,33 @@ const tab = async (p, name) => {
     /const GEO_PING_INTERVAL_MS = \(typeof window[^|]+\|\| 7200000;/.test(src));
   await p3.close();
 
+  // 2026-09-09, owner's request: most recently active first (not longest out of contact
+  // first), and the dot goes red past the SAME two-hour interval the periodic re-pin
+  // itself runs on — not the old 12h/24h amber-then-red ladder, which let a technician
+  // sit two-plus hours overdue on a two-hourly ping and still read green.
+  const p4 = await signIn(browser, 'omar@makaman.ly');
+  await p4.evaluate(() => window.__mkApp.mutate(d => {
+    // Yousef's t3 just synced — inside the 2h window. Mahmoud's t2 last synced over a
+    // day ago (the seed value) — well past it. If the sort or the dot ignored this,
+    // the seed order (Yousef listed first in the demo data) would hide the bug.
+    d.tickets.find(t => t.id === 't3').syncedAt = new Date(Date.now() - 5 * 60000).toISOString();
+  }));
+  await p4.waitForTimeout(400);
+  await tab(p4, 'Sync');
+  const rows = await p4.evaluate(() => Array.from(document.querySelectorAll('.mk-dev-card')).map(card => ({
+    name: card.querySelector('.mk-dev-top .mk-flex1 div').textContent.trim(),
+    dot: card.querySelector('span').style.background,
+  })));
+  check('the most recently active technician sorts first, not the longest out of contact',
+    rows[0] && rows[0].name === 'Yousef Al-Harbi', JSON.stringify(rows.map(r => r.name)));
+  check('synced within the two-hour ping interval shows a green dot',
+    (rows.find(r => r.name === 'Yousef Al-Harbi') || {}).dot.includes('success'),
+    (rows.find(r => r.name === 'Yousef Al-Harbi') || {}).dot);
+  check('out of contact past the two-hour ping interval shows a red dot, not green',
+    (rows.find(r => r.name === 'Mahmoud Zaki') || {}).dot.includes('danger'),
+    (rows.find(r => r.name === 'Mahmoud Zaki') || {}).dot);
+  await p4.close();
+
   await browser.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
