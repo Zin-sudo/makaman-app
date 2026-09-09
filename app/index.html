@@ -11453,14 +11453,29 @@ class Component extends DCLogic {
     const locked = readOnly || this.settled(t);
 
     // Sheet ordering rank for a charged line. Transportation is the standing first line
-    // on a ticket (MKN-1801 is the travel line — the same code addItemByCode already
-    // special-cases for round-trip mileage); percentage lines are always the tail, with
-    // the surcharge above the discount so the discount reads as the final adjustment.
-    // Anything else keeps its insertion order in the middle band.
+    // on a ticket — detected by DESCRIPTION, not by one hardcoded item code, since each
+    // client prices its travel line under a different code (HOO/SOC use MKN-1801, AGOCO
+    // uses ST-6601, Waha uses MKN-001, Zueitina uses MKN-0001).
+    //
+    // UOM looked like the obvious signal and was tried first, but the live cleaned price
+    // lists (2026-09-10 replacement) disprove it: the travel line's own UOM cell is blank
+    // for four of the five real clients (only Waha's carries "per KM") — while a handful
+    // of unrelated catalog rows ("Truck", "Tools pick up") DO have a literal "km"/"$/km"
+    // UOM and would have been wrongly swept up as the transportation line. The one signal
+    // that is actually consistent across every real client's price list is the item's own
+    // description, which reads "Pick-up with tools traveling to wells, per KM." verbatim
+    // (checked against all six cleaned batches — this exact phrase appears exactly once
+    // per client and nowhere else). The regex also matches the demo/offline seed's British
+    // spelling ("travelling") so the local-mode tests keep working unchanged.
+    //
+    // Percentage lines are always the tail, with the surcharge above the discount so the
+    // discount reads as the final adjustment. Anything else keeps its insertion order in
+    // the middle band.
+    const isMileageItem = (it) => /pick-?up\s+with\s+tools\s+travel(l)?ing\s+to\s+wells/i.test((it && it.desc) || '');
     const ITEM_RANK = { transportation: 0, regular: 1, surcharge: 2, discount: 3 };
     const itemRank = (it) => {
       if (it.kind === 'percent') return it.sign < 0 ? ITEM_RANK.discount : ITEM_RANK.surcharge;
-      if (it.code === 'MKN-1801') return ITEM_RANK.transportation;
+      if (isMileageItem(it)) return ITEM_RANK.transportation;
       return ITEM_RANK.regular;
     };
     // Array.prototype.sort is stable, so lines that share a rank stay in the order they
@@ -11476,7 +11491,7 @@ class Component extends DCLogic {
     const addItemLine = (src, origin) => {
       if (locked || !src || !t) return;
       const isPercent = src.kind === 'percent';
-      const qty = isPercent ? '' : (src.code === 'MKN-1801' && t.mileage ? Number(t.mileage) * roundTrip : 1);
+      const qty = isPercent ? '' : (isMileageItem(src) && t.mileage ? Number(t.mileage) * roundTrip : 1);
       this.mutate(d => {
         const x = d.tickets.find(y => y.id === t.id);
         const line = { code: src.code, desc: src.desc, qty: qty, uom: src.uom, cost: src.cost, ov: {} };

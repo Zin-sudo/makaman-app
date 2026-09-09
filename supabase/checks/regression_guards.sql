@@ -269,6 +269,90 @@ begin
   end;
 
   -------------------------------------------------------------------------------------
+  -- Guard 7 (2026-09-10): the six client price lists (WAHA 1, WAHA 2, AGOCO, HOO, SOC,
+  -- Zueitina — 2,608 items total) were fully replaced with the cleaned, reviewed batches
+  -- supplied by the owner. This is exactly the class of fact cloudstub.js cannot check:
+  -- there is no real price_list_items data behind the offline demo seed, so a Playwright
+  -- test proves nothing about whether the live table actually holds 2,608 real rows
+  -- split correctly across five real clients, not 2,610 stale ones or a partial import
+  -- left over from an interrupted batch run.
+  --
+  -- Also confirms has_valid_code is still the GENERATED column it was found to be mid-
+  -- migration (`(item_number ~ '[A-Za-z]') AND (item_number ~ '[0-9]')`) — a future
+  -- migration that turns it into a plain writable column would silently stop enforcing
+  -- "the CODE column itself is unreadable" and let a bad import set it to whatever it
+  -- likes, which is exactly the ambiguity that caused the 428C9 insert failure this
+  -- guard exists to remember.
+  -------------------------------------------------------------------------------------
+  begin
+    select count(*) into n_before from public.price_list_items;
+    if n_before is distinct from 2608 then
+      failures := failures || format(E'\n  [price_list_items] expected exactly 2608 rows after the 2026-09-10 replacement, found %s — a batch may be missing or duplicated.', n_before);
+    end if;
+  exception when others then
+    failures := failures || format(E'\n  [price_list_items] row-count guard itself errored: %s', sqlerrm);
+  end;
+
+  begin
+    for expected in
+      select * from (values
+        ('Waha Oil Company', 681),
+        ('AGOCO', 245),
+        ('Harouge Oil Operations (HOO)', 424),
+        ('Sirte Oil Company (SOC)', 372),
+        ('Zueitina Oil Company', 886)
+      ) as x(client_name, expected_count)
+    loop
+      select count(*) into n_before
+      from public.price_list_items p join public.clients c on c.id = p.client_id
+      where c.name = expected.client_name;
+      if n_before is distinct from expected.expected_count then
+        failures := failures || format(E'\n  [price_list_items] client "%s" should carry %s items after the 2026-09-10 replacement, found %s.', expected.client_name, expected.expected_count, n_before);
+      end if;
+    end loop;
+  exception when others then
+    failures := failures || format(E'\n  [price_list_items] per-client count guard itself errored: %s', sqlerrm);
+  end;
+
+  begin
+    select count(*) into n_before
+    from public.price_list_items p join public.clients c on c.id = p.client_id
+    where c.name = 'Sirte Oil Company (SOC)' and p.currency <> 'LYD';
+    if n_before > 0 then
+      failures := failures || format(E'\n  [price_list_items] SOC carries %s row(s) not priced in LYD — its price list is quoted in Libyan Dinar, never USD.', n_before);
+    end if;
+    select count(*) into n_before
+    from public.price_list_items p join public.clients c on c.id = p.client_id
+    where c.name <> 'Sirte Oil Company (SOC)' and p.currency <> 'USD';
+    if n_before > 0 then
+      failures := failures || format(E'\n  [price_list_items] %s row(s) outside SOC are not priced in USD — every other client''s list is USD.', n_before);
+    end if;
+  exception when others then
+    failures := failures || format(E'\n  [price_list_items] currency guard itself errored: %s', sqlerrm);
+  end;
+
+  begin
+    if not exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'price_list_items' and column_name = 'has_valid_code'
+        and generation_expression = '((item_number ~ ''[A-Za-z]''::text) AND (item_number ~ ''[0-9]''::text))'
+    ) then
+      failures := failures || E'\n  [price_list_items] has_valid_code is no longer the generated expression this project depends on (readable code = contains a letter AND a digit) — a plain writable column here would let an import set it to anything, including the wrong thing.';
+    end if;
+    if not exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'price_list_items' and column_name = 'review_flags'
+    ) or not exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'price_list_items' and column_name = 'pricing_details'
+    ) then
+      failures := failures || E'\n  [price_list_items] review_flags/pricing_details (migration 0070) are missing — the ~214 rows the cleaned batches flagged for human review would have nowhere to record why.';
+    end if;
+  exception when others then
+    failures := failures || format(E'\n  [price_list_items] has_valid_code/review_flags shape guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
   if failures <> '' then
     raise exception E'REGRESSION GUARD FAILURES:%', failures;
   else
