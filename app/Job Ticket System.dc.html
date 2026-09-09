@@ -1579,6 +1579,29 @@
                   </div>
                 </sc-for>
               </div>
+              <!-- 2026-09-09, owner's request: tool custody reads the same as everything
+                   else on this screen — the office's own review copy of this same panel
+                   (showAssetAnswers, computed once and shared) lives further up in this
+                   file; this is that panel's phone-sized twin, not a second source of
+                   truth for it. Leaving it out of only one of the two screens is the
+                   exact "Two Account screens" trap the project has been bitten by before. -->
+              <sc-if value="{{ showAssetAnswers }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px;padding:11px 13px;border:1px solid var(--warning);background:rgba(var(--warning-rgb),0.08)">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--warning-ink);margin-bottom:8px">Allocated assets — accounted for on closing</div>
+                  <sc-for list="{{ assetAnswers }}" as="q" hint-placeholder-count="3">
+                    <div style="display:flex;gap:10px;padding:4px 0;font-size:12px;line-height:1.4">
+                      <div style="width:150px;flex:none;color:var(--ink-faint)">{{ q.label }}</div>
+                      <div style="flex:1;min-width:0;font-weight:600;color:{{ q.fg }};overflow-wrap:anywhere">{{ q.value }}</div>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ showAssetJustification }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(var(--warning-rgb),0.3);font-size:12px;line-height:1.45">
+                      <span style="color:var(--ink-faint)">Justification: </span><span style="color:var(--danger);font-weight:600">{{ assetJustification }}</span>
+                    </div>
+                  </sc-if>
+                  <div style="font-size:11px;color:var(--ink-faint);margin-top:6px">{{ assetAnsweredBy }}</div>
+                </div>
+              </sc-if>
               <sc-if value="{{ notHolder }}" hint-placeholder-val="{{ false }}">
                 <div class="mk-note" style="margin-top:12px;padding:10px 12px;background:var(--accent-wash);border-left:3px solid var(--accent);font-size:12px;line-height:1.45;color:var(--accent-ink)">{{ holderName }} has this job now. You can read it, but only they can add to the log.</div>
               </sc-if>
@@ -9216,7 +9239,12 @@ class Component extends DCLogic {
             ? this.setState({ activeId: t.id, techScreen: 'log', roleTab: 'tickets' })
             : this.openReview(t.id, { roleTab: 'tickets' }))) : null);
       }))
-      .filter((a) => deep || a.kind === 'lifecycle' || a.kind === 'pending')
+      // 2026-09-09, owner's request: "tools allocated" joins the same company-wide,
+      // read-only bucket lifecycle entries already sit in — a technician or the Observer
+      // may not touch a closing-questions answer, but they may read one, the same as any
+      // other stage of a ticket that is not theirs. Only 'edit' — an office correction —
+      // stays behind `deep`.
+      .filter((a) => deep || a.kind === 'lifecycle' || a.kind === 'assets' || a.kind === 'pending')
       .sort((a, b) => new Date(b.ts) - new Date(a.ts));
   }
 
@@ -12285,9 +12313,9 @@ class Component extends DCLogic {
           .filter(a => want === 'all' || a.kind === want)
           .slice(0, 60);
       })(),
-      hasActivity: D.tickets.some(x => (x.audit || []).some(a => deepActivity || auditKind(a) === 'lifecycle')),
-      noActivity: !D.tickets.some(x => (x.audit || []).some(a => deepActivity || auditKind(a) === 'lifecycle')),
-      activityScope: deepActivity ? 'Everything, company-wide' : 'Job stages, company-wide',
+      hasActivity: D.tickets.some(x => (x.audit || []).some(a => deepActivity || auditKind(a) === 'lifecycle' || auditKind(a) === 'assets')),
+      noActivity: !D.tickets.some(x => (x.audit || []).some(a => deepActivity || auditKind(a) === 'lifecycle' || auditKind(a) === 'assets')),
+      activityScope: deepActivity ? 'Everything, company-wide' : 'Job stages and tool custody, company-wide',
       // Chips only exist for roles that have more than one kind to choose between.
       showActivityChips: deepActivity,
       activityChips: [
@@ -13227,9 +13255,12 @@ class Component extends DCLogic {
       }),
       assetJustification: (t && t.assetCheck && t.assetCheck.justification) || '',
       showAssetJustification: !!(t && t.assetCheck && t.assetCheck.justification),
-      // Tool custody is an internal matter between the office and the field. The
-      // Observer reads the work, not how the kit was accounted for.
-      showAssetAnswers: !!t && !!t.assetCheck && S.role !== 'founder',
+      // 2026-09-09, owner's request: tool custody joins the rest of the operational
+      // history the Observer and every technician may read — used to be withheld from
+      // the Observer specifically ("an internal matter between the office and the
+      // field"); that boundary is gone, the same widening the Activity feed's own
+      // 'assets'-kind entries just got.
+      showAssetAnswers: !!t && !!t.assetCheck,
       assetAnsweredBy: t && t.assetCheck
         ? ('Answered by ' + (t.assetCheck.by || 'the technician') + ' · ' + F.stamp(t.assetCheck.at))
         : '',
@@ -14056,20 +14087,20 @@ class Component extends DCLogic {
       // an argument.
       curAudit: t
         ? (t.audit || []).slice().reverse()
-          .filter(a => curAuditDeep || auditKind(a) === 'lifecycle')
+          .filter(a => curAuditDeep || auditKind(a) === 'lifecycle' || auditKind(a) === 'assets')
           .map(a => ({
             stamp: F.stamp(a.ts),
             text: a.text,
             by: a.by ? a.by : '',
-            kindLabel: auditKind(a) === 'edit' ? 'Edit' : 'Stage',
-            kindBg: auditKind(a) === 'edit' ? 'rgba(var(--warning-rgb),0.16)' : 'var(--accent-wash)',
-            kindFg: auditKind(a) === 'edit' ? 'var(--warning)' : 'var(--accent-ink)',
+            kindLabel: auditKind(a) === 'edit' ? 'Edit' : auditKind(a) === 'assets' ? 'Assets' : 'Stage',
+            kindBg: auditKind(a) === 'edit' ? 'rgba(var(--warning-rgb),0.16)' : auditKind(a) === 'assets' ? 'rgba(var(--success-rgb),0.16)' : 'var(--accent-wash)',
+            kindFg: auditKind(a) === 'edit' ? 'var(--warning)' : auditKind(a) === 'assets' ? 'var(--success-ink)' : 'var(--accent-ink)',
           }))
         : [],
       curAuditScope: curAuditDeep
         ? 'Every recorded change to this ticket'
-        : 'Job stages only',
-      curAuditEmpty: !t || !(t.audit || []).some(a => curAuditDeep || auditKind(a) === 'lifecycle'),
+        : 'Job stages and tool custody only',
+      curAuditEmpty: !t || !(t.audit || []).some(a => curAuditDeep || auditKind(a) === 'lifecycle' || auditKind(a) === 'assets'),
       sheets: SH.pages,
       // Surfaced on the print/preview screen when a ticket has more charged items or
       // job-log lines than fit the one-page cap (ITEM_ROW_CAP=24 / LOG_ROW_CAP=25,

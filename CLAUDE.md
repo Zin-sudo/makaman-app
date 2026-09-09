@@ -132,7 +132,17 @@ already work, and the week before a field trial is not the time to try.
 
 Four roles: **technician** (raises and logs jobs, offline-first), **ops_manager** and
 **admin** (review, price, approve, and run the office screens), **observer/founder**
-(read-only, approved jobs). Capabilities come from the database
-(`public.has_permission`), and `hasPermission()` in the app treats a hydrated map as final
-— **a capability key with no migration behind it reads as false for everyone**, silently.
-Add the key in a migration or the control simply never appears.
+(read-only, every ticket — company-wide, any status, not only approved). Capabilities
+come from the database (`public.has_permission`), and `hasPermission()` in the app
+treats a hydrated map as final — **a capability key with no migration behind it reads
+as false for everyone**, silently. Add the key in a migration or the control simply
+never appears.
+
+**Activity visibility, owner's standing rule (2026-09-09).** A technician and the
+Observer read the same operational history for every ticket, not only their own: job
+openings, log-lines, stage changes, handovers, notes, tools allocated, and sheets
+downloaded/uploaded. Neither may act on someone else's ticket — a technician may only
+edit, note, or attach to a ticket they hold; the Observer may only add notes, on any
+ticket. Pricing (`ticket_items`) and office corrections (audit `kind: 'edit'`) stay
+office-only for both — the one thing this rule does not extend to. See migrations
+0064 and 0069.

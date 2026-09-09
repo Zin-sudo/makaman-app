@@ -1,5 +1,8 @@
-// The Observer reads the work, not the machinery behind it: no edits, no tool custody.
-// And the Admin owns the wording of the closing questions.
+// The Observer reads the work, not the machinery behind it: no edits — but, 2026-09-09,
+// owner's request, tool custody is no longer withheld from the Observer or a technician
+// either; both now read the same operational history (openings, log-lines, stage
+// changes, handovers, notes, tools allocated, sheets in and out) for every ticket, not
+// just their own. And the Admin owns the wording of the closing questions.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
@@ -56,19 +59,19 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   let body = await p.innerText('body');
   check('the Observer sees job stages', /STAGEMARKER/.test(body));
   check('but not edits', !/EDITMARKER/.test(body));
-  check('and not tool custody', !/ASSETMARKER/.test(body));
+  check('and now sees tool custody too', /ASSETMARKER/.test(body));
   check('and is not offered the Edits filter at all', !/\bEdits\b/.test(body));
-  check('the scope line says job stages', /Job stages/i.test(body));
+  check('the scope line still says job stages, now naming tool custody too', /Job stages/i.test(body));
 
-  // and not on the ticket either
+  // and on the ticket too, now
   await tab(p, 'Tickets');
   const rowT = p.locator('tr', { hasText: 'Kuwait' }).first();
   if (await rowT.count()) {
     await rowT.click();
     await p.waitForTimeout(900);
     body = await p.innerText('body');
-    check('nor the accounted-for panel on the ticket', !/Allocated assets — accounted for/i.test(body));
-    check('nor the justification text', !/SECRETJUSTIFICATION/.test(body));
+    check('and the accounted-for panel on the ticket', /Allocated assets — accounted for/i.test(body));
+    check('including the justification', /SECRETJUSTIFICATION/.test(body));
   }
   await p.close();
 
@@ -87,12 +90,12 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   check('including the justification', /SECRETJUSTIFICATION/.test(body));
   await p.close();
 
-  // ── a technician sees stages only, as before ─────────────────────────────
+  // ── a technician sees the same as the Observer: stages and tool custody, no edits ──
   p = await signIn(ctx, 'yousef@makaman.ly');
   await tab(p, 'Activity');
   body = await p.innerText('body');
   check('a technician sees stages but no edits', /STAGEMARKER/.test(body) && !/EDITMARKER/.test(body));
-  check('and no custody entries either', !/ASSETMARKER/.test(body));
+  check('and now sees custody entries too', /ASSETMARKER/.test(body));
   await p.close();
 
   // ── the Admin owns the questions ─────────────────────────────────────────

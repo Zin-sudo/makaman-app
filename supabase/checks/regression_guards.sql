@@ -30,7 +30,9 @@ declare
   actual_cols text[];
   tech_id uuid := '56ca31ce-19b6-49e0-93dd-8d748108e014';   -- techtest2@makaman.ly
   tech_other uuid := '0de7e9f4-7a5d-4f77-8dcf-bae73eca6925'; -- tech3@makaman.ly
+  founder_id uuid := 'c80de7fe-e187-47b6-bb4f-a1e99825f66c'; -- ahmed@makaman.ly, role=founder
   logging_ticket uuid := 'ac19bb92-b3a9-470b-a215-38c79f59da8a'; -- a real ticket, status='logging', held by tech_id
+  n_check boolean;
 begin
   -------------------------------------------------------------------------------------
   -- Guard 1 (2026-09-09, b31e739): pageAll()'s ORDER_KEY map in app/index.html must
@@ -187,6 +189,83 @@ begin
   exception when others then
     execute 'reset role';
     failures := failures || format(E'\n  [presence RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 6 (2026-09-09, migration 0069): the company-wide Activity read the owner asked
+  -- for — "technicians should see the same as observers... tools allocated... they can
+  -- see all tickets" — depends on four live facts at once: ticket_assets is readable
+  -- company-wide by any technician AND correctly correlated to the ticket it belongs to
+  -- (not the `c.ticket_id = c.ticket_id` self-comparison bug this same migration fixed,
+  -- which would have silently re-opened as a cross-ticket leak the moment anyone widened
+  -- the policy again without noticing the bug); ticket_notes is readable company-wide by
+  -- any technician; a founder/Observer can read a ticket regardless of its status, not
+  -- only 'approved'; and — the one thing that must NOT have moved — ticket_items
+  -- (pricing) stays invisible to a technician on a ticket they do not crew, exactly as
+  -- it was before this migration. Uses two disposable tickets and their child rows
+  -- rather than a real fixture, since the point is cross-ticket isolation, which no
+  -- existing pair of real tickets can be relied on to demonstrate at any given moment.
+  -------------------------------------------------------------------------------------
+  begin
+    insert into public.tickets (id, technician_id, holder_id, client_id, job_type_id, status) values
+      ('aaaaaaaa-0000-4000-8000-00000000a001', tech_other, tech_other, (select id from public.clients limit 1), (select id from public.job_types limit 1), 'done'),
+      ('bbbbbbbb-0000-4000-8000-00000000b001', tech_id, tech_id, (select id from public.clients limit 1), (select id from public.job_types limit 1), 'sent_finance');
+    insert into public.ticket_crew (ticket_id, profile_id, position) values
+      ('aaaaaaaa-0000-4000-8000-00000000a001', tech_other, 0),
+      ('bbbbbbbb-0000-4000-8000-00000000b001', tech_id, 0);
+    insert into public.ticket_assets (id, ticket_id, item, qty, note, sort_order) values
+      (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-00000000a001', 'GUARD6-ASSET-A', '1', '', 0);
+    insert into public.ticket_notes (id, ticket_id, raised_by, body) values
+      (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-00000000b001', tech_id, 'GUARD6-NOTE-B');
+    insert into public.ticket_items (id, ticket_id, item_number, description, uom, qty, unit_cost) values
+      (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-00000000b001', 'MKN-G6', 'GUARD6-ITEM-B', 'ea', '1', 1);
+
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_other, 'role', 'authenticated')::text);
+    select exists(select 1 from public.ticket_assets where item = 'GUARD6-ASSET-A') into n_check;
+    if not n_check then
+      failures := failures || E'\n  [ticket_assets RLS] a technician cannot read another technician''s ticket_assets row at all — company-wide read (migration 0069) is missing or has regressed.';
+    end if;
+    select exists(select 1 from public.ticket_notes where body = 'GUARD6-NOTE-B') into n_check;
+    if not n_check then
+      failures := failures || E'\n  [ticket_notes RLS] a technician cannot read another technician''s ticket_notes row — company-wide read (migration 0069) is missing or has regressed.';
+    end if;
+    select exists(select 1 from public.ticket_items where description = 'GUARD6-ITEM-B') into n_check;
+    if n_check then
+      failures := failures || E'\n  [ticket_items RLS] a technician on neither ticket''s crew can read ANOTHER technician''s priced items — pricing has leaked past crew-scoping. Migration 0069 deliberately left ticket_items untouched; this must stay false.';
+    end if;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [migration 0069 · technician reads] guard itself errored: %s', sqlerrm);
+  end;
+
+  begin
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', founder_id, 'role', 'authenticated')::text);
+    select exists(select 1 from public.tickets where id = 'aaaaaaaa-0000-4000-8000-00000000a001') into n_check;
+    if not n_check then
+      failures := failures || E'\n  [tickets RLS] the Observer (founder) cannot read a ''done''-status ticket — tickets_select_founder is still status-restricted; migration 0069 widened it to unconditional and this proves it stayed that way.';
+    end if;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [migration 0069 · founder reads] guard itself errored: %s', sqlerrm);
+  end;
+
+  -- Confirm the exact shape of the fix, not just its effect: a policy that happens to
+  -- pass the behavioural checks above by some OTHER route (e.g. is_staff() creeping in)
+  -- would not actually prove the self-comparison bug is gone. Read the qual back.
+  begin
+    if exists (
+      select 1 from pg_policies
+      where schemaname = 'public' and tablename = 'ticket_assets' and policyname = 'ticket_assets_select_crew'
+        and qual not like '%ticket_assets.ticket_id%'
+    ) then
+      failures := failures || E'\n  [ticket_assets RLS] ticket_assets_select_crew no longer correlates to ticket_assets.ticket_id in its own text — the c.ticket_id = c.ticket_id self-comparison bug (fixed in migration 0069) may have come back.';
+    end if;
+  exception when others then
+    failures := failures || format(E'\n  [ticket_assets RLS] qual-text guard itself errored: %s', sqlerrm);
   end;
 
   -------------------------------------------------------------------------------------

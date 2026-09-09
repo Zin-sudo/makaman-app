@@ -10,10 +10,12 @@
 //   owned by other technicians. the cross signs and input fields should all be greyed
 //   out and disabled for them as they are not the holder of that ticket."
 //
-// The database side (company-wide SELECT on tickets/ticket_lines/audit_log, still
-// crew-only on ticket_items/ticket_assets/ticket_notes) is migration 0064, verified live
-// against igutjfezxkdncrcpvnqx — not exercised here, since cloudstub.js has no RLS
-// semantics to test against. What IS testable here is the client-side half: once a
+// The database side is migrations 0064 (company-wide SELECT on tickets/ticket_lines/
+// audit_log) and 0069 (2026-09-09, same widening extended to ticket_assets and
+// ticket_notes — "tools allocated" and "notes" join the same company-wide read; only
+// ticket_items, the priced lines, stays crew-only), verified live against
+// igutjfezxkdncrcpvnqx — not exercised here, since cloudstub.js has no RLS semantics to
+// test against. What IS testable here is the client-side half: once a
 // ticket is in the local replica, every existing log line's textarea and delete cross
 // are disabled unless the viewer actually holds it, and the "add to the log" section is
 // replaced by a plain statement of who does.

@@ -98,7 +98,7 @@ const panel = (p) => p.evaluate(() => {
     // this suite did exactly that and reported the leak as fixed when nothing had
     // rendered at all.
     check('the Observer still reaches the trail', !!text, text ? '' : 'no panel rendered');
-    check('and is told it is narrowed', !!text && /job stages only/i.test(text));
+    check('and is told it is narrowed', !!text && /job stages and tool custody only/i.test(text));
     check('the stage entry is there', !!text && /job closed by the technician/i.test(text));
     check('THE EDIT IS WITHHELD',
       !!text && !/mileage changed from 100 to 120/i.test(text),
@@ -115,9 +115,9 @@ const panel = (p) => p.evaluate(() => {
     check('the per-ticket log reads the same capability as the Activity tab',
       /const curAuditDeep = this\.hasPermission\('activity\.view_edits'\);/.test(src));
     check('and the gate is applied to the rows, not only to a label',
-      /\.filter\(a => curAuditDeep \|\| auditKind\(a\) === 'lifecycle'\)/.test(src));
+      /\.filter\(a => curAuditDeep \|\| auditKind\(a\) === 'lifecycle' \|\| auditKind\(a\) === 'assets'\)/.test(src));
     check('the empty state uses the same gate, so it cannot disagree with the list',
-      /curAuditEmpty: .*curAuditDeep \|\| auditKind\(a\) === 'lifecycle'/.test(src));
+      /curAuditEmpty: .*curAuditDeep \|\| auditKind\(a\) === 'lifecycle' \|\| auditKind\(a\) === 'assets'/.test(src));
     check('who made the entry is carried through', /by: a\.by \? a\.by : '',/.test(src));
     await ctx.close();
   }
