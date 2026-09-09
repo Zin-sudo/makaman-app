@@ -1380,6 +1380,17 @@
               <button onClick="{{ startNew }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">+ New Job Ticket</button>
               <input dir="auto" value="{{ ticketQuery }}" onChange="{{ setTicketQuery }}" placeholder="Search ticket no., customer, well…" style="width:100%;min-height:40px;margin-top:16px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
               </div>
+              <!-- Filter by status (2026-09-09, owner's request). A contained,
+                   horizontally-scrolling pill row rather than an evenly-divided mk-seg:
+                   "Awaiting Review" alone is wider than a fifth of a phone screen, and
+                   squeezing five labels to fit would either wrap the text or shrink the
+                   tap targets below the 40px floor the rest of the app holds to. The
+                   scroll stays inside this one row — the page itself never does. -->
+              <div style="display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px">
+                <sc-for list="{{ techStatusOptions }}" as="o" hint-placeholder-count="5">
+                  <button onClick="{{ o.pick }}" style="flex:none;white-space:nowrap;min-height:36px;padding:0 14px;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;border:1px solid rgba(var(--ink-rgb),0.22);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+                </sc-for>
+              </div>
               <!-- The awaiting-paperwork backlog, as one line rather than as a list.
                    It used to render every waiting ticket in an unbounded warning box
                    above the inbox: twenty tickets waiting on a signature meant twenty
@@ -10807,6 +10818,19 @@ class Component extends DCLogic {
         .concat(crewNames(x))
         .some(v => String(v || '').toLowerCase().indexOf(ticketQuery) !== -1);
     };
+    // A technician's own four buckets (2026-09-09, owner's request) — coarser than the
+    // six statusChip() actually renders, on purpose: once a ticket has gone to the
+    // client or to finance it has already cleared "Approved" as far as a technician
+    // filtering his own list cares, and splitting it further would be a distinction
+    // only the office needs.
+    const techStatusBucket = (x) => {
+      if (x.status === 'cancelled') return 'cancelled';
+      if (x.status === 'done') return 'review';
+      if (SETTLED_STATES.indexOf(x.status) >= 0) return 'approved';
+      return 'progress';
+    };
+    const techStatusFilter = S.techStatusFilter || '';
+    const matchesTechStatus = (x) => !techStatusFilter || techStatusBucket(x) === techStatusFilter;
     const pageOf = (rows) => {
       const shown = Math.min(rows.length, S.ticketLimit || TICKET_PAGE);
       return {
@@ -10912,8 +10936,8 @@ class Component extends DCLogic {
       : LIVE.filter(x => everReached(x) && (!S.techFilter || inCrew(x, S.techFilter, ''))
         && matchesQuery(x))));
     const myPage = pageOf(bandedTickets(S.awaitingFilter
-      ? awaitingDocs.filter(x => inCrew(x, myName, myEmail) && matchesQuery(x))
-      : myTickets.filter(matchesQuery)));
+      ? awaitingDocs.filter(x => inCrew(x, myName, myEmail) && matchesQuery(x) && matchesTechStatus(x))
+      : myTickets.filter(x => matchesQuery(x) && matchesTechStatus(x))));
     const list = this.client(S.adminClient) ? this.client(S.adminClient).items : [];
     const curClient = t ? this.client(t.customer) : null;
 
@@ -12561,6 +12585,17 @@ class Component extends DCLogic {
 
       techName: myName,
       myCount: myTickets.length + ' on device',
+      // 2026-09-09, owner's request: let a technician filter his own list by status.
+      // 'All' plus the four buckets techStatusBucket() sorts every ticket into above —
+      // same segmented-control pattern as Settings' theme/time-format rows, so this
+      // reads as the same control language rather than a one-off.
+      techStatusOptions: [['', 'All'], ['progress', 'In Progress'], ['review', 'Awaiting Review'],
+        ['approved', 'Approved'], ['cancelled', 'Cancelled']].map(([key, label]) => ({
+        key, label,
+        bg: techStatusFilter === key ? 'var(--accent)' : 'transparent',
+        fg: techStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
+        pick: () => this.setState({ techStatusFilter: key, ticketLimit: 10 }),
+      })),
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
       myHasMore: myPage.hasMore,
       myMoreLabel: myPage.moreLabel,
