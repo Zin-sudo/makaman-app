@@ -105,6 +105,12 @@ const reasonBox = (p) => p.locator('textarea[placeholder*="recorded in the audit
       !t3.deletedAt, JSON.stringify(t3.deletedAt));
     check('and it says so on the screen',
       /called off/i.test(await text(p)));
+    // 2026-09-09: statusChip() and cardTreatment() fell all the way through to the
+    // "in progress" default for a cancelled ticket — nothing anywhere on the Inbox,
+    // Activity or Field Devices distinguished a called-off job from one still running.
+    check('the status chip reads CANCELLED, not IN PROGRESS',
+      /\bCANCELLED\b/.test(await text(p)) && !/\bIN PROGRESS\b/.test(await text(p)),
+      (await text(p)).match(/CANCELLED|IN PROGRESS/g));
 
     // And he cannot undo it himself, which the wall promised.
     await p.waitForTimeout(200);

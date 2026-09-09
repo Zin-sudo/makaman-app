@@ -6166,6 +6166,10 @@ const ICON_D = {
   people:   ['M9 11a3 3 0 100-6 3 3 0 000 6z', 'M3 19a6 6 0 0112 0', 'M16 5.5a3 3 0 010 5.6', 'M18 19a6 6 0 00-3-5.2'],
   system:   ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M12 2v3', 'M12 19v3', 'M2 12h3', 'M19 12h3', 'M4.9 4.9l2.2 2.2', 'M16.9 16.9l2.2 2.2', 'M19.1 4.9l-2.2 2.2', 'M7.1 16.9l-2.2 2.2'],
   chevron:  ['M9 6l6 6-6 6'],
+  // A cancelled job's own tile — a plain X, not the checkmark every settled stage uses,
+  // so a chip glanced at from across the room does not read as "done" for a job that
+  // was called off instead.
+  cancel:   ['M6 6l12 12', 'M18 6L6 18'],
 };
 function icon(name, size, className) {
   const d = ICON_D[name];
@@ -8629,6 +8633,10 @@ class Component extends DCLogic {
     if (t.status === 'sent_client') return { statusLabel: 'SENT TO CLIENT', chipBg: 'rgba(var(--success-rgb),0.16)', chipFg: 'var(--success-ink)' };
     if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
     if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'rgba(var(--warning-rgb),0.16)', chipFg: 'var(--warning-deep)' };
+    // Missing until 2026-09-09: a cancelled job fell through to the default below and
+    // read as "IN PROGRESS" everywhere its chip renders — the Inbox, Activity, Field
+    // Devices — indistinguishable from a job someone is actively working right now.
+    if (t.status === 'cancelled') return { statusLabel: 'CANCELLED', chipBg: 'rgba(var(--danger-rgb),0.16)', chipFg: 'var(--danger-deep)' };
     return { statusLabel: 'IN PROGRESS', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
   }
   // The same three stages as a card treatment — a coloured rule down the leading edge
@@ -8639,6 +8647,9 @@ class Component extends DCLogic {
     if (t.status === 'sent_client') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
     if (t.status === 'approved') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
     if (t.status === 'done') return { edge: 'var(--warning)', tileBg: 'rgba(var(--warning-rgb),0.16)', tileFg: 'var(--warning-ink)', tileIcon: icon('clock') };
+    // Same gap as statusChip just above: a cancelled job used to fall all the way
+    // through to the "in progress" default, tile and edge included.
+    if (t.status === 'cancelled') return { edge: 'var(--danger)', tileBg: 'rgba(var(--danger-rgb),0.16)', tileFg: 'var(--danger-deep)', tileIcon: icon('cancel') };
     return { edge: 'var(--accent)', tileBg: 'var(--accent-wash)', tileFg: 'var(--accent)', tileIcon: icon('rig') };
   }
   ticketView(t) {

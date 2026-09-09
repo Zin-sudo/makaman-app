@@ -92,10 +92,16 @@ async function open(ctx, cfg) {
       // side. AUTH_RESTORE_TIMEOUT_MS is a `const`, not a `function`, so grab()'s brace
       // matching cannot pull it out; hardcoded below alongside the other constants this
       // block already carries in by hand for the same reason.
+      // opDescribe came in when outboxSetAside started naming the refusal in logError's
+      // `doing` field ("what IS this, whatever it is") — missed here until 2026-09-09,
+      // when this suite went from a quiet false pass to a hard ReferenceError instead,
+      // which at least is the loud kind this comment already warned about. opLabel rides
+      // along because opDescribe calls it first and it has no further dependencies of
+      // its own to chase.
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
                      'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
                      'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain',
-                     'withTimeout']
+                     'withTimeout', 'opDescribe', 'opLabel']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
