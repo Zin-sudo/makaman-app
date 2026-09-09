@@ -1,0 +1,200 @@
+-- Regression guards for the live bugs found and fixed on 2026-09-09.
+--
+-- Every one of these was a real, live failure that the JS Playwright suite in app/*.test.js
+-- structurally could not have caught — neither the offline demo seed nor cloudstub.js
+-- enforce real RLS, real primary keys, or real function grants the way Postgres does. This
+-- file is that missing layer: run it against the live project (igutjfezxkdncrcpvnqx) after
+-- ANY migration that touches a table, policy, or function named below, and before shipping
+-- one. It changes nothing that outlives the run — the whole file is one transaction, rolled
+-- back at the end regardless of outcome (BEGIN at the top, ROLLBACK at the bottom), and each
+-- check's own probe writes are caught by an exception handler rather than left to fail the
+-- whole script, so it reports every failure it finds in one pass rather than stopping at the
+-- first — a single broken guard does not hide the others.
+--
+-- Run it with mcp__Supabase__execute_sql against project igutjfezxkdncrcpvnqx, or
+-- `psql ... -f supabase/checks/regression_guards.sql`. A clean run ends with a single
+-- NOTICE: "ALL REGRESSION GUARDS PASSED". Anything else names exactly which guard failed
+-- and why, in the same words the original incident was diagnosed in, so the next person
+-- (human or Claude) does not have to re-derive the diagnosis from scratch.
+--
+-- Add a new guard here, in this same shape, every time a live bug like these ships a fix —
+-- this file is the standing place for that, not a one-time list.
+begin;
+
+do $$
+declare
+  failures text := '';
+  n_before int;
+  n_after int;
+  expected record;
+  actual_cols text[];
+  tech_id uuid := '56ca31ce-19b6-49e0-93dd-8d748108e014';   -- techtest2@makaman.ly
+  tech_other uuid := '0de7e9f4-7a5d-4f77-8dcf-bae73eca6925'; -- tech3@makaman.ly
+  logging_ticket uuid := 'ac19bb92-b3a9-470b-a215-38c79f59da8a'; -- a real ticket, status='logging', held by tech_id
+begin
+  -------------------------------------------------------------------------------------
+  -- Guard 1 (2026-09-09, b31e739): pageAll()'s ORDER_KEY map in app/index.html must
+  -- name every table whose real primary key is not a plain `id` column. Ordering by a
+  -- column that does not exist fails the request outright and takes the whole hydrate
+  -- down with it — this is exactly what happened when the `presence` table (profile_id)
+  -- shipped without an entry: nine failures in three minutes on one technician's device,
+  -- every single hydrate refused by Postgres before any RLS check even ran.
+  --
+  -- This list must be kept in step BY HAND with app/index.html's own ORDER_KEY constant
+  -- and the table list hydrate() passes to all(...) — there is no way to read the JS
+  -- source from inside Postgres. When either changes, this list changes with it.
+  -------------------------------------------------------------------------------------
+  begin
+    for expected in
+      select * from (values
+        ('profiles', 'id'), ('clients', 'id'), ('job_types', 'id'),
+        ('ticket_numbering', 'id'), ('org_defaults', 'id'), ('asset_questions', 'id'),
+        ('numbering_claim', 'id'), ('user_settings', 'user_id'),
+        ('tickets', 'id'), ('ticket_lines', 'id'), ('ticket_items', 'id'),
+        ('ticket_assets', 'id'), ('ticket_crew', 'ticket_id'), ('audit_log', 'id'),
+        ('ticket_notes', 'id'), ('ticket_attachments', 'id'),
+        ('permissions', 'permission_id'), ('user_permissions', 'user_id'),
+        ('presence', 'profile_id')
+      ) as t(table_name, expected_col)
+    loop
+      select array_agg(kcu.column_name)
+        into actual_cols
+        from information_schema.table_constraints tc
+        join information_schema.key_column_usage kcu
+          on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema
+        where tc.constraint_type = 'PRIMARY KEY'
+          and tc.table_schema = 'public'
+          and tc.table_name = expected.table_name;
+
+      if actual_cols is null then
+        failures := failures || format(E'\n  [ORDER_KEY] %s: table not found — renamed or dropped? Update this guard and app/index.html''s ORDER_KEY together.', expected.table_name);
+      elsif not (expected.expected_col = any(actual_cols)) then
+        failures := failures || format(
+          E'\n  [ORDER_KEY] %s: app/index.html assumes "%s" is (part of) the primary key for pageAll()''s ordering, but the real primary key is %s. This is the exact shape of the presence.id incident (2026-09-09, b31e739) — every hydrate() of this table will be refused outright by Postgres. Add/fix its entry in ORDER_KEY.',
+          expected.table_name, expected.expected_col, actual_cols);
+      end if;
+    end loop;
+  exception when others then
+    failures := failures || format(E'\n  [ORDER_KEY] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 2 (2026-09-09, d52f9fb, migration 0068): a technician must be able to read
+  -- OTHER technicians' profiles (Field Devices showing "the rest of the team"), and must
+  -- NOT be able to read admin/ops_manager/founder profiles. Before this migration,
+  -- profiles had only "your own row" and "any staff member, every row" — a technician's
+  -- hydrate() of `profiles` came back with exactly one row: themselves, and Field Devices
+  -- had nobody else to show, silently, with no error anywhere.
+  -------------------------------------------------------------------------------------
+  begin
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+
+    select count(*) into n_before from public.profiles where role = 'technician';
+    if n_before < 2 then
+      failures := failures || format(E'\n  [profiles RLS] a technician can see only %s technician row(s) — expected at least 2 (itself plus another). migration 0068''s profiles_select_technician_team policy may be missing or narrowed.', n_before);
+    end if;
+
+    select count(*) into n_after from public.profiles where role <> 'technician';
+    if n_after > 0 then
+      failures := failures || format(E'\n  [profiles RLS] a technician can see %s non-technician profile row(s) — this policy has been widened past what was asked for ("the other technicians", not staff).', n_after);
+    end if;
+
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [profiles RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 3 (2026-09-09, 0eb3a2c): current_role()/is_staff()/my_permissions()/
+  -- has_permission() must stay grantless to `anon`. errorKind()'s NOSESSION
+  -- classification in app/index.html depends on this being true — "permission denied for
+  -- function X" is trusted as PROOF a request went out unauthenticated (dead session)
+  -- specifically because anon can never legitimately reach these functions any other way.
+  -- If anon ever gains EXECUTE here, NOSESSION starts misfiring on requests that are
+  -- actually signed in.
+  -------------------------------------------------------------------------------------
+  begin
+    execute 'set local role anon';
+    begin
+      perform public.current_role();
+      failures := failures || E'\n  [function grants] anon can call current_role() without error — errorKind()''s NOSESSION classification (app/index.html) will no longer distinguish a dead session from an ordinary RLS refusal. Revoke EXECUTE on current_role() from anon.';
+    exception when insufficient_privilege then
+      null; -- expected: anon must be refused
+    end;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [function grants] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 4 (P0-A, ticket_assets_write_holder): a technician holding a `logging` ticket
+  -- must be able to write ticket_assets for it — the allocated-assets closing-questions
+  -- feature depends on this, and it once had zero write policy at all for anyone but
+  -- staff (proven live by ticket_assets having zero rows against seven real tickets).
+  -- Uses a real ticket already in this state rather than staging one, since staging
+  -- would itself be a write this guard should not depend on succeeding.
+  -------------------------------------------------------------------------------------
+  begin
+    if not exists (select 1 from public.tickets where id = logging_ticket and holder_id = tech_id and status = 'logging') then
+      failures := failures || format(E'\n  [ticket_assets RLS] guard fixture stale: ticket %s is no longer status=logging held by %s — pick a fresh real example and update this guard.', logging_ticket, tech_id);
+    else
+      execute 'set local role authenticated';
+      execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+
+      begin
+        insert into public.ticket_assets (id, ticket_id, item, qty, note, sort_order)
+          values (gen_random_uuid(), logging_ticket, 'Regression guard probe', '0', '', 999);
+      exception when insufficient_privilege or others then
+        failures := failures || format(E'\n  [ticket_assets RLS] a technician holding a logging ticket cannot write ticket_assets for it (%s) — this is the P0-A gap: zero write policy for anyone but staff. Confirm ticket_assets_write_holder still exists and matches (holder_id = auth.uid() and status = ''logging'').', sqlerrm);
+      end;
+      execute 'reset role';
+    end if;
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [ticket_assets RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 5 (2026-09-09, 6f88ae7 + 0eb3a2c): the online/idle presence heartbeat depends
+  -- on every signed-in account being able to READ every presence row (Field Devices shows
+  -- everyone's badge) and WRITE only its own (the cross-device clobber fix — one account's
+  -- device must never be able to overwrite another account's presence row).
+  -------------------------------------------------------------------------------------
+  begin
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+
+    select count(*) into n_before from public.presence;
+    select count(*) into n_after from public.presence where profile_id = tech_id;
+    -- Read-any: this account should see at least its own row among however many exist
+    -- company-wide, i.e. it must not be silently filtered to only its own.
+    if n_before < n_after then
+      failures := failures || E'\n  [presence RLS] guard invariant broken (n_before < n_after) — cannot evaluate read-any.';
+    end if;
+
+    begin
+      insert into public.presence (profile_id, active_view, updated_at)
+        values (tech_other, null, now())
+        on conflict (profile_id) do update set updated_at = excluded.updated_at;
+      failures := failures || format(E'\n  [presence RLS] account %s can write ANOTHER account''s (%s) presence row — this is exactly the cross-device clobber shape (0eb3a2c): one signed-in device overwriting a fact only another device should state. presence_upsert_own must scope profile_id = auth.uid().', tech_id, tech_other);
+    exception when insufficient_privilege or others then
+      null; -- expected: writing someone else's row must be refused
+    end;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [presence RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  if failures <> '' then
+    raise exception E'REGRESSION GUARD FAILURES:%', failures;
+  else
+    raise notice 'ALL REGRESSION GUARDS PASSED';
+  end if;
+end $$;
+
+rollback;

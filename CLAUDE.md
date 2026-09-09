@@ -90,6 +90,30 @@ Two traps worth knowing:
 A test that agrees with a bug is worse than no test. When a suite fails after a fix, work
 out which of the two is wrong before changing either.
 
+**Every fix ships with a guard, no exceptions — owner's standing instruction (2026-09-09).**
+Not just this session's fixes: every future one too. The guard's shape depends on where the
+bug actually lived:
+
+- **If `app/*.test.js` can see it** (client logic, template markup, offline behavior): add
+  or extend a Playwright test that fails on the old code and passes on the new one. This is
+  the default and covers most fixes.
+- **If it can't** — an RLS policy, a table's real primary key, a function's EXECUTE grant,
+  or anything else that only exists in the live Postgres schema — the offline demo seed and
+  `cloudstub.js` cannot enforce it (no real RLS, no real schema, no real grants), so a
+  Playwright test proves nothing about it either way. This class of bug has already shipped
+  live three times this project (`presence.id`'s missing ORDER_KEY entry, `ticket_assets`
+  with no write policy for anyone but staff, `profiles` readable only to yourself). Its
+  guard belongs in **`supabase/checks/regression_guards.sql`** — one more check appended in
+  the same shape as the ones already there, verified against the live project
+  (`igutjfezxkdncrcpvnqx`) before the fix is considered done, not just asserted from reading
+  the migration.
+
+Run `regression_guards.sql` (via `mcp__Supabase__execute_sql` or `psql -f`) after any
+migration that touches a table, policy, or function it names, and before shipping a new one
+— it changes nothing (one transaction, rolled back at the end) and reports every failure it
+finds in one pass. A clean run ends with `NOTICE: ALL REGRESSION GUARDS PASSED`; anything
+else names the exact guard and the live fact that broke it.
+
 ---
 
 ## Design and UX
