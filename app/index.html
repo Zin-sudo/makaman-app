@@ -1804,6 +1804,7 @@
                    mgr/admin/observer shell) — one derivation, shown to everyone, not a
                    second one kept in step with the first by hand. -->
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:22px 0 8px">Devices on field</div>
+              <div class="mk-muted-mb20" style="margin-top:-14px">Most recently active first. Positions refresh only while a job is open.</div>
               <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
                 <div class="mk-col-gap10">
                   <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
@@ -1872,7 +1873,7 @@
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
                     <div>
                       <div style="font-size:13px">Arrival location</div>
-                      <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">Share where you are when you open a job. Your position stays in the top bar either way, so a screenshot of any screen can be used to find you.</div>
+                      <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">Share where you are when you open a job. This never appears anywhere on your own screen — only the office sees it, on the ticket and on Field Devices.</div>
                     </div>
                     <button onClick="{{ toggleShareLocation }}" class="mk-switch" role="switch" aria-checked="{{ shareLocationOn }}" style="background:{{ shareLocationBg }};flex:none"><span class="mk-switch-knob" style="inset-inline-start:{{ shareLocationKnob }}"></span></button>
                   </div>
@@ -2942,7 +2943,7 @@
                 <span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:5px 10px;background:var(--accent-wash);color:var(--accent-ink)">{{ j.name }}<button onClick="{{ j.remove }}" style="font-size:13px;color:var(--accent-deep);background:none;border:0;cursor:pointer;padding:0">×</button></span>
               </sc-for>
             </div>
-            <div style="font-size:12px;color:var(--ink-faint);margin-top:14px">Technicians can also type a job type freehand; the manager corrects it during review.</div>
+            <div style="font-size:12px;color:var(--ink-faint);margin-top:14px">Office staff type the job type freehand during review, not from a dropdown here — a name that matches one in this list links the ticket to it when it syncs. Technicians no longer set a job type themselves.</div>
           </div>
         </div>
       </sc-if>
@@ -8091,23 +8092,47 @@ class Component extends DCLogic {
   // nothing is happening. Each fix still replaces the previous one rather than appending,
   // so a job with forty log lines arrives with one current position, not forty
   // breadcrumbs — the last fix before Job Done is what remains.
+  // 2026-09-09, owner's request: this must update Latest/Current location "without
+  // failing to do so unless the toggle is turned off" — so the only silent no-op above is
+  // geoEnabled('periodic'); everything past that either lands a fix or queues one rather
+  // than dropping the request on the floor. GPS itself needs no signal to answer (see
+  // geoFix's own comment) — the write always lands in local state first, through mutate(),
+  // the same offline-first path every other field on this ticket already uses, so a
+  // technician logging a line with no bars gets their position recorded immediately and it
+  // rides to the server with the rest of the ticket at the next sync, same as the log line
+  // itself does. Nothing here has to know or care whether the device is online.
   geoLogPing(ticketId) {
     if (!this.geoEnabled('periodic')) return;
     const S = this.state;
     if (!S.session || S.role !== 'tech') return;
+    // geoBusy is shared with every other geo ask (the opening pin, a manual retry) — a
+    // log line landing while one of those is still in flight used to just return here and
+    // be gone, no different from the toggle being off, which is exactly the silent failure
+    // this was asked to stop being. Remembered instead, and re-asked the moment the
+    // in-flight call settles (below) — one extra fix behind, never dropped outright.
+    if (this.geoBusy) { this.geoLogPingQueued = ticketId; return; }
     const me = S.session.name;
     const askedAt = iso(new Date());
     this.geoFix((fix) => {
-      if (!fix) return;
-      this.mutate(d => {
-        const x = d.tickets.find(y => y.id === ticketId);
-        // Re-checked inside the mutation: the fix can land after the ticket was handed
-        // off or marked done while it was in flight, and a position recorded after
-        // either would be following someone who is no longer the one on site.
-        if (!x || x.status !== 'logging' || holderOf(x) !== me) return;
-        x.geo = Object.assign({}, x.geo, { last: fix, pingedAt: askedAt });
-        if (!x.geo.open) x.geo.open = fix;
-      });
+      if (fix) {
+        this.mutate(d => {
+          const x = d.tickets.find(y => y.id === ticketId);
+          // Re-checked inside the mutation: the fix can land after the ticket was handed
+          // off or marked done while it was in flight, and a position recorded after
+          // either would be following someone who is no longer the one on site.
+          if (!x || x.status !== 'logging' || holderOf(x) !== me) return;
+          x.geo = Object.assign({}, x.geo, { last: fix, pingedAt: askedAt });
+          if (!x.geo.open) x.geo.open = fix;
+        });
+      }
+      // Whatever queued up behind this call gets its own attempt now — win or lose, this
+      // one is done with geoBusy, and a request that arrived while it ran must not also
+      // pay for however this one turned out.
+      if (this.geoLogPingQueued) {
+        const queued = this.geoLogPingQueued;
+        this.geoLogPingQueued = null;
+        this.geoLogPing(queued);
+      }
     // A position meant to show whether someone is still on site has to be current, so
     // this refuses cached answers outright. (The opening pin is the one place a recent
     // cached fix is welcome — see GEO_MAX_AGE_MS.)
