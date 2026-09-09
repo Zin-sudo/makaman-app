@@ -4607,18 +4607,27 @@ function rowsChildren(t, idByName) {
 // belongs to the database's row-level security, not to this function: a technician's
 // select on tickets simply returns fewer rows than an Ops Manager's. Filtering here as
 // well would be a second, weaker copy of a rule that already exists.
-// Four of these tables have no `id` column — permissions is keyed on permission_id,
-// and ticket_crew, user_permissions and user_settings on their own columns. Ordering
-// every table by 'id' would not have truncated them, it would have failed the request
-// outright and taken the whole sign-in down with it, so the key is named per table
-// rather than assumed. (All four are small enough that a second page never comes; the
-// order is there to make the request valid, not to make it correct.)
+// Five of these tables have no `id` column — permissions is keyed on permission_id,
+// ticket_crew, user_permissions and user_settings on their own columns, and presence
+// (2026-09-09) on profile_id. Ordering every table by 'id' would not have truncated
+// them, it would have failed the request outright and taken the whole sign-in down
+// with it, so the key is named per table rather than assumed. (All five are small
+// enough that a second page never comes; the order is there to make the request valid,
+// not to make it correct.)
+//
+// presence went live without this entry — proven live, 2026-09-09: every hydrate on
+// the production database failed outright with "column presence.id does not exist",
+// which is exactly the failure this comment already described for the other four
+// tables and exactly why this map exists. Reported by a real technician's error log
+// nine times in three minutes, one per retry, which is what "took the whole sign-in
+// down with it" actually looks like on a device.
 const PAGE = 1000;
 const ORDER_KEY = {
   permissions: 'permission_id',
   ticket_crew: 'ticket_id',
   user_permissions: 'user_id',
   user_settings: 'user_id',
+  presence: 'profile_id',
 };
 
 // Hoisted out of hydrate() so the on-demand price-list fetch can reuse it rather than
