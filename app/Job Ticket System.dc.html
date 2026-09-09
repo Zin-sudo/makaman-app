@@ -288,6 +288,14 @@
     .mk-nav-title { display:none !important; }
     .mk-nav-role { display:none !important; }
     .mk-nav-name { white-space:nowrap !important; }
+    /* 2026-09-10, reported live: with the title and role already gone, the swap
+       buttons ("Work as technician" / "Back to Ops Manager") were still the two
+       longest labels left in the bar — min-width:0 (below) let the flex algorithm
+       shrink each button's own box to fit, and since the text inside stayed nowrap,
+       it spilled out past the shrunk border rather than wrapping or truncating. Same
+       fix as the title/role above: the SHORT label is what a real phone gets. */
+    .mk-swap-full { display:none !important; }
+    .mk-swap-short { display:inline !important; }
   }
   @media (max-width: 640px) {
     /* Two across rather than one. Four figures stacked single-file pushed the actual
@@ -423,6 +431,11 @@
   .mk-appbar > * { min-width:0; }
   .mk-nav-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mk-nav-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Belt and braces beside the short-label swap above: even the short text gets
+     truncated with an ellipsis rather than spilling past the button's own border,
+     in case something even narrower than a 480px phone ever renders this bar. */
+  .mk-swap-full, .mk-swap-short { overflow:hidden; text-overflow:ellipsis; }
+  .mk-swap-short { display:none; }
   @media (max-width: 380px) {
     .mk-appbar { gap:10px; padding-inline:12px; }
     .mk-nav-role { display:none; }
@@ -1127,10 +1140,10 @@
          thing it changes is who the app thinks you are working as, and that has to be
          readable from the same glance that tells you who you are. -->
     <sc-if value="{{ showSwapIn }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ swapToTech }}" title="Raise and run a job yourself. Your name stays on everything you do." style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:inherit;border:1px solid rgba(var(--on-navbar-rgb),0.22);white-space:nowrap">Work as technician</button>
+      <button onClick="{{ swapToTech }}" title="Raise and run a job yourself. Your name stays on everything you do." style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:inherit;border:1px solid rgba(var(--on-navbar-rgb),0.22);white-space:nowrap"><span class="mk-swap-full">Work as technician</span><span class="mk-swap-short">Work as tech</span></button>
     </sc-if>
     <sc-if value="{{ showSwapOut }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning-ink);border:1px solid var(--warning);white-space:nowrap">{{ swapBackLabel }}</button>
+      <button onClick="{{ swapBack }}" title="{{ swapBackHint }}" style="display:flex;align-items:center;gap:6px;padding:6px 12px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:rgba(var(--warning-rgb),0.18);color:var(--warning-ink);border:1px solid var(--warning);white-space:nowrap"><span class="mk-swap-full">{{ swapBackLabel }}</span><span class="mk-swap-short">Back</span></button>
     </sc-if>
     <!-- No boxes. Two outlined rectangles sat here — one around the bell, one around the
          whole name group — and neither was doing any work: the bar has a ground of its
@@ -9088,10 +9101,20 @@ class Component extends DCLogic {
     // online right now, because nothing here can.
     const showPresence = t.status === 'logging';
     const mine = inCrew(t, (this.state.session || {}).name, (this.state.session || {}).email);
-    const contactTs = [((t.geo || {}).last || {}).ts, ((t.geo || {}).open || {}).ts, t.syncedAt]
+    // 2026-09-10, owner's report: this dot predates the presence heartbeat built for
+    // Field Devices and the Team screen, and never got folded in — a technician who
+    // was genuinely signed in and active (just logged in, no fresh position fix or
+    // sync yet) still read "Not heard from" here, grey, on a job they were actively
+    // working. Same fold-in, same shared PRESENCE_ONLINE_MS window as those two
+    // screens, so all three agree on what "recently" means. Matched by name only —
+    // the ticket header carries the holder's name, not their id — same lossy match
+    // this file already makes going the other way (idByName, in the outbound diff).
+    const D = this.state.data;
+    const holderUser = (D.users || []).find(u => u.name === holderOf(t));
+    const seenAt = holderUser ? (D.presenceSeen || {})[holderUser.id] : '';
+    const contactTs = [((t.geo || {}).last || {}).ts, ((t.geo || {}).open || {}).ts, t.syncedAt, seenAt]
       .filter(Boolean).sort((a, b) => new Date(b) - new Date(a))[0] || '';
-    const FRESH_MS = 15 * 60 * 1000;
-    const fresh = !!contactTs && (Date.now() - new Date(contactTs).getTime()) < FRESH_MS;
+    const fresh = !!contactTs && (Date.now() - new Date(contactTs).getTime()) < PRESENCE_ONLINE_MS;
     const online = !!this.state.online;
     return Object.assign({
       id: t.id, customer: t.customer, tech: t.tech, well: t.well, jobType: t.jobType || '—',

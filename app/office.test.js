@@ -146,6 +146,36 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
     seen.warm === 'In contact' && /success/.test(seen.warmDot), seen.warm + ' / ' + seen.warmDot);
   check('an old fix says when, rather than going on claiming contact',
     /^Last heard /.test(seen.stale), seen.stale);
+
+  // 2026-09-10, owner's report, screenshot in hand: this dot predates the presence
+  // heartbeat built for Field Devices and the Team screen (2026-09-09) and never got
+  // folded in — a technician freshly signed in and actively working a job, with no
+  // position fix yet and no sync since the last edit, still read "Not heard from",
+  // grey, on the very job they were on. Same fold-in as those two screens: a fresh
+  // presenceSeen entry alone, nothing else, must read as recent contact here too.
+  const heartbeat = await p.evaluate(() => {
+    const app = window.__mkApp;
+    const live = (app.state.data.tickets || []).filter(t => t.status === 'logging');
+    const t = live[0];
+    app.mutate(d => {
+      const x = d.tickets.find(y => y.id === t.id);
+      x.geo = {}; x.syncedAt = '';
+      const u = d.users.find(u2 => u2.name === (x.holder || x.tech));
+      u.id = u.id || 'presence-test-id';
+      d.presenceSeen = Object.assign({}, d.presenceSeen, { [u.id]: new Date().toISOString() });
+    });
+    const fresh = app.ticketView(app.state.data.tickets.find(y => y.id === t.id));
+    app.mutate(d => {
+      d.presenceSeen[Object.keys(d.presenceSeen)[0]] = new Date(Date.now() - 5 * 3600 * 1000).toISOString();
+    });
+    const stale = app.ticketView(app.state.data.tickets.find(y => y.id === t.id));
+    return { freshLabel: fresh.presenceLabel, freshDot: fresh.presenceDot, staleLabel: stale.presenceLabel };
+  });
+  check('a fresh presence heartbeat alone — no position fix, no sync — reads as in contact',
+    heartbeat.freshLabel === 'In contact' && /success/.test(heartbeat.freshDot),
+    heartbeat.freshLabel + ' / ' + heartbeat.freshDot);
+  check('and goes stale again past the shared window, not stuck green forever',
+    /^Last heard /.test(heartbeat.staleLabel), heartbeat.staleLabel);
   await p.close();
 
   // On his own job, the technician's own live flag IS the fact.

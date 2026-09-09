@@ -123,7 +123,9 @@ const login = async (p, email) => {
     const ctx = await b.newContext();
     const p = await open(ctx, 430);
     await login(p, 'omar@makaman.ly');
-    await p.getByRole('button', { name: /work as technician/i }).click();
+    // At this phone width the short label is what's actually on screen — see the
+    // swap-buttons-stay-inside-their-border block below.
+    await p.getByRole('button', { name: /work as tech/i }).click();
     await p.waitForTimeout(900);
 
     const before = await p.evaluate(() => (window.__mkApp.state.data.tickets || []).length);
@@ -214,6 +216,61 @@ const login = async (p, email) => {
       (src.match(/actingAs: null/g) || []).length >= 3);
     check('nothing about the swap is written to a profile',
       !/actingAs[\s\S]{0,120}from\('profiles'\)/.test(src));
+    await ctx.close();
+  }
+
+  // ── The swap buttons stay inside their own border, at any width ──
+  //
+  // 2026-09-10, reported live with a screenshot: "WORK AS TECHNICIAN" spilled out
+  // past its own button on an iPhone-width screen. min-width:0 on every appbar child
+  // (deliberate, so the row itself never forces a horizontal scroll) let the flex
+  // layout shrink the button's own box, and since the label inside had nowrap and no
+  // way to shrink WITH it, the text spilled past the border rather than staying
+  // inside it. A real phone's exact font metrics are not reproducible here (a
+  // self-hosted condensed font can render a few px narrower or wider than in this
+  // sandbox), so this forces the same shape of squeeze directly — a button pinned
+  // well under its label's natural width — rather than hoping one particular
+  // viewport happens to reproduce it. Below 480px the label itself also shortens
+  // (see the @media rule) — a second, independent line of defence, checked
+  // separately at a real phone width further down.
+  {
+    const ctx = await b.newContext();
+    const p = await open(ctx); // desktop width — the FULL label is what renders
+    await login(p, 'omar@makaman.ly');
+    await p.addStyleTag({ content: '.mk-appbar button { max-width: 70px !important; }' });
+    const fits = (loc) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+
+    const swapIn = p.getByRole('button', { name: /work as technician/i });
+    check('the swap-in button exists, pinned well under its label\'s natural width',
+      await swapIn.count() > 0);
+    check('and its text truncates to fit rather than spilling past the border',
+      await fits(swapIn));
+
+    await swapIn.click();
+    await p.waitForTimeout(900);
+    const swapOut = p.getByRole('button', { name: /back to ops manager/i });
+    check('the swap-out button exists, same squeeze', await swapOut.count() > 0);
+    check('and it too truncates rather than spilling past the border',
+      await fits(swapOut));
+    await ctx.close();
+  }
+
+  // ── And at a real phone width, the label itself is short enough not to need it ──
+  {
+    const ctx = await b.newContext();
+    const p = await open(ctx, 390);
+    await login(p, 'omar@makaman.ly');
+    const fits = (loc) => loc.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+
+    const swapIn = p.getByRole('button', { name: /work as tech/i });
+    check('the short label is what a real phone gets', await swapIn.count() > 0);
+    check('and it fits comfortably on its own, no truncation needed',
+      await fits(swapIn));
+
+    await swapIn.click();
+    await p.waitForTimeout(900);
+    const swapOut = p.getByRole('button', { name: /^back$/i });
+    check('same for the way back', await swapOut.count() > 0 && await fits(swapOut));
     await ctx.close();
   }
 
