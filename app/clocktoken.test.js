@@ -11,8 +11,10 @@
 // Both halves are proven here, the same way NET's identical treatment is already proven
 // elsewhere in this suite: a queued write that keeps failing as CLOCK must never be
 // counted against `tries` or set aside, only actually stop being retried once the
-// underlying fault clears; and a foreground action must retry once, silently, before
-// ever bothering whoever is waiting on it.
+// underlying fault clears; and a foreground action must retry — with a short backoff, up
+// to CLOCK_RETRY_MAX times (2026-09-10: widened from a single retry, since nothing says
+// the disagreement clears inside one short pause) — silently, before ever bothering
+// whoever is waiting on it.
 const { chromium } = require('playwright-core');
 const { makeDB, STUB, assertStubParses } = require('./cloudstub.js');
 const URL = 'http://localhost:8934/index.html';
@@ -99,7 +101,7 @@ const pile = (p) => p.evaluate(() => {
     await ctx.close();
   }
 
-  // ── A foreground action retries once, silently, before bothering anyone ──
+  // ── A foreground action retries, with a backoff, silently, before bothering anyone ──
   {
     const { ctx, p } = await boot(b);
     const r1 = await p.evaluate((msg) => {
@@ -116,7 +118,10 @@ const pile = (p) => p.evaluate(() => {
     const toastAfterRecover = await p.evaluate(() => (document.querySelector('.mk-toast') || {}).textContent || '');
     check('nobody watching the ring is ever told anything went wrong', !/issued in the future/i.test(toastAfterRecover), toastAfterRecover);
 
-    // ── A SECOND failure in a row is the one that finally reaches the person ──
+    // ── A fault that never clears is retried CLOCK_RETRY_MAX times, not forever ──
+    // 2026-09-10: widened from a single retry to a short backoff (up to 3 more tries)
+    // — nothing says a real disagreement clears inside one short pause, only "within a
+    // few seconds" — so one failed retry used to be a false negative here.
     const r2 = await p.evaluate((msg) => {
       let calls = 0;
       return window.__mkApp.runBusy('test-clock-persist', 'Testing', () => {
@@ -124,13 +129,32 @@ const pile = (p) => p.evaluate(() => {
         return Promise.reject(new Error(msg));
       }).then(() => ({ calls: calls }), (err) => ({ error: err.message, calls: calls }));
     }, CLOCK_MSG);
-    check('exactly one retry is attempted, not an open-ended loop', r2.calls === 2, JSON.stringify(r2));
+    check('the fault is retried 3 more times (4 calls total), not once and not forever',
+      r2.calls === 4, JSON.stringify(r2));
     await p.waitForTimeout(200);
     const toastAfterPersist = await p.evaluate(() => (document.querySelector('.mk-toast') || {}).textContent || '');
-    check('a fault that does not clear on the one retry is finally shown',
+    check('a fault that does not clear after every retry is finally shown',
       /issued in the future/i.test(toastAfterPersist), toastAfterPersist);
     check('and it no longer tells someone to go check a clock that is probably fine',
       !/this device's clock is wrong/i.test(toastAfterPersist), toastAfterPersist);
+    await ctx.close();
+  }
+
+  // ── refreshCurrentTab (the top-bar Force Refresh / Sync button) gets the same
+  // treatment — it calls refreshCore() directly, not through runBusy, and used to show
+  // the raw MK-CLOCK sentence on the very first refusal. ──
+  {
+    const { ctx, p } = await boot(b);
+    await p.evaluate((msg) => { window.__failSelect = { '*': msg }; }, CLOCK_MSG);
+    await p.getByRole('button', { name: 'Refresh current tab' }).click();
+    // Worst case here is CLOCK_RETRY_MAX retries at the test's own short backoff
+    // (clockRetryMs=50 doubling 3 times) plus the drain/hydrate round trips themselves —
+    // comfortably inside this wait.
+    await p.waitForTimeout(1500);
+    const toast = await p.evaluate(() => (document.querySelector('.mk-toast') || {}).textContent || '');
+    check('Force Refresh also retries a CLOCK refusal before ever showing it',
+      /issued in the future/i.test(toast), toast);
+    await p.evaluate(() => { window.__failSelect = {}; });
     await ctx.close();
   }
 

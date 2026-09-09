@@ -75,6 +75,20 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   const after = await p.evaluate(() => window.__mkApp.state.data.tickets.find(t => t.id === 't2').events[0].text);
   check('a disabled textarea genuinely refuses the edit', before === after, JSON.stringify({ before, after }));
 
+  // 2026-09-10, owner's request: the same lock, applied to notes — migration 0069 lets a
+  // technician now READ notes on a colleague's ticket (company-wide activity), but
+  // ticket_notes_insert_viewer still requires ticket_crew, so writing one to it was
+  // refused by the database every time (MK-SYNC-RLS ×4, techtest2@makaman.ly, live,
+  // 2026-09-09) while the screen showed a live-looking box with no explanation. Proven
+  // the same way as the log-line lock just above: the input is gone, not merely disabled,
+  // and a plain sentence explains why, naming the real holder.
+  // A placeholder never appears in innerText — it is a rendering hint, not text content —
+  // so the box's actual absence is checked on the element itself, not on body text.
+  check('no note box is offered on a ticket that is not his',
+    await p.getByPlaceholder(/Raise a note on this job/i).count() === 0);
+  check('a plain sentence explains why, naming the real holder',
+    /Mahmoud Zaki holds this job\. Only they can raise a note here\./i.test(body));
+
   // ── His own ticket (t3) — none of this applies ─────────────────────────────────────
   await p.evaluate(() => window.__mkApp.setState({ activeId: 't3', techScreen: 'log', roleTab: 'tickets' }));
   await p.waitForTimeout(400);
@@ -82,6 +96,8 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   check('on his own open ticket, the "someone else holds this" banner is gone',
     !/has this job now/i.test(body));
   check('and "Log line" is offered again', /Log line — stamps/i.test(body));
+  check('and the note box is offered again on his own ticket',
+    await p.getByPlaceholder(/Raise a note on this job/i).count() === 1);
 
   const ownRowState = await p.evaluate(() => {
     const boxes = Array.from(document.querySelectorAll('textarea'));
@@ -118,6 +134,10 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   });
   check('and every existing log line is disabled for him too, real role notwithstanding',
     swappedRows.allDisabled, JSON.stringify(swappedRows));
+  const swappedNoteBoxCount = await p2.getByPlaceholder(/Raise a note on this job/i).count();
+  check('and the same note lock applies to him swapped-in, real role notwithstanding',
+    swappedNoteBoxCount === 0
+      && /Mahmoud Zaki holds this job\. Only they can raise a note here\./i.test(swappedBody));
   await p2.close();
 
   await b.close();

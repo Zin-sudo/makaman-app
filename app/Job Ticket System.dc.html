@@ -1731,6 +1731,12 @@
                       <button onClick="{{ addNote }}" disabled="{{ noteDraftEmpty }}" style="flex:none;padding:0 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--accent);color:var(--on-accent);border:0;opacity:{{ noteAddOpacity }}">RAISE</button>
                     </div>
                   </sc-if>
+                  <!-- 2026-09-10, owner's request: a technician who is not this job's crew
+                       is told so, in place of a note box that would only ever be refused —
+                       same treatment attachLockedNote already gives paperwork below. -->
+                  <sc-if value="{{ noteLocked }}" hint-placeholder-val="{{ false }}">
+                    <div class="mk-note" style="margin-top:12px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ noteLockedNote }}</div>
+                  </sc-if>
                 </div>
               </sc-if>
 
@@ -2629,6 +2635,12 @@
                     <input dir="auto" value="{{ noteDraft }}" onChange="{{ setNoteDraft }}" placeholder="Raise a note on this job…" style="flex:1;min-width:0;min-height:38px;padding:0 11px;font-size:13px;background:var(--field);color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.22)">
                     <button onClick="{{ addNote }}" disabled="{{ noteDraftEmpty }}" style="flex:none;padding:0 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;cursor:pointer;background:var(--accent);color:var(--on-accent);border:0;opacity:{{ noteAddOpacity }}">RAISE</button>
                   </div>
+                </sc-if>
+                <!-- 2026-09-10, owner's request: same as the phone copy above — a
+                     non-crew technician is told why, in place of a note box that would
+                     only ever be refused. -->
+                <sc-if value="{{ noteLocked }}" hint-placeholder-val="{{ false }}">
+                  <div class="mk-note" style="margin-top:12px;padding:10px 12px;font-size:12px;line-height:1.45;background:rgba(var(--ink-rgb),0.05);border-left:3px solid rgba(var(--ink-rgb),0.25);color:var(--ink-dim)">{{ noteLockedNote }}</div>
                 </sc-if>
               </div>
             </sc-if>
@@ -4357,14 +4369,24 @@ const ERROR_AREA = {
   APP: 'The app itself',
 };
 const ERROR_KIND = {
-  RLS: 'The database refused it under a row-level security policy — the signed-in account is not permitted to write that row.',
+  // 2026-09-10, owner's request: most refusals this names are ones the screen should have
+  // prevented outright by greying out the control (see canAddNoteTo/canAttachTo) — this
+  // wording only reaches anyone when a genuinely unanticipated case slips past a
+  // preventative check (a ticket handed to someone else moments before the tap lands, for
+  // one). It used to say "the database refused it under a row-level security policy," which
+  // named the mechanism instead of the fact: nobody acts on jargon about a policy they have
+  // never heard of. This says the fact in words a person can actually do something with —
+  // and does NOT claim retrying is futile: a bare RLS refusal is not always permanent (see
+  // the queue's own reasoning a few hundred lines down, where this exact ambiguity is why
+  // it still gets real retries before anything is set aside).
+  RLS: "You don't have permission to make this change. If this looks wrong — the job should be yours, or the account should be able to do this — check with the office.",
   TYPE: 'A value had the wrong type or shape for its column.',
   DUP: 'Something with that key already exists.',
   STALE: 'Somebody else changed it first, so this version was not written over theirs.',
   LOCKED: 'The office had already approved this ticket by the time the change reached the server, and an approved ticket cannot be edited this way — permanently, not just for now. Nothing to retry; if the change still needs to happen, it has to be made from the review screen in the office.',
   AUTH: 'The session was not accepted.',
   NOSESSION: "This device's sign-in has expired at the server — everything is being read and written as a stranger until it is fixed. You have been signed out; log in again to keep working.",
-  CLOCK: "A token was refused as issued in the future. This is almost always a brief clock disagreement between servers that clears on its own within a few seconds — your device's own clock does not have to be wrong for it to happen, and usually is not. It has already been retried once automatically; if it keeps happening, check the date and time in the device's own settings as well.",
+  CLOCK: "A token was refused as issued in the future. This is almost always a brief clock disagreement between servers that clears on its own within a few seconds — your device's own clock does not have to be wrong for it to happen, and usually is not. It has already been retried automatically several times; if it keeps happening after that, check the date and time in the device's own settings as well.",
   QUOTA: 'The device is out of room.',
   NET: 'The server could not be reached.',
   MISSING: 'The row or file was not there.',
@@ -4386,17 +4408,38 @@ const OUTBOX_TRIES = 5;
 // while a header keeps racing against fresh edits from someone else, which ends almost
 // immediately in practice.
 const REBASE_MAX_TRIES = 3;
-// How long runBusy() waits before silently retrying a foreground action once, when the
-// first attempt was refused as MK-CLOCK ("JWT issued at future"). Traced live, 2026-09-09:
-// the device's own clock was already correct and set automatically, and the failure came
-// and went within the same minute with nothing on the phone changed in between — the
-// same shape outboxDrain's own comment already documents for a session that had not
-// finished attaching yet (an audit_log row refused, then landing unchanged a few seconds
-// later). A clock-issuance refusal is a fact about the MOMENT the request was made, not
-// about the request itself, so one retry a short pause later is the actual fix; sending
-// someone to check settings that are already correct is not. Test-overridable so
+// How long a foreground action (runBusy, refreshCurrentTab) waits before silently
+// retrying, when an attempt was refused as MK-CLOCK ("JWT issued at future"). Traced live,
+// 2026-09-09: the device's own clock was already correct and set automatically, and the
+// failure came and went within the same minute with nothing on the phone changed in
+// between — the same shape outboxDrain's own comment already documents for a session that
+// had not finished attaching yet (an audit_log row refused, then landing unchanged a few
+// seconds later). A clock-issuance refusal is a fact about the MOMENT the request was
+// made, not about the request itself, so retrying a short pause later is the actual fix;
+// sending someone to check settings that are already correct is not. Test-overridable so
 // clocktoken.test.js does not have to wait for it in real time.
 const CLOCK_RETRY_DELAY_MS = (typeof window !== 'undefined' && window.__CLOCK_RETRY_TEST_MS) || 1500;
+// 2026-09-10, owner's follow-up: a single retry is not always enough — nothing says the
+// disagreement clears inside 1.5s, only that it clears "within a few seconds." Backs off
+// (1×, 2×, 4× the base delay) for up to this many retries — worst case a few extra
+// seconds of a spinner, not an error — before finally admitting anything is wrong.
+const CLOCK_RETRY_MAX = 3;
+// Shared by every foreground path that makes a live round trip a person is actually
+// watching (runBusy, refreshCurrentTab) — anything queued through outboxDrain already
+// gets the equivalent treatment its own way, retried indefinitely via scheduleDrain's own
+// backoff, because nobody is watching a spinner for those at all. `run` is retried in
+// place; only a CLOCK-classified refusal is ever retried, and only up to CLOCK_RETRY_MAX
+// times — everything else, and a CLOCK refusal that still has not cleared after that many
+// tries, is thrown straight through to the caller unchanged.
+function retryThroughClockSkew(run, attempt) {
+  attempt = attempt || 0;
+  return run().catch((err) => {
+    if (attempt >= CLOCK_RETRY_MAX || errorKind(err) !== 'CLOCK') throw err;
+    const delay = CLOCK_RETRY_DELAY_MS * Math.pow(2, attempt);
+    return new Promise((resolve) => setTimeout(resolve, delay))
+      .then(() => retryThroughClockSkew(run, attempt + 1));
+  });
+}
 
 // Ids are minted on the device, not by the database. An offline technician opening a
 // ticket needs its id immediately — for the ticket's own children, for the audit trail,
@@ -7680,18 +7723,12 @@ class Component extends DCLogic {
     };
     // A refusal classified MK-CLOCK is a fact about the MOMENT the request landed, not
     // about this action — see the identical reasoning on outboxDrain's own CLOCK branch,
-    // traced to the same live incident (2026-09-09). One silent retry after a short pause
-    // catches that window before anyone watching the ring is told anything at all; the
-    // ring keeps spinning through the pause, since from where they are standing nothing
-    // has actually gone wrong yet. Only a second failure in a row — of any kind — reaches
-    // the toast below.
-    const attempt = (isRetry) => run().catch((err) => {
-      if (!isRetry && errorKind(err) === 'CLOCK') {
-        return new Promise((resolve) => setTimeout(resolve, CLOCK_RETRY_DELAY_MS)).then(() => attempt(true));
-      }
-      throw err;
-    });
-    return attempt(false).then((result) => {
+    // traced to the same live incident (2026-09-09). Silent retries with a short backoff
+    // (retryThroughClockSkew) catch that window before anyone watching the ring is told
+    // anything at all; the ring keeps spinning through every pause, since from where they
+    // are standing nothing has actually gone wrong yet. Only a failure that is still
+    // happening after every retry — of any kind — reaches the toast below.
+    return retryThroughClockSkew(run).then((result) => {
       stop();
       if (this.state.busy && this.state.busy.startedAt === startedAt) {
         this.setState({ busy: { key: key, label: label, pct: 100, startedAt: startedAt, tone: 'ok' } });
@@ -7879,7 +7916,11 @@ class Component extends DCLogic {
       if (S.adminTab === 'check') return Promise.resolve(this.runSelfCheck());
       return Promise.resolve();
     };
-    return this.runLatest('topRefresh', () => this.refreshCore().then(extra)).then(
+    // 2026-09-10, owner's follow-up: this button showed the raw MK-CLOCK sentence on the
+    // very first refusal — it calls refreshCore() directly rather than through runBusy, so
+    // it never got that retry treatment even though it makes the exact same kind of live
+    // round trip. Wrapped the same way runBusy wraps its own `run()`.
+    return this.runLatest('topRefresh', () => retryThroughClockSkew(() => this.refreshCore().then(extra))).then(
       () => {
         try { performance.mark('refresh_completed'); } catch (e) { /* not fatal */ }
         this.setState({ refreshBusy: false, refreshLastMs: Date.now() - startedAt, refreshLastOk: true });
@@ -9912,6 +9953,25 @@ class Component extends DCLogic {
     if (role === 'mgr' || role === 'admin') return true;
     // The technician who did the job. Crew, not "a technician": a job passed between two
     // hands leaves both answerable for it, and nobody else.
+    const me = this.state.session || {};
+    return inCrew(t, me.name, me.email);
+  }
+  // Mirrors canAttachTo immediately above — same three-way split (staff and the Observer
+  // may note any ticket, a technician only one they hold) — applied to notes instead of
+  // attachments. This check did not exist before 2026-09-10: canAddNote below used to be
+  // "does this role have note.add" alone, with no per-ticket holder check, so a technician
+  // who could merely SEE another technician's ticket (the 2026-09-09 company-wide activity
+  // read) still got a live-looking note box on it. Postgres refused every one of those
+  // writes correctly — ticket_notes_insert_viewer requires the caller to be ticket_crew —
+  // but nothing on screen said so first: MK-SYNC-RLS ×4, techtest2@makaman.ly, 2026-09-09,
+  // confirmed live against the ticket's real crew list. staff (is_staff()) and founder are
+  // unrestricted here because the database's own INSERT policy already grants them any
+  // ticket; only 'tech' needs the crew check.
+  canAddNoteTo(t) {
+    if (!t) return false;
+    if (!this.hasPermission('note.add')) return false;
+    const role = this.state.actingAs ? 'tech' : this.state.role;
+    if (role !== 'tech') return true;
     const me = this.state.session || {};
     return inCrew(t, me.name, me.email);
   }
@@ -12950,11 +13010,18 @@ class Component extends DCLogic {
       },
 
       // ── Notes on the open ticket ──
-      // Shown to anyone who can see the ticket. Raising is gated on note.add, answering
-      // on note.resolve, both through hasPermission so an exception granted to one person
-      // works the same way here as anywhere else.
+      // Shown to anyone who can see the ticket. Raising is gated on canAddNoteTo — note.add
+      // through hasPermission, same as everywhere else, PLUS (for a technician only) being
+      // on the ticket's own crew — answering on note.resolve.
       showNotes: !!t,
-      canAddNote: !!t && this.hasPermission('note.add'),
+      canAddNote: this.canAddNoteTo(t),
+      // Why the box is absent, when it is (2026-09-10, owner's request) — mirrors
+      // attachLockedNote below exactly: a panel that simply omits its own composer teaches
+      // nobody what to do next, and it is the reason a technician saw MK-SYNC-RLS instead
+      // of a sentence in the first place.
+      noteLocked: !!t && !this.canAddNoteTo(t),
+      noteLockedNote: (!t || this.canAddNoteTo(t)) ? ''
+        : (holderOf(t) + ' holds this job. Only they can raise a note here.'),
       noteDraft: S.noteDraft || '',
       noteDraftEmpty: !String(S.noteDraft || '').trim(),
       noteAddOpacity: String(S.noteDraft || '').trim() ? '1' : '0.45',
