@@ -39,11 +39,13 @@ async function boot(browser, email, w, h) {
   await p.waitForTimeout(1000);
   return p;
 }
+// The Inbox's table became simple ticket tiles, same style as a technician's own
+// list (2026-09-10) — read the well code off each tile's location line instead of
+// a "Field / Well / Rig" column, in the same DOM order the bands render in.
 const wells = (p) => p.evaluate(() => {
-  const th = Array.from(document.querySelectorAll('th')).find(h => /field \/ well/i.test(h.textContent || ''));
-  if (!th) return null;
-  return Array.from(th.closest('table').querySelectorAll('tbody tr'))
-    .map(tr => (tr.textContent.match(/W\d/) || [''])[0]).filter(Boolean);
+  const cards = document.querySelectorAll('.mk-ticket-card');
+  if (!cards.length) return null;
+  return Array.from(cards).map(c => (c.textContent.match(/W\d/) || [''])[0]).filter(Boolean);
 });
 
 (async () => {

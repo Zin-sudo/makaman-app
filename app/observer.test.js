@@ -64,6 +64,8 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   check('the scope line still says job stages, now naming tool custody too', /Job stages/i.test(body));
 
   // and on the ticket too, now
+  // The Observer's own Tickets tab is a separate screen (founderRows), not the ops
+  // Inbox this session's tile change touched — its rows stay <tr>.
   await tab(p, 'Tickets');
   const rowT = p.locator('tr', { hasText: 'Kuwait' }).first();
   if (await rowT.count()) {
@@ -83,7 +85,8 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
     /STAGEMARKER/.test(body) && /EDITMARKER/.test(body) && /ASSETMARKER/.test(body));
   check('and keeps the filter chips', /\bEdits\b/.test(body));
   await tab(p, 'Tickets');
-  await p.locator('tr', { hasText: 'Kuwait' }).first().getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  await p.locator('.mk-ticket-card', { hasText: 'Kuwait' }).first().click();
   await p.waitForTimeout(900);
   body = await p.innerText('body');
   check('and reads the custody panel on the ticket', /Allocated assets — accounted for/i.test(body));

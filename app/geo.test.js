@@ -149,9 +149,9 @@ async function logLine(page, text) {
     if (who === 'ops manager') {
       // Pick the row for the ticket this test created (Test Field / TG-1), not
       // whichever seeded ticket happens to sort first.
-      const row = page.locator('tr', { hasText: 'TG-1' }).first();
-      const btn = row.getByRole('button', { name: /^(Review|View)$/i }).first();
-      await btn.click(); await page.waitForTimeout(900);
+      // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+      const card = page.locator('.mk-ticket-card', { hasText: 'TG-1' }).first();
+      await card.click(); await page.waitForTimeout(900);
       const body = await page.textContent('body');
       // 2026-09-09: ops/admin gained location.edit, so the fix now renders as an
       // editable input (pre-filled with the value) rather than plain text — its value

@@ -69,7 +69,7 @@ const stage = (p, n) => p.evaluate((many) => {
         && !document.querySelector('.mk-stat-tile'),
       tiles: Array.from(document.querySelectorAll('.mk-stat-tile'))
         .map(x => (x.innerText || '').split('\n').slice(0, 2).join(' = ')),
-      rows: document.querySelectorAll('.mk-stack tbody tr').length,
+      rows: document.querySelectorAll('.mk-ticket-card').length,
     }));
     check('the counter row carries it', before.tiles.some(t => /Awaiting paperwork/i.test(t)),
       JSON.stringify(before.tiles));
@@ -84,15 +84,17 @@ const stage = (p, n) => p.evaluate((many) => {
     await p.waitForTimeout(700);
     const on = await p.evaluate(() => ({
       filtered: window.__mkApp.state.awaitingFilter === true,
-      // Every row on screen is one of the jobs being chased.
-      rows: Array.from(document.querySelectorAll('.mk-stack tbody tr'))
-        .map(r => (r.innerText || '').split('\n')[0]),
+      // Every row on screen is one of the jobs being chased — the ticket number is
+      // shown top-right on the tile now, not necessarily the tile's first line, so
+      // the whole tile's text is searched rather than assuming a fixed line.
+      rows: Array.from(document.querySelectorAll('.mk-ticket-card'))
+        .map(r => (r.innerText || '').replace(/\s+/g, ' ').trim()),
       action: (Array.from(document.querySelectorAll('.mk-stat-tile'))
         .map(x => x.innerText).find(t => /Awaiting paperwork/i.test(t)) || ''),
     }));
     check('tapping filters the inbox', on.filtered);
     check('and the rows shown are the ones being chased',
-      on.rows.length > 0 && on.rows.every(r => /^90\d\d/.test(r)),
+      on.rows.length > 0 && on.rows.every(r => /90\d\d/.test(r)),
       on.rows.slice(0, 3).join(', ') + ' (' + on.rows.length + ' rows)');
     check('the tile says how to get back', /Show all/i.test(on.action));
 

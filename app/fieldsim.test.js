@@ -430,7 +430,7 @@ const trail = (p, id) => p.evaluate((tid) => {
     });
     await p.waitForTimeout(1200);
     const rendered = await p.evaluate(() => ({
-      rows: document.querySelectorAll('.mk-stack tbody tr').length,
+      rows: document.querySelectorAll('.mk-ticket-card').length,
       total: window.__mkApp.state.data.tickets.length,
     }));
     check('400 tickets do not stall the Tickets tab', ms < 200,

@@ -264,7 +264,7 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
   await p4.waitForTimeout(900);
   const filtered = await p4.evaluate(() => ({
     on: window.__mkApp.state.awaitingFilter === true,
-    rows: Array.from(document.querySelectorAll('.mk-stack tbody tr'))
+    rows: Array.from(document.querySelectorAll('.mk-ticket-card'))
       .map(r => (r.innerText || '').replace(/\s+/g, ' ').trim()),
   }));
   check('and names the ticket number so it can be chased',

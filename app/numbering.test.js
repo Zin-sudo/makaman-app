@@ -34,8 +34,9 @@ const seedAll = (p) => p.evaluate(() => {
   localStorage.setItem('makaman.jobtickets.v2', JSON.stringify(d));
 });
 const openReview = async (p, text) => {
-  const row = p.locator('tr', { hasText: text }).first();
-  await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  const row = p.locator('.mk-ticket-card', { hasText: text }).first();
+  await row.click();
   await p.waitForTimeout(800);
 };
 

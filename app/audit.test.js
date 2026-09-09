@@ -29,7 +29,8 @@ const audit = (page) => page.evaluate(() => {
   await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('makaman2026');
   await page.getByRole('button', { name: /log in/i }).click();
   await page.waitForTimeout(1000);
-  await page.getByRole('button', { name: /^Review$/i }).first().click();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  await page.locator('.mk-ticket-card').first().click();
   await page.waitForTimeout(900);
 
   // 1. mileage

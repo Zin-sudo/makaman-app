@@ -57,7 +57,9 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await p.getByRole('button', { name: /log in/i }).click();
   await p.waitForTimeout(1000);
 
-  const rows = () => p.locator('tbody tr').count();
+  // The Inbox's table became simple ticket tiles, same style as a technician's own
+  // list (2026-09-10) — count tiles, not table rows.
+  const rows = () => p.locator('.mk-ticket-card').count();
   check('the inbox opens with ten, not everything', await rows() === 10, String(await rows()));
   check('and says how many there are', /2[0-9] tickets/.test(await p.innerText('body')),
     (await p.innerText('body')).split('\n').find(l => /tickets$/.test(l.trim())) || '');
@@ -77,7 +79,7 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await box.fill('7007');
   await p.waitForTimeout(500);
   check('searching a ticket number finds exactly it', await rows() === 1, String(await rows()));
-  check('and it is the right one', /7007/.test(await p.innerText('tbody')));
+  check('and it is the right one', /7007/.test(await p.innerText('.mk-card-grid')));
 
   // search resets the paging rather than staying expanded
   await box.fill('');

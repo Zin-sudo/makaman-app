@@ -113,8 +113,11 @@ function db(itemsPerClient) {
     const verdict = find(rows, 'Signed in (server)');
     check('a clock-skew refusal is caught, not read as a generic auth failure',
       verdict.ok === false, verdict.detail);
+    // 2026-09-09: rewritten again — a token issued a moment "in the future" is almost
+    // always a brief clock disagreement between servers that clears on its own, not proof
+    // this device's own clock is wrong (see clocktoken.test.js for the retry itself).
     check('and it says the actual cause in plain words',
-      /clock is wrong/.test(verdict.detail) && /check the date and time/i.test(verdict.detail),
+      /clock disagreement/i.test(verdict.detail) && /device's own date and time/i.test(verdict.detail),
       verdict.detail);
     // The raw Postgres/gotrue sentence is not what a technician acts on — the plain-words
     // rewrite is what belongs on screen, not "JWT issued at future" verbatim.

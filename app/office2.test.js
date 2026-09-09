@@ -77,10 +77,11 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   check('and shows the coordinates for the technician who shared them', /32\.887209/.test(body));
   check('and says so plainly for those who have not', /No Location Shared/i.test(body));
 
-  // the ticket detail
+  // the ticket detail — the whole tile opens review now, not a button inside a row
+  // (2026-09-10: the Inbox's table became simple ticket tiles, same style as a
+  // technician's own list).
   await tab(p, 'Tickets');
-  const row = p.locator('tr', { hasText: 'ZT-9' }).first();
-  await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  await p.locator('.mk-ticket-card', { hasText: 'ZT-9' }).first().click();
   await p.waitForTimeout(900);
   body = await p.innerText('body');
   // 2026-09-09: ops gained location.edit, so this fix now renders as an editable input
@@ -101,6 +102,9 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   });
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
+  // The Observer's own Tickets tab is a separate screen (founderRows), not the ops
+  // Inbox — its rows were never the "bog boxes" this change fixed, and its <tr onClick>
+  // already opened review before this change, so this selector stays untouched.
   check('the Observer can open a ticket at all', await p.locator('tr', { hasText: '9001' }).count() > 0);
   await p.locator('tr', { hasText: '9001' }).first().click();
   await p.waitForTimeout(900);

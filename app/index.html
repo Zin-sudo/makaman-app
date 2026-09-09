@@ -562,7 +562,16 @@
   }
   /* The office roles' pages scroll under a bar pinned to the viewport, so the last
      row of every dashboard needs room to clear it. */
-  .mk-page { padding-bottom:96px; flex:1 0 auto; }
+  /* 2026-09-10: mk-page is a flex item of the root column (see the flex:1 note
+     below) with no width of its own, so its cross-axis size fell back to its
+     content's intrinsic minimum. That was invisible until a descendant refused to
+     shrink on purpose — the status-filter pill row's horizontally-scrolling
+     buttons (flex:none, white-space:nowrap) — which then dragged the whole page,
+     and the viewport, out to their width instead of scrolling inside their own
+     row as the row's own overflow-x:auto already intended. width:100% pins the
+     page to the container's actual width so a non-shrinking descendant can only
+     ever overflow itself, never the page around it. */
+  .mk-page { padding-bottom:96px; flex:1 0 auto; width:100%; }
   /* flex:1 turns the root wrapper (min-height:100vh, now display:flex column — see the
      opening <div>) into a proper sticky footer: this page fills whatever room a short
      screen leaves, pushing showDeskNav's bar down to sit flush at the bottom edge instead
@@ -2021,54 +2030,48 @@
             </button>
           </sc-for>
         </div>
-        <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
-          <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:14px">
-            <thead>
-              <tr>
-                <th class="mk-th-11">Ticket No.</th>
-                <th class="mk-th-11">Customer</th>
-                <th class="mk-th-11">Field / Well / Rig</th>
-                <th class="mk-th-11">Technician</th>
-                <th class="mk-th-11">Job dates</th>
-                <th class="mk-th-11">Lines</th>
-                <th class="mk-th-11">Status</th>
-                <th style="border-bottom:1px solid rgba(var(--ink-rgb),0.16)"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
-                <tr>
-                  <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);border-left:3px solid {{ t.edge }};font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
-                  <td data-label="Customer" class="mk-td-pad11">
-                    <div style="display:flex;align-items:center;gap:9px">
-                      <div class="mk-icon-chip mk-icon-chip-sm" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
-                      <span>{{ t.customer }}</span>
-                    </div>
-                  </td>
-                  <td data-label="Field / Well / Rig" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ t.locLine }}</td>
-                  <td data-label="Technician" class="mk-td-pad11">
-                    {{ t.crewLabel }}
-                    <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
-                      <div style="font-size:10px;letter-spacing:0.05em;color:var(--hue-indigo);margin-top:2px">CO-OP</div>
-                    </sc-if>
-                  </td>
-                  <td data-label="Job dates" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-size:13px;color:var(--ink-dim)">{{ t.dateRange }}</td>
-                  <td data-label="Lines" class="mk-td-pad11">{{ t.eventCount }}</td>
-                  <td data-label="Status" class="mk-td-pad11">
-                    <div style="display:flex;align-items:center;gap:8px">
-                      <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
-                      <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
-                        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-faint)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
-                      </sc-if>
-                    </div>
-                  </td>
-                  <td style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);text-align:right">
-                    <button onClick="{{ t.review }}" style="padding:6px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ t.actionLabel }}</button>
-                  </td>
-                </tr>
-              </sc-for>
-            </tbody>
-          </table>
+        <!-- The same status filter "My Job Tickets" has, adopted here (2026-09-10,
+             owner's request) — identical pill row, same reasoning: a horizontally-
+             scrolling row rather than an mk-seg, since "Awaiting Review" alone is
+             wider than a fifth of even a desktop column at this font size. -->
+        <div class="mk-statusfilter" style="display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px">
+          <sc-for list="{{ mgrStatusOptions }}" as="o" hint-placeholder-count="5">
+            <button onClick="{{ o.pick }}" style="flex:none;white-space:nowrap;min-height:36px;padding:0 14px;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;border:1px solid rgba(var(--ink-rgb),0.22);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+          </sc-for>
+        </div>
+        <!-- Simple ticket tiles, the same style as a technician's own list (2026-09-10,
+             owner's request), in place of the wide multi-column table this used to be —
+             on a phone that table stacked into a big, dense card per row (Ticket No.,
+             Customer, Field/Well/Rig, Technician, Job dates, Lines, Status, one under the
+             other); this is the same compact tile a technician already reads, showing the
+             office's own priorities (ticket number, crew) instead of a technician's own
+             (arrival time). The whole tile opens review now, not only a button inside it. -->
+        <div class="mk-card-grid mk-col-gap10">
+          <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
+            <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
+                <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:10px;padding:3px 8px;letter-spacing:0.05em;background:var(--hue-indigo-wash);color:var(--hue-indigo)">CO-OP</span>
+                </sc-if>
+                <sc-if value="{{ t.presenceShow }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-faint)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
+                </sc-if>
+                <span class="mk-hint-end">{{ t.noLabel }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px">
+                <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
+                <div class="mk-flex1">
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;line-height:1.15">{{ t.customer }}</div>
+                  <div style="font-size:13px;color:var(--ink-dim)">{{ t.locLine }}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(var(--ink-rgb),0.08);font-size:11px;color:var(--ink-faint)">
+                <span>{{ t.crewLabel }}</span>
+                <span>{{ t.eventCount }} log lines</span>
+              </div>
+            </div>
+          </sc-for>
         </div>
         <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
           <div style="font-size:12px;color:var(--ink-faint)">{{ inboxCountLabel }}</div>
@@ -4361,7 +4364,7 @@ const ERROR_KIND = {
   LOCKED: 'The office had already approved this ticket by the time the change reached the server, and an approved ticket cannot be edited this way — permanently, not just for now. Nothing to retry; if the change still needs to happen, it has to be made from the review screen in the office.',
   AUTH: 'The session was not accepted.',
   NOSESSION: "This device's sign-in has expired at the server — everything is being read and written as a stranger until it is fixed. You have been signed out; log in again to keep working.",
-  CLOCK: "This device's clock is wrong. The server refused a token that looked like it was issued in the future — check the date and time in the device's own settings, then try again.",
+  CLOCK: "A token was refused as issued in the future. This is almost always a brief clock disagreement between servers that clears on its own within a few seconds — your device's own clock does not have to be wrong for it to happen, and usually is not. It has already been retried once automatically; if it keeps happening, check the date and time in the device's own settings as well.",
   QUOTA: 'The device is out of room.',
   NET: 'The server could not be reached.',
   MISSING: 'The row or file was not there.',
@@ -4383,6 +4386,17 @@ const OUTBOX_TRIES = 5;
 // while a header keeps racing against fresh edits from someone else, which ends almost
 // immediately in practice.
 const REBASE_MAX_TRIES = 3;
+// How long runBusy() waits before silently retrying a foreground action once, when the
+// first attempt was refused as MK-CLOCK ("JWT issued at future"). Traced live, 2026-09-09:
+// the device's own clock was already correct and set automatically, and the failure came
+// and went within the same minute with nothing on the phone changed in between — the
+// same shape outboxDrain's own comment already documents for a session that had not
+// finished attaching yet (an audit_log row refused, then landing unchanged a few seconds
+// later). A clock-issuance refusal is a fact about the MOMENT the request was made, not
+// about the request itself, so one retry a short pause later is the actual fix; sending
+// someone to check settings that are already correct is not. Test-overridable so
+// clocktoken.test.js does not have to wait for it in real time.
+const CLOCK_RETRY_DELAY_MS = (typeof window !== 'undefined' && window.__CLOCK_RETRY_TEST_MS) || 1500;
 
 // Ids are minted on the device, not by the database. An offline technician opening a
 // ticket needs its id immediately — for the ticket's own children, for the audit trail,
@@ -5489,7 +5503,19 @@ function outboxDrain() {
         // So only an answer FROM the server counts. A connection that never arrived
         // leaves the op exactly as it was, and stops this drain: everything queued behind
         // it is about to fail for the same reason, and trying proves nothing.
-        if (errorKind(err) === 'NET') return Promise.reject(err);
+        //
+        // MK-CLOCK belongs in this same bucket, not the RLS-shaped one below. It IS an
+        // answer from the server — PostgREST refusing a token as "issued in the future" —
+        // but it is not a fact about THIS row: every op behind it carries the identical
+        // token and would fail the identical way in the same drain, for a disagreement
+        // between two clocks that is gone within moments (traced live, 2026-09-09: the
+        // device's own clock was already correct and automatic; the refusal came and went
+        // inside the same minute with nothing on the phone changed in between — the same
+        // shape as the session-not-attached-yet race two paragraphs up, not a broken
+        // setting). Counting it against `tries` would eventually set aside a perfectly
+        // good change as "refused, check your device's clock" for a blip that had already
+        // passed by the time anyone read the banner.
+        if (errorKind(err) === 'NET' || errorKind(err) === 'CLOCK') return Promise.reject(err);
         q[n].tries = (q[n].tries || 0) + 1;
         // A foreign key that does not resolve is as terminal as a version conflict: the row
         // it points at is not there, and asking four more times cannot put it there. This
@@ -5561,9 +5587,12 @@ function outboxDrain() {
     );
   };
   return step(0).catch((err) => {
-    // Reached only by the no-signal path above. Nothing was lost; the queue keeps
-    // whatever it had and the next drain picks up where this one stopped.
-    if (errorKind(err) !== 'NET') throw err;
+    // Reached only by the no-signal / clock-skew paths above. Nothing was lost; the
+    // queue keeps whatever it had and the next drain picks up where this one stopped —
+    // and, same as NET, that next drain is scheduled with backoff by scheduleDrain()
+    // rather than left to wait for something else to ask again (see its own comment).
+    const kind = errorKind(err);
+    if (kind !== 'NET' && kind !== 'CLOCK') throw err;
   }).then(() => {
     // Re-read, and remove only what THIS drain actually settled.
     //
@@ -7649,7 +7678,20 @@ class Component extends DCLogic {
     const stop = () => {
       if (this.busyTimer) { clearInterval(this.busyTimer); this.busyTimer = null; }
     };
-    return run().then((result) => {
+    // A refusal classified MK-CLOCK is a fact about the MOMENT the request landed, not
+    // about this action — see the identical reasoning on outboxDrain's own CLOCK branch,
+    // traced to the same live incident (2026-09-09). One silent retry after a short pause
+    // catches that window before anyone watching the ring is told anything at all; the
+    // ring keeps spinning through the pause, since from where they are standing nothing
+    // has actually gone wrong yet. Only a second failure in a row — of any kind — reaches
+    // the toast below.
+    const attempt = (isRetry) => run().catch((err) => {
+      if (!isRetry && errorKind(err) === 'CLOCK') {
+        return new Promise((resolve) => setTimeout(resolve, CLOCK_RETRY_DELAY_MS)).then(() => attempt(true));
+      }
+      throw err;
+    });
+    return attempt(false).then((result) => {
       stop();
       if (this.state.busy && this.state.busy.startedAt === startedAt) {
         this.setState({ busy: { key: key, label: label, pct: 100, startedAt: startedAt, tone: 'ok' } });
@@ -9614,8 +9656,9 @@ class Component extends DCLogic {
           const err = r && r.error;
           if (!u && err) {
             add('Signed in (server)', false, errorKind(err) === 'CLOCK'
-              ? "this device's clock is wrong — the server refused the session as issued in "
-                + "the future. Check the date and time in the device's own settings, then try again."
+              ? "a token was refused as issued in the future — almost always a brief clock "
+                + "disagreement between servers, not this device. Try again; check the device's "
+                + "own date and time only if it keeps happening."
               : err.message);
             return null;
           }
@@ -9624,8 +9667,9 @@ class Component extends DCLogic {
         },
         (e) => {
           add('Signed in (server)', false, errorKind(e) === 'CLOCK'
-            ? "this device's clock is wrong — the server refused the session as issued in "
-              + "the future. Check the date and time in the device's own settings, then try again."
+            ? "a token was refused as issued in the future — almost always a brief clock "
+              + "disagreement between servers, not this device. Try again; check the device's "
+              + "own date and time only if it keeps happening."
             : e.message);
           return null;
         }),
@@ -11324,6 +11368,12 @@ class Component extends DCLogic {
     };
     const techStatusFilter = S.techStatusFilter || '';
     const matchesTechStatus = (x) => !techStatusFilter || techStatusBucket(x) === techStatusFilter;
+    // 2026-09-10, owner's request: the same status filter "My Job Tickets" already has,
+    // adopted onto the office's own Inbox — its own state so switching between the two
+    // screens (an admin/founder can work as a technician and back) never carries one
+    // screen's filter choice into the other's.
+    const mgrStatusFilter = S.mgrStatusFilter || '';
+    const matchesMgrStatus = (x) => !mgrStatusFilter || techStatusBucket(x) === mgrStatusFilter;
     const pageOf = (rows) => {
       const shown = Math.min(rows.length, S.ticketLimit || TICKET_PAGE);
       return {
@@ -11431,9 +11481,9 @@ class Component extends DCLogic {
     // list that disagree is the exact failure this replaced a duplicated banner to avoid.
     // Caught by attachments.test.js, where the fixture's ticket has no sync stamp.
     const inboxPage = pageOf(bandedTickets(S.awaitingFilter
-      ? awaitingDocs.filter(x => (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x) && archivedOk(x))
+      ? awaitingDocs.filter(x => (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x) && archivedOk(x) && matchesMgrStatus(x))
       : LIVE.filter(x => everReached(x) && (!S.techFilter || inCrew(x, S.techFilter, ''))
-        && matchesQuery(x) && archivedOk(x))));
+        && matchesQuery(x) && archivedOk(x) && matchesMgrStatus(x))));
     const myPage = pageOf(bandedTickets(S.awaitingFilter
       ? awaitingDocs.filter(x => inCrew(x, myName, myEmail) && matchesQuery(x) && matchesTechStatus(x))
       : myTickets.filter(x => matchesQuery(x) && matchesTechStatus(x))));
@@ -13099,6 +13149,15 @@ class Component extends DCLogic {
         fg: techStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
         pick: () => this.setState({ techStatusFilter: key, ticketLimit: 10 }),
       })),
+      // The same filter, adopted onto the office's own Inbox (2026-09-10, owner's
+      // request) — same buckets, same pill row, its own state (see matchesMgrStatus).
+      mgrStatusOptions: [['', 'All'], ['progress', 'In Progress'], ['review', 'Awaiting Review'],
+        ['approved', 'Approved'], ['cancelled', 'Cancelled']].map(([key, label]) => ({
+        key, label,
+        bg: mgrStatusFilter === key ? 'var(--accent)' : 'transparent',
+        fg: mgrStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
+        pick: () => this.setState({ mgrStatusFilter: key, ticketLimit: 10 }),
+      })),
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
       myHasMore: myPage.hasMore,
       myMoreLabel: myPage.moreLabel,
@@ -13634,6 +13693,9 @@ class Component extends DCLogic {
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
         actionLabel: this.settled(x) ? 'View' : 'Review',
         review: () => this.openReview(x.id),
+        // 2026-09-10, owner's request: the whole tile opens review now, the same as a
+        // technician's own ticket card — not only a small button inside it.
+        open: () => this.openReview(x.id),
       })),
       // Withdrawn tickets, kept where the office can find them and put them back. Not in
       // the table above: they are not work, and folding them in would make "awaiting

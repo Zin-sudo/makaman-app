@@ -51,8 +51,9 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   await p.close();
 
   p = await signIn(ctx, 'omar@makaman.ly');
-  const row = p.locator('tr', { hasText: 'Northern Gulf' }).first();
-  await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  const row = p.locator('.mk-ticket-card', { hasText: 'Northern Gulf' }).first();
+  await row.click();
   await p.waitForTimeout(900);
   let body = await p.innerText('body');
   check('a running job offers an allocation list', /Tools & crossovers allocated/i.test(body));
@@ -73,10 +74,10 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   check('with quantity and note', tk.assets[0].qty === '1' && /crossover box/.test(tk.assets[0].note));
 
   // an approved ticket must not offer allocation
-  const approvedRow = p.locator('tr', { hasText: 'Kuwait' }).first();
+  const approvedRow = p.locator('.mk-ticket-card', { hasText: 'Kuwait' }).first();
   await p.getByRole('button', { name: /‹ Inbox/i }).click();
   await p.waitForTimeout(500);
-  await approvedRow.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  await approvedRow.click();
   await p.waitForTimeout(800);
   check('a finished job does not offer allocation', !/Tools & crossovers allocated/i.test(await p.innerText('body')));
   await p.close();
@@ -194,7 +195,7 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   });
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
-  await p.locator('tr', { hasText: 'Northern Gulf' }).first().getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  await p.locator('.mk-ticket-card', { hasText: 'Northern Gulf' }).first().click();
   await p.waitForTimeout(900);
   body = await p.innerText('body');
   check('the office sees the answers on the ticket', /Allocated assets — accounted for on closing/i.test(body));

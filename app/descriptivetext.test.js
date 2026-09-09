@@ -131,8 +131,8 @@ const sweep = (label, body) => {
   // wording must not have leaked in here either.
   await p.getByRole('button', { name: /^Tickets$/i }).last().click();
   await p.waitForTimeout(500);
-  const row = p.locator('tr', { hasText: /Review|View/i }).first();
-  await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  await p.locator('.mk-ticket-card').first().click();
   await p.waitForTimeout(700);
   body = await p.innerText('body');
   sweep('ops ticket review', body);

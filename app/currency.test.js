@@ -63,9 +63,10 @@ async function signIn(ctx, email, fresh) {
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(800);
 
-  const row = p.locator('tr', { hasText: 'Sirte' }).first();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  const row = p.locator('.mk-ticket-card', { hasText: 'Sirte' }).first();
   if (await row.count()) {
-    await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+    await row.click();
     await p.waitForTimeout(900);
     const body = await p.innerText('body');
     check('line costs and totals read LYD, not dollars',

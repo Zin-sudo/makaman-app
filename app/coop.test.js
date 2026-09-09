@@ -102,8 +102,9 @@ const store = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('makaman.j
   await sel.selectOption(''); await p.waitForTimeout(500);
 
   // both names reach the printed sheets
-  const row = p.locator('tr', { hasText: 'Northern Gulf Petroleum' }).first();
-  await row.getByRole('button', { name: /^(Review|View)$/i }).first().click();
+  // The whole ticket tile opens review now (2026-09-10), not a button inside a row.
+  const row = p.locator('.mk-ticket-card', { hasText: 'Northern Gulf Petroleum' }).first();
+  await row.click();
   await p.waitForTimeout(800);
   check('office can reassign', /Reassign to another technician/i.test(await p.innerText('body')));
   await p.getByRole('button', { name: /Preview 4 sheets/i }).click();
