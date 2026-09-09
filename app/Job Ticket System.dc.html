@@ -6448,6 +6448,12 @@ const REALTIME_REFRESH_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__
 // site," not live tracking, and the wider spacing costs the field device fewer GPS
 // wake-ups over a shift.
 const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 7200000;
+// How long a cancelled ticket stays in the ordinary Inbox view before it drops out to
+// "archived" (2026-09-09, owner's request: "stays for a couple of days to allow
+// withdrawal then gets archived"). Withdrawal itself has no deadline — staff can always
+// reach it through "Show archived" — this only controls how long it competes for
+// attention in the default view of a screen meant for open work.
+const ARCHIVE_DAYS = (typeof window !== 'undefined' && window.__ARCHIVE_DAYS_TEST) || 3;
 // How often the app *checks* whether a ping is due. Checking often and pinging rarely is
 // what keeps a device that was asleep or offline from owing a burst of catch-up fixes:
 // the check finds one ping due, not six.
@@ -8686,6 +8692,15 @@ class Component extends DCLogic {
   // there is one list here rather than an `|| status === 'sent_client'` on twenty lines,
   // each of which would be a place to forget the third one.
   settled(t) { return !!t && SETTLED_STATES.indexOf(t.status) >= 0; }
+  // A cancelled ticket that has aged out of the office's ordinary Inbox view — see
+  // ARCHIVE_DAYS. A ticket with no cancelledAt stamp (should not happen — cancel() always
+  // sets it — but a stray import or seed row might lack it) is never archived: an unknown
+  // age is not evidence of an old one, and hiding it silently would be worse than showing
+  // it a little too long.
+  cancelledArchived(t) {
+    return !!t && t.status === 'cancelled' && !!t.cancelledAt
+      && (Date.now() - new Date(t.cancelledAt).getTime()) > ARCHIVE_DAYS * 86400000;
+  }
   statusChip(t) {
     if (t.status === 'sent_finance') return { statusLabel: 'SENT TO FINANCE', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
     if (t.status === 'sent_client') return { statusLabel: 'SENT TO CLIENT', chipBg: 'rgba(var(--success-rgb),0.16)', chipFg: 'var(--success-ink)' };
@@ -10977,6 +10992,12 @@ class Component extends DCLogic {
     // the office has a copy of belongs in the inbox whether or not the latest local
     // change has been pushed back yet.
     const everReached = (x) => x.synced || !!x.syncedAt;
+    // A cancelled job is final once it has sat that way for ARCHIVE_DAYS — office can
+    // still withdraw it (enforce_ticket_update_rules already restricts that to staff),
+    // but it drops out of the ordinary Inbox view so it stops competing with real work.
+    // "Show archived" (below) is the one deliberate way back to it.
+    const archivedCancelled = LIVE.filter(x => this.cancelledArchived(x));
+    const archivedOk = (x) => S.showArchived || !this.cancelledArchived(x);
     // The awaiting-paperwork counter narrows this list rather than duplicating it above.
     // Built from the same awaitingDocs() the counter counted, so the number on the tile
     // and the number of rows underneath it cannot come apart.
@@ -10987,9 +11008,9 @@ class Component extends DCLogic {
     // list that disagree is the exact failure this replaced a duplicated banner to avoid.
     // Caught by attachments.test.js, where the fixture's ticket has no sync stamp.
     const inboxPage = pageOf(bandedTickets(S.awaitingFilter
-      ? awaitingDocs.filter(x => (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x))
+      ? awaitingDocs.filter(x => (!S.techFilter || inCrew(x, S.techFilter, '')) && matchesQuery(x) && archivedOk(x))
       : LIVE.filter(x => everReached(x) && (!S.techFilter || inCrew(x, S.techFilter, ''))
-        && matchesQuery(x))));
+        && matchesQuery(x) && archivedOk(x))));
     const myPage = pageOf(bandedTickets(S.awaitingFilter
       ? awaitingDocs.filter(x => inCrew(x, myName, myEmail) && matchesQuery(x) && matchesTechStatus(x))
       : myTickets.filter(x => matchesQuery(x) && matchesTechStatus(x))));
@@ -13155,6 +13176,17 @@ class Component extends DCLogic {
         cursor: 'pointer',
         action: S.awaitingFilter ? 'Show all' : 'Show these',
         pick: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
+      }] : []).concat(archivedCancelled.length ? [{
+        // 2026-09-09, owner's request: a cancelled job "stays for a couple of days to
+        // allow withdrawal then gets archived." Archived means out of the ordinary
+        // Inbox view, not gone — this is the one deliberate way back to it, same
+        // toggle-tile shape as "Awaiting paperwork" just above.
+        label: 'Archived (cancelled)', value: String(archivedCancelled.length), color: 'var(--ink-faint)',
+        edge: S.showArchived ? 'var(--ink-dim)' : 'rgba(var(--ink-rgb),0.16)',
+        bg: S.showArchived ? 'rgba(var(--ink-rgb),0.1)' : 'transparent',
+        cursor: 'pointer',
+        action: S.showArchived ? 'Hide these' : 'Show these',
+        pick: () => this.setState({ showArchived: !S.showArchived, ticketLimit: 10 }),
       }] : []),
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
         actionLabel: this.settled(x) ? 'View' : 'Review',
