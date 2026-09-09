@@ -1798,6 +1798,61 @@
                 <button onClick="{{ sync }}" disabled="{{ syncDisabled }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);opacity:{{ syncOpacity }}">Sync now</button>
                 <div style="font-size:11px;color:var(--ink-faint);margin-top:8px;text-align:center">Uploads happen on their own once there is signal.</div>
               </sc-if>
+
+              <!-- Devices on Field, for a technician too (2026-09-09, owner's request):
+                   "the same way others like ops, admin, observers see the rest of the
+                   team." Same fieldDevices/hasFieldDevices data the office's own Field
+                   devices screen reads (app/index.html's other navSync block, under the
+                   mgr/admin/observer shell) — one derivation, shown to everyone, not a
+                   second one kept in step with the first by hand. -->
+              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:22px 0 8px">Devices on field</div>
+              <sc-if value="{{ hasFieldDevices }}" hint-placeholder-val="{{ true }}">
+                <div class="mk-col-gap10">
+                  <sc-for list="{{ fieldDevices }}" as="d" hint-placeholder-count="3">
+                    <div class="mk-dev-card">
+                      <div class="mk-dev-top">
+                        <span style="width:9px;height:9px;flex:none;border-radius:50%;background:{{ d.dot }};margin-top:7px"></span>
+                        <div class="mk-flex1">
+                          <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:18px;line-height:1.2">{{ d.name }}</div>
+                          <div style="font-size:13px;color:var(--ink-dim)">{{ d.base }} · {{ d.tollLabel }}</div>
+                        </div>
+                        <div class="mk-dev-contact">
+                          <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Last contact</div>
+                          <div style="font-size:13px">{{ d.lastLabel }}</div>
+                          <sc-if value="{{ d.showPending }}" hint-placeholder-val="{{ false }}">
+                            <div style="font-size:11px;color:var(--warning-ink);margin-top:3px">{{ d.pendingLabel }}</div>
+                          </sc-if>
+                        </div>
+                      </div>
+                      <div class="mk-dev-pos" style="display:flex;gap:18px;flex-wrap:wrap">
+                        <div style="min-width:0">
+                          <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Well location</div>
+                          <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.wellLocDim }};overflow-wrap:anywhere">{{ d.wellLocText }}</div>
+                          <div class="mk-hint">{{ d.wellLocStamp }}</div>
+                        </div>
+                        <div style="min-width:0">
+                          <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Latest/Current location</div>
+                          <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.curLocDim }};overflow-wrap:anywhere">{{ d.curLocText }}</div>
+                          <div class="mk-hint">{{ d.curLocStamp }}</div>
+                        </div>
+                      </div>
+                      <sc-if value="{{ d.hasOpenJobs }}" hint-placeholder-val="{{ true }}">
+                        <div class="mk-dev-jobs">
+                          <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:6px">Open jobs</div>
+                          <sc-for list="{{ d.openJobs }}" as="j" hint-placeholder-count="2">
+                            <div style="margin-bottom:11px;min-width:0">
+                              <div style="font-size:13px;font-weight:600;overflow-wrap:anywhere">{{ j.customer }}</div>
+                              <div style="font-size:12px;color:var(--ink-faint);overflow-wrap:anywhere">{{ j.locLine }}</div>
+                              <div style="font-size:12px;color:var(--ink-dim);margin-top:4px;overflow-wrap:anywhere">{{ j.lastLogText }}</div>
+                              <div class="mk-hint">{{ j.lastLogTime }}</div>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
             </sc-if>
 
             <sc-if value="{{ navAccount }}" hint-placeholder-val="{{ false }}">
