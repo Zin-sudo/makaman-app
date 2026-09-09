@@ -2291,6 +2291,15 @@
                   <label class="mk-field-label">Ticket No. (unique)</label>
                   <input dir="auto" value="{{ cur.ticketNo }}" onChange="{{ f.ticketNo }}" onFocus="{{ onTicketNoFocus }}" onBlur="{{ onTicketNoBlur }}" disabled="{{ numberingBlocked }}" placeholder="1884 / F703 / D5024" style="width:100%;min-height:38px;padding:7px 10px;font-size:15px;background:var(--field);border:1px solid {{ noBorder }};color:var(--ink)">
                   <div style="font-size:11px;margin-top:5px;color:{{ noMsgColor }}">{{ noMsg }}</div>
+                  <!-- A declared, per-ticket exception (2026-09-10, owner's request) — not
+                       a standing mode, and only offered to ops_manager/admin holding
+                       numbering.override_floor (migration 0072). -->
+                  <sc-if value="{{ showFloorOverride }}" hint-placeholder-val="{{ false }}">
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:var(--ink-dim);cursor:pointer">
+                      <input type="checkbox" checked="{{ floorOverrideChecked }}" onChange="{{ toggleFloorOverride }}">
+                      Override — allow a number below the series floor
+                    </label>
+                  </sc-if>
                 </div>
                 <div class="mk-flex1-bare">
                   <label class="mk-field-label">Take next from series</label>
@@ -4075,6 +4084,11 @@ const PERMISSION_DEFAULTS = (function () {
       ['ticket.edit_closed', 'ticket.charge_items', 'ticket.reorder_items',
         'ticket.assign_number', 'ticket.approve', 'ticket.force_number',
         'ticket.approve_on_behalf', 'ticket.reopen', 'numbering.hold', 'numbering.transfer',
+        // 2026-09-10, owner's request: a special-case escape hatch for the numbering
+        // floor below, not a standing mode — "an admin option that can also be used by
+        // the ops to override this restriction for special cases." Both, deliberately,
+        // same as every other numbering capability in this group.
+        'numbering.override_floor',
         'user.approve_signup', 'user.create', 'client.manage',
         'pricelist.view', 'pricelist.edit', 'pricelist.delete',
         // Seeing every ticket's activity and seeing the edit trail are different
@@ -6454,6 +6468,20 @@ function inCrew(t, name, email) {
 function crewNames(t) { return crewOf(t).map(c => c.name).filter(Boolean); }
 // "Yousef Al-Harbi → Mahmoud Zaki" — the order the job passed through hands.
 function crewLabel(t) { return crewNames(t).join(' → '); }
+
+// Which numbering series a typed ticket number belongs to — same matching reseatSeries
+// already does per-ticket (prefix, then a plain run of digits for the one series with no
+// prefix), pulled out here so numberIssue() can ask the same question of one number
+// instead of reseatSeries's own job of scanning every ticket against every series.
+function seriesForNumber(no, seriesList) {
+  const upper = String(no || '').trim().toUpperCase();
+  if (!upper) return null;
+  return (seriesList || []).find((s) => {
+    const prefix = (s.prefix || '').toUpperCase();
+    if (prefix) return upper.indexOf(prefix) === 0 && /^\d+$/.test(upper.slice(prefix.length));
+    return /^\d+$/.test(upper);
+  }) || null;
+}
 
 // Entries written before audit entries carried a kind — the seeded history, and
 // anything saved by an older build — have to be placed by their wording. Only the
@@ -9302,6 +9330,22 @@ class Component extends DCLogic {
   numberIssue(t) {
     const no = (t.ticketNo || '').trim();
     if (!no) return { msg: 'Required before approval.', bad: false };
+    // The admin's own "Last used" input on the Numbering Series screen already says "the
+    // system continues from there and refuses any number already used" — this is that
+    // promise, kept. A number at or below a series' declared floor was used before this
+    // system tracked numbers at all (on paper), so it is not a live duplicate this device
+    // could ever have seen — checked separately from, and before, the plain-duplicate
+    // check just below. `t.numberFloorOverride` is a deliberate, per-ticket, audited
+    // exception (see the checkbox next to the ticket-number field) — never a standing mode.
+    const series = seriesForNumber(no, this.state.data.series);
+    if (series && !t.numberFloorOverride) {
+      const floor = series.floor === undefined ? series.last : series.floor;
+      const n = Number(no.slice((series.prefix || '').length));
+      if (!isNaN(n) && n <= floor) {
+        return { msg: 'REFUSED — ' + no + ' was already used, before this series started. '
+          + series.label + ' floor: ' + (series.prefix || '') + floor + '.', bad: true };
+      }
+    }
     const dup = this.state.data.tickets.find(x => x.id !== t.id && (x.ticketNo || '').trim().toUpperCase() === no.toUpperCase());
     if (dup) return { msg: 'REFUSED — already used on ' + dup.customer + ' / ' + dup.well + '.', bad: true };
     if (!/^(F\d{3,}|D\d{4,}|\d{4})$/i.test(no)) return { msg: 'Unexpected format (1880 / F703 / D5024) — allowed but flagged.', bad: false, warn: true };
@@ -11738,6 +11782,23 @@ class Component extends DCLogic {
         + (myName || 'the office') + '. ' + (tk.holder || tk.tech || 'The technician')
         + ' had not closed it.', 'lifecycle');
     };
+    // Same reasoning as noteForcedNumber just above, same 'lifecycle' kind — the
+    // technician finds out their job carried a number from before this device's own
+    // sequence started, without being told separately. Only fires when the number
+    // actually committed is genuinely below the series' floor; ticking the override
+    // checkbox and then typing an ordinary number writes nothing.
+    const noteFloorOverride = (tk, num) => {
+      if (!tk || !tk.numberFloorOverride) return;
+      const series = seriesForNumber(num, D.series);
+      if (!series) return;
+      const floor = series.floor === undefined ? series.last : series.floor;
+      const n = Number(num.slice((series.prefix || '').length));
+      if (isNaN(n) || n > floor) return;
+      const seriesLabel = (series.prefix || '') + floor;
+      if ((tk.audit || []).some(a => a.kind === 'lifecycle' && a.text && a.text.indexOf('Numbering floor overridden') === 0 && a.text.indexOf(num) >= 0)) return;
+      this.logOn(tk.id, 'Numbering floor overridden by ' + (myName || 'the office') + ': '
+        + num + ' entered below the declared floor of ' + seriesLabel + '.', 'lifecycle');
+    };
     // An Admin moving a claim they do not hold is an override, and reads differently to
     // the holder passing it on deliberately.
     const adminOverridingClaim = this.hasPermission('numbering.override') && !this.holdsNumbering()
@@ -13302,10 +13363,8 @@ class Component extends DCLogic {
         // series, so it leaves the same record. On blur rather than onChange, or it
         // would fire once per digit.
         if (numberingForced) noteForcedNumber(t, v);
-        const known = (D.series || []).some(x => x.prefix
-          ? (v.toUpperCase().indexOf(x.prefix.toUpperCase()) === 0 && /^\d+$/.test(v.slice(x.prefix.length)))
-          : /^\d+$/.test(v));
-        if (!known) this.setState({ dialog: 'unfamiliarNumber', pendingNumber: v });
+        noteFloorOverride(t, v);
+        if (!seriesForNumber(v, D.series)) this.setState({ dialog: 'unfamiliarNumber', pendingNumber: v });
       },
       onMileageFocus: commitMileage.focus, onMileageBlur: commitMileage.blur,
       onJobTypeFocus: commitJobType.focus, onJobTypeBlur: commitJobType.blur,
@@ -13986,6 +14045,22 @@ class Component extends DCLogic {
       numberingForcedText: 'This job is still running. Assigning a number now is a forced action — '
         + ((t && (t.holder || t.tech)) || 'the technician')
         + ' will be told, and it is recorded on the ticket.',
+      // 2026-09-10, owner's request: "an admin option that can also be used by the ops to
+      // override this restriction for special cases where we need to manually enter a
+      // previous number." A per-ticket, deliberate exception — not a standing mode — so
+      // it lives on the ticket itself (t.numberFloorOverride), gated on the same
+      // permission the catalogue registers it under (migration 0072), and only shown at
+      // all once a ticket is open to number.
+      showFloorOverride: !!t && this.hasPermission('numbering.override_floor'),
+      floorOverrideChecked: !!(t && t.numberFloorOverride),
+      toggleFloorOverride: () => {
+        if (!t) return;
+        const next = !t.numberFloorOverride;
+        this.mutate((d) => {
+          const x = d.tickets.find((y) => y.id === t.id);
+          if (x) x.numberFloorOverride = next;
+        });
+      },
       // Forced approval: the technician never closed this himself, the office did. Worth
       // saying at the moment of approval rather than only in the trail, because it is the
       // last point at which somebody can decide to phone him instead.
@@ -14595,7 +14670,12 @@ class Component extends DCLogic {
       },
       seriesRows: D.series.map((s, i) => ({
         label: s.label, prefix: s.prefix || '(none)', last: s.last, next: s.prefix + (s.last + 1),
-        onLast: ev => { const v = Number(ev.target.value) || 0; this.mutate(d => { d.series[i].last = v; }); },
+        // Written to `floor` as well as `last`, in lock-step: one input, one meaning.
+        // "Enter the last number you reached on paper" (this screen's own subtitle) is
+        // both where the auto-offer continues from AND the line numberIssue() refuses
+        // anything at or below — the two were already always equal in the live data,
+        // this just keeps them that way by construction instead of coincidence.
+        onLast: ev => { const v = Number(ev.target.value) || 0; this.mutate(d => { d.series[i].last = v; d.series[i].floor = v; }); },
       })),
       usedNumbers: D.tickets.filter(x => x.ticketNo).map(x => x.ticketNo).join(', ') || 'none yet',
       newJobType: S.newJobType,
