@@ -112,11 +112,14 @@ const boot = async (b, email, reduced) => {
   //
   // The first version of this counted pulsing elements on the technician's ticket list
   // and found none, then declared victory — a vacuous pass. The sync banner's dot only
-  // exists when there is something pending, so the condition has to be created before
-  // the claim means anything. Proved in both directions in one run: infinite normally,
-  // once under reduced motion.
+  // exists when there is something pending AND nothing automatic can reach the office
+  // over — 2026-09-10, owner's request: sync is automatic while online now, so the
+  // banner (and its pulsing dot) only appears genuinely offline; setOffline(true) is
+  // what actually creates the condition being probed, not merely leaving work pending.
+  // Proved in both directions in one run: infinite normally, once under reduced motion.
   {
     const arm = async (p) => {
+      await p.context().setOffline(true);
       await p.evaluate(() => {
         window.__mkApp.mutate((d) => {
           const t = d.tickets.find(x => x.id === 't1');

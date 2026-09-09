@@ -244,6 +244,10 @@ async function persist(p) {
   }
 
   // ── 3b. The pending-sync bar: 12px box, 8px button ───────────────────────
+  //
+  // 2026-09-10, owner's request: sync is automatic while online now, so this bar only
+  // appears genuinely offline (see sync.test.js) — setOffline(true) is what actually
+  // creates the condition this shape check needs, not merely leaving work pending.
   {
     const { ctx, p } = await boot(b, 'yousef@makaman.ly');
     await persist(p);
@@ -253,6 +257,9 @@ async function persist(p) {
       localStorage.setItem('makaman.jobtickets.v2', JSON.stringify(d));
     });
     await p.reload({ waitUntil: 'networkidle' });
+    // After the reload, not before — setOffline(true) blocks ALL requests including
+    // the reload's own fetch of the page itself, not just the app's later calls.
+    await ctx.setOffline(true);
     await p.waitForTimeout(1300);
     const s = await p.evaluate(() => {
       const el = document.querySelector('.mk-banner');

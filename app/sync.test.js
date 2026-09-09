@@ -141,7 +141,14 @@ const tab = async (p, name) => {
     JSON.stringify(after.filter(x => x.tech === 'Mahmoud Zaki').map(x => x.synced)));
   await p.close();
 
-  // ── closing a job makes it pending, and the banner obeys the tab rule ─────
+  // ── closing a job makes it pending, and the banner no longer nags while online ──
+  //
+  // 2026-09-09/10, owner's request: "when the user is connected to the internet
+  // already they don't need to click manually on the sync banner... unless automatic
+  // syncing fails... otherwise the sync should be automatic." Sync itself is automatic
+  // now (autoSyncNow/syncClosedTickets, hooked into refreshCore — see their own
+  // comments); this banner's own remaining job is narrower than it used to be: say so
+  // only when nothing here CAN act on its own, i.e. genuinely offline.
   p = await signIn(ctx, 'yousef@makaman.ly');
   await p.getByText('Northern Gulf Petroleum').first().click();
   await p.waitForTimeout(700);
@@ -153,21 +160,45 @@ const tab = async (p, name) => {
   check('closing the job marks it as needing upload', ts.find(x => x.id === 't3').synced === false);
 
   await tab(p, 'Tickets');
-  check('banner shows on Tickets', await p.getByRole('button', { name: /^SYNC$/ }).count() > 0);
+  check('no nag banner on Tickets while online — this is handled automatically now',
+    !(await p.getByRole('button', { name: /^SYNC$/ }).count()));
   await tab(p, 'Activity');
-  check('banner shows on Activity', await p.getByRole('button', { name: /^SYNC$/ }).count() > 0);
+  check('no nag banner on Activity while online', !(await p.getByRole('button', { name: /^SYNC$/ }).count()));
   await tab(p, 'Account');
-  check('banner shows on Account', await p.getByRole('button', { name: /^SYNC$/ }).count() > 0);
+  check('no nag banner on Account while online', !(await p.getByRole('button', { name: /^SYNC$/ }).count()));
   await tab(p, 'Sync');
-  check('banner is hidden on the Sync tab', await p.getByRole('button', { name: /^SYNC$/ }).count() === 0);
+  check('and naturally none on the Sync tab either', await p.getByRole('button', { name: /^SYNC$/ }).count() === 0);
   body = await p.innerText('body');
-  check('the Sync tab lists the closed ticket instead', /1 ticket waiting to upload/i.test(body));
+  check('the Sync tab still lists the closed ticket, informationally', /1 ticket waiting to upload/i.test(body));
 
-  await goOnline();
+  // The one case the banner still exists for: nothing automatic can reach the office
+  // over no connection at all, so a person is told rather than left guessing why a
+  // closed job never showed up.
+  await ctx.setOffline(true);
+  await p.waitForTimeout(400);
+  await tab(p, 'Tickets');
+  check('but the banner returns the moment there really is nothing automatic can do about it',
+    await p.getByRole('button', { name: /^SYNC$/ }).count() > 0);
+  body = await p.innerText('body');
+  check('and says offline, not "auto-syncing"', /Offline/i.test(body) && !/auto-syncing/i.test(body));
+  // 2026-09-10, owner's request, the actual claim this whole section exists to prove:
+  // coming back online uploads the closed ticket on its own — nobody has to notice the
+  // banner or press anything for it to happen.
+  await ctx.setOffline(false);
+  await p.waitForTimeout(700);
+  const backOnline = await tickets(p);
+  check('reconnecting alone — no button pressed — uploads the closed ticket',
+    backOnline.find(x => x.id === 't3').synced === true);
+
+  await tab(p, 'Sync');
+  body = await p.innerText('body');
+  check('and the Sync tab already reads nothing pending, before the button is ever touched',
+    /Every closed ticket on this device has been uploaded/i.test(body));
   await p.getByRole('button', { name: /Sync now/i }).click();
   await p.waitForTimeout(700);
   body = await p.innerText('body');
-  check('uploading reports the closed count', /1 closed ticket uploaded/i.test(body));
+  check('so pressing it anyway just confirms there was nothing left to do',
+    /Tickets Already Synchronized/i.test(body));
   await p.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);

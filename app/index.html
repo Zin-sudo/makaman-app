@@ -6524,9 +6524,12 @@ const ASSET_TONES = {
 };
 const assetTone = (q) => ASSET_TONES[q.tone] || ASSET_TONES.accent;
 
-// The backstop, not the mechanism. Real syncing happens when the connection returns and
-// when somebody presses Sync; this only catches a device that never fired an 'online'
-// event. Fifteen minutes rather than one, because at one minute it WAS the mechanism.
+// The backstop, not the mechanism. 2026-09-10, owner's request: real syncing now runs
+// on every refreshCore() pass — the Force Refresh button, a realtime notification, an
+// 'online' event, the page becoming visible again — not only on a timer or a deliberate
+// tap on Sync. This interval only catches the case none of those cover: a device that
+// never fires 'online' and is never brought back into view. Fifteen minutes rather than
+// one, because at one minute it WAS the mechanism.
 const AUTO_SYNC_INTERVAL_MS = (typeof window !== 'undefined' && window.__AUTO_SYNC_TEST_MS) || 900000;
 // How long a burst of edits is allowed to settle before the queue is sent. Long enough
 // that typing a field is one write rather than twenty; short enough that the office sees
@@ -7752,6 +7755,24 @@ class Component extends DCLogic {
         }
         this.persist(merged);
         this.setState({ data: merged });
+        // 2026-09-10, owner's request: "link the sync actions to the refresh button...
+        // hook the feature to the actual realtime build." This is that hook — every
+        // successful pull through this one shared path (login, reconnect, a realtime
+        // notification, the 'online'/visibilitychange events, and the Force Refresh
+        // button) also resolves any closed-but-unsynced ticket of the signed-in
+        // person's own against what the office just told us, the same clash-aware pass
+        // the manual Sync button runs. Deliberately AFTER setState above: the clash
+        // check (settled(), officeClosed/closedBy) has to read what the office just
+        // said, not what this device believed before the pull — the entire point of
+        // moving this here rather than leaving it on its own separate, staler timer.
+        //
+        // syncLiveTickets() (the in-progress flag) is deliberately NOT called from
+        // here — it stays on autoSyncNow()'s own callers (the interval backstop, the
+        // 'online'/visibilitychange events), exactly as before this change. Folding it
+        // in here too would fire it on every ordinary login and Force Refresh — a
+        // write nobody asked for and conflict.test.js's own version-number assertions
+        // (rightly) do not expect immediately after signing in.
+        this.syncClosedTickets({ silent: true });
         // No argument — see syncPresence's own comment. This device stating its own
         // (possibly unswapped) actingAs here would overwrite whatever another device
         // signed into the same account legitimately set, the instant anyone hit Refresh.
@@ -8238,41 +8259,132 @@ class Component extends DCLogic {
     // cached fix is welcome — see GEO_MAX_AGE_MS.)
     }, 0, 'periodic');
   }
-  // Background sync — runs on a timer instead of only when the technician remembers to
-  // tap Sync. Same effect as the manual Sync button (uploads every not-yet-synced
-  // ticket) but silent: no confirmation dialog, and audit entries say "Auto-synced"
-  // instead of "Uploaded" so the trail shows which happened. Only runs once someone is
-  // logged in and the device currently has signal, and no-ops when nothing is pending.
-  // Runs on a timer, so it is the one most able to stack: a slow upload on a weak
-  // connection must not have the next tick start a second one behind it. Coalesced under
-  // the same key as the manual button, because they do the same work — pressing Sync
-  // while the background pass is running joins it rather than racing it.
+  // The one place a technician's closed-but-not-yet-marked-synced work is actually
+  // resolved against the office's own current state and pushed. 2026-09-10, owner's
+  // request: "we shouldn't hold tickets locally anymore... the sync should be
+  // automatic... hook the feature to the actual realtime build." Used to be the manual
+  // Sync button's own private logic, called from nowhere else — so the background pass
+  // (then called autoSyncNow) had a separate, WEAKER copy: no clash detection at all
+  // (an office decision made while the device was away could be silently overwritten),
+  // and scoped to "every unsynced ticket this device happens to have," not "my own
+  // crew's closed tickets" — meaning that once a technician could see company-wide
+  // tickets (migrations 0064/0069), the background pass would try to mark and push
+  // OTHER technicians' tickets too, refused at the database every time. One
+  // implementation now, shared by the button and every automatic trigger (refreshCore —
+  // so this also runs on the Force Refresh button, a realtime notification, and the
+  // 'online'/visibilitychange events — plus the interval backstop below), so "automatic"
+  // and "manual" can never quietly disagree about whose ticket this device may touch or
+  // what counts as a clash.
+  syncClosedTickets(opts) {
+    const silent = !!(opts && opts.silent);
+    const S = this.state, D = S.data;
+    const myName = (S.session && S.session.name) || '';
+    const myEmail = (S.session && S.session.email) || '';
+    const LIVE = this.liveTickets(D.tickets);
+    const myTickets = LIVE.filter(x => inCrew(x, myName, myEmail));
+    const myClosed = myTickets.filter(x => x.status !== 'logging');
+    const myPending = myClosed.filter(x => !x.synced);
+    const myInProgress = myTickets.filter(x => x.status === 'logging');
+    // Nothing to send is not an event worth a toast when nobody asked — the audit trail
+    // is what somebody reads to find out what happened to a job, and a line saying
+    // "nothing happened" pushes the lines that matter off the screen. The button still
+    // answers, because a person who pressed it is owed a response either way.
+    if (!myPending.length) {
+      if (!silent) {
+        if (myInProgress.length && !myClosed.length) this.toast('sync-open', 'Close Ticket To Sync', 'warn');
+        else this.toast('sync-done', 'Tickets Already Synchronized', 'ok');
+      }
+      return;
+    }
+    const now = iso(new Date());
+    // A job the office already closed is settled. Uploading this device's stale copy
+    // would overwrite a sheet someone has already reviewed, so the field copy is
+    // dropped and the reason is named rather than silently overwriting or silently
+    // dropping. Approved counts too (§2d — sealed for the technician the same way).
+    const clashed = myPending.filter(x =>
+      (x.officeClosed && x.closedBy && x.closedBy !== myName) || this.settled(x));
+    const clashReason = (x) => {
+      if (x.status === 'cancelled') {
+        return this.settled(x)
+          ? 'approved in the office before your cancellation reached them, so the job stands as worked'
+          : 'closed in the office by ' + (x.closedBy || 'the office')
+            + ' before your cancellation reached them, so the job stands as worked';
+      }
+      return this.settled(x)
+        ? 'already approved in the office'
+        : 'already closed in the office by ' + x.closedBy;
+    };
+    const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
+    this.mutate(d => d.tickets.forEach(x => {
+      if (clashed.some(c => c.id === x.id)) {
+        x.synced = true; x.syncedAt = x.closedAt || now;
+        (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
+          text: 'Field copy discarded on sync — ' + clashReason(clashed.find(c => c.id === x.id)) + '.' });
+        return;
+      }
+      if (ids.indexOf(x.id) === -1) return;
+      x.synced = true; x.syncedAt = now;
+      (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
+        text: (silent ? 'Auto-synced from field device (' : 'Uploaded from field device (') + x.tech + ').' });
+    }));
+    this.setState({ lastAutoSyncAt: now });
+    if (clashed.length) {
+      if (!silent) {
+        const one = clashed[0];
+        this.toast('sync-clash', (clashed.length === 1
+          ? one.customer + ' was ' + clashReason(one) + '.'
+          : clashed.length + ' tickets were already settled in the office.')
+          + ' Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.', 'warn');
+      }
+      if (!ids.length) { if (!silent) this.setState({ syncedCount: 0 }); return; }
+    }
+    if (!silent) {
+      this.toast('sync-up', ids.length === 1 ? '1 closed ticket uploaded — the operations manager can see it now.' : ids.length + ' closed tickets uploaded — the operations manager can see them now.', 'ok');
+    }
+  }
+  // A job still being logged is never something the technician is "waiting to upload"
+  // (sync.test.js's own framing) — it is not in myPending, never counted in the banner,
+  // never consumed by the Sync button, and reaching this quietly is exactly the point.
+  // But its own edits already went to the server the moment they were made (mutate()'s
+  // own outbox push); what still lags is purely the LOCAL `.synced` flag on the ticket
+  // header, which is what liveTickets() reads to decide whether the office's own "live
+  // in-progress jobs" panel shows it at all. No clash detection here — an in-progress
+  // job is never "settled" the way a closed one can be — and no audit line: an
+  // "Auto-synced" entry every time this quietly re-confirms a job still being worked is
+  // noise, not something the trail is asked about; the audit trail already records the
+  // log lines and stage changes that are the actual story.
+  syncLiveTickets() {
+    const S = this.state, D = S.data;
+    const myName = (S.session && S.session.name) || '';
+    const myEmail = (S.session && S.session.email) || '';
+    const myLive = this.liveTickets(D.tickets)
+      .filter(x => x.status === 'logging' && !x.synced && inCrew(x, myName, myEmail));
+    if (!myLive.length) return;
+    const ids = myLive.map(x => x.id);
+    const now = iso(new Date());
+    this.mutate(d => d.tickets.forEach(x => {
+      if (ids.indexOf(x.id) === -1) return;
+      x.synced = true; x.syncedAt = now;
+    }));
+  }
+  // Coalesced under the same key as the manual button, because they do the same work —
+  // pressing Sync while the background pass is running joins it rather than racing it.
   autoSync() { return this.runLatest('sync', () => this.autoSyncNow()); }
-  // What the background sync may touch, and what it must leave alone.
-  //
-  // A withdrawn ticket is frozen at the database — `enforce_ticket_update_rules` refuses
-  // every edit until it is restored. It was still being picked up here, marked synced
-  // locally, and written an audit line saying so; the push was then refused, the server
-  // stayed unsynced, the next refresh brought it back as pending, and it happened again.
-  // That loop wrote 38 identical "Auto-synced from field device" entries against one
-  // cancelled ticket over a day, and every one of them arrived as an unread notification
-  // for everybody. A sync that cannot succeed must not claim it did.
-  syncable(x) { return !!x && !x.synced && !x.deletedAt; }
+  // The one silent entry point — called on every automatic trigger (refreshCore, the
+  // 'online'/visibilitychange events, and the interval backstop) and nowhere else, so
+  // there is exactly one place that decides what "automatic" covers: closed work,
+  // clash-checked, AND the in-progress live flag, never anything requiring a person's
+  // judgment (a clash always waits for the button or the next automatic pass, which
+  // will see whatever the office has done by then).
   autoSyncNow() {
     const S = this.state;
     if (!S.online || !S.session) return;
-    const pending = (S.data.tickets || []).filter((x) => this.syncable(x));
-    // Nothing to send is not an event. The audit trail is what somebody reads to find out
-    // what happened to a job, and a line saying "nothing happened" pushes the lines that
-    // matter off the screen.
-    if (!pending.length) { this.setState({ lastAutoSyncAt: iso(new Date()) }); return; }
-    const now = iso(new Date());
-    this.mutate(d => d.tickets.forEach(x => {
-      if (!this.syncable(x)) return;
-      x.synced = true; x.syncedAt = now;
-      (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: '', text: 'Auto-synced from field device (' + x.tech + ').' });
-    }));
-    this.setState({ lastAutoSyncAt: now });
+    this.syncClosedTickets({ silent: true });
+    this.syncLiveTickets();
+    // Stamped regardless of whether anything was actually pending — the "Last upload"
+    // label on the Sync tab answers "when did this device last check in," not only
+    // "when did it last have something to send."
+    this.setState({ lastAutoSyncAt: iso(new Date()) });
   }
   ticket(id) { return this.state.data.tickets.find(t => t.id === (id || this.state.activeId)); }
   // A ticket id, as a person would actually read it — the job it names, not the uuid
@@ -12901,85 +13013,35 @@ class Component extends DCLogic {
         }
       },
 
-      showBanner: myPending.length > 0 && S.roleTab !== 'sync',
-      bannerBg: S.online ? 'var(--accent-wash)' : 'var(--field)',
-      bannerBorder: S.online ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.16)',
-      bannerDot: S.online ? 'var(--accent)' : 'var(--ink-ghost)',
-      bannerText: S.online
-        ? myPending.length + ' closed ticket(s) auto-syncing in the background — connection available.'
-        : 'Offline · ' + myPending.length + ' closed ticket(s) stored on this device, waiting for signal.',
+      // 2026-09-10, owner's request: "when the user is connected to the internet
+      // already they don't need to click manually on the sync banner... unless
+      // automatic syncing fails... otherwise the sync should be automatic." Every
+      // refreshCore() pass already resolves closed work automatically now (see
+      // syncClosedTickets and its own comment) — the only state actually worth
+      // interrupting someone for is the one nothing here can fix by itself: no
+      // connection to sync over. A genuine failure (the server refused a write
+      // outright) already has its own always-on banner, above every screen — see
+      // refusedAny — so this one no longer needs to duplicate that job by nagging
+      // about a pending count that is already being handled.
+      showBanner: !S.online && myPending.length > 0 && S.roleTab !== 'sync',
+      bannerBg: 'var(--field)',
+      bannerBorder: 'rgba(var(--ink-rgb),0.16)',
+      bannerDot: 'var(--ink-ghost)',
+      bannerText: 'Offline · ' + myPending.length + ' closed ticket(s) stored on this device, waiting for signal.',
       lastAutoSyncLabel: S.lastAutoSyncAt ? 'Last auto-synced ' + F.stamp(S.lastAutoSyncAt) : '',
       syncDisabled: !S.online,
       syncBg: S.online ? 'var(--accent)' : 'transparent',
       syncFg: S.online ? 'var(--on-accent)' : 'var(--accent-deep)',
       syncOpacity: S.online ? 1 : 0.45,
+      // The button still exists — a technician who wants confirmation right now, or
+      // who is retrying after a genuine failure, should not have to wait for the next
+      // automatic pass — but it now shares its entire implementation with every
+      // automatic trigger (see syncClosedTickets). Shares the 'sync' runLatest key
+      // with the background pass too, so pressing it while one is already running
+      // joins it instead of racing it.
       sync: () => {
         if (!S.online) return;
-        // Shares the 'sync' key with the background pass, so pressing the button while
-        // one is already running joins it instead of starting a second upload of the
-        // same tickets. Holding the button cannot queue a dozen of them either — only
-        // the most recent press survives to run after the current one finishes.
-        return this.runLatest('sync', () => {
-          // Pressed with nothing closed to upload, answer rather than doing nothing. The
-          // in-progress tickets are deliberately left exactly where they are.
-          if (!myPending.length) {
-            if (myInProgress.length && !myClosed.length) this.toast('sync-open', 'Close Ticket To Sync', 'warn');
-            else this.toast('sync-done', 'Tickets Already Synchronized', 'ok');
-            return;
-          }
-          const now = iso(new Date());
-          // A job the office already closed is settled. Uploading this device's copy would
-          // overwrite a sheet someone has already reviewed, so the field copy is dropped
-          // and the technician is told plainly rather than left wondering why his edits
-          // vanished. Losing the local version is the decision on record; what is on the
-          // office copy stands.
-          // Approved counts too, and did not before. The guard only asked whether the
-          // office had CLOSED the job, so a ticket approved while the technician was out
-          // of signal was not a clash — his stale copy uploaded straight over a sheet
-          // that had already been signed off. Approved is sealed for the technician
-          // (§2d), so it is settled in exactly the same way, and the reason is named
-          // rather than lumped in with the other case.
-          const clashed = myPending.filter(x =>
-            (x.officeClosed && x.closedBy && x.closedBy !== myName) || this.settled(x));
-          // Three cases, not two. The third is the one a technician actually hits and
-          // the one the old wording left him guessing about: he called the job off on a
-          // dead connection, and by the time he had signal the office had already closed
-          // it. "Already closed in the office" is true and tells him nothing about the
-          // thing he did — his cancellation simply vanished, with no sentence anywhere
-          // saying it had been overruled or why. It is named now.
-          const clashReason = (x) => {
-            if (x.status === 'cancelled') {
-              return this.settled(x)
-                ? 'approved in the office before your cancellation reached them, so the job stands as worked'
-                : 'closed in the office by ' + (x.closedBy || 'the office')
-                  + ' before your cancellation reached them, so the job stands as worked';
-            }
-            return this.settled(x)
-              ? 'already approved in the office'
-              : 'already closed in the office by ' + x.closedBy;
-          };
-          const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
-          this.mutate(d => d.tickets.forEach(x => {
-            if (clashed.some(c => c.id === x.id)) {
-              x.synced = true; x.syncedAt = x.closedAt || now;
-              (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
-                text: 'Field copy discarded on sync — ' + clashReason(clashed.find(c => c.id === x.id)) + '.' });
-              return;
-            }
-            if (ids.indexOf(x.id) === -1) return;
-            x.synced = true; x.syncedAt = now;
-            (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName, text: 'Uploaded from field device (' + x.tech + ').' });
-          }));
-          if (clashed.length) {
-            const one = clashed[0];
-            this.toast('sync-clash', (clashed.length === 1
-              ? one.customer + ' was ' + clashReason(one) + '.'
-              : clashed.length + ' tickets were already settled in the office.')
-              + ' Your copy was not uploaded and has been removed from the upload list. Open the ticket to read what the office has.', 'warn');
-            if (!ids.length) { this.setState({ syncedCount: 0 }); return; }
-          }
-          this.toast('sync-up', ids.length === 1 ? '1 closed ticket uploaded — the operations manager can see it now.' : ids.length + ' closed tickets uploaded — the operations manager can see them now.', 'ok');
-        });
+        return this.runLatest('sync', () => this.syncClosedTickets({ silent: false }));
       },
 
       techName: myName,
