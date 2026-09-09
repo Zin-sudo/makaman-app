@@ -1257,15 +1257,9 @@
           </div>
         </div>
 
-        <sc-if value="{{ settingsIsTech }}" hint-placeholder-val="{{ true }}">
-          <div style="margin-bottom:28px;padding:14px;border:1px solid rgba(var(--ink-rgb),0.18);background:var(--surface)">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-              <div style="font-size:14px;font-weight:600">Share my arrival location with the Ops Manager</div>
-              <button onClick="{{ toggleShareLocation }}" class="mk-switch" role="switch" aria-checked="{{ shareLocationOn }}" style="background:{{ shareLocationBg }}"><span class="mk-switch-knob" style="inset-inline-start:{{ shareLocationKnob }}"></span></button>
-            </div>
-            <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;line-height:1.4">Controls what the office is told. Your own position stays in the top bar either way, so a screenshot of any screen can be used to find you.</div>
-          </div>
-        </sc-if>
+        <!-- Location sharing lived here AND on the Account tab's own profile card — two
+             switches over the same setting, easy to read as two different things. Both
+             gone from here 2026-09-09; the Account tab is now the one place they live. -->
 
         <div style="margin-bottom:28px">
           <div class="mk-eyebrow">Notifications</div>
@@ -1871,9 +1865,23 @@
                       <div style="flex:1;min-width:0;font-weight:500">{{ r.value }}</div>
                     </div>
                   </sc-for>
+                  <!-- Was two switches over one setting (this card, and a second copy
+                       inside the Settings tile) — merged 2026-09-09 into the one place a
+                       technician would look for it. Arrival location is the master
+                       consent: off, and nothing below it can send anything either. -->
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                    <div>
+                      <div style="font-size:13px">Arrival location</div>
+                      <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">Share where you are when you open a job. Your position stays in the top bar either way, so a screenshot of any screen can be used to find you.</div>
+                    </div>
+                    <button onClick="{{ toggleShareLocation }}" class="mk-switch" role="switch" aria-checked="{{ shareLocationOn }}" style="background:{{ shareLocationBg }};flex:none"><span class="mk-switch-knob" style="inset-inline-start:{{ shareLocationKnob }}"></span></button>
+                  </div>
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px">
-                    <div style="font-size:13px">Share my position with the office</div>
-                    <button onClick="{{ toggleShareLocation }}" class="mk-switch" role="switch" aria-checked="{{ shareLocationOn }}" style="background:{{ shareLocationBg }}"><span class="mk-switch-knob" style="inset-inline-start:{{ shareLocationKnob }}"></span></button>
+                    <div>
+                      <div style="font-size:13px">Update with each log line</div>
+                      <div style="font-size:11px;color:var(--ink-faint);margin-top:2px">While Arrival location is on, also refresh your position each time you write a new log line, for as long as the job stays open.</div>
+                    </div>
+                    <button onClick="{{ togglePeriodicLocation }}" class="mk-switch" role="switch" aria-checked="{{ periodicLocationOn }}" style="background:{{ periodicLocationBg }};flex:none"><span class="mk-switch-knob" style="inset-inline-start:{{ periodicLocationKnob }}"></span></button>
                   </div>
                 </div>
               </sc-if>
@@ -4798,6 +4806,9 @@ function hydrate() {
         notificationsReadAt: mySettings.notifications_read_at || '',
         timeFormat: mySettings.hour12 ? '12' : '24',
         shareLocation: !!mySettings.share_location,
+        // A refinement of shareLocation, not a second consent — geoEnabled('periodic')
+        // requires shareLocation too, so this only ever matters while that is already on.
+        periodicLocation: !!mySettings.periodic_location,
       },
       orgDefaults: {
         baseLocation: (orgDefaults[0] || {}).base_location || DEFAULT_BASE_LOCATION,
@@ -6109,7 +6120,8 @@ function diffOps(before, after) {
       // an empty string is not one. A refused write jams the head of the outbox, which is
       // how signup approval broke earlier in this project.
       notifications_read_at: (after.settings || {}).notificationsReadAt || null,
-      share_location: !!(after.settings || {}).shareLocation, updated_at: new Date().toISOString() } });
+      share_location: !!(after.settings || {}).shareLocation,
+      periodic_location: !!(after.settings || {}).periodicLocation, updated_at: new Date().toISOString() } });
   }
   return ops;
 }
@@ -6485,10 +6497,12 @@ const DRAIN_RETRY_CAP_MS = (typeof window !== 'undefined' && window.__DRAIN_RETR
 // scheduleDrain() is: one row's own write touches the ticket and several children in
 // the same moment, and Postgres Changes fires once per row, not once per edit.
 const REALTIME_REFRESH_DEBOUNCE_MS = (typeof window !== 'undefined' && window.__REALTIME_TEST_MS) || 1200;
-// How often a ticket that is still being logged re-pins where the device is. Two hours
-// rather than one (2026-09-04, owner's request): the office reads this as "still on
-// site," not live tracking, and the wider spacing costs the field device fewer GPS
-// wake-ups over a shift.
+// How stale a device's last fix is allowed to look before Field Devices marks it red.
+// Used to be also the clock a periodic re-pin ran on (2026-09-04, owner's request: two
+// hours rather than one). 2026-09-09: the re-pin itself is no longer a timer — see
+// geoLogPing — so this now serves only the one purpose, unchanged in value: past two
+// hours with nothing fresh, the dot reads "we haven't heard from this device in as long
+// as a job actually being worked should ever go quiet."
 const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING_TEST_MS) || 7200000;
 // How long a cancelled ticket stays in the ordinary Inbox view before it drops out to
 // "archived" (2026-09-09, owner's request: "stays for a couple of days to allow
@@ -6496,10 +6510,6 @@ const GEO_PING_INTERVAL_MS = (typeof window !== 'undefined' && window.__GEO_PING
 // reach it through "Show archived" — this only controls how long it competes for
 // attention in the default view of a screen meant for open work.
 const ARCHIVE_DAYS = (typeof window !== 'undefined' && window.__ARCHIVE_DAYS_TEST) || 3;
-// How often the app *checks* whether a ping is due. Checking often and pinging rarely is
-// what keeps a device that was asleep or offline from owing a burst of catch-up fixes:
-// the check finds one ping due, not six.
-const GEO_TICK_MS = (typeof window !== 'undefined' && window.__GEO_TICK_TEST_MS) || 60000;
 // The opening pin may reuse a fix this recent: the technician has just arrived and
 // tapped a button, so a position from the last half-minute is where they are, and
 // reusing it answers instantly instead of waiting on a cold GPS lock.
@@ -6691,7 +6701,7 @@ function seed() {
       // Libya time by default, not the device's. Every operation is at the Ahmadi base,
       // and the payroll month rule keys off the job end date — so a technician whose
       // phone is on the wrong zone must not be able to move a ticket into another month.
-      theme: 'dark', timeFormat: '24', shareLocation: true, notificationsReadAt: '',
+      theme: 'dark', timeFormat: '24', shareLocation: true, periodicLocation: true, notificationsReadAt: '',
     },
     // Permanent, admin-configured defaults (B13 Base Location / F14 Customer Rep. on the
     // real Service Ticket / Job Log sheets) — not per-ticket technician entry and not a
@@ -7293,8 +7303,10 @@ class Component extends DCLogic {
     // from sleep on the same network is the case that needs it), and it is harmless now
     // that an empty sync writes nothing.
     this.autoSyncTimer = setInterval(() => this.autoSync(), AUTO_SYNC_INTERVAL_MS);
-    // Checks every minute whether the two-hourly pin is due; see geoTick.
-    this.geoTimer = setInterval(() => this.geoTick(), GEO_TICK_MS);
+    // No geo timer here any more — 2026-09-09, owner's request: a blind two-hourly poll
+    // was replaced by geoLogPing, called straight from addEvent whenever a technician
+    // actually writes a log line. Real activity is the trigger now, not a clock nobody
+    // could see; see geoLogPing's own comment for why.
     // Registers sw.js so the app is a real installable PWA on any device (see the
     // <link rel="manifest"> in <helmet>). Swallows failures silently — e.g. when run
     // from file:// or a sandboxed preview with no service-worker support — since this is
@@ -7377,17 +7389,13 @@ class Component extends DCLogic {
     // visibilitychange fires when the page comes back either way, network blip or not,
     // which 'online' alone does not cover — the socket can die while the OS still
     // considers the device "online" the whole time.
-    // geoTick's own setInterval has the identical weakness — a suspended JS context does
-    // not keep firing timers on schedule, so a technician's PWA sitting backgrounded for
-    // the two-hourly interval simply never asks for a fix, and the office reads a stale
-    // "Latest/current location" indefinitely on both the Team tile and Field Devices,
-    // since they read the same x.geo.last this never updated. geoTick() is already safe
-    // to call opportunistically — it no-ops unless a fix is actually overdue — so coming
-    // back into view is the same moment worth checking as the realtime channel above.
+    // Geo capture no longer runs on a timer of its own (see geoLogPing) — it fires from
+    // addEvent, in the same JS turn as the log line that triggers it, so there is no
+    // schedule for a suspended tab to have missed and nothing here needs to catch it up.
     //
     // 2026-09-04, swept for every OTHER timer with the same shape rather than leaving the
-    // next one to be found live: autoSyncTimer has the identical weakness, and — unlike
-    // geoTick — the fix already exists one event over. netListener's own 'online' handler
+    // next one to be found live: autoSyncTimer has the identical weakness, and the fix
+    // already exists one event over. netListener's own 'online' handler
     // already calls refresh(), autoSync() AND reconnectRealtime() together, on exactly
     // this reasoning (see its own comment: "Coming back is the moment everything queued
     // while away goes out"). But 'online' only fires on a genuine network transition, and
@@ -7408,7 +7416,6 @@ class Component extends DCLogic {
         this.refresh();
         this.autoSync();
         this.reconnectRealtime();
-        this.geoTick();
       }
     };
     if (typeof document !== 'undefined') {
@@ -7464,7 +7471,7 @@ class Component extends DCLogic {
       window.removeEventListener('error', this.onWindowError);
       window.removeEventListener('unhandledrejection', this.onRejection);
     }
-    clearInterval(this.timer); clearInterval(this.autoSyncTimer); clearInterval(this.geoTimer);
+    clearInterval(this.timer); clearInterval(this.autoSyncTimer);
     if (this.toastTimer) clearTimeout(this.toastTimer);
     if (this.busyTimer) clearInterval(this.busyTimer);
     if (this.drainTimer) clearTimeout(this.drainTimer);
@@ -7868,26 +7875,25 @@ class Component extends DCLogic {
   //
   // GPS needs no network, so a device out of signal still records; the fixes ride up
   // with the ticket at the next sync.
-  geoEnabled() {
+  // 'arrival' (the default) checks only the master switch — the opening pin. 'periodic'
+  // additionally requires the per-log-line switch, which is a refinement of the master
+  // one, not a second consent: turning off Arrival location silences the log-line pings
+  // too, regardless of what that switch is set to, because there is no longer any consent
+  // for this device to tell the office anything about where it is.
+  geoEnabled(kind) {
     const s = (this.state.data || {}).settings || {};
-    return s.shareLocation !== false
-      && typeof navigator !== 'undefined' && !!navigator.geolocation
+    if (s.shareLocation === false) return false;
+    if (kind === 'periodic' && s.periodicLocation === false) return false;
+    return typeof navigator !== 'undefined' && !!navigator.geolocation
       && !this.geoDenied;
   }
-  // Tickets this device should be pinning: still being logged, and held by whoever
-  // is signed in. A manager reviewing a ticket never pings for it — and neither does
-  // a technician who has handed the job on, since they are no longer the one on site.
-  geoActiveTickets() {
-    const S = this.state;
-    if (!S.session || S.role !== 'tech') return [];
-    const me = S.session.name;
-    return (S.data.tickets || []).filter(x => x.status === 'logging' && holderOf(x) === me);
-  }
-  // One fix, shared by the opening pin and the periodic ones. The in-flight guard is
-  // what stops a slow fix from stacking: a request already running means the tick that
-  // wanted another one simply does nothing.
-  geoFix(cb, maxAgeMs) {
-    if (this.geoBusy || !this.geoEnabled()) return;
+  // One fix, shared by the opening pin and the per-log-line ones. The in-flight guard is
+  // what stops a slow fix from stacking: a request already running means a second caller
+  // wanting one simply does nothing. `kind` passes straight through to geoEnabled —
+  // geoLogPing asks as 'periodic' so its own switch is honoured; the opening pin asks as
+  // itself (undefined), the master check alone.
+  geoFix(cb, maxAgeMs, kind) {
+    if (this.geoBusy || !this.geoEnabled(kind)) return;
     this.geoBusy = true;
     let settled = false;
     const done = (fix) => {
@@ -8075,47 +8081,37 @@ class Component extends DCLogic {
     if (!id) return;
     this.setState({ geoAskDeferred: id, geoAskConfirmFor: null });
   }
-  // The periodic pin. Each fix replaces the previous one rather than appending, so a
-  // device that was offline for a day arrives with one current position, not a day of
+  // The periodic pin — no longer a blind clock. 2026-09-09, owner's request: "why not
+  // make it every time a technician enters a new log line into his ticket - the location
+  // is captured. More reasonable and less spam" — replacing the old two-hourly setInterval
+  // (see the git history for geoTick/geoActiveTickets, now gone). Called straight from
+  // addEvent, once per line, for the one ticket that line was written to: a technician
+  // actually working the job produces lines at a human pace, which ties the update to
+  // real activity instead of a clock nobody can see, and asks for nothing at all while
+  // nothing is happening. Each fix still replaces the previous one rather than appending,
+  // so a job with forty log lines arrives with one current position, not forty
   // breadcrumbs — the last fix before Job Done is what remains.
-  geoTick() {
-    if (!this.geoEnabled()) return;
-    const due = this.geoActiveTickets().filter(x => {
-      const g = x.geo || {};
-      // Scheduled from when the device was last *asked*, not from the age of the fix
-      // it came back with. The browser is allowed to answer with a recent cached fix,
-      // which carries its own older timestamp; scheduling from that timestamp would
-      // leave the ticket permanently overdue and re-ask on every single tick — a
-      // two-hourly ping turning into a once-a-minute one.
-      const askedAt = g.pingedAt || (g.last && g.last.ts);
-      if (!askedAt) return true;
-      return Date.now() - new Date(askedAt).getTime() >= GEO_PING_INTERVAL_MS;
-    });
-    if (!due.length) return;
-    // One fix serves every ticket still open on this device, not only the ones that
-    // happened to come due — a technician holds one device in one place, so a second
-    // open ticket must not mean a second trip to the GPS. Stamping them all together
-    // also pulls their schedules back into step, so two tickets opened an hour apart
-    // settle onto one hourly fix rather than drifting into two.
-    const ids = this.geoActiveTickets().map(x => x.id);
+  geoLogPing(ticketId) {
+    if (!this.geoEnabled('periodic')) return;
+    const S = this.state;
+    if (!S.session || S.role !== 'tech') return;
+    const me = S.session.name;
     const askedAt = iso(new Date());
     this.geoFix((fix) => {
       if (!fix) return;
       this.mutate(d => {
-        ids.forEach(id => {
-          const x = d.tickets.find(y => y.id === id);
-          // Re-checked inside the mutation: the ticket may have been marked done while
-          // the fix was in flight, and a position recorded after Job Done would be
-          // following someone off the job.
-          if (!x || x.status !== 'logging') return;
-          x.geo = Object.assign({}, x.geo, { last: fix, pingedAt: askedAt });
-          if (!x.geo.open) x.geo.open = fix;
-        });
+        const x = d.tickets.find(y => y.id === ticketId);
+        // Re-checked inside the mutation: the fix can land after the ticket was handed
+        // off or marked done while it was in flight, and a position recorded after
+        // either would be following someone who is no longer the one on site.
+        if (!x || x.status !== 'logging' || holderOf(x) !== me) return;
+        x.geo = Object.assign({}, x.geo, { last: fix, pingedAt: askedAt });
+        if (!x.geo.open) x.geo.open = fix;
       });
     // A position meant to show whether someone is still on site has to be current, so
-    // the periodic fix refuses cached answers outright. (The opening pin is the one
-    // place a recent cached fix is welcome — see GEO_MAX_AGE_MS.)
-    }, 0);
+    // this refuses cached answers outright. (The opening pin is the one place a recent
+    // cached fix is welcome — see GEO_MAX_AGE_MS.)
+    }, 0, 'periodic');
   }
   // Background sync — runs on a timer instead of only when the technician remembers to
   // tap Sync. Same effect as the manual Sync button (uploads every not-yet-synced
@@ -12227,10 +12223,10 @@ class Component extends DCLogic {
           // (same reasoning as geoNote(), used on the printed sheet); when someone holds
           // more than one open job, the most recently opened one stands for the pair,
           // same as "last contact" above already stands for the device as a whole.
-          // Latest/current location is the periodic re-pin (geoTick, every
-          // GEO_PING_INTERVAL_MS) — whether the device, and so presumably the
-          // technician, is still there. Both shown once for the person, not repeated
-          // under every open job.
+          // Latest/current location is the periodic re-pin (geoLogPing, fired from each
+          // log line the technician writes — see its own comment) — whether the device,
+          // and so presumably the technician, is still there. Both shown once for the
+          // person, not repeated under every open job.
           const openFixes = mine.map(x => (x.geo || {}).open).filter(Boolean)
             .sort((a, b) => new Date(b.ts) - new Date(a.ts));
           const wellFix = openFixes[0];
@@ -12242,13 +12238,14 @@ class Component extends DCLogic {
             name: u.name + (u.roleTag || ''), base: u.base || '—',
             sortKey: lastAt === null ? -Infinity : lastAt,
             lastLabel: lastAt === null ? 'Never synced' : F.stamp(iso(new Date(lastAt))),
-            // Red past the same interval the periodic ping itself runs on — 2026-09-09,
+            // Red past the same two hours the ping used to be scheduled on — 2026-09-09,
             // owner's request. The old ladder (green under 12h, amber under 24h, red
-            // past that) meant a technician could be two hours overdue on a ping that is
-            // only supposed to be two hours apart and still show green, which read as
-            // "everything's fine" when the actual fact was "we haven't heard from this
-            // device in as long as the ping interval itself." Two states, not three: the
-            // dot going red now means exactly "the next ping is overdue," nothing more.
+            // past that) meant a technician could be well overdue and still show green.
+            // The threshold outlived the timer it was borrowed from (see GEO_PING_INTERVAL_MS's
+            // own comment): a job actually being logged writes a line, and so a fix, far
+            // more often than every two hours, so two states, not three, and the dot
+            // going red now means exactly "nothing fresh in longer than a working job
+            // should ever go quiet," nothing more.
             dot: hours > (GEO_PING_INTERVAL_MS / 3600000) ? 'var(--danger)' : 'var(--success)',
             tollLabel: open.length + ' open · ' + closed.length + ' closed',
             pendingLabel: pending ? (pending === 1 ? '1 not uploaded' : pending + ' not uploaded') : '',
@@ -12401,6 +12398,15 @@ class Component extends DCLogic {
         // Only the switching-off direction says anything. Confirming a choice someone
         // just made, in the direction they wanted, is noise.
         if (!next) this.toast('geo-off', 'Location sharing is off. Your position will read "No Location Shared" — the office cannot reach you by coordinates if something goes wrong on site.', 'warn');
+      },
+      // A refinement of the switch above, not a second one: geoEnabled('periodic') also
+      // requires shareLocation, so this reads and writes independently but only ever
+      // takes effect while Arrival location is itself on.
+      periodicLocationOn: (D.settings || {}).periodicLocation ? 'true' : 'false',
+      periodicLocationBg: (D.settings || {}).periodicLocation ? 'var(--accent)' : 'var(--field)',
+      periodicLocationKnob: (D.settings || {}).periodicLocation ? '24px' : '3px',
+      togglePeriodicLocation: () => {
+        this.updateSettings({ periodicLocation: !(D.settings || {}).periodicLocation });
       },
 
       // Notifications — everyone, not gated by role like the two blocks above: an
@@ -13032,6 +13038,10 @@ class Component extends DCLogic {
         // Later (or NOT YET) deferred it until "next time something happens on this
         // job", and a fresh line is exactly that.
         this.setState({ newEventText: '', geoAskDeferred: S.geoAskDeferred === t.id ? null : S.geoAskDeferred });
+        // The periodic re-pin itself: see geoLogPing's own comment for why this replaced
+        // a timer. After mutate(), not inside it — geoFix is its own async round trip and
+        // must not be running while a mutation is still being applied.
+        this.geoLogPing(t.id);
       },
       handoverTo: S.handoverTo || '',
       setHandoverTo: e => this.setState({ handoverTo: e.target.value }),

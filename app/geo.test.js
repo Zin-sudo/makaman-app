@@ -4,9 +4,8 @@ const OUT = '/tmp/claude-0/-home-user-makaman-app/d91117f5-d40f-52d2-8052-784fa3
 const URL = 'http://localhost:8934/index.html';
 const A = { latitude: 32.887209, longitude: 13.191338, accuracy: 12 };
 const B = { latitude: 32.901544, longitude: 13.205871, accuracy: 9 };
-const C = { latitude: 33.500000, longitude: 14.500000, accuracy: 5 };
+const C = { latitude: 32.914477, longitude: 13.219903, accuracy: 6 };
 
-const PING = 2500, TICK = 500;
 let pass = 0, fail = 0;
 const check = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '  PASS  ' : '  FAIL  ') + name + (extra ? '   ' + extra : '')); };
 
@@ -15,18 +14,17 @@ async function boot(ctx, errs) {
   page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/404|Failed to load/.test(m.text())) errs.push('CONSOLE: ' + m.text()); });
   await page.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
-  await page.addInitScript(([p, t]) => {
-    window.__GEO_PING_TEST_MS = p;
-    window.__GEO_TICK_TEST_MS = t;
-    // Count every request the app makes to the GPS, so ping-rate can be asserted
-    // rather than inferred from whether the stored value happened to change.
+  await page.addInitScript(() => {
+    // Count every request the app makes to the GPS, so a log line can be proven to be
+    // exactly what asks for one — not a timer, not a keystroke, not the render that
+    // follows it.
     window.__geoCalls = 0;
     const orig = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
     navigator.geolocation.getCurrentPosition = function (ok, err, opts) {
       window.__geoCalls++;
       return orig(ok, err, opts);
     };
-  }, [PING, TICK]);
+  });
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
   await page.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
@@ -45,6 +43,16 @@ const geoOf = (page) => page.evaluate(() => {
   const t = (d.tickets || []).filter(x => x.geo).pop();
   return t ? { id: t.id, status: t.status, geo: t.geo } : null;
 });
+// The one real trigger under test: write a line, tap the log button, wait for the fake
+// GPS round trip and the mutate()+render it drives. By placeholder, not `textarea`
+// alone — every existing line gets its own editable textarea (see the log screen's
+// per-line edit box), so once a first line exists it is no longer the only one on
+// screen, and `.first()` would land on an existing line's box instead of a fresh one.
+async function logLine(page, text) {
+  await page.getByPlaceholder(/Describe the event as it happens/i).fill(text);
+  await page.getByRole('button', { name: /^Log line/i }).click();
+  await page.waitForTimeout(600);
+}
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
@@ -69,26 +77,34 @@ const geoOf = (page) => page.evaluate(() => {
     g && g.geo.open ? `lat ${g.geo.open.lat.toFixed(4)} lon ${g.geo.open.lon.toFixed(4)}` : '');
   const openTs = g.geo.open.ts, id = g.id;
 
-  // move the device, let a couple of ping windows elapse
+  // ── The re-pin is now a log line, not a clock (2026-09-09, owner's request) ─────────
   await ctx.setGeolocation(B);
-  await page.waitForTimeout(PING * 2 + 1200);
+  const beforeWait = await page.evaluate(() => window.__geoCalls);
+  await page.waitForTimeout(1500);
+  const afterWait = await page.evaluate(() => window.__geoCalls);
+  check('nothing asks the GPS merely because time passed — no timer left to fire',
+    afterWait === beforeWait, `${beforeWait} -> ${afterWait}`);
+
+  await logLine(page, 'Rigging up, function testing surface equipment.');
   g = await geoOf(page);
-  check('periodic fix follows the device', g.geo.last.lat.toFixed(4) === B.latitude.toFixed(4),
-    `last lat ${g.geo.last.lat.toFixed(4)}`);
+  check('writing a log line captures the device\'s current position',
+    g.geo.last.lat.toFixed(4) === B.latitude.toFixed(4), `last lat ${g.geo.last.lat.toFixed(4)}`);
   check('opening fix never rewritten', g.geo.open.ts === openTs && g.geo.open.lat.toFixed(4) === A.latitude.toFixed(4));
   check('keeps only open+last, no breadcrumb trail',
     Object.keys(g.geo).sort().join(',') === 'last,open,pingedAt', Object.keys(g.geo).sort().join(','));
+  const afterOneLine = await page.evaluate(() => window.__geoCalls);
+  check('exactly one GPS call for the one log line, not a burst',
+    afterOneLine - afterWait === 1, `${afterWait} -> ${afterOneLine}`);
 
-  // ping rate: over a fixed window, calls must track the ping interval, not the tick
-  const before = await page.evaluate(() => window.__geoCalls);
-  const WINDOW = PING * 4;
-  await page.waitForTimeout(WINDOW);
-  const after = await page.evaluate(() => window.__geoCalls);
-  const calls = after - before;
-  const ceiling = Math.ceil(WINDOW / PING) + 1;      // allow one boundary straddle
-  const tickRate = Math.floor(WINDOW / TICK);         // what unthrottled would look like
-  check('ping rate throttled to the interval, not the tick',
-    calls <= ceiling && calls < tickRate / 2, `${calls} calls in ${WINDOW}ms (ceiling ${ceiling}, unthrottled would be ~${tickRate})`);
+  await ctx.setGeolocation(C);
+  await logLine(page, 'Circulating bottoms up.');
+  g = await geoOf(page);
+  check('a second log line asks again and replaces the fix, not appends to it',
+    g.geo.last.lat.toFixed(4) === C.latitude.toFixed(4)
+    && Object.keys(g.geo).sort().join(',') === 'last,open,pingedAt');
+  const afterTwoLines = await page.evaluate(() => window.__geoCalls);
+  check('one GPS call per line — two lines, two calls, not more',
+    afterTwoLines - afterOneLine === 1, `${afterOneLine} -> ${afterTwoLines}`);
 
   // Job Done stops it
   await page.getByRole('button', { name: /^Job done$/i }).click();
@@ -98,19 +114,18 @@ const geoOf = (page) => page.evaluate(() => {
   g = await geoOf(page);
   check('ticket marked done', g.status === 'done', `status=${g.status}`);
   const frozen = JSON.stringify(g.geo.last);
-  await ctx.setGeolocation(C);
-  await page.waitForTimeout(PING * 3);
+  await ctx.setGeolocation(A);
+  // The log-line UI is gone once a job is done, so nothing in the app can call this any
+  // more in the ordinary run of things — called directly here to prove the function's OWN
+  // guard holds, not merely that the button that used to trigger it is out of reach.
+  await page.evaluate((tid) => window.__mkApp.geoLogPing(tid), id);
+  await page.waitForTimeout(500);
   g = await geoOf(page);
-  // Asserted on this ticket only: the seed leaves another ticket of the same
-  // technician's still being logged, and that one is *supposed* to keep pinging.
-  check('done ticket stops recording', JSON.stringify(g.geo.last) === frozen,
-    g.geo.last.lat.toFixed(4) === C.latitude.toFixed(4) ? 'followed device after done!' : 'unchanged');
+  check('a done ticket cannot be pinged any more, even called directly',
+    JSON.stringify(g.geo.last) === frozen);
 
   // The office's record of where the ticket was worked is still the office's, and it
   // stays off the technician's own ticket view.
-  // innerText, not textContent: the x-dc template lives inside <body>, so textContent
-  // hands back the markup for every screen including the office panel this is asserting
-  // is absent — it would pass or fail on source code rather than on what is rendered.
   const techBody = await page.innerText('body');
   check('the office position panel stays out of the technician\'s ticket view',
     !/Device position|Opening fix|Last fix/i.test(techBody));
@@ -148,7 +163,7 @@ const geoOf = (page) => page.evaluate(() => {
       check(`${who}: sees opening fix`,
         /When opened/.test(body) && (/32\.887209/.test(body) || /32\.887209/.test(coords)));
       check(`${who}: sees last fix before Job Done`,
-        /Last position before Job Done/.test(body) && (/32\.901544/.test(body) || /32\.901544/.test(coords)));
+        /Last position before Job Done/.test(body) && (/32\.914477/.test(body) || /32\.914477/.test(coords)));
       await page.screenshot({ path: OUT + '/61-mgr.png' });
     }
     await page.close();
@@ -188,16 +203,11 @@ const geoOf = (page) => page.evaluate(() => {
     let dg = await geoOf(dpage);
     check('an unanswered permission prompt leaves the ticket with no geo.open, not a hang',
       !(dg && dg.geo && dg.geo.open), JSON.stringify(dg));
-    // geoTick's own periodic retry (still due — nothing has landed yet) means geoBusy
-    // cycles true/false roughly every backstop interval rather than settling once, so
-    // this polls for a free moment instead of sampling a single instant that could land
-    // on either side of that cycle.
-    let everFree = false;
-    for (let i = 0; i < 6 && !everFree; i++) {
-      everFree = (await dpage.evaluate(() => window.__mkApp.geoBusy)) === false;
-      if (!everFree) await dpage.waitForTimeout(200);
-    }
-    check('and the backstop actually releases geoBusy rather than leaving it stuck', everFree);
+    // No periodic retry exists any more to keep re-triggering this in the background
+    // (see geoLogPing) — one attempt, one backstop, one settled state.
+    await dpage.waitForTimeout(300);
+    check('and the backstop actually releases geoBusy rather than leaving it stuck',
+      (await dpage.evaluate(() => window.__mkApp.geoBusy)) === false);
 
     // Backdate the arrival past the missing-pin threshold instead of waiting 20 real
     // seconds — the binding only reads the elapsed time, not the wall clock it ran on.
@@ -208,16 +218,6 @@ const geoOf = (page) => page.evaluate(() => {
       });
     });
     await dpage.waitForTimeout(300);
-    // Isolated from geoTick's own periodic recovery: this ticket has never had a fix at
-    // all, so geoTick's own "never asked" branch (see its own comment on `!askedAt`)
-    // treats it as due on every single firing, sped up to every __GEO_TICK_TEST_MS
-    // (500ms) in this file. Once getCurrentPosition is redefined below to succeed, a
-    // periodic tick landing in the gap between Capture Now and YES backfills geo.open
-    // on its own (geoTick's own comment: "if (!x.geo.open) x.geo.open = fix") and wins
-    // the race — a REAL and correct behaviour (the ticket's need is satisfied either
-    // way), just not what this check is testing, which is the manual confirm flow
-    // itself. Disabled for the rest of this scenario rather than raced against.
-    await dpage.evaluate(() => { window.__mkApp.geoTick = () => {}; });
     // Capture Now / Ask Again Later, then Are you here? / YES / NOT YET — the missing
     // pin is no longer one button, it is a message plus a two-step choice, so nothing
     // captures on the first tap any more.
@@ -235,14 +235,6 @@ const geoOf = (page) => page.evaluate(() => {
         ok({ coords: { latitude: lat, longitude: lon, accuracy: 10 }, timestamp: Date.now() });
       };
     }, [A.latitude, A.longitude]);
-    // geoTick's own periodic retry is still due and can be mid-flight (on the old
-    // hanging behaviour, with its own backstop still counting down) at the instant this
-    // clicks — wait for a free moment first so the click's own call is the one that
-    // actually reaches getCurrentPosition, now that the stub answers instantly.
-    for (let i = 0; i < 6; i++) {
-      if ((await dpage.evaluate(() => window.__mkApp.geoBusy)) === false) break;
-      await dpage.waitForTimeout(200);
-    }
     await captureNowBtn.click();
     await dpage.waitForTimeout(200);
     check('Capture Now turns the message into a direct question',
@@ -306,11 +298,6 @@ const geoOf = (page) => page.evaluate(() => {
       });
     });
     await dpage.waitForTimeout(300);
-    // Same isolation as the earlier scenario — a never-pinned ticket plus this file's
-    // sped-up geoTick would otherwise be free to interleave its own attempt (denied,
-    // same as this one, but not the one this check is naming) between Capture Now
-    // and YES below.
-    await dpage.evaluate(() => { window.__mkApp.geoTick = () => {}; });
     const firstDenialMsg = dpage.getByText(/Well location not captured/i);
     check(`${who}: a first, automatic denial is still offered as an ordinary retry`,
       await firstDenialMsg.isVisible());
@@ -337,7 +324,7 @@ const geoOf = (page) => page.evaluate(() => {
     await dCtx.close();
   }
 
-  // ---- consent toggle honoured ----
+  // ---- consent toggle honoured — for the opening pin AND the per-line one ----
   page = await boot(ctx, errs);
   await page.evaluate(() => {
     const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));
@@ -353,75 +340,68 @@ const geoOf = (page) => page.evaluate(() => {
   await page.locator('select').first().selectOption({ index: 1 });
   await page.locator('input').nth(0).fill('X'); await page.locator('input').nth(1).fill('Y'); await page.locator('input').nth(2).fill('Z');
   await page.getByRole('button', { name: /Start Logging/i }).click();
-  await page.waitForTimeout(PING * 2);
+  await page.waitForTimeout(600);
+  // Master off silences the log-line ping too — it is a refinement of this switch, not
+  // a second consent, so writing a line must not reach the GPS either.
+  await logLine(page, 'Testing with location sharing off.');
   const offCalls = await page.evaluate(() => window.__geoCalls);
   const offGeo = await geoOf(page);
   // The rule the toggle enforces: "never tell the office", not "never ask the GPS" —
   // it must not put a fix on a ticket, where it would sync, even while it is off.
-  check('sharing off: nothing lands on the ticket', !offGeo, JSON.stringify(offGeo));
+  check('sharing off: nothing lands on the ticket, opening pin or log line alike',
+    !offGeo, JSON.stringify(offGeo));
   const stored = await page.evaluate(() => localStorage.getItem('makaman.jobtickets.v2') || '');
   check('sharing off: no coordinate is written to the store at all',
     !/"lat"\s*:/.test(stored), '(gps calls=' + offCalls + ')');
   await page.close();
 
-  // ---- a backgrounded PWA catches up the moment it is reopened ----
+  // ---- the per-line switch is a refinement of Arrival location, not a second consent ----
   //
-  // 2026-09-04, owner's request: geoTick's own setInterval has the same weakness the
-  // realtime channel had — a JS context the OS actually suspended (a backgrounded tab, a
-  // Home-Screen PWA) does not keep firing timers on schedule, so a technician who left
-  // the app backgrounded past the two-hourly interval never gets asked for a fresh fix,
-  // and the office reads a stale "Latest/current location" on both the Team tile and
-  // Field Devices — they read the same x.geo.last this never updated. Proven here with
-  // the tick interval set absurdly long (so the ordinary timer provably cannot be what
-  // fires) and the ping interval set to zero (so a fix is due the instant one is asked
-  // for): nothing happens on its own, and dispatching visibilitychange is what actually
-  // gets a fresh fix — the same event the realtime reconnect fix already listens for.
+  // 2026-09-09, owner's request: the two switches that used to be one ("Share my
+  // position") merged into "Arrival location" on the Account tab, plus this second one
+  // governing whether each log line also refreshes the position. Off, with Arrival
+  // location still on: the opening pin still fires, but a log line must not move it.
   {
-    const vctx = await browser.newContext({ viewport: { width: 430, height: 950 }, permissions: ['geolocation'], geolocation: A });
-    const vpage = await vctx.newPage();
-    vpage.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
-    await vpage.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
-    await vpage.addInitScript(() => {
-      window.__GEO_PING_TEST_MS = 0;
-      // Longer than this whole test block could ever run — if a fresh fix shows up, it
-      // was not this timer, because this timer will not have fired yet.
-      window.__GEO_TICK_TEST_MS = 999999;
-      window.__geoCalls = 0;
-      const orig = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
-      navigator.geolocation.getCurrentPosition = function (ok, err, opts) {
-        window.__geoCalls++;
-        return orig(ok, err, opts);
-      };
+    page = await boot(ctx, errs);
+    await page.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));
+      d.settings = Object.assign({}, d.settings, { shareLocation: true, periodicLocation: false });
+      d.tickets = [];
+      localStorage.setItem('makaman.jobtickets.v2', JSON.stringify(d));
     });
-    await vpage.goto(URL, { waitUntil: 'networkidle' });
-    await vpage.waitForTimeout(300);
-    await vpage.evaluate(() => localStorage.removeItem('makaman.jobtickets.session.v1'));
-    await vpage.reload({ waitUntil: 'networkidle' });
-    await vpage.waitForTimeout(600);
-    await login(vpage, 'yousef@makaman.ly');
-    await vpage.getByRole('button', { name: /New Job Ticket/i }).click();
-    await vpage.waitForTimeout(400);
-    await vpage.locator('select').first().selectOption({ index: 1 });
-    await vpage.locator('input').nth(0).fill('Test Field');
-    await vpage.locator('input').nth(1).fill('TG-1');
-    await vpage.locator('input').nth(2).fill('RIG-9');
-    await vpage.getByRole('button', { name: /Start Logging/i }).click();
-    await vpage.waitForTimeout(1200); // the opening fix, unrelated to what is under test
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(600);
+    await login(page, 'yousef@makaman.ly');
+    await page.getByRole('button', { name: /New Job Ticket/i }).click();
+    await page.waitForTimeout(400);
+    await page.locator('select').first().selectOption({ index: 1 });
+    await page.locator('input').nth(0).fill('SplitFld');
+    await page.locator('input').nth(1).fill('SP-1');
+    await page.locator('input').nth(2).fill('RIG-S');
+    await page.getByRole('button', { name: /Start Logging/i }).click();
+    await page.waitForTimeout(1200);
 
-    const before = await vpage.evaluate(() => window.__geoCalls);
-    await vpage.waitForTimeout(800);
-    const stillIdle = await vpage.evaluate(() => window.__geoCalls);
-    check('with the tick interval effectively disabled, nothing asks for a fix on its own',
-      stillIdle === before, `${before} -> ${stillIdle}`);
+    g = await geoOf(page);
+    check('Arrival location alone still captures the opening pin', !!(g && g.geo.open));
 
-    await vpage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await vpage.waitForTimeout(800);
-    const afterVisible = await vpage.evaluate(() => window.__geoCalls);
-    check('the page coming back into view asks for a fresh fix on its own',
-      afterVisible > stillIdle, `${stillIdle} -> ${afterVisible}`);
+    await ctx.setGeolocation(B);
+    await logLine(page, 'Line while the per-line switch is off.');
+    g = await geoOf(page);
+    check('but a log line does not move the position while the per-line switch is off',
+      g.geo.last.lat.toFixed(4) === A.latitude.toFixed(4), `last lat ${g.geo.last.lat.toFixed(4)}`);
 
-    await vpage.close();
-    await vctx.close();
+    // updateSettings is the real instance method the Account tab's switch itself calls
+    // (see togglePeriodicLocation in the render output) — this exercises the same write
+    // path without needing to navigate to Account and back mid-ticket. The switch's own
+    // presence and wiring in the DOM is covered separately, in roles.test.js.
+    await page.evaluate(() => window.__mkApp.updateSettings({ periodicLocation: true }));
+    await page.waitForTimeout(200);
+    await logLine(page, 'Line after turning the per-line switch on.');
+    g = await geoOf(page);
+    check('turning the per-line switch on lets the next log line move the position',
+      g.geo.last.lat.toFixed(4) === B.latitude.toFixed(4), `last lat ${g.geo.last.lat.toFixed(4)}`);
+
+    await page.close();
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);

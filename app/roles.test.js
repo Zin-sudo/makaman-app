@@ -42,7 +42,12 @@ const tab = async (p, name) => {
   check('tech Account shows profile', /Name/.test(body) && /yousef@makaman\.ly/.test(body)
     && /MKN Operations Base/.test(body),
     (body.match(/MKN [A-Za-z ]+/) || ['no base shown'])[0]);
-  check('tech Account surfaces the location toggle', /Share my position/.test(body));
+  // 2026-09-09: the two location switches that used to say "Share my arrival location"
+  // (Settings tile) and "Share my position with the office" (this card) were the same
+  // setting shown twice — merged here into one, "Arrival location," plus a second,
+  // genuinely new switch for the per-log-line update.
+  check('tech Account surfaces the location toggle', /Arrival location/.test(body));
+  check('and the per-log-line switch beside it', /Update with each log line/.test(body));
   body = await tab(p, 'Sync');
   check('tech Sync is about this device', !/Field devices/.test(body));
   await p.close();
@@ -56,7 +61,7 @@ const tab = async (p, name) => {
   check('office Sync shows last contact', /Last contact/i.test(body));
   body = await tab(p, 'Account');
   check('mgr Account has Team', /Team/.test(body));
-  check('mgr Account has no profile table', !/Share my position/.test(body));
+  check('mgr Account has no profile table', !/Arrival location/.test(body));
   await p.close();
 
   // ---- Observer ----

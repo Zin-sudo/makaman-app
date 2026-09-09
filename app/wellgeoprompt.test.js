@@ -49,9 +49,9 @@ const missing = (page) => page.getByText(/Well location not captured/i);
   await page.getByRole('button', { name: /Start Logging/i }).click();
   await page.waitForTimeout(500);
 
-  // Never captured, and geoTick left running on its normal (un-sped-up) interval here —
-  // it will not fire within this test's lifetime, so no isolation is needed the way
-  // geo.test.js has to.
+  // Never captured — no timer to isolate from any more (see geoLogPing): the only calls
+  // this test makes are the log lines below, and geolocation permission is never granted
+  // in this context, so every one of them hangs to its own backstop and resolves null.
   await page.evaluate(() => {
     window.__mkApp.mutate((d) => {
       const t = d.tickets.find((x) => x.field === 'DeferFld');

@@ -45,7 +45,7 @@ const BASE_DB = {
     { id: 'q1', key: 'reclaimed', label: 'Tools allocated reclaimed or back-to-base?', tone: 'warning', multi: false, presets: ['Yes', 'Not yet', 'Handed over to replacement'], sort_order: 0 },
   ],
   numbering_claim: [{ id: true, holder_id: OPS, since: '2026-08-01T00:00:00.000Z' }],
-  user_settings: [{ user_id: TECH, theme: 'dark', accent: 'red', timezone: 'Africa/Tripoli', hour12: false, share_location: true }],
+  user_settings: [{ user_id: TECH, theme: 'dark', accent: 'red', timezone: 'Africa/Tripoli', hour12: false, share_location: true, periodic_location: true }],
   tickets: [{
     id: TICKET, technician_id: TECH, holder_id: TECH, client_id: CLIENT, job_type_id: JOB,
     customer: 'Kuwait Oil Group', field_name: 'Burgan North', well_no: 'BG-214', rig_name: 'WS-11',
