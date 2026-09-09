@@ -138,9 +138,17 @@ const geoOf = (page) => page.evaluate(() => {
       const btn = row.getByRole('button', { name: /^(Review|View)$/i }).first();
       await btn.click(); await page.waitForTimeout(900);
       const body = await page.textContent('body');
+      // 2026-09-09: ops/admin gained location.edit, so the fix now renders as an
+      // editable input (pre-filled with the value) rather than plain text — its value
+      // never shows up in textContent/innerText, an input's value is not a text node.
+      // Read both: the label as page text, the coordinate from whichever the role sees.
+      const coords = await page.evaluate(() => Array.from(document.querySelectorAll('input'))
+        .map(i => i.value).join(' | '));
       check(`${who}: sees position panel`, /Device position/.test(body));
-      check(`${who}: sees opening fix`, /When opened/.test(body) && /32\.887209/.test(body));
-      check(`${who}: sees last fix before Job Done`, /Last position before Job Done/.test(body) && /32\.901544/.test(body));
+      check(`${who}: sees opening fix`,
+        /When opened/.test(body) && (/32\.887209/.test(body) || /32\.887209/.test(coords)));
+      check(`${who}: sees last fix before Job Done`,
+        /Last position before Job Done/.test(body) && (/32\.901544/.test(body) || /32\.901544/.test(coords)));
       await page.screenshot({ path: OUT + '/61-mgr.png' });
     }
     await page.close();

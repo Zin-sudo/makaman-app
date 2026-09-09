@@ -2450,7 +2450,12 @@
                     <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--hue-teal-wash);color:var(--hue-teal)">{{ icWell }}</div>
                     <div class="mk-flex1">
                       <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">When opened</div>
-                      <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoOpenText }}</div>
+                      <sc-if value="{{ cur.geoEditable }}" hint-placeholder-val="{{ false }}">
+                        <input dir="auto" value="{{ cur.geoOpenInput }}" onChange="{{ cur.geoOpenOnChange }}" onBlur="{{ cur.geoOpenOnCommit }}" placeholder="lat, lon — e.g. 28.906745, 19.213311" style="width:100%;min-height:32px;margin-top:2px;padding:5px 7px;font-size:12px;font-variant-numeric:tabular-nums;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
+                      </sc-if>
+                      <sc-if value="{{ !cur.geoEditable }}" hint-placeholder-val="{{ true }}">
+                        <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoOpenText }}</div>
+                      </sc-if>
                       <div class="mk-hint">{{ cur.geoOpenStamp }}</div>
                     </div>
                   </div>
@@ -2459,10 +2464,18 @@
                       <div class="mk-icon-chip mk-icon-chip-sm" style="background:var(--accent-wash);color:var(--accent-deep)">{{ icWell }}</div>
                       <div class="mk-flex1">
                         <div style="font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint)">{{ cur.geoLastLabel }}</div>
-                        <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoLastText }}</div>
+                        <sc-if value="{{ cur.geoEditable }}" hint-placeholder-val="{{ false }}">
+                          <input dir="auto" value="{{ cur.geoLastInput }}" onChange="{{ cur.geoLastOnChange }}" onBlur="{{ cur.geoLastOnCommit }}" placeholder="lat, lon — e.g. 28.906745, 19.213311" style="width:100%;min-height:32px;margin-top:2px;padding:5px 7px;font-size:12px;font-variant-numeric:tabular-nums;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
+                        </sc-if>
+                        <sc-if value="{{ !cur.geoEditable }}" hint-placeholder-val="{{ true }}">
+                          <div style="font-size:12px;font-variant-numeric:tabular-nums;line-height:1.4">{{ cur.geoLastText }}</div>
+                        </sc-if>
                         <div class="mk-hint">{{ cur.geoLastStamp }}</div>
                       </div>
                     </div>
+                  </sc-if>
+                  <sc-if value="{{ cur.geoEditable }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--ink-faint);margin-top:9px">Clear a field and leave it blank to remove that coordinate. "lat, lon" — six decimal places is what the device itself records.</div>
                   </sc-if>
                 </div>
               </sc-if>
@@ -3975,6 +3988,11 @@ const PERMISSION_DEFAULTS = (function () {
     // false for every real signed-in user however this constant reads.
     [['tech', 'mgr', 'admin'], ['ticket.cancel_own']],
     [['mgr', 'admin'], ['ticket.close_any', 'ticket.withdraw', 'ticket.restore']],
+    // 2026-09-09, owner's request: "ops and admin should have the ability to manually
+    // modify, remove, add the coordinates of the well site if the arrival GPS ping
+    // didn't capture automatically from the technician's device." Registered here and
+    // in migration 0065 — same belt-and-braces reasoning as ticket.cancel_own above.
+    [['mgr', 'admin'], ['location.edit']],
     [['tech', 'mgr', 'admin', 'founder'],
       ['report.generate']],
     [['mgr', 'admin', 'founder'],
@@ -8782,6 +8800,16 @@ class Component extends DCLogic {
           : 'Not heard from'),
     }, chip, card, this.geoView(t));
   }
+  // "lat, lon" (geoText()'s own format, six decimals) back into numbers. Loose on
+  // whitespace, strict on range — a typo that lands outside real coordinates is refused
+  // rather than silently accepted as a well somewhere in the ocean or the sky.
+  parseLatLon(str) {
+    const m = String(str || '').trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    if (!m) return null;
+    const lat = Number(m[1]), lon = Number(m[2]);
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { lat: lat, lon: lon };
+  }
   // The two positions as the office reads them. Gated on role here rather than in the
   // markup so a technician's own view cannot render them even by accident: for a
   // technician every field below is empty and the section that shows them is hidden.
@@ -8794,15 +8822,53 @@ class Component extends DCLogic {
     // Only worth showing the later fix separately once it has actually moved on from
     // the opening one; otherwise it is the same line printed twice.
     const moved = !!(g.open && g.last && g.last.ts !== g.open.ts);
+    // 2026-09-09, owner's request: "ops and admin should have the ability to manually
+    // modify, remove, add the coordinates of the well site if the arrival GPS ping
+    // didn't capture automatically from the technician's device." One capability gates
+    // both fixes — a device that missed the opening pin very often misses the periodic
+    // one too, and there is no reason to make the office ask for the second separately.
+    const canEdit = office && this.hasPermission('location.edit');
+    // geoView() is a plain method, not a closure inside render() — myName lives only in
+    // the latter, so it has to be re-derived here the same way every other class method
+    // that logs an actor already does.
+    const who = (this.state.session && this.state.session.name) || '';
+    const setFix = (which, str) => {
+      const parsed = this.parseLatLon(str);
+      const label = which === 'open' ? 'Well location' : 'Latest/Current location';
+      if (!t.geo && !parsed) return; // clearing an already-empty field is not an edit
+      if (str.trim() && !parsed) { this.toast('geo-manual', label + ' — enter as "lat, lon", e.g. 28.906745, 19.213311.', 'warn'); return; }
+      this.mutate(d => {
+        const x = d.tickets.find(y => y.id === t.id);
+        if (!x) return;
+        x.geo = x.geo || {};
+        if (parsed) {
+          x.geo[which] = { lat: parsed.lat, lon: parsed.lon, ts: iso(new Date()), source: 'manual' };
+        } else {
+          delete x.geo[which];
+        }
+      });
+      this.log(label + (parsed ? ' set manually by ' + who + ': ' + geoText(parsed) + '.'
+        : ' removed by ' + who + ' — no coordinates recorded.'), 'edit');
+    };
     return {
-      geoShow: !!openTxt,
-      geoNone: office && !openTxt,
+      geoShow: !!openTxt || canEdit,
+      geoNone: office && !openTxt && !canEdit,
       geoOpenText: openTxt,
       geoOpenStamp: g.open ? F.stamp(g.open.ts) : '',
-      geoLastShow: moved && !!lastTxt,
+      geoLastShow: (moved && !!lastTxt) || canEdit,
       geoLastText: lastTxt,
       geoLastStamp: g.last ? F.stamp(g.last.ts) : '',
       geoLastLabel: t.status === 'logging' ? 'Latest position' : 'Last position before Job Done',
+      // Manual entry — office/admin only. A plain text field rather than two number
+      // inputs: "lat, lon" is the same shape the read-only text and the printed sheet
+      // already use, so there is one format to learn, not two.
+      geoEditable: canEdit,
+      geoOpenInput: this.draftOf('geo:open:' + t.id, openTxt),
+      geoOpenOnChange: (e) => this.setDraft('geo:open:' + t.id, e.target.value),
+      geoOpenOnCommit: (e) => { this.clearDraft('geo:open:' + t.id); setFix('open', e.target.value); },
+      geoLastInput: this.draftOf('geo:last:' + t.id, lastTxt),
+      geoLastOnChange: (e) => this.setDraft('geo:last:' + t.id, e.target.value),
+      geoLastOnCommit: (e) => { this.clearDraft('geo:last:' + t.id); setFix('last', e.target.value); },
     };
   }
 
