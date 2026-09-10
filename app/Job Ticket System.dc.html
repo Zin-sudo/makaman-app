@@ -5842,7 +5842,7 @@ function outboxSetAside(op, why, terminal, alsoRetired) {
   // ReferenceError was caught by a `catch` meant for quota — the refusal was dropped and
   // the drain reported success. A catch wide enough to hide a programming error is the
   // same failure this whole file exists to prevent: a record lost in silence.
-  const reason = refusalText(why, terminal);
+  const reason = refusalText(why, terminal, op);
   // The same refusal, twice over and for two different readers. The dead-letter is what
   // the app shows the person now, in their words — scoped by whether this is confirmed
   // terminal (see refusalText) so nobody is told a still-retryable change has been
@@ -5909,7 +5909,26 @@ function outboxSetAside(op, why, terminal, alsoRetired) {
 // shape apart from "an admin is mid-way through fixing a policy", which genuinely does
 // resolve itself on a later try. Saying "refused" for both trained a person to stop
 // trusting the word, which is worse than saying nothing.
-function refusalText(err, terminal) {
+// 2026-09-10, pre-purge audit, Part 7: named ONLY where a write maps to exactly one
+// enforced, still-per-person-visible capability (same shape as opLabel's own table/action
+// switch, just above). Deliberately NOT a lookup for every table that has some plausible
+// capability name — ticket_items/ticket.charge_items, clients/client.manage, and
+// ticket_numbering/numbering.manage_series would each name a real catalogue key, but all
+// three are among the 19 PERSON_LEVEL_UNENFORCED keys Part 5 just hid from the per-person
+// screen: telling someone to "ask an admin for" a capability the screen no longer offers to
+// grant would be actively misleading, not organic. ticket_attachments is not here for a
+// different reason — attachFile/removeAttachment write straight to Supabase and never pass
+// through the outbox at all, so this branch never sees that table. Everything else (tickets,
+// ticket_lines, audit_log, ticket_assets, ticket_crew, numbering_claim, org_defaults,
+// asset_questions) is crew/lifecycle/staff-shaped, not permission-table-shaped — no hint,
+// same organic sentence as today, per the owner's own "if not just be organic."
+function capabilityHint(op) {
+  if (!op) return null;
+  if (op.table === 'ticket_notes') return op.action === 'update' ? 'note.resolve' : 'note.add';
+  if (op.table === 'price_list_items') return 'pricelist.edit';
+  return null;
+}
+function refusalText(err, terminal, op) {
   const raw = (err && (err.message || err.details || err.hint)) || '';
   if (/MK_STALE/.test(raw)) {
     return 'Someone in the office changed this job while you were out of signal, so your version of it was not saved over theirs. Open the ticket to see where it stands now and make the change again if it is still needed.';
@@ -5926,9 +5945,21 @@ function refusalText(err, terminal) {
       + 'there, so it has been set aside rather than retried.';
   }
   if (/row-level security|permission denied|violates/i.test(raw)) {
-    return terminal
-      ? 'The server has refused this change under a permissions rule, and asking again will not change that.'
-      : 'The server has not confirmed this change yet. It will keep trying on its own — no need to do it again.';
+    // Named only when capabilityHint has an actual, still-grantable answer — everything
+    // else keeps the plain sentence exactly as it read before this, per the owner's own
+    // "if not just be organic." Checked in both branches, not just the terminal one: a
+    // bare RLS refusal on the two tables capabilityHint actually names (ticket_notes,
+    // price_list_items) has no mkTerminal path anywhere in outboxDrain — a real missing
+    // capability shows up here as "not confirmed yet" on every single retry, forever, not
+    // as the terminal sentence, so a hint gated on terminal alone would never be seen for
+    // the exact cases it exists for.
+    const hint = capabilityHint(op);
+    if (!terminal) {
+      return 'The server has not confirmed this change yet. It will keep trying on its own — no need to do it again.'
+        + (hint ? " If it keeps not going through, it usually needs the '" + hint + "' capability — check with an admin." : '');
+    }
+    return 'The server has refused this change under a permissions rule, and asking again will not change that.'
+      + (hint ? " This usually needs the '" + hint + "' capability — check with an admin." : '');
   }
   if (raw) return raw;
   return terminal

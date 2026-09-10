@@ -379,6 +379,84 @@ const openAccount = async (p) => {
     await ctx.close();
   }
 
+  // ── 2026-09-10, pre-purge audit, Part 7: a permission-shaped refusal gets a named
+  // capability hint ONLY where the write maps to exactly one still-enforced, still-
+  // grantable capability. Everything else — including a table that once had a plausible
+  // capability name but got hidden from the per-person screen by Part 5 — stays exactly
+  // as organic as it read before this. Read off the dead-letter pile (refusalText's own
+  // reader), not the error log (logError's own classification, a different sentence). ──
+  {
+    const { ctx, p } = await signIn(b, db(), 'awhida@makaman.ly');
+    const deadWhy = (table) => p.evaluate((tbl) => {
+      const acct = (window.__mkApp.state.session || {}).email;
+      const key = 'makaman.outbox.refused.v1' + (acct ? '.' + acct.toLowerCase() : '');
+      const dead = JSON.parse(localStorage.getItem(key) || '[]');
+      const hit = dead.find((e) => e.op && e.op.table === tbl);
+      return hit ? hit.why : null;
+    }, table);
+    const refuseNoteWith = async (message) => {
+      await p.evaluate(([msg]) => {
+        window.__failInsert = 'ticket_notes';
+        window.__failMessage = msg;
+      }, [message]);
+      await p.evaluate(() => {
+        const app = window.__mkApp;
+        const t = (app.state.data.tickets || [])[0];
+        if (t) app.addNote(t.id, 'A note raised at ' + Date.now() + '.');
+      });
+      for (let i = 0; i < 8; i++) {
+        await p.evaluate(() => window.__mkApp.refresh().catch(() => {}));
+        await p.waitForTimeout(280);
+      }
+      await p.evaluate(() => { window.__failInsert = ''; window.__failMessage = ''; });
+    };
+
+    await refuseNoteWith('new row violates row-level security policy for table "ticket_notes"');
+    const noteWhy = await deadWhy('ticket_notes');
+    check('a table that maps to exactly one capability (ticket_notes -> note.add) names it',
+      /needs the 'note\.add' capability/i.test(noteWhy || ''), noteWhy);
+
+    // audit_log is crew/lifecycle-shaped, not permission-table-shaped — no lookup entry,
+    // and the sentence must read exactly as it always has: organic. A bare RLS refusal on
+    // a non-header table never earns mkTerminal anywhere in outboxDrain, so what actually
+    // reaches the dead-letter pile here is the non-terminal wording — the exact sentence
+    // this fix left untouched everywhere it has no hint to add.
+    await refuseWith(p, 'new row violates row-level security policy for table "audit_log"');
+    const auditWhy = await deadWhy('audit_log');
+    check('a table with no clean capability mapping (audit_log) stays organic — no hint appended',
+      auditWhy === 'The server has not confirmed this change yet. It will keep trying on its own — no need to do it again.',
+      auditWhy);
+
+    // ticket_items -> ticket.charge_items is a real catalogue key, but Part 5 hid it from
+    // the per-person screen as unenforced — naming it here would send someone to ask an
+    // admin for a grant the screen no longer offers. Confirms the lookup deliberately
+    // excludes it, not merely that nobody wired it in yet. Triggered by mutate() directly
+    // (CHILD_TABLES' own ticket_items replace op) rather than refuseWith's logOn, which
+    // only ever writes audit_log.
+    await p.evaluate(() => {
+      window.__failInsert = 'ticket_items';
+      window.__failMessage = 'new row violates row-level security policy for table "ticket_items"';
+    });
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      app.mutate((d) => {
+        d.tickets[0].items = (d.tickets[0].items || []).concat([{
+          code: 'MKN-TEST', desc: 'Test line', qty: 1, uom: 'Day', cost: 1, ov: {},
+        }]);
+      });
+    });
+    for (let i = 0; i < 8; i++) {
+      await p.evaluate(() => window.__mkApp.refresh().catch(() => {}));
+      await p.waitForTimeout(280);
+    }
+    await p.evaluate(() => { window.__failInsert = ''; window.__failMessage = ''; });
+    const itemsWhy = await deadWhy('ticket_items');
+    check('a table whose only capability name is one Part 5 just hid stays organic too',
+      itemsWhy === 'The server has not confirmed this change yet. It will keep trying on its own — no need to do it again.',
+      itemsWhy);
+    await ctx.close();
+  }
+
   await b.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

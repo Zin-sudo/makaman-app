@@ -126,8 +126,13 @@ const login = async (p, email) => {
     check('choosing a person shows their role', /Field Technician/.test(picked));
     check('they start with no exceptions', /0 exceptions to their role/.test(picked),
       (picked.match(/\d+ exceptions? to their role/) || ['?'])[0]);
+    // 2026-09-10, pre-purge audit Part 5: was ticket.approve ("Approve") — now one of the
+    // 19 keys hidden from this exact screen because no hasPermission(...) call anywhere
+    // ever read it. ticket.withdraw ("Withdraw") is mgr/admin-only, genuinely enforced,
+    // and stays visible, so it is the row that still proves this — a technician's role
+    // reads No.
     check('a capability their role does not carry reads No',
-      /APPROVE A TICKET|Approve a ticket|Approve/i.test(picked));
+      /WITHDRAW|Withdraw/i.test(picked));
     await ctx.close();
   }
 
@@ -158,7 +163,7 @@ const login = async (p, email) => {
       return was;
     }, label);
 
-    const granted = await clickRow('Approve');
+    const granted = await clickRow('Withdraw');
     await p.waitForTimeout(700);
     const after = await p.evaluate(() => document.body.innerText);
     check('granting writes one exception', /1 exception to their role/.test(after),
@@ -176,7 +181,7 @@ const login = async (p, email) => {
 
     // Toggle the same row back. The role already says no, so the row should be deleted,
     // not stored as a redundant false.
-    const wasYes = await clickRow('Approve');
+    const wasYes = await clickRow('Withdraw');
     check('the granted row is now showing Yes', wasYes === 'Yes', 'button read: ' + wasYes);
     await p.waitForTimeout(700);
     const back = await p.evaluate(() => ({
