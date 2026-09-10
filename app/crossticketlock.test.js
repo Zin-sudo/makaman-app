@@ -225,6 +225,25 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   check('and the composer is genuinely gone from the DOM, not just visually styled away',
     await p3.locator('textarea[placeholder="Describe the event as it happens…"]').count() === 0);
 
+  // ── Section 5: the EXISTING log lines on that same closed ticket are locked too ─────
+  //
+  // 2026-09-10, pre-purge audit: canLogLine only ever covered NEW lines — the composer
+  // just proven gone above. rowLockedForViewer, which disables each EXISTING line's own
+  // textarea and × cross, still checked only holderOf(t) !== myName for a technician —
+  // the ticket's own closed state was never in it, so the holder of a now-approved ticket
+  // kept a live edit/delete on lines that were already there. t1 is that same ticket
+  // (approved) and its own holder (Yousef) is still signed in on this same page.
+  const closedRowState = await p3.evaluate(() => {
+    const boxes = Array.from(document.querySelectorAll('textarea'));
+    const crosses = Array.from(document.querySelectorAll('button.mk-rowdel'));
+    return {
+      textareaCount: boxes.length, allTextareasDisabled: boxes.length > 0 && boxes.every(t => t.disabled),
+      crossCount: crosses.length, allCrossesDisabled: crosses.length > 0 && crosses.every(x => x.disabled),
+    };
+  });
+  check('every existing log line on his own now-closed ticket is disabled too',
+    closedRowState.allTextareasDisabled && closedRowState.allCrossesDisabled, JSON.stringify(closedRowState));
+
   // A cancelled ticket is exactly as closed to its own holder — techSealed and
   // askJobDone's own guard were broadened to cover it alongside settled/officeClosed,
   // since enforce_ticket_update_rules() already refuses a technician's own reopen of one
@@ -238,6 +257,12 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   const cancelledBody = await p3.innerText('body');
   check('a cancelled ticket also loses its own holder\'s Log line composer',
     !/Log line — stamps/i.test(cancelledBody));
+  const cancelledRowState = await p3.evaluate(() => {
+    const boxes = Array.from(document.querySelectorAll('textarea'));
+    return { allDisabled: boxes.length > 0 && boxes.every(t => t.disabled), count: boxes.length };
+  });
+  check('and its own existing log lines are disabled too, not just the composer',
+    cancelledRowState.allDisabled, JSON.stringify(cancelledRowState));
   await p3.getByRole('button', { name: /Reopen for corrections/i }).click();
   await p3.waitForTimeout(300);
   check('and pressing its own "Reopen for corrections" button is refused rather than opening a doomed dialog',

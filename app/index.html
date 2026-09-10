@@ -13667,11 +13667,20 @@ class Component extends DCLogic {
         // greyed out and disabled for them as they are not the holder of that ticket."
         // Only bites on the technician screen (S.role === 'tech' — true for a real
         // technician AND for an ops/admin swapped into Work as Technician, since swap-in
-        // sets S.role itself) and only for a ticket someone ELSE holds. On the office
-        // review screen this same curEvents array feeds (role !== 'tech' there by
-        // construction) it collapses to `locked` alone, exactly as it always has —
-        // staff are never "the holder" and were never meant to be gated on it.
-        const rowLockedForViewer = locked || (S.role === 'tech' && holderOf(t) !== myName);
+        // sets S.role itself). On the office review screen this same curEvents array
+        // feeds (role !== 'tech' there by construction) it collapses to `locked` alone,
+        // exactly as it always has — staff are never "the holder" and were never meant
+        // to be gated on it, and the database always lets staff edit any ticket at any
+        // status (enforce_ticket_update_rules()'s own `not v_staff` bypass), so widening
+        // this for staff would take away a real capability the server grants.
+        //
+        // 2026-09-10, pre-purge audit: not-the-holder was the only tech-side check here —
+        // a technician who still holds a now-closed ticket kept a live edit/delete on its
+        // EXISTING lines, the one remaining gap of the exact shape canLogLine (just above,
+        // for NEW lines) and canAddNoteTo already closed this session: identity checked,
+        // the ticket's own lifecycle not. Same boundary as canLogLine, mirrored exactly.
+        const rowLockedForViewer = locked || (S.role === 'tech'
+          && (holderOf(t) !== myName || this.settled(t) || t.officeClosed || t.status === 'cancelled'));
         return {
         dateLine: F.short(e.ts), timeLine: F.time(e.ts), stamp: F.stamp(e.ts), text: e.text,
         tsInput: this.draftOf('evt:' + t.id + ':' + i, F.input(e.ts)),
