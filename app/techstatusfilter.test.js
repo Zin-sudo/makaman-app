@@ -2,11 +2,11 @@
 // tab allow technicians to filter by ticket status (In-Progress, Awaiting Review,
 // Approved, Cancelled)."
 //
-// techStatusBucket() sorts every ticket into one of four buckets, coarser than the six
-// statusChip() actually renders (sent_client/sent_finance both read as "Approved" here —
-// a technician filtering his own list has no reason to distinguish paperwork already past
-// approval). 'All' is the fifth option and clears the filter rather than being its own
-// bucket, so it never needs to agree with what SETTLED_STATES holds.
+// techStatusBucket() sorts every ticket into one of four buckets, coarser than the several
+// statusChip() actually renders (sent_finance reads as "Approved" here too — a technician
+// filtering his own list has no reason to distinguish paperwork already past approval).
+// 'All' is the fifth option and clears the filter rather than being its own bucket, so it
+// never needs to agree with what SETTLED_STATES holds.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;

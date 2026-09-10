@@ -243,7 +243,7 @@ const freeStorage = (p) => p.evaluate(() => {
       }, 400));
     }, [status, closedBy]);
 
-    for (const st of ['approved', 'sent_client', 'sent_finance']) {
+    for (const st of ['approved', 'sent_finance']) {
       const res = await clashFor(st, '');
       check('a stale copy of a ticket at ' + st + ' is discarded, not uploaded over',
         res.discarded && !res.uploaded, JSON.stringify(res));
