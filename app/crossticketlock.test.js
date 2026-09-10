@@ -205,6 +205,46 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   check('calling addNote directly on a closed ticket writes nothing', !bypassed.grew, JSON.stringify(bypassed));
   check('and shows the same closed-ticket sentence as an interactive toast, not a queued write',
     /This ticket is closed/i.test(bypassed.toastText), bypassed.toastText);
+
+  // ── Section 4: the same closed ticket takes the Log line composer away too ──────────
+  //
+  // 2026-09-10, owner's follow-up: a log line queued against this same closed ticket
+  // (ticket_lines_insert_holder_or_staff, migration 0050, requires status = 'logging' for
+  // anyone but staff) was refused by the database — "new row violates row-level security
+  // policy for table ticket_lines" — because the composer was gated on isHolder alone,
+  // exactly the gap notes had. Reusing the same page and the same closed ticket (t1).
+  check('the same holder sees no Log line composer on it either, once it is closed',
+    !/Log line — stamps/i.test(closedBody));
+  check('and sees the sealed explanation in its place',
+    /Approved and sealed\. Ask the operations manager to make any correction\./i.test(closedBody));
+
+  // addEvent is built fresh inside renderVals() as a closure over the current ticket —
+  // there is no standalone method to grab and call directly the way addNote's real class
+  // method allows, so the proof here is the composer's genuine absence from the DOM
+  // (not merely styled away) rather than a second, independent call-site guard.
+  check('and the composer is genuinely gone from the DOM, not just visually styled away',
+    await p3.locator('textarea[placeholder="Describe the event as it happens…"]').count() === 0);
+
+  // A cancelled ticket is exactly as closed to its own holder — techSealed and
+  // askJobDone's own guard were broadened to cover it alongside settled/officeClosed,
+  // since enforce_ticket_update_rules() already refuses a technician's own reopen of one
+  // ("A cancelled ticket can only be reopened by Ops Manager or Admin").
+  await p3.evaluate(() => window.__mkApp.mutate(d => {
+    const x = d.tickets.find(t => t.id === 't3');
+    x.status = 'cancelled'; x.cancelledAt = new Date().toISOString(); x.cancelledBy = 'Yousef Al-Harbi';
+  }));
+  await p3.evaluate(() => window.__mkApp.setState({ activeId: 't3', techScreen: 'log', roleTab: 'tickets' }));
+  await p3.waitForTimeout(400);
+  const cancelledBody = await p3.innerText('body');
+  check('a cancelled ticket also loses its own holder\'s Log line composer',
+    !/Log line — stamps/i.test(cancelledBody));
+  await p3.getByRole('button', { name: /Reopen for corrections/i }).click();
+  await p3.waitForTimeout(300);
+  check('and pressing its own "Reopen for corrections" button is refused rather than opening a doomed dialog',
+    await p3.evaluate(() => window.__mkApp.state.dialog) == null, 'expected no dialog to open');
+  check('naming who can actually reopen it',
+    /This job was cancelled\. Only Ops Manager or Admin can reopen it\./i.test(
+      await p3.evaluate(() => (window.__mkApp.state.toast || {}).text || '')));
   await p3.close();
 
   // Office and the Observer are NOT locked out of a closed ticket's notes — CLAUDE.md's

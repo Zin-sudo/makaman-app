@@ -1640,8 +1640,17 @@
               </sc-if>
               <sc-if value="{{ isHolder }}" hint-placeholder-val="{{ true }}">
               <div style="border-top:1px solid rgba(var(--ink-rgb),0.16);margin-top:12px;padding-top:12px;display:flex;flex-direction:column;gap:10px">
+                <!-- 2026-09-10, owner's request: isHolder alone said nothing about the
+                     ticket's own status, so this stayed live on an approved/closed/
+                     cancelled ticket and queued a ticket_lines write the database always
+                     refuses (ticket_lines_insert_holder_or_staff, migration 0050, requires
+                     status = 'logging' for anyone but staff). canLogLine is that same
+                     boundary, checked before the composer ever renders — the techSealed
+                     banner just below already explains why whenever this is hidden. -->
+                <sc-if value="{{ canLogLine }}" hint-placeholder-val="{{ true }}">
                 <textarea dir="auto" value="{{ newEventText }}" onChange="{{ f.newEvent }}" rows="2" placeholder="Describe the event as it happens…" style="width:100%;padding:9px 11px;font-size:15px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink);resize:vertical"></textarea>
                 <button onClick="{{ addEvent }}" style="width:100%;min-height:48px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Log line — stamps {{ clock }}</button>
+                </sc-if>
                 <sc-if value="{{ assetPromptOpen }}" hint-placeholder-val="{{ false }}">
                   <div style="padding:13px;border:2px solid var(--danger);background:rgba(var(--danger-rgb),0.07)">
                     <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;color:var(--danger);margin-bottom:4px">Account for the tools before closing</div>
@@ -13634,6 +13643,19 @@ class Component extends DCLogic {
       newEventText: S.newEventText,
       addEvent: () => {
         const text = (S.newEventText || '').trim(); if (!text || !t) return;
+        // 2026-09-10, owner's request: the rule the composer's own canLogLine gate already
+        // applies (holder-only, and not once the job is closed), checked again here so a
+        // call that reaches this some other way is refused with a toast instead of a
+        // doomed ticket_lines write reaching the outbox — the exact live refusal this
+        // closes off ("new row violates row-level security policy for table
+        // ticket_lines", techtest@makaman.ly, 2026-09-10). Mirrors addNote's own guard,
+        // added earlier this same session, exactly.
+        if (holderOf(t) !== myName || this.settled(t) || t.officeClosed || t.status === 'cancelled') {
+          this.toast('log', (this.settled(t) || t.officeClosed || t.status === 'cancelled')
+            ? 'This ticket is closed. Log lines can no longer be added here.'
+            : holderOf(t) + ' holds this job. Only they can add to the log.', 'warn');
+          return;
+        }
         const now = iso(new Date());
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
@@ -13824,10 +13846,27 @@ class Component extends DCLogic {
       // While a job is merely awaiting review it is still the technician's to correct,
       // even though he closed it himself. Once the office has closed it or approved it,
       // it is not — corrections go through the Ops Manager from there.
-      techSealed: !!t && (this.settled(t) || !!t.officeClosed),
+      //
+      // 2026-09-10, owner's request, broadened to also cover cancelled: a cancelled job is
+      // exactly as closed to a technician's own correction as an approved or office-closed
+      // one, and enforce_ticket_update_rules() already refuses a technician's own reopen of
+      // one ("A cancelled ticket can only be reopened by Ops Manager or Admin") — previously
+      // unguarded here, so the button stayed live and would have queued that refusal too.
+      techSealed: !!t && (this.settled(t) || !!t.officeClosed || t.status === 'cancelled'),
       techSealedNote: this.settled(t)
         ? 'Approved and sealed. Ask the operations manager to make any correction.'
-        : (t && t.officeClosed ? 'Closed in the office by ' + (t.closedBy || 'the operations manager') + '. Ask them to make any correction.' : ''),
+        : (t && t.status === 'cancelled'
+          ? 'This job was cancelled. Only Ops Manager or Admin can reopen it.'
+          : (t && t.officeClosed ? 'Closed in the office by ' + (t.closedBy || 'the operations manager') + '. Ask them to make any correction.' : '')),
+      // 2026-09-10, owner's request, after a log line queued against ticket 1881 (approved)
+      // was refused — "new row violates row-level security policy for table ticket_lines"
+      // (ticket_lines_insert_holder_or_staff, migration 0050, requires the ticket to still
+      // be 'logging' for anyone but staff) — because the composer below was gated on
+      // isHolder alone, same gap canAddNoteTo had before this session's own earlier fix.
+      // Exactly techSealed's own boundary, not a separate one: a technician may still add a
+      // line to a job he merely closed himself (addEvent reopens it to 'logging' as part of
+      // the same edit, which the database allows), just not one the office has since sealed.
+      canLogLine: !!t && holderOf(t) === myName && !this.settled(t) && !t.officeClosed && t.status !== 'cancelled',
       doneLabel: t && t.status !== 'logging' ? 'Reopen for corrections' : 'Job done',
       // Asked once, at the moment of closing, and only of a technician who was actually
       // given something. A job with no allocated kit closes exactly as it did before.
@@ -13937,10 +13976,17 @@ class Component extends DCLogic {
       },
 
       askJobDone: () => {
-        if (t && (this.settled(t) || t.officeClosed)) {
+        // 2026-09-10, owner's request: cancelled joins settled/officeClosed here — the
+        // "Reopen for corrections" label already offers itself on a cancelled ticket
+        // (doneLabel keys only on status !== 'logging'), and without this it would open
+        // reopenTech and queue an edit enforce_ticket_update_rules() refuses outright
+        // ("A cancelled ticket can only be reopened by Ops Manager or Admin").
+        if (t && (this.settled(t) || t.officeClosed || t.status === 'cancelled')) {
           this.toast('tech-sealed', this.settled(t)
             ? 'This ticket is approved and sealed. Ask the operations manager to make any correction.'
-            : 'The operations manager closed this job. Ask them to make any correction.', 'warn');
+            : (t.status === 'cancelled'
+              ? 'This job was cancelled. Only Ops Manager or Admin can reopen it.'
+              : 'The operations manager closed this job. Ask them to make any correction.'), 'warn');
           return;
         }
         // Kit was handed out and the job is being closed: account for it first.
