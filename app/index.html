@@ -9454,7 +9454,9 @@ class Component extends DCLogic {
       && (Date.now() - new Date(t.cancelledAt).getTime()) > ARCHIVE_DAYS * 86400000;
   }
   statusChip(t) {
-    if (t.status === 'sent_finance') return { statusLabel: 'SENT TO FINANCE', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
+    // 2026-09-10, owner's request: green for a fully paperworked job, not blue — blue
+    // stays reserved for In-Progress alone (the default at the bottom of this function).
+    if (t.status === 'sent_finance') return { statusLabel: 'SENT TO FINANCE', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
     // 2026-09-10, owner's request: a named stage of its own for an approved job still
     // owed a signed/stamped sheet back — not just "approved" (which reads as fully
     // settled) and not the generic in-progress/warning colours either, so all three read
@@ -9476,7 +9478,7 @@ class Component extends DCLogic {
   // and an icon tile — so a ticket is identifiable from its shape before any text is
   // read. Merged into ticketView() so every list that renders a ticket picks it up.
   cardTreatment(t) {
-    if (t.status === 'sent_finance') return { edge: 'var(--accent)', tileBg: 'var(--accent-wash)', tileFg: 'var(--accent)', tileIcon: icon('check') };
+    if (t.status === 'sent_finance') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
     if (t.status === 'approved') return { edge: 'var(--success)', tileBg: 'rgba(var(--success-rgb),0.16)', tileFg: 'var(--success-ink)', tileIcon: icon('check') };
     if (t.status === 'done') return { edge: 'var(--warning)', tileBg: 'rgba(var(--warning-rgb),0.16)', tileFg: 'var(--warning-ink)', tileIcon: icon('clock') };
     // Same gap as statusChip just above: a cancelled job used to fall all the way

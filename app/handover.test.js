@@ -147,6 +147,20 @@ const audit = (p, id) => p.evaluate((tid) => {
     check('both signed documents together move it straight to sent_finance',
       after.status === 'sent_finance', JSON.stringify(after));
     check('and stamps when that happened', !!after.sentFinanceAt, after.sentFinanceAt);
+
+    // 2026-09-10, owner's request: green for Sent to Finance, not blue — blue stays
+    // reserved for In-Progress alone.
+    const colors = await p.evaluate((tid) => {
+      const app = window.__mkApp;
+      const t = app.state.data.tickets.find(x => x.id === tid);
+      return { chip: app.statusChip(t), card: app.cardTreatment(t) };
+    }, id);
+    check('the chip reads the ok-green tokens, not the accent-blue ones',
+      colors.chip.chipBg === 'var(--chip-ok-bg)' && colors.chip.chipFg === 'var(--chip-ok-fg)',
+      JSON.stringify(colors.chip));
+    check('the card edge is the same green as an approved ticket, not accent-blue',
+      colors.card.edge === 'var(--success)' && colors.card.tileFg === 'var(--success-ink)',
+      JSON.stringify(colors.card));
     await ctx.close();
   }
 
