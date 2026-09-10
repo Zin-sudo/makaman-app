@@ -12908,8 +12908,6 @@ class Component extends DCLogic {
           this.setState({ session: session, role: user.roleKey, actingAs: null });
         }
       },
-
-      isTech: S.role === 'tech', isMgr: S.role === 'mgr', isAdmin: S.role === 'admin', isFounder: S.role === 'founder',
       // Excludes an open admin subpage the same way showMgrPage does, below. The phone
       // frame's own tab body already stops offering its four tabs once adminTab is set
       // (navTickets and friends), but the frame itself — flex:1, min-height calc(100vh -
@@ -13245,7 +13243,6 @@ class Component extends DCLogic {
       // hardcopy going out to the field and coming back. Same panel, same controls; what
       // differs is only which tickets it can see, and that is enforced in reportBase
       // rather than by hiding buttons.
-      showReports: true,
       reportsTitle: S.role === 'tech' ? 'My approved jobs' : 'Reports',
 
       showSettings: S.showSettings,
@@ -13968,7 +13965,6 @@ class Component extends DCLogic {
         });
       },
       assetHolderLabel: t ? ('Allocated to ' + (holderOf(t) || 'the technician')) : '',
-      hasAssets: !!t && (t.assets || []).length > 0,
       // The answers, pinned on the ticket for the office. Not a banner — this is a fact
       // about the job that has to still be there next week.
       assetAnswers: !t || !t.assetCheck ? [] : assetQs.map(q => {
@@ -14687,7 +14683,6 @@ class Component extends DCLogic {
       // Ops Manager doesn't have to search/scroll the full price list for the items they
       // reach for on nearly every job.
       suggestedItems: suggestedItems,
-      showSuggested: suggestedItems.length > 0,
       showSuggestedEditable: suggestedItems.length > 0 && !locked,
       curItems: t ? (t.items || []).map((it, i) => {
         // Typing changes the value as you go, but the audit entry is written once, on
@@ -15025,7 +15020,6 @@ class Component extends DCLogic {
       permTargetName: permTarget ? permTarget.name : '',
       permTargetRole: permTarget ? permTarget.role : '',
       permGroups: permGroups,
-      permExceptionCount: permOverrideCount,
       permExceptionLabel: permOverrideCount === 1 ? '1 exception to their role' : permOverrideCount + ' exceptions to their role',
       permClearAll: () => {
         // 2026-09-10, pre-purge audit: held up only by the sibling button's own
@@ -15070,7 +15064,6 @@ class Component extends DCLogic {
         if (!m) return 'var(--ink-faint)';
         return m.status === 'failed' ? 'var(--warning-ink)' : 'var(--ink-faint)';
       })(),
-      masterCanDownload: !!(D.masterExport && D.masterExport.status === 'ok' && D.masterExport.path),
       masterCannotDownload: !(D.masterExport && D.masterExport.status === 'ok' && D.masterExport.path),
       downloadMaster: () => this.downloadMaster(),
       refreshMaster: () => this.refreshMaster(),
@@ -15115,7 +15108,6 @@ class Component extends DCLogic {
       hasPriceClient: !!S.adminClient,
       noPriceClient: !S.adminClient,
       adminPriceNote: S.adminClient ? (list.length + ' items · changes apply to new ticket lines only') : '',
-      canEditPrices: this.hasPermission('pricelist.edit'),
       priceReadOnly: !this.hasPermission('pricelist.edit'),
       canDeletePrices: this.hasPermission('pricelist.delete'),
       priceRows: list.map((p, i) => {
