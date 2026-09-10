@@ -56,14 +56,22 @@ async function runDrain(p, headerOutcome) {
     // calls opDescribe for logError's `doing` field, and this file lifts outboxSetAside
     // standalone the same way, so it needs the same dependency named here or it throws
     // a ReferenceError instead of testing anything.
+    // capabilityHint/findChainRoot: same fix again, 2026-09-10 — refusalText's Part 7
+    // addition and logError's Part 8 addition, same reasoning.
     const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
-                   'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
-                   'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain',
-                   'withTimeout', 'opDescribe', 'opLabel']
+                   'capabilityHint', 'errorKind', 'currentAccount', 'acctKey', 'errlogKey',
+                   'outboxKey', 'deadletterKey', 'opTicket', 'logError', 'findChainRoot',
+                   'outboxSetAside', 'outboxDrain', 'withTimeout', 'opDescribe', 'opLabel']
       .map(grab).filter(Boolean).join('\n');
     const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
     const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
     const AUTH_RESTORE_TIMEOUT_MS = 4000;
+    // A `new Function(...)` body only sees what its own parameter list names, never the
+    // surrounding scope — CHAIN_WINDOW_MS (a const, so grab() cannot pull it out with
+    // findChainRoot) has to be passed in the same way AUTH_RESTORE_TIMEOUT_MS is, just
+    // below, or findChainRoot throws a ReferenceError that logError's own try/catch then
+    // hides completely — every entry silently unlogged, not just the chain field.
+    const CHAIN_WINDOW_MS = 3 * 60 * 1000;
     const TICKET_ID = 't-collateral-' + outcome;
 
     localStorage.setItem(OUTBOX_K, JSON.stringify([
@@ -116,10 +124,10 @@ async function runDrain(p, headerOutcome) {
     };
 
     const fn = new Function('OUTBOX_K', 'DEADLETTER_K', 'OUTBOX_TRIES', 'ERRLOG_K',
-                            'ERRLOG_MAX', 'SK', 'AUTH_RESTORE_TIMEOUT_MS', 'sb', `
+                            'ERRLOG_MAX', 'SK', 'AUTH_RESTORE_TIMEOUT_MS', 'CHAIN_WINDOW_MS', 'sb', `
       ${parts}
       return outboxDrain;
-    `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, 'makaman.jobtickets.session.v1', AUTH_RESTORE_TIMEOUT_MS, () => stub);
+    `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, 'makaman.jobtickets.session.v1', AUTH_RESTORE_TIMEOUT_MS, CHAIN_WINDOW_MS, () => stub);
 
     return fn().then(() => new Promise((r) => setTimeout(r, 200))).then(() => ({
       lineWasSent: calls.some((c) => c.table === 'ticket_lines' && c.action === 'upsert'),

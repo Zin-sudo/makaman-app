@@ -98,14 +98,21 @@ async function open(ctx, cfg) {
       // which at least is the loud kind this comment already warned about. opLabel rides
       // along because opDescribe calls it first and it has no further dependencies of
       // its own to chase.
+      // capabilityHint came in with refusalText's Part 7 addition (2026-09-10) — refusalText
+      // now calls it directly in its RLS branch, so missing it here is the exact same
+      // ReferenceError-through-a-catch this whole comment already warns about. findChainRoot
+      // came in the same day with logError's own Part 8 addition, for the same reason.
       const parts = ['outboxRead', 'outboxWrite', 'outboxPush', 'outboxSend', 'refusalText',
-                     'errorKind', 'currentAccount', 'acctKey', 'errlogKey', 'outboxKey',
-                     'deadletterKey', 'opTicket', 'logError', 'outboxSetAside', 'outboxDrain',
-                     'withTimeout', 'opDescribe', 'opLabel']
+                     'capabilityHint', 'errorKind', 'currentAccount', 'acctKey', 'errlogKey',
+                     'outboxKey', 'deadletterKey', 'opTicket', 'logError', 'findChainRoot',
+                     'outboxSetAside', 'outboxDrain', 'withTimeout', 'opDescribe', 'opLabel']
         .map(grab).filter(Boolean).join('\n');
       const OUTBOX_K = 'makaman.outbox.v1', DEADLETTER_K = 'makaman.outbox.refused.v1';
       const ERRLOG_K = 'makaman.errorlog.v1', ERRLOG_MAX = 400;
       const AUTH_RESTORE_TIMEOUT_MS = 4000;
+      // findChainRoot's own window — a const, so grab()'s brace matching cannot pull it
+      // out either, same reasoning as AUTH_RESTORE_TIMEOUT_MS just above.
+      const CHAIN_WINDOW_MS = 3 * 60 * 1000;
       // window.__mkApp inside this Function IS the real page's running app (a `new
       // Function` still shares the page's global window) and nobody has signed in on it
       // here — so currentErrlogAccount() reads a null session and errlogKey() falls back
@@ -133,11 +140,18 @@ async function open(ctx, cfg) {
       // inside that function's own try/catch — swallowed, answering "nobody is signed in"
       // for the wrong reason. Correct answer here either way, but not by accident.
       const SK = 'makaman.jobtickets.session.v1';
+      // CHAIN_WINDOW_MS has to be passed in as an actual parameter, the same as
+      // AUTH_RESTORE_TIMEOUT_MS just above it — a `new Function(...)` body does not close
+      // over the surrounding scope the way a real closure would, only over what is named in
+      // its own parameter list. Declaring it as a plain outer `const` and expecting
+      // findChainRoot to see it here is exactly the mistake logError's own try/catch then
+      // hides: the ReferenceError never reaches anywhere visible, logError no-ops, and
+      // every entry below reads as "nothing was ever logged" instead of naming the bug.
       const fn = new Function('OUTBOX_K', 'DEADLETTER_K', 'OUTBOX_TRIES', 'ERRLOG_K',
-                              'ERRLOG_MAX', 'SK', 'AUTH_RESTORE_TIMEOUT_MS', 'sb', `
+                              'ERRLOG_MAX', 'SK', 'AUTH_RESTORE_TIMEOUT_MS', 'CHAIN_WINDOW_MS', 'sb', `
         ${parts}
         return outboxDrain;
-      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, SK, AUTH_RESTORE_TIMEOUT_MS, () => stub);
+      `)(OUTBOX_K, DEADLETTER_K, 5, ERRLOG_K, ERRLOG_MAX, SK, AUTH_RESTORE_TIMEOUT_MS, CHAIN_WINDOW_MS, () => stub);
 
       const runs = [];
       // What is STILL queued after each pass, so "held its place" can be asserted as the

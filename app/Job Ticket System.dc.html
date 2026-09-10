@@ -4484,6 +4484,27 @@ function errorKind(err) {
 }
 // One line in the log. `area` says which part of the app was working; `ctx` is whatever
 // makes the entry actionable — the table, the action, the ticket, the file.
+// 2026-09-10, pre-purge audit, Part 8: "make sure the LOAD NET & the RLS SYNC errors are
+// recorded as a full chain to find their true root causes at a given moment." A device
+// that just failed to pull from the office (LOAD) or lost the connection outright (NET) is
+// running on a stale or half-formed session, and a write refusal (SYNC, often RLS-shaped)
+// landing within moments of that is very often the SAME incident wearing a second code —
+// three unrelated-looking log lines for what was actually one dropped connection. Only a
+// LOAD or NET entry counts as a candidate root: a permission refusal that follows one of
+// those is worth connecting, but chaining SYNC-after-SYNC would just tie every failure to
+// whatever else happened to be failing at the same time.
+const CHAIN_WINDOW_MS = 3 * 60 * 1000;
+function findChainRoot(list, now) {
+  const cutoff = new Date(now).getTime() - CHAIN_WINDOW_MS;
+  let best = null;
+  list.forEach((e) => {
+    if (e.area !== 'LOAD' && e.kind !== 'NET') return;
+    const t = new Date(e.last).getTime();
+    if (isNaN(t) || t > new Date(now).getTime() || t < cutoff) return;
+    if (!best || t > new Date(best.last).getTime()) best = e;
+  });
+  return best;
+}
 function logError(area, err, ctx) {
   try {
     const kind = errorKind(err);
@@ -4496,13 +4517,23 @@ function logError(area, err, ctx) {
     const list = JSON.parse(localStorage.getItem(storeKey) || '[]');
     // Grouped on everything that would make two entries the same fault. The context is
     // part of the key, so the same code against two different tables stays two entries.
+    // Computed from the CALLER'S ctx, before any chain info is added below — chainedFrom
+    // carries a timestamp that differs on every occurrence, and folding it into the key
+    // would turn one repeating fault into a fresh entry every single time it recurred.
     const key = code + '|' + raw + '|' + JSON.stringify(ctx || {});
     const hit = list.find((e) => e.key === key);
     const now = new Date().toISOString();
     if (hit) { hit.n += 1; hit.last = now; }
     else {
-      list.push({ key: key, code: code, kind: kind, area: String(area || 'APP').toUpperCase(),
-        raw: raw, ctx: ctx || {}, n: 1, first: now, last: now });
+      const entry = { key: key, code: code, kind: kind, area: String(area || 'APP').toUpperCase(),
+        raw: raw, ctx: ctx || {}, n: 1, first: now, last: now };
+      // Only for a genuinely new fault, and only additive — chainedFrom describes how
+      // THIS fault began, not something recomputed on every later repeat of it.
+      if (entry.area === 'SYNC') {
+        const root = findChainRoot(list, now);
+        if (root) entry.ctx = Object.assign({}, entry.ctx, { chainedFrom: { code: root.code, at: root.last } });
+      }
+      list.push(entry);
     }
     // Oldest first, so the cap drops history rather than the fault happening right now.
     localStorage.setItem(storeKey, JSON.stringify(list.slice(-ERRLOG_MAX)));
@@ -10668,6 +10699,7 @@ class Component extends DCLogic {
       L.push('- **What went wrong:** ' + (ERROR_KIND[e.kind] || e.kind));
       const c = e.ctx || {};
       Object.keys(c).forEach((k) => {
+        if (k === 'chainedFrom') return; // printed separately, below — not a plain fact.
         if (c[k] === undefined || c[k] === null || c[k] === '') return;
         // `ticket` is a bare id — the same one the office would have to paste into a
         // query to find out what it even was. Resolved to its ticket NUMBER wherever
@@ -10678,6 +10710,13 @@ class Component extends DCLogic {
         const val = (k === 'ticket') ? this.ticketRefLabel(c[k]) : c[k];
         L.push('- **' + k + ':** `' + String(val) + '`');
       });
+      // Part 8: a LOAD or NET fault within the last 3 minutes of this one's onset, printed
+      // as a lead, not a fact among facts — the two often are the same incident.
+      if (c.chainedFrom && c.chainedFrom.code) {
+        const gapMs = new Date(e.first).getTime() - new Date(c.chainedFrom.at).getTime();
+        const gapS = isNaN(gapMs) ? '?' : Math.max(0, Math.round(gapMs / 1000));
+        L.push('- ↳ ' + gapS + 's after `' + c.chainedFrom.code + '` — may share the same root cause');
+      }
       L.push('- **First seen:** ' + stamp(e.first) + '  ·  **Last seen:** ' + stamp(e.last));
       L.push('');
       L.push('> ' + (e.raw || '(the failure carried no message)'));

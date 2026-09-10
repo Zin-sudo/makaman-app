@@ -457,6 +457,55 @@ const openAccount = async (p) => {
     await ctx.close();
   }
 
+  // ── 2026-09-10, pre-purge audit, Part 8: "make sure the LOAD NET & the RLS SYNC errors
+  // are recorded as a full chain to find their true root causes at a given moment." A LOAD
+  // or NET fault within the chain window of a later SYNC entry's own onset is recorded as
+  // one incident, not two unrelated-looking lines — and the exported report leads with it. ──
+  {
+    const { ctx, p } = await signIn(b, db(), 'awhida@makaman.ly');
+
+    // A real LOAD/NET fault, through the actual code path (refreshCore's own hydrate
+    // failure) rather than a hand-built log entry — proving logError is genuinely wired
+    // into that path, the same reasoning refuseWith already applies to the SYNC side.
+    await p.evaluate(() => { window.__offline = true; });
+    await p.evaluate(() => window.__mkApp.refresh().catch(() => {}));
+    await p.waitForTimeout(400);
+    await p.evaluate(() => { window.__offline = false; });
+    let l = await log(p);
+    check('the connection loss itself is recorded', l.some((e) => e.area === 'LOAD' && e.kind === 'NET'),
+      l.map((e) => e.code).join(' '));
+
+    // A permission-shaped SYNC failure right behind it — the live shape this exists for:
+    // a dropped connection that comes back, then the very next write is refused because
+    // the session it went out on was never fully re-attached.
+    await refuseWith(p, 'new row violates row-level security policy for table "audit_log"');
+    l = await log(p);
+    const syncEntry = l.find((e) => e.code === 'MK-SYNC-RLS');
+    check('the SYNC entry records which fault it followed',
+      !!(syncEntry && syncEntry.ctx && syncEntry.ctx.chainedFrom
+        && syncEntry.ctx.chainedFrom.code === 'MK-LOAD-NET'),
+      JSON.stringify(syncEntry && syncEntry.ctx));
+
+    const md = await p.evaluate(() => window.__mkApp.errorReport());
+    check('the exported report leads with the correlation, not just the two codes separately',
+      /↳ \d+s after `MK-LOAD-NET` — may share the same root cause/.test(md), md);
+    await ctx.close();
+  }
+
+  // ── The same RLS failure, nothing recent behind it — the sentence today's suite already
+  // proved stays organic must also stay un-chained. Silence is the correct answer here. ──
+  {
+    const { ctx, p } = await signIn(b, db(), 'awhida@makaman.ly');
+    await refuseWith(p, 'new row violates row-level security policy for table "audit_log"');
+    const l = await log(p);
+    const syncEntry = l.find((e) => e.code === 'MK-SYNC-RLS');
+    check('with no recent LOAD/NET fault, the entry carries no chain at all',
+      !!syncEntry && !(syncEntry.ctx || {}).chainedFrom, JSON.stringify(syncEntry && syncEntry.ctx));
+    const md = await p.evaluate(() => window.__mkApp.errorReport());
+    check('and the report shows no correlation line for it', !/↳.*may share the same root cause/.test(md));
+    await ctx.close();
+  }
+
   await b.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
