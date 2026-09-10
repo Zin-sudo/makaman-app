@@ -2983,10 +2983,10 @@
             <tbody>
               <sc-for list="{{ priceRows }}" as="p" hint-placeholder-count="5">
                 <tr>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" class="mk-input-32"></td>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" class="mk-input-32"></td>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" class="mk-input-32"></td>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
                   <td class="mk-td-pad6">
                     <sc-if value="{{ canDeletePrices }}" hint-placeholder-val="{{ true }}">
                       <button onClick="{{ p.remove }}" class="mk-rowdel" title="Remove this line from the price list" aria-label="Remove this line from the price list">×</button>

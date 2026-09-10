@@ -2983,10 +2983,10 @@
             <tbody>
               <sc-for list="{{ priceRows }}" as="p" hint-placeholder-count="5">
                 <tr>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" class="mk-input-32"></td>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" class="mk-input-32"></td>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" class="mk-input-32"></td>
-                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.code }}" onChange="{{ p.onCode }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.desc }}" onChange="{{ p.onDesc }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.uom }}" onChange="{{ p.onUom }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
+                  <td class="mk-td-pad6"><input dir="auto" value="{{ p.cost }}" onChange="{{ p.onCost }}" disabled="{{ priceReadOnly }}" class="mk-input-32"></td>
                   <td class="mk-td-pad6">
                     <sc-if value="{{ canDeletePrices }}" hint-placeholder-val="{{ true }}">
                       <button onClick="{{ p.remove }}" class="mk-rowdel" title="Remove this line from the price list" aria-label="Remove this line from the price list">×</button>
@@ -12238,7 +12238,18 @@ class Component extends DCLogic {
       reopenTech: {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
-        confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
+        confirm: () => {
+          // 2026-09-10, pre-purge audit: this can only be opened via askJobDone's own gate
+          // (settled/officeClosed/cancelled all refuse before the dialog ever shows), but
+          // the office can act on the ticket in the time the dialog sits open — re-checks
+          // the same condition at Confirm instead of trusting that render never went stale.
+          if (!t || this.settled(t) || t.officeClosed || t.status === 'cancelled') {
+            this.setState({ dialog: null });
+            this.toast('reopentech-stale', 'This job has moved on since you opened this — nothing was reopened.', 'warn');
+            return;
+          }
+          this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null });
+        },
       },
       // ── Unwinding a ticket ────────────────────────────────────────────────
       //

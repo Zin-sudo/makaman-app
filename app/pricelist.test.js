@@ -263,6 +263,46 @@ const priceAudit = (p) => p.evaluate(() => (window.__mkApp.state.data.priceAudit
     await ctx.close();
   }
 
+  // ── 2026-09-10, pre-purge audit: the row inputs themselves, not just Save ──────────
+  // priceReadOnly already refused the write in setField and disabled "+ Add item" — but
+  // the Item No./Description/U/M/Unit cost boxes on every existing row carried no
+  // `disabled` binding at all, so someone lacking pricelist.edit saw a fully live-looking
+  // table and only found out a change did nothing after typing it and it silently not
+  // sticking. Proven here by revoking the capability from an otherwise-normal office
+  // account via an override, the same way Admin Permissions itself would.
+  {
+    const { ctx, p } = await boot(b, 'omar@makaman.ly');
+    await openPrices(p);
+    const firstRowDisabled = () => p.evaluate(() => {
+      const row = document.querySelector('tbody tr');
+      if (!row) return null;
+      const inputs = Array.from(row.querySelectorAll('input'));
+      return { count: inputs.length, allDisabled: inputs.length > 0 && inputs.every(i => i.disabled) };
+    });
+    let state = await firstRowDisabled();
+    check('with pricelist.edit, the row inputs are genuinely editable',
+      state && state.count > 0 && !state.allDisabled, JSON.stringify(state));
+
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      const me = (app.state.data.users || []).find(u => u.email === 'omar@makaman.ly');
+      app.setPermissionOverride(me, 'pricelist.edit', false);
+    });
+    await p.waitForTimeout(500);
+    check('the read-only note appears once the capability is revoked',
+      /You can read this price list but not change it/i.test(await p.evaluate(() => document.body.innerText)));
+    state = await firstRowDisabled();
+    check('and every row input is now genuinely disabled, not merely unresponsive on save',
+      state && state.count > 0 && state.allDisabled, JSON.stringify(state));
+    // Disabled is real, not cosmetic: the browser itself refuses focus/typing into it.
+    const before = await p.evaluate(() => document.querySelector('tbody tr td input').value);
+    await p.locator('tbody tr td input').first().fill('TAMPERED').catch(() => {});
+    await p.waitForTimeout(200);
+    const after = await p.evaluate(() => document.querySelector('tbody tr td input').value);
+    check('a disabled row input genuinely refuses typed input', before === after, JSON.stringify({ before, after }));
+    await ctx.close();
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);
