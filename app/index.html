@@ -3323,6 +3323,71 @@
             <div class="mk-accent-heading">Danger zone</div>
             <div style="font-size:12px;color:var(--ink-dim);margin-bottom:12px">Resets this prototype's local data back to the seeded demo tickets and price lists.</div>
             <button onClick="{{ resetAll }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.4)">Reset demo data</button>
+
+            <!-- Purge every ticket on the live project (2026-09-10, owner's request) — see
+                 the render-side comment on showPurgeTool for the full reasoning. A three-
+                 step wall, each step gated on the one before it, red border throughout so
+                 it reads apart from the ordinary controls above it. -->
+            <sc-if value="{{ showPurgeTool }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(var(--danger-rgb),0.3)">
+                <div style="font-size:14px;font-weight:600;color:var(--danger)">Purge all test tickets</div>
+                <div style="font-size:12px;color:var(--ink-dim);margin:4px 0 12px;line-height:1.4">Deletes every ticket on the live project for good — job logs, priced lines, tool custody, notes, attachments and audit history all go with it. Use this once testing is over, before creating real technician accounts. The five named office and Observer accounts are never touched by this; nothing here deletes a user.</div>
+
+                <sc-if value="{{ purgeStepIdle }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ askPurge }}" style="padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid var(--danger)">Purge all test tickets…</button>
+                </sc-if>
+
+                <sc-if value="{{ purgeStepPhrase }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:14px;border:2px solid var(--danger);background:rgba(var(--danger-rgb),0.07)">
+                    <div style="font-size:13px;line-height:1.5;margin-bottom:10px">This will permanently delete <strong>{{ purgeTicketCount }}</strong> ticket(s). There is no restore. Type <strong>DELETE ALL TICKETS</strong> to continue.</div>
+                    <input dir="auto" value="{{ purgeConfirmText }}" onChange="{{ setPurgeConfirmText }}" placeholder="DELETE ALL TICKETS" style="width:100%;min-height:40px;margin-bottom:10px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--danger-rgb),0.4);color:var(--ink)">
+                    <sc-if value="{{ purgeError }}" hint-placeholder-val="{{ false }}">
+                      <div class="mk-error-text">{{ purgeError }}</div>
+                    </sc-if>
+                    <div style="display:flex;gap:10px">
+                      <button onClick="{{ cancelPurge }}" style="flex:1;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Cancel</button>
+                      <button onClick="{{ purgeConfirmNext }}" style="flex:1;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-danger);border:1px solid var(--danger)">Continue</button>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ purgeStepPassword }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:14px;border:2px solid var(--danger);background:rgba(var(--danger-rgb),0.07)">
+                    <div style="font-size:13px;line-height:1.5;margin-bottom:10px">Enter your password to have a verification code emailed to you.</div>
+                    <input type="password" dir="auto" value="{{ purgePassword }}" onChange="{{ setPurgePassword }}" placeholder="Your password" style="width:100%;min-height:40px;margin-bottom:10px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--danger-rgb),0.4);color:var(--ink)">
+                    <sc-if value="{{ purgeError }}" hint-placeholder-val="{{ false }}">
+                      <div class="mk-error-text">{{ purgeError }}</div>
+                    </sc-if>
+                    <div style="display:flex;gap:10px">
+                      <button onClick="{{ cancelPurge }}" style="flex:1;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Cancel</button>
+                      <button onClick="{{ purgeSendCode }}" style="flex:1;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-danger);border:1px solid var(--danger)">Send code</button>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ purgeStepCode }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:14px;border:2px solid var(--danger);background:rgba(var(--danger-rgb),0.07)">
+                    <div style="font-size:13px;line-height:1.5;margin-bottom:10px">Enter the 6-digit code just emailed to you. It expires in 10 minutes and works once.</div>
+                    <input inputmode="numeric" dir="auto" value="{{ purgeCode }}" onChange="{{ setPurgeCode }}" placeholder="000000" style="width:100%;min-height:40px;margin-bottom:10px;padding:8px 11px;font-size:18px;letter-spacing:0.15em;text-align:center;background:var(--field);border:1px solid rgba(var(--danger-rgb),0.4);color:var(--ink)">
+                    <button onClick="{{ purgeResendCode }}" style="background:none;border:0;padding:0;margin-bottom:10px;font-size:12px;color:var(--accent-deep);cursor:pointer;text-decoration:underline">Resend the code</button>
+                    <sc-if value="{{ purgeError }}" hint-placeholder-val="{{ false }}">
+                      <div class="mk-error-text">{{ purgeError }}</div>
+                    </sc-if>
+                    <div style="display:flex;gap:10px">
+                      <button onClick="{{ cancelPurge }}" style="flex:1;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Cancel</button>
+                      <button onClick="{{ purgeGo }}" style="flex:1;min-height:40px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-danger);border:1px solid var(--danger)">Delete every ticket</button>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ purgeStepDone }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:14px;border:1px solid rgba(var(--success-rgb),0.4);background:rgba(var(--success-rgb),0.08)">
+                    <div style="font-size:13px;line-height:1.5;margin-bottom:10px"><strong>{{ purgeDeletedCount }}</strong> ticket(s) permanently deleted. The three test technician accounts can now be removed below — Delete is refused for anyone still holding work, and it no longer will be.</div>
+                    <button onClick="{{ purgeDone }}" style="min-height:40px;padding:0 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--ink);border:1px solid rgba(var(--ink-rgb),0.3)">Done</button>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
           </div>
         </div>
       </sc-if>
@@ -14905,6 +14970,84 @@ class Component extends DCLogic {
         },
       ],
       resetAll: () => this.setState({ dialog: 'reset' }),
+
+      // ── Purge every ticket on the live project (Part 1, owner's request, 2026-09-10) ──
+      //
+      // "Prepare a purge function for all the dummy tickets... So i can remove them and
+      // reset the app to 0 tickets when the testing is over... don't purge the following
+      // users [the 5 named real accounts]." The account side already exists and is
+      // already safe — Delete (below) already refuses anyone with a ticket, audit entry,
+      // crew row, log line, note or attachment still on the record. What was missing was
+      // the ticket wipe itself, which is what makes those three test technician accounts
+      // deletable at all.
+      //
+      // Owner's follow-up, same day: "not to abuse the feature unintentionally make the
+      // purge a feature where the admin needs to input his password to activate it. And
+      // input a verification code that arrives to his email as a must." Three independent
+      // things stand between this panel and every ticket in the table — a live admin
+      // session, a password re-entered seconds ago, and a code that only reached one
+      // inbox — and any refusal at step 2 or 3 drops back to that same step with the
+      // exact server-side reason shown, never silently retried. Local/offline demo mode
+      // has no live table to purge, so the whole panel stays behind USE_CLOUD.
+      showPurgeTool: USE_CLOUD && S.role === 'admin',
+      purgeTicketCount: (D.tickets || []).length,
+      // No inline comparisons in the template — one flag per step, computed here.
+      purgeStepIdle: !S.purgeStep,
+      purgeStepPhrase: S.purgeStep === 1,
+      purgeStepPassword: S.purgeStep === 2,
+      purgeStepCode: S.purgeStep === 3,
+      purgeStepDone: S.purgeStep === 4,
+      purgeError: S.purgeError || '',
+      askPurge: () => this.setState({ purgeStep: 1, purgeConfirmText: '', purgeError: '', purgeResult: null }),
+      cancelPurge: () => this.setState({
+        purgeStep: 0, purgeConfirmText: '', purgePassword: '', purgeCode: '', purgeError: '',
+      }),
+      purgeConfirmText: S.purgeConfirmText || '',
+      setPurgeConfirmText: (e) => this.setState({ purgeConfirmText: e.target.value, purgeError: '' }),
+      // Step 1 → 2: the typed phrase alone, checked client-side first so a mistyped
+      // phrase never spends the one live password re-entry on nothing.
+      purgeConfirmNext: () => {
+        if ((S.purgeConfirmText || '').trim() !== 'DELETE ALL TICKETS') {
+          this.setState({ purgeError: 'Type "DELETE ALL TICKETS" exactly, as shown, to continue.' });
+          return;
+        }
+        this.setState({ purgeStep: 2, purgeError: '', purgePassword: '' });
+      },
+      purgePassword: S.purgePassword || '',
+      setPurgePassword: (e) => this.setState({ purgePassword: e.target.value, purgeError: '' }),
+      // Step 2 → 3: request_purge_code re-verifies the password against Auth right now
+      // and, only if it is actually correct, emails a fresh 6-digit code to the admin's
+      // own registered address — never anything the request body could redirect.
+      purgeSendCode: () => {
+        const password = S.purgePassword || '';
+        if (!password) { this.setState({ purgeError: 'Enter your current password.' }); return; }
+        this.runBusy('purge:request-code', 'Verifying your password', () => adminAction('request_purge_code', { password }), { toastOnError: false })
+          .then(() => this.setState({ purgeStep: 3, purgeError: '', purgeCode: '' }))
+          .catch((err) => this.setState({ purgeError: err.message || 'That password is incorrect.' }));
+      },
+      purgeCode: S.purgeCode || '',
+      setPurgeCode: (e) => this.setState({ purgeCode: e.target.value.replace(/\D/g, '').slice(0, 6), purgeError: '' }),
+      // The password already re-entered at step 2 is reused here rather than asked again —
+      // a resend is "send that email again," not a second step-up check.
+      purgeResendCode: () => {
+        this.runBusy('purge:request-code', 'Sending a new code', () => adminAction('request_purge_code', { password: S.purgePassword || '' }), { toastOnError: false })
+          .then(() => this.setState({ purgeError: 'A new code was sent. The old one no longer works.', purgeCode: '' }))
+          .catch((err) => this.setState({ purgeError: err.message || 'Could not send a new code.' }));
+      },
+      // Step 3 → done: the actual wipe. One use per code, matching "to activate again if
+      // necessary" — whether this succeeds or fails, the same code will not work twice.
+      purgeGo: () => {
+        const code = S.purgeCode || '';
+        if (!/^\d{6}$/.test(code)) { this.setState({ purgeError: 'Enter the 6-digit code that was emailed to you.' }); return; }
+        this.runBusy('purge:go', 'Deleting every ticket', () => adminAction('purge_test_tickets', { code: code, confirm: 'DELETE ALL TICKETS' }), { toastOnError: false })
+          .then((r) => this.setState({
+            purgeStep: 4, purgeError: '', purgeResult: r, purgeConfirmText: '', purgePassword: '', purgeCode: '',
+          }))
+          .catch((err) => this.setState({ purgeError: err.message || 'The purge was refused.' }));
+      },
+      purgeDeletedCount: (S.purgeResult || {}).deletedCount,
+      purgeDone: () => this.setState({ purgeStep: 0, purgeResult: null, purgeError: '' }),
+
       defBaseLocation: (D.orgDefaults || {}).baseLocation || '',
       defCustomerRep: (D.orgDefaults || {}).customerRep || '',
 

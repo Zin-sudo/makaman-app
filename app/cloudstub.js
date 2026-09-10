@@ -349,6 +349,25 @@ window.supabase = {
         window.__rtt++;
         return window.__wire({ data: [], error: null }, 'rpc:my_permissions');
       },
+      // The admin-actions Edge Function (delete_user, create_technician, the purge tool,
+      // and everything else adminAction() sends). Not a table, not RLS -- a suite that
+      // wants to drive one of these sets window.__invokeFunction = function(name, body)
+      // and returns the exact { data, error } shape the real function would, matching
+      // adminAction()'s own read of it (r.error / r.data.error / r.data). Every call is
+      // recorded to window.__functionCalls so a suite can assert on the payload it sent,
+      // not just on what came back. Unstubbed, named out loud rather than answered with
+      // undefined -- the same rule this file states for itself at the top.
+      functions: {
+        invoke: function (name, opts) {
+          var body = (opts && opts.body) || {};
+          window.__functionCalls = window.__functionCalls || [];
+          window.__functionCalls.push({ name: name, body: body });
+          var reply = (typeof window.__invokeFunction === 'function')
+            ? window.__invokeFunction(name, body)
+            : { data: null, error: { message: 'cloudstub: functions.invoke is not stubbed for ' + name } };
+          return Promise.resolve(reply);
+        },
+      },
       auth: {
         signInWithPassword: function (c) {
           if (window.__offline) return fail();

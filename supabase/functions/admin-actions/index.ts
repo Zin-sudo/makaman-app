@@ -47,6 +47,21 @@ async function tokenKey(jwt: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(jwt))
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
+
+// SHA-256 hex of a plain string — used for the purge confirmation code below. Same shape
+// as tokenKey() just above, generalized to any input rather than only a JWT.
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+// Constant-time compare — a hash mismatch on the purge code must not be distinguishable
+// by timing from a near-miss, the same reasoning any credential check follows.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
 // The token's own expiry, read from the payload WITHOUT trusting it for anything else.
 // It is only ever used to shorten the cache lifetime, never to lengthen it and never to
 // decide who somebody is — the signature check that establishes that is done by the auth
@@ -84,6 +99,16 @@ async function identify(jwt: string): Promise<{ id: string; email: string } | nu
 // convention: it is the account that can rescue every other one, and an office
 // that locks itself out has no way back in.
 const MASTER_ADMIN_EMAIL = 'lateri@makaman.ly'
+
+// The purge tool below (request_purge_code / purge_test_tickets). Owner's own words,
+// 2026-09-10: "make the purge a feature where the admin needs to input his password to
+// activate it. And input a verification code that arrives to his email as a must. To
+// activate again if necessary." A real step-up re-authentication, not a second checkbox —
+// see migration 0073 for the table this reads and writes.
+const PURGE_CONFIRM_PHRASE = 'DELETE ALL TICKETS'
+const PURGE_CODE_TTL_MS = 10 * 60 * 1000
+const RESEND_FROM = 'tickets@makaman.ly'
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -360,6 +385,132 @@ Deno.serve(async (req) => {
       const { error } = await admin.auth.admin.deleteUser(userId)
       if (error) throw error
       return json({ ok: true })
+    }
+
+    // Step 1 of 2 for the purge tool: re-verify the admin's own password right now, and if
+    // it's correct, email a one-time code to their own registered address.
+    //
+    // "Right now" is the whole point — a stolen or still-open browser tab already carries a
+    // valid session, so the ordinary auth check above (which only proves the JWT is real)
+    // proves nothing about who is at the keyboard this second. Re-running the actual
+    // sign-in against Auth is what a step-up check means, so it is done with a throwaway
+    // anon client rather than the service-role one already open above — the ANON_KEY client
+    // asks GoTrue "is this the real password", the SERVICE_ROLE client could only ever
+    // answer "does this user exist," which is not the question.
+    if (action === 'request_purge_code') {
+      if (!isAdmin) return json({ error: 'Only Admin can prepare a purge.' }, 403)
+      const password = body.password as string
+      if (typeof password !== 'string' || !password) {
+        return json({ error: 'Your current password is required.' }, 400)
+      }
+
+      const stepUp = createClient(SUPABASE_URL, ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+      const { error: signInErr } = await stepUp.auth.signInWithPassword({
+        email: caller.email, password,
+      })
+      // The session this just minted is never used for anything and never reaches the
+      // client — signed straight back out so it doesn't sit as a live refresh token nobody
+      // asked for.
+      await stepUp.auth.signOut().catch(() => {})
+      if (signInErr) return json({ error: 'That password is incorrect.' }, 401)
+
+      // A random 6-digit code — crypto.getRandomValues, not Math.random, for the same
+      // reason the numbering claim never trusts a client-supplied number: this one has to
+      // actually be unguessable. Only its hash is ever stored; the code itself is never
+      // written to the database and never returned in this response.
+      const codeNum = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000
+      const code = String(codeNum).padStart(6, '0')
+      const codeHash = await sha256Hex(code)
+      const now = Date.now()
+
+      const { error: upsertErr } = await admin.from('purge_confirmation_codes').upsert({
+        admin_id: callerId,
+        code_hash: codeHash,
+        requested_at: new Date(now).toISOString(),
+        expires_at: new Date(now + PURGE_CODE_TTL_MS).toISOString(),
+        used_at: null,
+      }, { onConflict: 'admin_id' })
+      if (upsertErr) throw upsertErr
+
+      const { data: resendKey, error: keyErr } = await admin.rpc('get_paperwork_resend_key')
+      if (keyErr || !resendKey) throw new Error(`Could not read the Resend key from the Vault: ${keyErr?.message ?? 'not set'}`)
+
+      const sendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [caller.email],
+          subject: 'Makaman: verification code to purge test tickets',
+          html: `<p>A purge of every ticket on Makaman was just requested for this account.</p>`
+            + `<p style="font-size:28px;font-weight:600;letter-spacing:0.08em">${code}</p>`
+            + `<p>This code expires in 10 minutes and works once. If you did not request this, `
+            + `sign in and change your password — someone else has it.</p>`,
+        }),
+      })
+      const sendBody = await sendRes.json().catch(() => ({}))
+      if (!sendRes.ok) throw new Error(`Resend refused the send: ${sendRes.status} ${JSON.stringify(sendBody)}`)
+
+      return json({ ok: true })
+    }
+
+    // Step 2 of 2: the actual wipe. Requires everything request_purge_code minted, plus the
+    // typed confirm phrase — three independent things (a live session, a password entered
+    // seconds ago, a code that only reached one inbox) standing between this and every
+    // ticket in the table.
+    if (action === 'purge_test_tickets') {
+      if (!isAdmin) return json({ error: 'Only Admin can purge test tickets.' }, 403)
+      const confirm = body.confirm as string
+      const code = (body.code as string || '').trim()
+      if (confirm !== PURGE_CONFIRM_PHRASE) {
+        return json({ error: `Type "${PURGE_CONFIRM_PHRASE}" exactly to confirm.` }, 400)
+      }
+      if (!/^\d{6}$/.test(code)) {
+        return json({ error: 'Enter the 6-digit code that was emailed to you.' }, 400)
+      }
+
+      const { data: row, error: rowErr } = await admin
+        .from('purge_confirmation_codes').select('code_hash, expires_at, used_at')
+        .eq('admin_id', callerId).maybeSingle()
+      if (rowErr) throw rowErr
+      if (!row) {
+        return json({ error: 'No verification code is on file. Request a new one first.' }, 400)
+      }
+      if (row.used_at) {
+        return json({ error: 'That code has already been used. Request a new one.' }, 400)
+      }
+      if (new Date(row.expires_at).getTime() < Date.now()) {
+        return json({ error: 'That code has expired. Request a new one.' }, 400)
+      }
+      const codeHash = await sha256Hex(code)
+      if (!timingSafeEqual(codeHash, row.code_hash)) {
+        return json({ error: 'That code is incorrect.' }, 401)
+      }
+
+      // One use only, marked before the delete runs — matches "to activate again if
+      // necessary": whether the delete below succeeds or fails, this exact code will not
+      // work a second time, so the next attempt starts over from request_purge_code.
+      const { error: usedErr } = await admin.from('purge_confirmation_codes')
+        .update({ used_at: new Date().toISOString() }).eq('admin_id', callerId)
+      if (usedErr) throw usedErr
+
+      const { count, error: countErr } = await admin
+        .from('tickets').select('*', { count: 'exact', head: true })
+      if (countErr) throw countErr
+
+      // Every ticket-child FK (ticket_lines, ticket_items, ticket_crew, ticket_assets,
+      // ticket_attachments, ticket_notes, audit_log.ticket_id) is ON DELETE CASCADE from
+      // tickets, confirmed live — this one delete cleans all of it. Neither this nor
+      // anything above touches public.profiles, public.ticket_numbering, or any account;
+      // deleting the now-unreferenced technician accounts is the existing delete_user
+      // action, one press per account.
+      const { error: deleteErr } = await admin
+        .from('tickets').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      if (deleteErr) throw deleteErr
+
+      return json({ ok: true, deletedCount: count ?? 0 })
     }
 
     return json({ error: `Unknown action: ${action}` }, 400)

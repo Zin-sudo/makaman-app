@@ -372,6 +372,71 @@ begin
   end;
 
   -------------------------------------------------------------------------------------
+  -- Guard 8 (2026-09-10, migration 0073, Part 1 of the session's seven-part plan): the
+  -- purge tool. Two facts only Postgres can confirm, neither of which a Playwright test
+  -- against the offline demo/cloudstub.js could ever prove:
+  --
+  --   · purge_confirmation_codes carries RLS on and NO policy for any role — not even the
+  --     admin who requested a code may read or write it directly. The one-time code lives
+  --     here only as a hash, and the only door open to this table is the admin-actions
+  --     Edge Function's service-role key, which bypasses RLS entirely. A policy ever
+  --     appearing here (even an "admin can read their own row" one, added with good
+  --     intentions) would let a signed-in admin session read back its own emailed code's
+  --     hash — not the code itself, but a foothold this table was built to have none of.
+  --   · purge_test_tickets deletes exactly one row (`delete from tickets ...`) and relies
+  --     entirely on every ticket-child table cascading from it — ticket_lines,
+  --     ticket_items, ticket_crew, ticket_assets, ticket_attachments, ticket_notes, and
+  --     audit_log.ticket_id. If any one of these were ever changed to NO ACTION or
+  --     SET NULL, the purge would either fail outright (NO ACTION refuses the parent
+  --     delete while children remain) or worse, silently orphan rows (SET NULL) that the
+  --     app would then render with a blank ticket reference. Confirmed live once already,
+  --     re-confirmed here as a standing fact rather than a one-time observation.
+  -------------------------------------------------------------------------------------
+  begin
+    if not exists (
+      select 1 from pg_class where relname = 'purge_confirmation_codes'
+        and relnamespace = 'public'::regnamespace and relrowsecurity
+    ) then
+      failures := failures || E'\n  [purge_confirmation_codes RLS] the table either does not exist or does not have row level security enabled — the one-time purge code would be readable by anyone with a client, not just the service-role Edge Function.';
+    end if;
+    select count(*) into n_before from pg_policies
+      where schemaname = 'public' and tablename = 'purge_confirmation_codes';
+    if n_before <> 0 then
+      failures := failures || format(E'\n  [purge_confirmation_codes RLS] %s client-reachable polic(y/ies) exist on this table — it must have none. Even an "admin reads their own row" policy would let a session read back the hash of a code that was only ever supposed to reach one inbox.', n_before);
+    end if;
+  exception when others then
+    failures := failures || format(E'\n  [purge_confirmation_codes RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  begin
+    for expected in
+      select * from (values
+        ('ticket_lines'), ('ticket_items'), ('ticket_crew'), ('ticket_assets'),
+        ('ticket_attachments'), ('ticket_notes'), ('audit_log')
+      ) as t(table_name)
+    loop
+      select array_agg(distinct rc.delete_rule)
+        into actual_cols
+        from information_schema.table_constraints tc
+        join information_schema.referential_constraints rc
+          on tc.constraint_name = rc.constraint_name and tc.constraint_schema = rc.constraint_schema
+        join information_schema.constraint_column_usage ccu
+          on rc.unique_constraint_name = ccu.constraint_name and rc.unique_constraint_schema = ccu.constraint_schema
+        where tc.constraint_type = 'FOREIGN KEY'
+          and tc.table_schema = 'public' and tc.table_name = expected.table_name
+          and ccu.table_name = 'tickets';
+
+      if actual_cols is null or not ('CASCADE' = any(actual_cols)) then
+        failures := failures || format(
+          E'\n  [purge cascade] %s''s foreign key to tickets is %s, not CASCADE — purge_test_tickets''s single `delete from tickets` (admin-actions Edge Function) would no longer clean this table up, and would either refuse the whole purge or leave orphaned rows behind depending on which rule replaced it.',
+          expected.table_name, coalesce(array_to_string(actual_cols, ', '), '(no such foreign key found)'));
+      end if;
+    end loop;
+  exception when others then
+    failures := failures || format(E'\n  [purge cascade] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
   if failures <> '' then
     raise exception E'REGRESSION GUARD FAILURES:%', failures;
   else
