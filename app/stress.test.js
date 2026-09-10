@@ -221,6 +221,15 @@ const freeStorage = (p) => p.evaluate(() => {
         x.officeClosed = !!by; x.closedBy = by || '';
         x.audit = [];
       });
+      // 2026-09-10: this same ticket is reused across every scenario in the loop below,
+      // and the sync-discarded record is deliberately sticky (never revisited once a
+      // clash is resolved, and kept in its own top-level key rather than on the ticket —
+      // see syncDiscardedAdd) — cleared here alongside synced/audit or every scenario
+      // after the first clash would find nothing pending and silently no-op.
+      try {
+        const acct = (app.state.session || {}).email;
+        localStorage.removeItem('makaman.sync.discarded.v1' + (acct ? '.' + acct.toLowerCase() : ''));
+      } catch (e) { /* none */ }
       return new Promise(r => setTimeout(() => {
         app.renderVals().sync();
         setTimeout(() => {

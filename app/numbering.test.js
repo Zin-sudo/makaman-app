@@ -159,7 +159,20 @@ const openReview = async (p, text) => {
   check('and that his copy was not uploaded', /not uploaded/i.test(body));
   d = await store(p);
   const clash = d.tickets.find(x => x.customer.indexOf('Northern Gulf') === 0);
-  check('the ticket leaves the upload list', clash.synced === true);
+  // 2026-09-10: no longer `synced === true` — that field is part of the ticket's own
+  // header and setting it was itself a write to an office-closed ticket the database
+  // always refused, which the next hydrate() would have silently undone, putting the
+  // ticket right back on the upload list on the next sync pass. The client-only
+  // sync-discarded record (its own top-level key, never sent, never overwritten by a
+  // pull — see syncDiscardedAdd) is what now actually keeps a settled/office-closed
+  // ticket off the list for good.
+  const discardedIds = await p.evaluate(() => {
+    const acct = (window.__mkApp.state.session || {}).email;
+    const key = 'makaman.sync.discarded.v1' + (acct ? '.' + acct.toLowerCase() : '');
+    return JSON.parse(localStorage.getItem(key) || '[]');
+  });
+  check('the ticket leaves the upload list for good', discardedIds.indexOf(clash.id) !== -1,
+    JSON.stringify(discardedIds));
   check('and the discard is on the record',
     (clash.audit || []).some(a => /Field copy discarded on sync/i.test(a.text)));
 

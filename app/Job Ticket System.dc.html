@@ -4325,6 +4325,14 @@ const CACHE_K = 'makaman.cloud.v1';
 const OUTBOX_K = 'makaman.outbox.v1';
 const DEADLETTER_K = 'makaman.outbox.refused.v1';
 const ERRLOG_K = 'makaman.errorlog.v1';
+// A device's own record of "I have given up reconciling this ticket, permanently" — see
+// syncClosedTickets. Deliberately its own top-level key, not a field on the ticket object:
+// hydrate() rebuilds every ticket from server columns alone (shapeTicket), so anything
+// stored ON the ticket that the server has never heard of is silently gone the moment the
+// next pull replaces it. A flat list of ticket ids, same shape and same per-account scoping
+// as the outbox/dead-letter/error-log keys just above, survives exactly the refresh that
+// would otherwise erase it.
+const SYNC_DISCARD_K = 'makaman.sync.discarded.v1';
 // Whose device-side record this is. A device is not one person here, and everything below
 // that assumed it was has now cost real work.
 //
@@ -4374,6 +4382,21 @@ function acctKey(base) {
 function errlogKey() { return acctKey(ERRLOG_K); }
 function outboxKey() { return acctKey(OUTBOX_K); }
 function deadletterKey() { return acctKey(DEADLETTER_K); }
+function syncDiscardKey() { return acctKey(SYNC_DISCARD_K); }
+function syncDiscardedRead() {
+  try { return JSON.parse(localStorage.getItem(syncDiscardKey()) || '[]'); } catch (e) { return []; }
+}
+function syncDiscardedHas(id) { return !!id && syncDiscardedRead().indexOf(id) >= 0; }
+function syncDiscardedAdd(id) {
+  if (!id) return;
+  try {
+    const list = syncDiscardedRead();
+    if (list.indexOf(id) === -1) {
+      list.push(id);
+      localStorage.setItem(syncDiscardKey(), JSON.stringify(list.slice(-500)));
+    }
+  } catch (e) { /* quota — the loop this exists to stop is worse than losing this record */ }
+}
 
 // ── The error log ────────────────────────────────────────────────────────────
 //
@@ -8524,7 +8547,10 @@ class Component extends DCLogic {
     const LIVE = this.liveTickets(D.tickets);
     const myTickets = LIVE.filter(x => inCrew(x, myName, myEmail));
     const myClosed = myTickets.filter(x => x.status !== 'logging');
-    const myPending = myClosed.filter(x => !x.synced);
+    // syncDiscardedHas (2026-09-10): a ticket this device already gave up trying to
+    // reconcile — see the clashed branch below — is never pending again, on this or any
+    // later pass, including after a hydrate() that would otherwise rebuild it from scratch.
+    const myPending = myClosed.filter(x => !x.synced && !syncDiscardedHas(x.id));
     const myInProgress = myTickets.filter(x => x.status === 'logging');
     // Nothing to send is not an event worth a toast when nobody asked — the audit trail
     // is what somebody reads to find out what happened to a job, and a line saying
@@ -8556,9 +8582,27 @@ class Component extends DCLogic {
         : 'already closed in the office by ' + x.closedBy;
     };
     const ids = myPending.filter(x => clashed.indexOf(x) === -1).map(x => x.id);
+    // 2026-09-10, owner's report, live: this used to also set `x.synced = true` on a
+    // clashed ticket, inside the same mutate() below — a header field (rowTicket sends
+    // `synced`/`synced_at`), so this "reconciliation" was itself a write to an
+    // approved/closed ticket's header, refused every time by enforce_ticket_update_rules()
+    // exactly like any other technician edit to a sealed ticket (MK-SYNC-LOCKED). The
+    // refusal didn't matter for what this code was trying to do — the local optimistic
+    // flip already happened — except that the NEXT hydrate() pulled the server's real,
+    // never-actually-written `synced` value (still false) straight back over it via
+    // shapeTicket (which rebuilds every ticket from server columns alone, keeping nothing
+    // local the server has never heard of), so this exact ticket looked "pending" again on
+    // the very next sync cycle, discarded itself again, queued the same doomed header
+    // write again, forever: a self-perpetuating loop, confirmed live on ticket 1881
+    // (techtest@makaman.ly) — 26+ "Field copy discarded" notifications and a dead-letter
+    // banner that kept reappearing minutes after being dismissed, both on the same
+    // auto-sync cadence. syncDiscardedAdd writes to its own top-level, never-synced key
+    // instead (see its own comment) — this can never become a header write, and nothing
+    // hydrate() pulls back can ever erase it, so myPending (both copies, just below)
+    // excludes this ticket for good.
+    clashed.forEach((c) => syncDiscardedAdd(c.id));
     this.mutate(d => d.tickets.forEach(x => {
       if (clashed.some(c => c.id === x.id)) {
-        x.synced = true; x.syncedAt = x.closedAt || now;
         (x.audit = x.audit || []).push({ ts: now, kind: 'lifecycle', by: myName,
           text: 'Field copy discarded on sync — ' + clashReason(clashed.find(c => c.id === x.id)) + '.' });
         return;
@@ -9364,7 +9408,10 @@ class Component extends DCLogic {
       arrivalShort: F.stamp(t.arrival), startShort: F.short(t.start), endShort: t.end ? F.short(t.end) : 'open',
       dateRange: t.start ? F.date(t.start) + ' → ' + (t.end ? F.date(t.end) : 'open') : '—',
       eventCount: (t.events || []).length,
-      syncLabel: t.synced ? F.stamp(t.syncedAt) : 'not synced',
+      // syncDiscardedHas (2026-09-10): this device's own copy was never actually written —
+      // the office's is what stands — so "not synced" would read as still-outstanding
+      // when there is nothing left to send.
+      syncLabel: t.synced ? F.stamp(t.syncedAt) : (syncDiscardedHas(t.id) ? 'Settled — nothing to sync' : 'not synced'),
       noLabel: t.ticketNo || '— unassigned —',
       value: money(this.ticketTotal(t), this.ticketCurrency(t)),
       currency: this.ticketCurrency(t),
@@ -11485,7 +11532,10 @@ class Component extends DCLogic {
     // by the Sync button. Scoped to the signed-in person as well: the previous global
     // filter meant one technician's Sync uploaded another technician's tickets.
     const myClosed = myTickets.filter(x => x.status !== 'logging');
-    const myPending = myClosed.filter(x => !x.synced);
+    // syncDiscardedHas (2026-09-10): a ticket this device already gave up trying to
+    // reconcile — see the clashed branch below — is never pending again, on this or any
+    // later pass, including after a hydrate() that would otherwise rebuild it from scratch.
+    const myPending = myClosed.filter(x => !x.synced && !syncDiscardedHas(x.id));
     const myInProgress = myTickets.filter(x => x.status === 'logging');
     // The office chases every outstanding job; a technician chases his own. Same rule,
     // different list — not a different rule.
@@ -12076,6 +12126,38 @@ class Component extends DCLogic {
         okLabel: 'Give up on them', cancelLabel: 'Keep them', hasCancel: true,
         okBg: 'var(--danger)', okFg: 'var(--on-danger)',
         confirm: () => {
+          // 2026-09-10, owner's report, live: clearing just the dead-letter pile used to
+          // leave the actual loop running — a clashed ticket's own reconciliation write
+          // (see syncClosedTickets) kept re-queuing and re-refusing itself on every later
+          // sync cycle, so the banner (and the "Field copy discarded" notification beside
+          // it) came back within minutes of being dismissed, looking like Dismiss had done
+          // nothing at all. syncClosedTickets no longer generates that doomed write going
+          // forward (syncDiscarded, not synced/syncedAt), but a device that already hit
+          // this needs the same fix applied to its own stuck tickets right now, not on
+          // whatever the next sync cycle happens to be. Read before clearing, so this is
+          // the same set of tickets the banner being dismissed actually named.
+          let dead = [];
+          try { dead = JSON.parse(localStorage.getItem(deadletterKey()) || '[]'); } catch (e) { /* none */ }
+          const staleTicketIds = {};
+          dead.forEach((e) => { const id = opTicket(e && e.op); if (id) staleTicketIds[id] = true; });
+          // syncDiscardedAdd writes a plain localStorage record, not a ticket-data change —
+          // no mutate() needed, and nothing here is sent anywhere.
+          (this.state.data.tickets || []).forEach((x) => {
+            if (staleTicketIds[x.id] && (this.settled(x) || !!x.officeClosed || x.status === 'cancelled')) {
+              syncDiscardedAdd(x.id);
+            }
+          });
+          // Belt and braces: a literal re-queued copy of one of these SAME exact refusals
+          // (matched by key, not just by ticket — a ticket can carry other, unrelated,
+          // still-legitimate pending work of its own that this must not also throw away)
+          // still sitting in the live queue is done being retried too — "give up" means
+          // give up, not "give up until the next automatic attempt."
+          try {
+            const deadKeys = {};
+            dead.forEach((e) => { const k = (e && e.op && e.op.key) || ''; if (k) deadKeys[k] = true; });
+            const q = outboxRead().filter((op) => !deadKeys[(op && op.key) || '']);
+            outboxWrite(q);
+          } catch (e) { /* nothing to do */ }
           try { localStorage.removeItem(deadletterKey()); } catch (e) { /* nothing to do */ }
           this.setState({ dialog: null });
           this.toast('errlog', 'Refused changes dismissed.', 'ok');
