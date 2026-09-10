@@ -164,6 +164,71 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
       && /Mahmoud Zaki holds this job\. Only they can raise a note here\./i.test(swappedBody));
   await p2.close();
 
+  // ── Section 3: a closed ticket takes the note box away, even from its own holder ────
+  //
+  // 2026-09-10, owner's request, after a note queued against a closed ticket (t1/1882 in
+  // this seed: Yousef's own, approved) was refused by enforce_ticket_update_rules() and
+  // then kept resurfacing as a dead-letter banner and an error-log entry — a genuinely
+  // unanticipated case slipping past a preventative check that should have existed from
+  // the start (ERROR_KIND's own stated philosophy). Fixed by teaching canAddNoteTo about
+  // "closed" the same way techSealed already is, and by hardening addNote() itself
+  // (mirroring attachFile) so a call that reaches it anyway is refused with a toast
+  // instead of ever becoming a queued write.
+  const p3 = await b.newPage({ viewport: { width: 1300, height: 950 } });
+  await p3.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
+  await p3.goto(URL, { waitUntil: 'networkidle' });
+  await p3.waitForTimeout(400);
+  await p3.evaluate(() => localStorage.clear());
+  await p3.reload({ waitUntil: 'networkidle' });
+  await p3.waitForTimeout(700);
+  const i3 = p3.locator('input');
+  await i3.nth(0).fill('yousef@makaman.ly'); await i3.nth(1).fill('makaman2026');
+  await p3.getByRole('button', { name: /log in/i }).click();
+  await p3.waitForTimeout(1200);
+  await p3.evaluate(() => window.__mkApp.setState({ activeId: 't1', techScreen: 'log', roleTab: 'tickets' }));
+  await p3.waitForTimeout(400);
+  const closedBody = await p3.innerText('body');
+  check('the technician who held this job sees no note box on it once it is closed',
+    await p3.getByPlaceholder(/Raise a note on this job/i).count() === 0);
+  check('and is told the ticket is closed, not that someone else holds it',
+    /This ticket is closed\. Notes can no longer be added here\./i.test(closedBody));
+
+  const bypassed = await p3.evaluate(() => {
+    const app = window.__mkApp;
+    const before = (app.state.data.tickets.find(t => t.id === 't1').notes || []).length;
+    app.addNote('t1', 'Trying anyway');
+    return {
+      grew: (app.state.data.tickets.find(t => t.id === 't1').notes || []).length > before,
+      toastText: (app.state.toast || {}).text || '',
+    };
+  });
+  check('calling addNote directly on a closed ticket writes nothing', !bypassed.grew, JSON.stringify(bypassed));
+  check('and shows the same closed-ticket sentence as an interactive toast, not a queued write',
+    /This ticket is closed/i.test(bypassed.toastText), bypassed.toastText);
+  await p3.close();
+
+  // Office and the Observer are NOT locked out of a closed ticket's notes — CLAUDE.md's
+  // own standing rule (2026-09-09) says the Observer "may only add notes, on any ticket,"
+  // unconditionally, and the office may reasonably want to note a fully paperworked job.
+  for (const [email, label] of [['omar@makaman.ly', 'the office'], ['founder@makaman.ly', 'the Observer']]) {
+    const p4 = await b.newPage({ viewport: { width: 1300, height: 950 } });
+    await p4.addInitScript(() => { window.MAKAMAN_CONFIG = { authMode: 'local' }; });
+    await p4.goto(URL, { waitUntil: 'networkidle' });
+    await p4.waitForTimeout(400);
+    await p4.evaluate(() => localStorage.clear());
+    await p4.reload({ waitUntil: 'networkidle' });
+    await p4.waitForTimeout(700);
+    const i4 = p4.locator('input');
+    await i4.nth(0).fill(email); await i4.nth(1).fill('makaman2026');
+    await p4.getByRole('button', { name: /log in/i }).click();
+    await p4.waitForTimeout(1200);
+    await p4.evaluate(() => window.__mkApp.setState({ activeId: 't1', mgrScreen: 'review', techScreen: 'log', roleTab: 'tickets' }));
+    await p4.waitForTimeout(400);
+    check(label + ' still sees the note box on the same closed ticket',
+      await p4.getByPlaceholder(/Raise a note on this job/i).count() === 1);
+    await p4.close();
+  }
+
   await b.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

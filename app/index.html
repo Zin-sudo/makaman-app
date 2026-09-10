@@ -9663,6 +9663,21 @@ class Component extends DCLogic {
   addNote(ticketId, body) {
     const text = String(body || '').trim();
     if (!ticketId || !text || !this.hasPermission('note.add')) return;
+    const t = (this.state.data.tickets || []).find((x) => x.id === ticketId);
+    // 2026-09-10, owner's request: the rule the composer's own canAddNoteTo gate already
+    // applies (crew-only, and — new this session — not on a closed ticket) checked again
+    // here, so a note that reaches this call some other way (a stale render, a queued
+    // double-tap before the gate re-renders) is refused with a plain sentence on screen
+    // instead of a doomed write reaching the outbox — retried, dead-lettered, and logged
+    // as an error for something the screen already knew was not allowed. Mirrors
+    // attachFile's own guard, a few hundred lines down, exactly.
+    if (!t || !this.canAddNoteTo(t)) {
+      this.toast('note', (t && (this.settled(t) || t.status === 'cancelled' || t.officeClosed))
+        ? 'This ticket is closed. Notes can no longer be added here.'
+        : (t ? holderOf(t) + ' holds this job. Only they can raise a note here.' : 'That job could not be found.'),
+        'warn');
+      return;
+    }
     const who = (this.state.session && this.state.session.name) || '';
     const id = uuid();
     this.mutate((d) => {
@@ -10137,6 +10152,18 @@ class Component extends DCLogic {
     if (!this.hasPermission('note.add')) return false;
     const role = this.state.actingAs ? 'tech' : this.state.role;
     if (role !== 'tech') return true;
+    // 2026-09-10, owner's request, after a note on a closed ticket queued, was refused
+    // ("Ticket already approved and can no longer be edited" — enforce_ticket_update_
+    // rules(), migration 0039, though that trigger only guards the header row; this is a
+    // client-side rule of its own) and then kept resurfacing as a dead-letter banner and
+    // an error-log entry: once a job is out of a technician's hands there is nothing left
+    // for them to note. Same "closed" techSealed already locks header edits against, just
+    // below in render, plus cancelled (which techSealed does not cover — a cancelled job
+    // was never approved or office-closed, but it is exactly as done). Office (is_staff())
+    // and the Observer are deliberately exempt — CLAUDE.md's own standing rule says the
+    // Observer "may only add notes, on any ticket," unconditionally, and the office may
+    // reasonably want to note a fully paperworked job as easily as an open one.
+    if (this.settled(t) || t.status === 'cancelled' || !!t.officeClosed) return false;
     const me = this.state.session || {};
     return inCrew(t, me.name, me.email);
   }
@@ -13218,8 +13245,18 @@ class Component extends DCLogic {
       // nobody what to do next, and it is the reason a technician saw MK-SYNC-RLS instead
       // of a sentence in the first place.
       noteLocked: !!t && !this.canAddNoteTo(t),
-      noteLockedNote: (!t || this.canAddNoteTo(t)) ? ''
-        : (holderOf(t) + ' holds this job. Only they can raise a note here.'),
+      // Two distinct reasons canAddNoteTo can refuse a technician, checked in the same
+      // order that function does (closed, then not-crew) — added 2026-09-10 alongside the
+      // closed-ticket rule itself, so a technician who once held this very job is told the
+      // job is closed rather than the previous wording's "X holds this job," which reads
+      // as nonsense when X is himself.
+      noteLockedNote: (() => {
+        if (!t || this.canAddNoteTo(t)) return '';
+        if (this.settled(t) || t.status === 'cancelled' || !!t.officeClosed) {
+          return 'This ticket is closed. Notes can no longer be added here.';
+        }
+        return holderOf(t) + ' holds this job. Only they can raise a note here.';
+      })(),
       noteDraft: S.noteDraft || '',
       noteDraftEmpty: !String(S.noteDraft || '').trim(),
       noteAddOpacity: String(S.noteDraft || '').trim() ? '1' : '0.45',
