@@ -4204,6 +4204,19 @@ const PERMISSION_DEFAULTS = (function () {
   return out;
 })();
 
+// 2026-09-10, pre-purge audit: these 19 keys are registered and default-role-seeded but no
+// hasPermission(...) call anywhere in this file ever reads them — the screens they would
+// logically gate use a raw role check instead, which already matches what the database
+// enforces. Toggling one of these for a person on the Admin Permissions screen silently did
+// nothing. Hidden from the per-person editor below rather than wiring 27 scattered role
+// checks over to hasPermission() for zero behavior change — role-level is the real answer
+// for these until a reason to grant them per-person actually exists.
+const PERSON_LEVEL_UNENFORCED = ['ticket.create', 'ticket.close', 'ticket.sync', 'ticket.print_own',
+  'ticket.charge_items', 'ticket.reorder_items', 'ticket.approve', 'ticket.approve_on_behalf',
+  'ticket.force_number', 'ticket.reopen', 'ticket.view_all', 'activity.view_all', 'location.view_team',
+  'report.generate', 'numbering.manage_series', 'user.approve_signup', 'user.create', 'client.manage',
+  'jobtype.manage'];
+
 // The catalogue as the demo store sees it. Derived from the defaults above rather than
 // restating migration 0014's wording, because two copies of the same prose drift and the
 // database's copy is the one that matters. A real session replaces all of this at the
@@ -11582,6 +11595,10 @@ class Component extends DCLogic {
       if (!permTarget) return [];
       const out = [], seen = {};
       permCatalogue.forEach((p) => {
+        // 2026-09-10, pre-purge audit: PERSON_LEVEL_UNENFORCED names capabilities no
+        // hasPermission(...) call in this file ever reads — toggling one here silently
+        // did nothing. Skipped rather than shown and inert.
+        if (PERSON_LEVEL_UNENFORCED.indexOf(p.id) !== -1) return;
         // Keyed by id where there is one and by email where there is not, matching what
         // setPermissionOverride writes — the demo store's users have never had ids.
         const key = (permTarget.id || permTarget.email) + '|' + p.id;
