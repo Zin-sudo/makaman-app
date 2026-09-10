@@ -1585,7 +1585,13 @@
                    with this field, so it is gone from this screen entirely rather than
                    merely disabled — a blank, greyed-out field a technician can never fill
                    would just be a second way to ask the same unanswerable question. -->
-              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:18px 0 8px">Job events — {{ cur.eventCount }} lines</div>
+              <!-- 2026-09-10, owner's request: the ticket owner's name visible right above
+                   the log, for every viewer — the holder included, who otherwise saw no
+                   name at all here (only a non-holder got one, from the notHolder banner
+                   below, and only to explain why they can't act). This is in addition to
+                   that banner, not instead of it. -->
+              <div style="font-size:11px;color:var(--ink-dim);margin-top:14px">Job held by <strong style="color:var(--ink-strong)">{{ holderName }}</strong></div>
+              <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:8px 0 8px">Job events — {{ cur.eventCount }} lines</div>
               <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ curEvents }}" as="e" hint-placeholder-count="4">
                   <div style="display:flex;gap:10px;padding:9px 0;border-top:1px solid rgba(var(--ink-rgb),0.1)">
@@ -1801,6 +1807,12 @@
                     <button onClick="{{ a.open }}" style="width:100%;display:flex;gap:11px;padding:11px 0;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);background:transparent;text-align:left;cursor:pointer">
                       <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
                       <div class="mk-flex1">
+                        <!-- 2026-09-10, owner's request: every row leads with who took the
+                             action, not buried mid-sentence — blank for the price-list
+                             feed, which has no single actor to name. -->
+                        <sc-if value="{{ a.by }}" hint-placeholder-val="{{ true }}">
+                          <div style="font-size:12px;font-weight:600;color:var(--ink-strong)">{{ a.by }}</div>
+                        </sc-if>
                         <div style="font-size:13px;line-height:1.4;color:var(--ink)">{{ a.text }}</div>
                         <div style="font-size:11px;color:var(--ink-faint);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
                       </div>
@@ -2426,10 +2438,15 @@
             </div>
 
             <div class="mk-panel-pad">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
                 <div class="mk-accent-label">3 · Job log from the field</div>
                 <div class="mk-hint-end">Line timestamps editable — every change is written to the audit trail</div>
               </div>
+              <!-- 2026-09-10, owner's request: same as the technician's own copy of this
+                   screen — the ticket owner's name, visible right above the log, for
+                   every viewer (office, Observer, anyone). "Two Account screens" trap:
+                   this is that screen's desk-sized twin. -->
+              <div style="font-size:11px;color:var(--ink-dim);margin-bottom:12px">Job held by <strong style="color:var(--ink-strong)">{{ holderName }}</strong></div>
               <div style="margin-bottom:12px;max-width:420px">
                 <label class="mk-field-label">Job type (objective) — office only</label>
                 <input dir="auto" value="{{ cur.jobType }}" onChange="{{ f.jobType }}" onFocus="{{ onJobTypeFocus }}" onBlur="{{ onJobTypeBlur }}" disabled="{{ ticketLocked }}" style="width:100%;min-height:38px;padding:7px 10px;font-size:14px;background:var(--field);border:1px solid {{ jobTypeBorder }};color:var(--ink);text-transform:uppercase">
@@ -3459,6 +3476,11 @@
               <button onClick="{{ a.open }}" style="width:100%;display:flex;gap:12px;padding:12px 0;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08);background:transparent;text-align:left;cursor:pointer;color:var(--ink)">
                 <span style="width:3px;flex:none;background:{{ a.edge }}"></span>
                 <div class="mk-flex1">
+                  <!-- 2026-09-10, owner's request: same as the phone copy above — every
+                       row leads with who took the action. -->
+                  <sc-if value="{{ a.by }}" hint-placeholder-val="{{ true }}">
+                    <div style="font-size:13px;font-weight:600;color:var(--ink-strong)">{{ a.by }}</div>
+                  </sc-if>
                   <div style="font-size:14px;line-height:1.45">{{ a.text }}</div>
                   <div style="font-size:12px;color:var(--ink-faint);margin-top:3px">{{ a.where }} · {{ a.stamp }}</div>
                 </div>
@@ -9457,7 +9479,11 @@ class Component extends DCLogic {
     return (D.tickets || [])
       .reduce((acc, x) => acc.concat((x.audit || []).map((a) => entry(
         a, auditKind(a),
-        (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer,
+        // 2026-09-10, owner's request: the ticket's own owner named alongside its number
+        // and customer — office actions land on someone else's job far more often than a
+        // technician's own actions do, and "who did this" (a.by, rendered separately,
+        // leading the row) is a different fact from "whose job this is."
+        (x.ticketNo ? x.ticketNo + ' · ' : '') + x.customer + (holderOf(x) ? ' · ' + holderOf(x) : ''),
         () => this.cardTreatment(x).edge,
         () => (S.role === 'tech'
           ? this.setState({ activeId: x.id, techScreen: 'log', roleTab: 'tickets' })
@@ -9495,7 +9521,7 @@ class Component extends DCLogic {
           ? ': "' + (preview.length > 60 ? preview.slice(0, 60) + '…' : preview) + '"' : '')
           + ' — ' + status;
         return entry({ ts: ts, by: (S.session && S.session.name) || '', text: text }, 'pending',
-          t ? ((t.ticketNo ? t.ticketNo + ' · ' : '') + t.customer) : '',
+          t ? ((t.ticketNo ? t.ticketNo + ' · ' : '') + t.customer + (holderOf(t) ? ' · ' + holderOf(t) : '')) : '',
           () => (item.state === 'failed' && item.terminal) ? 'var(--warning)' : 'var(--accent)',
           t ? (() => (S.role === 'tech'
             ? this.setState({ activeId: t.id, techScreen: 'log', roleTab: 'tickets' })

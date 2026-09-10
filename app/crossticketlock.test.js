@@ -89,6 +89,11 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   check('a plain sentence explains why, naming the real holder',
     /Mahmoud Zaki holds this job\. Only they can raise a note here\./i.test(body));
 
+  // 2026-09-10, owner's request: the ticket owner's name visible above the log for
+  // EVERY viewer, not only a non-holder being told why they can't act.
+  check('the owner\'s name shows above the log, on a colleague\'s ticket too',
+    /Job held by\s*Mahmoud Zaki/i.test(body));
+
   // ── His own ticket (t3) — none of this applies ─────────────────────────────────────
   await p.evaluate(() => window.__mkApp.setState({ activeId: 't3', techScreen: 'log', roleTab: 'tickets' }));
   await p.waitForTimeout(400);
@@ -98,6 +103,25 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
   check('and "Log line" is offered again', /Log line — stamps/i.test(body));
   check('and the note box is offered again on his own ticket',
     await p.getByPlaceholder(/Raise a note on this job/i).count() === 1);
+  check('the owner\'s name shows above the log on his own ticket too',
+    /Job held by\s*Yousef Al-Harbi/i.test(body));
+
+  // 2026-09-10, owner's request: the Activity feed leads with who acted, and names the
+  // ticket's owner separately in the subtext — the two differ whenever the office acts on
+  // someone else's job, which this same seeded data (Mahmoud's ticket, t2) already has an
+  // audit entry for (job opened by Mahmoud) that a technician reads company-wide.
+  await p.getByRole('button', { name: /^Activity$/i }).last().click();
+  await p.waitForTimeout(600);
+  const lines = (await p.innerText('body')).split('\n');
+  // "Omar Al-Saleh" / "Approved · ..." / "1882 · Kuwait Oil Group · Yousef Al-Harbi · ..."
+  // is exactly the case that proves the two names differ: the office (Omar) acting on a
+  // technician's (Yousef's) own ticket.
+  const actorIdx = lines.findIndex((l, i) => l === 'Omar Al-Saleh' && /Approved/.test(lines[i + 1] || ''));
+  check('the Activity feed leads the row with the actor\'s name, on its own line',
+    actorIdx >= 0, lines.slice(0, 12).join(' | '));
+  const ownerSubtext = actorIdx >= 0 ? lines[actorIdx + 2] : '';
+  check('and names the ticket\'s owner in the subtext, alongside the ticket number and customer — distinct from the actor when they differ',
+    /1882 · Kuwait Oil Group · Yousef Al-Harbi/.test(ownerSubtext), ownerSubtext);
 
   const ownRowState = await p.evaluate(() => {
     const boxes = Array.from(document.querySelectorAll('textarea'));
