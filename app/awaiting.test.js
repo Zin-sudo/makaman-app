@@ -71,30 +71,37 @@ const stage = (p, n) => p.evaluate((many) => {
         .map(x => (x.innerText || '').split('\n').slice(0, 2).join(' = ')),
       rows: document.querySelectorAll('.mk-ticket-card').length,
     }));
-    check('the counter row carries it', before.tiles.some(t => /Awaiting paperwork/i.test(t)),
+    check('the counter row carries it', before.tiles.some(t => /Collect Signature\/Stamp/i.test(t)),
       JSON.stringify(before.tiles));
     check('and it shows the number, not the list',
-      before.tiles.some(t => new RegExp('Awaiting paperwork = ' + waiting + '$', 'i').test(t)),
-      before.tiles.find(t => /Awaiting paperwork/i.test(t)) || '(none)');
+      before.tiles.some(t => new RegExp('Collect Signature/Stamp = ' + waiting + '$', 'i').test(t)),
+      before.tiles.find(t => /Collect Signature\/Stamp/i.test(t)) || '(none)');
     check('the old warning block is gone', before.banner === false);
 
     // Tap it.
-    const tile = p.locator('.mk-stat-tile', { hasText: /Awaiting paperwork/i }).first();
+    const tile = p.locator('.mk-stat-tile', { hasText: /Collect Signature\/Stamp/i }).first();
     await tile.click();
     await p.waitForTimeout(700);
-    const on = await p.evaluate(() => ({
-      filtered: window.__mkApp.state.awaitingFilter === true,
-      // Every row on screen is one of the jobs being chased — the ticket number is
-      // shown top-right on the tile now, not necessarily the tile's first line, so
-      // the whole tile's text is searched rather than assuming a fixed line.
-      rows: Array.from(document.querySelectorAll('.mk-ticket-card'))
-        .map(r => (r.innerText || '').replace(/\s+/g, ' ').trim()),
-      action: (Array.from(document.querySelectorAll('.mk-stat-tile'))
-        .map(x => x.innerText).find(t => /Awaiting paperwork/i.test(t)) || ''),
-    }));
+    const on = await p.evaluate(() => {
+      const app = window.__mkApp;
+      // The true set, read the same way the tile counted it — not "starts with 90",
+      // which was only ever true by accident of insertion order. 2026-09-10's recency
+      // sort (owner's request) can legitimately interleave the seed's own pre-existing
+      // awaiting ticket (1882) among these fifteen staged ones depending on real
+      // wall-clock activity, so the set membership is what is actually being proven.
+      const wanted = new Set(app.awaitingDocs(app.state.data.tickets).map(t => t.ticketNo));
+      return {
+        filtered: app.state.awaitingFilter === true,
+        rows: Array.from(document.querySelectorAll('.mk-ticket-card'))
+          .map(r => (r.innerText || '').replace(/\s+/g, ' ').trim()),
+        wanted: Array.from(wanted),
+        action: (Array.from(document.querySelectorAll('.mk-stat-tile'))
+          .map(x => x.innerText).find(t => /Collect Signature\/Stamp/i.test(t)) || ''),
+      };
+    });
     check('tapping filters the inbox', on.filtered);
     check('and the rows shown are the ones being chased',
-      on.rows.length > 0 && on.rows.every(r => /90\d\d/.test(r)),
+      on.rows.length > 0 && on.rows.every(r => on.wanted.some(no => r.indexOf(no) !== -1)),
       on.rows.slice(0, 3).join(', ') + ' (' + on.rows.length + ' rows)');
     check('the tile says how to get back', /Show all/i.test(on.action));
 
@@ -103,7 +110,7 @@ const stage = (p, n) => p.evaluate((many) => {
     const off = await p.evaluate(() => ({
       filtered: window.__mkApp.state.awaitingFilter === true,
       action: (Array.from(document.querySelectorAll('.mk-stat-tile'))
-        .map(x => x.innerText).find(t => /Awaiting paperwork/i.test(t)) || ''),
+        .map(x => x.innerText).find(t => /Collect Signature\/Stamp/i.test(t)) || ''),
     }));
     check('tapping again puts everything back', off.filtered === false);
     // Not a row count: both lists page at ten, so the numbers agree while the contents
@@ -113,27 +120,60 @@ const stage = (p, n) => p.evaluate((many) => {
     await ctx.close();
   }
 
-  // ── The phone: one strip, thumb-sized ────────────────────────────────────
+  // ── The phone: one high-alert tile, thumb-sized ──────────────────────────
+  //
+  // 2026-09-10, owner's request: "ticket owner should get a high alert tile to know
+  // which tickets are awaiting for signature/stamp the same way that the ops have them
+  // highlighted on their Ticket Inbox" — the thin .mk-awaiting-strip is gone, replaced
+  // with the same .mk-stat-tile weight the office's own Collect Signature/Stamp tile
+  // uses, and it must appear and disappear with awaitingDocsAny exactly as that one does.
   {
     const { ctx, p } = await boot(b, 'yousef@makaman.ly', 390);
-    await stage(p, 15);
+    const waiting = await stage(p, 15);
     await p.waitForTimeout(900);
-    const strip = await p.evaluate(() => {
-      const el = document.querySelector('.mk-awaiting-strip');
+    const tile = await p.evaluate(() => {
+      const el = Array.from(document.querySelectorAll('.mk-stat-tile'))
+        .find(x => /Collect Signature\/Stamp/i.test(x.innerText || ''));
       if (!el) return null;
       const r = el.getBoundingClientRect();
       return { text: (el.innerText || '').replace(/\s+/g, ' ').trim(), h: Math.round(r.height),
         w: Math.round(r.width), overflow: Math.round(r.right) > 390 };
     });
-    check('the phone gets one strip, not a list', !!strip, JSON.stringify(strip));
-    check('it is a thumb-sized target', strip && strip.h >= 44, strip ? strip.h + 'px' : 'n/a');
-    check('and it does not push the page sideways', strip && !strip.overflow,
-      strip ? strip.w + 'px wide in 390' : 'n/a');
-    // The badge counts; the sentence must not count again. "16 · 16 approved jobs are
-    // still waiting" is what reusing the desk label here produced.
-    check('it carries the count once, not twice',
-      strip && /^\d+ approved jobs? still waiting/.test(strip.text),
-      strip ? strip.text : 'n/a');
+    check('the phone gets one high-alert tile, not the old thin strip',
+      !!tile, JSON.stringify(tile));
+    check('the old strip class is gone from the page',
+      await p.locator('.mk-awaiting-strip').count() === 0);
+    check('it is a thumb-sized target', tile && tile.h >= 44, tile ? tile.h + 'px' : 'n/a');
+    check('and it does not push the page sideways', tile && !tile.overflow,
+      tile ? tile.w + 'px wide in 390' : 'n/a');
+    check('it carries the real count', tile && new RegExp('\\b' + waiting + '\\b').test(tile.text),
+      tile ? tile.text : 'n/a');
+
+    // Appearing/disappearing with awaitingDocsAny — none of the 15 staged jobs are his own
+    // (they cloned ticket[0], not necessarily his), so drive the underlying signal directly.
+    const goneWhenSettled = await p.evaluate(() => {
+      const app = window.__mkApp;
+      // Settle every job actually still owed, not just the fifteen this test staged —
+      // the seeded data already carries one of its own (the case attachments.test.js
+      // exercises), and leaving it out would fail this check for the wrong reason.
+      const owedIds = app.awaitingDocs(app.state.data.tickets).map(t => t.id);
+      app.mutate((d) => {
+        d.tickets.forEach((t) => {
+          if (owedIds.indexOf(t.id) !== -1) {
+            t.attachments = [
+              { id: t.id + '-s', docKind: 'service_ticket', filename: 's.pdf', path: t.id + '/s.pdf' },
+              { id: t.id + '-l', docKind: 'job_log', filename: 'l.pdf', path: t.id + '/l.pdf' },
+            ];
+          }
+        });
+      });
+      return app.awaitingDocs(app.state.data.tickets).length;
+    });
+    await p.waitForTimeout(500);
+    check('and once every job is settled, awaitingDocsAny goes false', goneWhenSettled === 0,
+      String(goneWhenSettled));
+    check('so the tile is gone, not just relabelled',
+      await p.locator('.mk-stat-tile', { hasText: /Collect Signature\/Stamp/i }).count() === 0);
     await ctx.close();
   }
 

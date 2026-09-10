@@ -247,7 +247,7 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
   // pushing the work off the screen.
   const chase = () => p4.evaluate(() => {
     const tile = Array.from(document.querySelectorAll('.mk-stat-tile'))
-      .find(x => /Awaiting paperwork/i.test(x.innerText || ''));
+      .find(x => /Collect Signature\/Stamp/i.test(x.innerText || ''));
     return {
       shown: !!tile,
       n: tile ? Number((tile.innerText.match(/\d+/) || [0])[0]) : 0,
@@ -260,7 +260,7 @@ Object.assign(DB.tickets[0], { status: 'approved', ticket_number: '1883', approv
 
   // Tapping narrows the inbox to the jobs being chased, and they are still identified by
   // their ticket number — which is what the office reads down the phone to the client.
-  await p4.locator('.mk-stat-tile', { hasText: /Awaiting paperwork/i }).first().click();
+  await p4.locator('.mk-stat-tile', { hasText: /Collect Signature\/Stamp/i }).first().click();
   await p4.waitForTimeout(900);
   const filtered = await p4.evaluate(() => ({
     on: window.__mkApp.state.awaitingFilter === true,

@@ -1415,12 +1415,17 @@
                    It used to render every waiting ticket in an unbounded warning box
                    above the inbox: twenty tickets waiting on a signature meant twenty
                    rows of warning before the first ticket somebody came to look at. The
-                   count is the whole message; the list is one tap away. -->
+                   count is the whole message; the list is one tap away.
+                   2026-09-10, owner's request: "the same way ops have them highlighted
+                   on their Ticket Inbox" — replaced the thin strip with the same
+                   .mk-stat-tile weight the office's own Collect Signature/Stamp tile
+                   uses (mgrStats above), one tile rather than four since a technician
+                   has only this one figure that needs a high-alert tile at all. -->
               <sc-if value="{{ awaitingDocsAny }}" hint-placeholder-val="{{ false }}">
-                <button onClick="{{ toggleAwaitingFilter }}" class="mk-awaiting-strip" style="border-color:{{ awaitingFilterEdge }};background:{{ awaitingFilterBg }}">
-                  <span class="mk-awaiting-n">{{ awaitingDocsCount }}</span>
-                  <span style="flex:1;min-width:0;text-align:left">{{ awaitingDocsPhrase }}</span>
-                  <span style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--warning-ink)">{{ awaitingFilterAction }}</span>
+                <button onClick="{{ toggleAwaitingFilter }}" class="mk-stat-tile" style="width:100%;margin-bottom:14px;border-color:{{ awaitingFilterEdge }};background:{{ awaitingFilterBg }}">
+                  <div style="font-size:10px;letter-spacing:0.09em;text-transform:uppercase;color:var(--ink-faint)">Collect Signature/Stamp</div>
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:30px;line-height:1.1;color:var(--hue-indigo)">{{ awaitingDocsCount }}</div>
+                  <div style="font-size:10px;letter-spacing:0.04em;text-transform:uppercase;color:var(--hue-indigo);min-height:12px">{{ awaitingFilterAction }}</div>
                 </button>
               </sc-if>
               <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint);margin:16px 0 8px">On this device</div>
@@ -6491,6 +6496,22 @@ function crewNames(t) { return crewOf(t).map(c => c.name).filter(Boolean); }
 // "Yousef Al-Harbi → Mahmoud Zaki" — the order the job passed through hands.
 function crewLabel(t) { return crewNames(t).join(' → '); }
 
+// 2026-09-10, owner's request: every ticket list shows the most recently active job
+// first. The newest of everything actually recorded against this ticket — an audit
+// entry, a log line, or the last time it reached the server — the same "newest of
+// everything we know about this ticket" idea ticketView()'s own contactTs already uses
+// for the presence dot, generalized here from device contact to ticket activity.
+// Falls back to 0 for a ticket with none of these, so it never outranks one that has
+// actually happened.
+function lastActivityAt(t) {
+  const stamps = []
+    .concat((t.audit || []).map((a) => a.ts))
+    .concat((t.events || []).map((e) => e.ts))
+    .concat([t.syncedAt]);
+  const ms = stamps.filter(Boolean).map((s) => new Date(s).getTime()).filter((n) => !isNaN(n));
+  return ms.length ? Math.max(...ms) : 0;
+}
+
 // Which numbering series a typed ticket number belongs to — same matching reseatSeries
 // already does per-ticket (prefix, then a plain run of digits for the one series with no
 // prefix), pulled out here so numberIssue() can ask the same question of one number
@@ -9193,6 +9214,15 @@ class Component extends DCLogic {
   statusChip(t) {
     if (t.status === 'sent_finance') return { statusLabel: 'SENT TO FINANCE', chipBg: 'var(--accent-wash)', chipFg: 'var(--accent-ink)' };
     if (t.status === 'sent_client') return { statusLabel: 'SENT TO CLIENT', chipBg: 'rgba(var(--success-rgb),0.16)', chipFg: 'var(--success-ink)' };
+    // 2026-09-10, owner's request: a named stage of its own for an approved job still
+    // owed a signed/stamped sheet back — not just "approved" (which reads as fully
+    // settled) and not the generic in-progress/warning colours either, so all three read
+    // apart from each other at a glance. Same missing-paperwork test signedDocsMissing()
+    // already runs for the "awaiting paperwork" tiles below, kept in the one place — a
+    // ticket is never in two of these systems disagreeing about whether it is owed.
+    if (t.status === 'approved' && this.signedDocsMissing(t).length) {
+      return { statusLabel: 'COLLECT SIGNATURE/STAMP', chipBg: 'var(--hue-indigo-wash)', chipFg: 'var(--hue-indigo)' };
+    }
     if (t.status === 'approved') return { statusLabel: 'APPROVED', chipBg: 'var(--chip-ok-bg)', chipFg: 'var(--chip-ok-fg)' };
     if (t.status === 'done') return { statusLabel: t.synced ? 'AWAITING REVIEW' : 'JOB DONE', chipBg: 'rgba(var(--warning-rgb),0.16)', chipFg: 'var(--warning-deep)' };
     // Missing until 2026-09-09: a cancelled job fell through to the default below and
@@ -11581,9 +11611,25 @@ class Component extends DCLogic {
     // to be created in, so a job needing approval today could sit below one closed
     // last month. One helper rather than a sort per screen, so the three roles cannot
     // drift into three different ideas of what "first" means.
-    const TICKET_BAND = { logging: 0, done: 1, approved: 2 };
-    const bandOf = (x) => (TICKET_BAND[x.status] === undefined ? 3 : TICKET_BAND[x.status]);
-    const bandedTickets = (list) => list.slice().reverse().sort((a, b) => bandOf(a) - bandOf(b));
+    // 2026-09-10, owner's request, spelled out band by band: "Cancelled at the bottom,
+    // then approved above it, then collect signature/stamp above it, then awaiting review
+    // above it, then in-progress above them all... for each category ordered as the most
+    // recently active is first." Band 2/3 is the one place band and status genuinely
+    // diverge — an approved ticket splits depending on whether its paperwork is still
+    // owed, the same signedDocsMissing() the Collect Signature/Stamp chip already uses,
+    // kept in the one place so a ticket is never in two of these systems disagreeing.
+    // sent_client/sent_finance land in band 3 alongside a fully-paperworked "approved":
+    // both only exist after paperwork is already back (Approved -> Sent to client -> Sent
+    // to finance), so neither is waiting on anything the way Collect Signature/Stamp is.
+    const bandOf = (x) => {
+      if (x.status === 'logging') return 0;      // In-progress
+      if (x.status === 'done') return 1;         // Awaiting Review
+      if (x.status === 'cancelled') return 4;    // Cancelled — bottom, always
+      return (x.status === 'approved' && this.signedDocsMissing(x).length) ? 2 : 3;
+      //     2 = Collect Signature/Stamp                3 = Approved (paperwork settled)
+    };
+    const bandedTickets = (list) => list.slice()
+      .sort((a, b) => bandOf(a) - bandOf(b) || lastActivityAt(b) - lastActivityAt(a));
 
     // "Has the office ever received this?", not "is it up to date right now".
     //
@@ -12200,7 +12246,7 @@ class Component extends DCLogic {
         title: 'Ticket approved',
         body: 'Ticket ' + (t ? t.ticketNo : '') + ' is approved and locked for the technician. '
           + 'The four sheets are ready to fill.\n\n'
-          + 'Next: it now shows under Awaiting paperwork until the client returns the '
+          + 'Next: it now shows under Collect Signature/Stamp until the client returns the '
           + 'signed and stamped Service Ticket and Job Log. Tap that count on the inbox to '
           + 'see everything still outstanding.',
         okLabel: 'Preview sheets', hasCancel: true, cancelLabel: 'Back to inbox',
@@ -13165,9 +13211,11 @@ class Component extends DCLogic {
       // and tapping again puts everything back — so the way out is the way in.
       toggleAwaitingFilter: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
       awaitingFilterAction: S.awaitingFilter ? 'Show all' : 'Show these',
-      awaitingFilterEdge: S.awaitingFilter ? 'var(--warning-ink)' : 'var(--warning)',
-      awaitingFilterBg: S.awaitingFilter
-        ? 'rgba(var(--warning-rgb),0.22)' : 'rgba(var(--warning-rgb),0.1)',
+      // Matches the office's own Collect Signature/Stamp tile (mgrStats) — same
+      // reasoning as its own comment: no rgba(var(--hue-indigo-rgb),…) exists, only the
+      // pre-mixed wash, so untoggled falls back to the plain tile border instead.
+      awaitingFilterEdge: S.awaitingFilter ? 'var(--hue-indigo)' : 'rgba(var(--ink-rgb),0.16)',
+      awaitingFilterBg: S.awaitingFilter ? 'var(--hue-indigo-wash)' : 'transparent',
 
       // ── Signed paperwork on the open ticket ──
       //
@@ -13824,9 +13872,13 @@ class Component extends DCLogic {
         { label: 'Approved value', value: this.totalByCurrency(approved), color: 'var(--ink-strong)',
           edge: 'rgba(var(--ink-rgb),0.16)', bg: 'transparent', cursor: 'default', action: '', pick: () => {} },
       ].concat(awaitingDocs.length ? [{
-        label: 'Awaiting paperwork', value: String(awaitingDocs.length), color: 'var(--warning-ink)',
-        edge: S.awaitingFilter ? 'var(--warning-ink)' : 'var(--warning)',
-        bg: S.awaitingFilter ? 'rgba(var(--warning-rgb),0.22)' : 'rgba(var(--warning-rgb),0.1)',
+        // 2026-09-10, owner's request: named and coloured to match the new
+        // "Collect Signature/Stamp" chip (statusChip) these same tickets now carry — no
+        // rgba(var(--hue-indigo-rgb),…) exists (only the pre-mixed wash), so this stays
+        // theme-safe by reusing that wash directly rather than inventing a literal.
+        label: 'Collect Signature/Stamp', value: String(awaitingDocs.length), color: 'var(--hue-indigo)',
+        edge: S.awaitingFilter ? 'var(--hue-indigo)' : 'rgba(var(--ink-rgb),0.16)',
+        bg: S.awaitingFilter ? 'var(--hue-indigo-wash)' : 'transparent',
         cursor: 'pointer',
         action: S.awaitingFilter ? 'Show all' : 'Show these',
         pick: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
@@ -13834,7 +13886,7 @@ class Component extends DCLogic {
         // 2026-09-09, owner's request: a cancelled job "stays for a couple of days to
         // allow withdrawal then gets archived." Archived means out of the ordinary
         // Inbox view, not gone — this is the one deliberate way back to it, same
-        // toggle-tile shape as "Awaiting paperwork" just above.
+        // toggle-tile shape as "Collect Signature/Stamp" just above.
         label: 'Archived (cancelled)', value: String(archivedCancelled.length), color: 'var(--ink-faint)',
         edge: S.showArchived ? 'var(--ink-dim)' : 'rgba(var(--ink-rgb),0.16)',
         bg: S.showArchived ? 'rgba(var(--ink-rgb),0.1)' : 'transparent',
@@ -14401,7 +14453,7 @@ class Component extends DCLogic {
             (x.audit = x.audit || []).push({
               ts: when, kind: 'lifecycle', by: who,
               text: 'Waiting on the client for ' + owed.join(' and ')
-                + '. The job stays under Awaiting paperwork until they come back.',
+                + '. The job stays under Collect Signature/Stamp until they come back.',
             });
           }
         });
@@ -14905,9 +14957,13 @@ class Component extends DCLogic {
           .then(n => this.toast('bundle', 'Overview of ' + n + ' ticket(s) downloaded.', 'ok'))
           .catch(() => this.toast('bundle-fail', 'Could not build the overview on this device.', 'warn')));
       },
-      founderRows: approved.slice().reverse().slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
-        open: () => this.openReview(x.id),
-      })),
+      // 2026-09-10, owner's request: "all lists... always show the most recently active
+      // at the top" — approved-only here, so no banding, just real recency in place of
+      // the old reverse()-as-recency proxy.
+      founderRows: approved.slice().sort((a, b) => lastActivityAt(b) - lastActivityAt(a))
+        .slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
+          open: () => this.openReview(x.id),
+        })),
 
       // Live activity — the only view in the app that shows tickets still being logged
       // in the field to the Observer, who otherwise only ever sees already-approved
@@ -14918,7 +14974,10 @@ class Component extends DCLogic {
       // currently in D.tickets — this prototype has one shared local data store rather
       // than a live multi-device feed, so it's honest to call it "refreshes
       // automatically," not a push subscription.
-      liveTickets: LIVE.filter(x => x.status === 'logging' && x.synced).slice().reverse().map(x => {
+      // Same recency sort as every other ticket list (2026-09-10, owner's request) — this
+      // one is already in-progress-only, so it is real recency with no banding needed.
+      liveTickets: LIVE.filter(x => x.status === 'logging' && x.synced)
+        .slice().sort((a, b) => lastActivityAt(b) - lastActivityAt(a)).map(x => {
         const lastEvent = (x.events || [])[x.events.length - 1];
         return Object.assign(this.ticketView(x), {
           lastLogText: lastEvent ? lastEvent.text : 'No log lines yet.',

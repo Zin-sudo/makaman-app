@@ -112,7 +112,7 @@ async function boot(b, email, width) {
     const after = await p.evaluate(() => document.body.innerText);
     check('approving confirms what was accomplished', /approved and locked/i.test(after));
     check('and names the next step rather than ending on a full stop',
-      /Awaiting paperwork/i.test(after) && /signed and stamped/i.test(after),
+      /Collect Signature\/Stamp/i.test(after) && /signed and stamped/i.test(after),
       (after.match(/Next:[^]{0,80}/) || ['(no next step)'])[0].replace(/\n/g, ' '));
     await ctx.close();
   }
