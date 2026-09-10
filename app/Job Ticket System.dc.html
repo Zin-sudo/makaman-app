@@ -3276,6 +3276,75 @@
         </sc-if>
       </sc-if>
 
+      <!-- 2026-09-10, owner's request: "Create a trail of well locations... a history of
+           all wells, saved by Well No. first, Field second, [and the] Arrival location of
+           that well when the technician clicked Open Ticket and began filling that
+           specific job log." One card per well (Well No. first, its field underneath),
+           the arrival fix as the headline location, a search box that matches a well
+           number OR a field name so a field search surfaces every well it holds, and the
+           full history — one row per job that ever touched this well — behind a tap
+           rather than open by default, per UX-PRINCIPLES #19 (reveal complexity gradually)
+           and #5 (chunk long content): a well visited on forty jobs prints one line, not
+           forty, until someone actually asks for the rest. -->
+      <sc-if value="{{ adminWellSites }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:900px">
+          <div style="width:300px;max-width:100%;margin-bottom:16px">
+            <label class="mk-field-label">Search well or field</label>
+            <input dir="auto" value="{{ wellSiteQuery }}" onChange="{{ setWellSiteQuery }}" placeholder="e.g. BG-214 or Burgan North" style="width:100%;min-height:40px;padding:8px 11px;font-size:14px;background:var(--field);border:1px solid rgba(var(--ink-rgb),0.2);color:var(--ink)">
+          </div>
+          <sc-if value="{{ wellSiteEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:26px 14px;text-align:center;font-size:13px;color:var(--ink-faint);border:1px solid rgba(var(--ink-rgb),0.16)">{{ wellSiteEmptyText }}</div>
+          </sc-if>
+          <sc-for list="{{ wellSiteRows }}" as="w" hint-placeholder-count="3">
+            <div class="mk-wellsite-row" style="border:1px solid rgba(var(--ink-rgb),0.16);padding:14px;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                <div class="mk-flex1" style="min-width:170px">
+                  <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:19px;line-height:1.2">{{ w.well }}</div>
+                  <div style="font-size:12px;color:var(--ink-faint)">{{ w.field }}</div>
+                </div>
+                <div style="min-width:170px">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Arrival location</div>
+                  <div style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink-dim)">{{ w.coords }}</div>
+                </div>
+                <div style="min-width:120px">
+                  <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Last seen</div>
+                  <div style="font-size:12px;color:var(--ink-dim)">{{ w.lastSeen }}</div>
+                </div>
+                <button onClick="{{ w.toggle }}" style="margin-left:auto;min-height:36px;padding:7px 14px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">{{ w.toggleLabel }} · {{ w.countLabel }}</button>
+              </div>
+              <sc-if value="{{ w.expanded }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(var(--ink-rgb),0.1);overflow-x:auto">
+                  <table class="mk-stack mk-table-plain">
+                    <thead>
+                      <tr>
+                        <th class="mk-th-10">Ticket No.</th>
+                        <th class="mk-th-10">Customer</th>
+                        <th class="mk-th-10">Rig</th>
+                        <th class="mk-th-10">Technician</th>
+                        <th class="mk-th-10">Arrival</th>
+                        <th class="mk-th-10">Coordinates</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ w.history }}" as="h" hint-placeholder-count="2">
+                        <tr>
+                          <td data-label="Ticket No." class="mk-td-pad6">{{ h.ticketNo }}</td>
+                          <td data-label="Customer" class="mk-td-pad6">{{ h.customer }}</td>
+                          <td data-label="Rig" class="mk-td-pad6">{{ h.rig }}</td>
+                          <td data-label="Technician" class="mk-td-pad6">{{ h.tech }}</td>
+                          <td data-label="Arrival" class="mk-td-pad6">{{ h.arrival }}</td>
+                          <td data-label="Coordinates" class="mk-td-pad6" style="font-variant-numeric:tabular-nums">{{ h.coords }}</td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
       <!-- The signed service ticket and job log are emailed to this list, both attached,
            the moment the second document lands on an approved job — no button, no
            button to forget to press. A disabled row stays on the list without receiving
@@ -9311,6 +9380,48 @@ class Component extends DCLogic {
       roleTag: seen[u.id] ? '' : ' (' + u.role + ')',
     }));
   }
+  // 2026-09-10, owner's request: "Create a trail of well locations... a history of all
+  // well[s], saved by Well No. first, Field second, [and the] Arrival location of that well
+  // when the technician clicked Open Ticket and began filling that specific job log."
+  //
+  // The source is t.geo.open — the SAME opening fix geoPinOpen writes once per ticket and
+  // never overwrites (see its own comment: "written once and never overwritten — it is the
+  // record of where the job was started"). t.geo.last was rejected on purpose: it drifts
+  // as the crew moves around the site after arriving, and a well does not move, so the
+  // fixed point at which the job began is the only fix worth keeping as a location record.
+  //
+  // Every ticket that ever named this well contributes one sighting — this is a trail, not
+  // a single latest-wins pointer, so a well visited on five separate jobs over two years
+  // keeps all five arrivals rather than only the newest. Grouped by well number (trimmed,
+  // matched case-insensitively — "BG-214" and "bg-214" are the same well), with the field
+  // name read off the MOST RECENT ticket to touch it: a well's field is occasionally
+  // corrected on a later job, and the trail should carry the correction forward rather
+  // than freezing on whatever the very first ticket happened to say.
+  wellSitesTrail() {
+    const D = this.state.data || {};
+    const groups = {};
+    (D.tickets || []).forEach(t => {
+      const well = (t.well || '').trim();
+      const fix = (t.geo || {}).open;
+      const coords = geoText(fix);
+      if (!well || !coords) return;
+      const key = well.toUpperCase();
+      if (!groups[key]) groups[key] = { well: well, field: '', fieldAt: '', sightings: [] };
+      const g = groups[key];
+      if (!g.fieldAt || (t.arrival || '') >= g.fieldAt) {
+        g.well = well; g.field = t.field || g.field; g.fieldAt = t.arrival || g.fieldAt;
+      }
+      g.sightings.push({
+        ticketNo: t.ticketNo || '', customer: t.customer || '—', rig: t.rig || '',
+        tech: holderOf(t) || t.tech || '—', arrival: t.arrival || '', coords: coords,
+      });
+    });
+    return Object.keys(groups).map(k => {
+      const g = groups[k];
+      g.sightings.sort((a, b) => (b.arrival || '').localeCompare(a.arrival || ''));
+      return { well: g.well, field: g.field, sightings: g.sightings };
+    }).sort((a, b) => (a.field || '').localeCompare(b.field || '') || a.well.localeCompare(b.well));
+  }
   // Going the other way is never gated on a capability. Acting as a technician drops
   // user.act_as_technician along with everything else the office holds, so a permission
   // check here would be a door that locks from the inside.
@@ -11929,6 +12040,22 @@ class Component extends DCLogic {
       }).slice(0, S.founderCount);
     })();
 
+    // Well Sites — same "only when the screen that shows them is open" discipline as
+    // reportRows just above: wellSitesTrail() walks every ticket in the account, and
+    // building that on every render (every keystroke in some other screen's search box,
+    // every sync tick) would be exactly the off-screen cost A3 already found and fixed
+    // once for Reports. An empty array is the correct value while the screen is closed —
+    // the sc-for renders nothing either way.
+    const wellSitesOpen = S.roleTab === 'tickets' && S.adminTab === 'wellsites';
+    const wellSiteQuery = (S.wellSiteQuery || '').trim().toLowerCase();
+    const wellSiteGroups = !wellSitesOpen ? [] : (() => {
+      const all = this.wellSitesTrail();
+      return wellSiteQuery
+        ? all.filter(g => g.well.toLowerCase().indexOf(wellSiteQuery) >= 0
+            || (g.field || '').toLowerCase().indexOf(wellSiteQuery) >= 0)
+        : all;
+    })();
+
     // Every ticket list reads top to bottom in the order the work needs attention:
     // still out in the field, then waiting on someone in the office, then finished.
     // Newest first inside each band.
@@ -13045,8 +13172,20 @@ class Component extends DCLogic {
       showAdminPage: S.roleTab === 'tickets' && !!S.adminTab
         && (S.role === 'admin' || S.adminTab === 'check' || S.adminTab === 'reports'
             || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))
-            || (S.adminTab === 'paperwork' && this.hasPermission('paperwork_email.manage'))),
-      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review',
+            || (S.adminTab === 'paperwork' && this.hasPermission('paperwork_email.manage'))
+            // Well Sites: the tile above only ever offers this to mgr/admin/founder, but
+            // the screen itself re-checks the same set here — the lesson this whole
+            // condition already exists to enforce ("a permission that unlocks a TILE has
+            // to unlock the SCREEN the tile leads to as the same edit, not two") applies
+            // just as much to a role check as to a capability one.
+            || (S.adminTab === 'wellsites' && (S.role === 'mgr' || S.role === 'founder'))),
+      // 2026-09-10, found while wiring Well Sites onto the Observer's own Account tab:
+      // this never excluded an open admin subpage, so Reports or Self-check (both already
+      // reachable by the founder role before this) rendered ON TOP of Observer View rather
+      // than replacing it — both screens' headings stacked on the same page. Every other
+      // role's equivalent "main tab" flag already excludes !!S.adminTab for exactly this
+      // reason (see showDeskNav's own comment); this one just never got the same guard.
+      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review' && !S.adminTab,
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
       deskTabs: S.role !== 'tech' && S.roleTab !== 'tickets',
@@ -13280,6 +13419,13 @@ class Component extends DCLogic {
           ? tile('Paperwork Email', 'Who gets the signed service ticket and job log', 'people', 'var(--accent-wash)', 'var(--accent)',
               () => { this.setState({ adminTab: 'paperwork', roleTab: 'tickets' }); this.loadPaperworkRecipients(); })
           : null;
+        // 2026-09-10, owner's request: "Create a trail of well locations that can be
+        // inspected by ops/admins/observers" — ops_manager, admin, and the Observer, not
+        // the technician: this is a lookup tool built from every technician's own arrival
+        // pings, not something a technician needs about their own ticket.
+        const wellSitesTile = tile('Well Sites', 'A history of where each well actually is',
+          'well', 'var(--hue-teal-wash)', 'var(--hue-teal)',
+          () => this.setState({ adminTab: 'wellsites', roleTab: 'tickets' }));
         if (S.role === 'admin') {
           const go = (t) => () => this.setState({ adminTab: t, roleTab: 'tickets' });
           return [
@@ -13288,6 +13434,7 @@ class Component extends DCLogic {
             tile('Users & Customers', (D.users || []).length + ' users · ' + D.clients.length + ' customers', 'people', 'var(--accent-wash)', 'var(--accent)', go('people')),
             tile('Closing Questions', assetQs.length + ' questions · ' + assetQs.reduce((n, q) => n + (q.presets || []).length, 0) + ' options', 'numbering', 'rgba(var(--warning-rgb),0.16)', 'var(--warning)', go('assets')),
             tile('Permissions', (D.permissions || []).length + ' capabilities · ' + overrideCount + (overrideCount === 1 ? ' exception' : ' exceptions'), 'people', 'rgba(var(--accent-rgb),0.16)', 'var(--accent)', go('perms')),
+            wellSitesTile,
             paperworkTile,
             // Reports, then the trailing utility trio every role ends on — System,
             // Self-check, Settings — kept together on purpose (owner's request, 2026-09-03).
@@ -13306,11 +13453,18 @@ class Component extends DCLogic {
               'priceList', 'rgba(var(--success-rgb),0.16)', 'var(--success)',
               () => this.setState({ adminTab: 'price', roleTab: 'tickets' })));
           }
+          mine.push(wellSitesTile);
           if (paperworkTile) mine.push(paperworkTile);
           mine.push(reports);
           mine.push(selfCheck);
           mine.push(settings);
           return mine;
+        }
+        // The Observer's own account tab, per the same request: everyone else falls
+        // through to this shared tail (paperworkTile is always null for a technician,
+        // since paperwork_email.manage is never granted to that role).
+        if (S.role === 'founder') {
+          return [wellSitesTile, paperworkTile, reports, selfCheck, settings].filter(Boolean);
         }
         return [paperworkTile, reports, selfCheck, settings].filter(Boolean);
       })(),
@@ -15033,6 +15187,7 @@ class Component extends DCLogic {
       adminToolTitle: { price: 'Price Lists', numbers: 'Numbering & Job Types',
         people: 'Users & Customers', system: 'System', assets: 'Closing Questions',
         perms: 'Permissions', check: 'Self-check', paperwork: 'Paperwork Email',
+        wellsites: 'Well Sites',
         reports: S.role === 'tech' ? 'My approved jobs' : 'Reports' }[S.adminTab] || 'Admin',
       adminToolHint: {
         price: 'Priced items per customer — changes apply to new ticket lines only.',
@@ -15043,6 +15198,7 @@ class Component extends DCLogic {
         perms: 'What each person may do. A role sets the default; a tick here overrides it for one person.',
         check: 'What only a browser can tell you: whether this build really reaches the project, and whether everything arrived.',
         paperwork: 'Who receives the signed service ticket and job log automatically once both arrive.',
+        wellsites: 'Where each well actually is — the arrival location recorded the moment a technician opened its first job ticket and began the job log, kept as a running history.',
         reports: S.role === 'tech' ? 'Printable sheets for jobs the office has approved.'
           : 'Bundles, ZIPs and the master workbook of every approved job.',
       }[S.adminTab] || '',
@@ -15105,6 +15261,37 @@ class Component extends DCLogic {
       adminPrice: S.adminTab === 'price', adminNumbers: S.adminTab === 'numbers',
       adminPeople: S.adminTab === 'people', adminSystem: S.adminTab === 'system',
       adminAssets: S.adminTab === 'assets', adminPerms: S.adminTab === 'perms',
+
+      // ── Well Sites ───────────────────────────────────────────────────────
+      adminWellSites: wellSitesOpen,
+      wellSiteQuery: S.wellSiteQuery || '',
+      setWellSiteQuery: e => this.setState({ wellSiteQuery: e.target.value }),
+      wellSiteEmpty: wellSitesOpen && wellSiteGroups.length === 0,
+      wellSiteEmptyText: wellSiteQuery
+        ? 'No well or field matches "' + (S.wellSiteQuery || '').trim() + '".'
+        : 'No well locations recorded yet — one appears here the first time a technician opens a job ticket for it with location sharing on.',
+      wellSiteRows: wellSiteGroups.map(g => {
+        const rowKey = g.well.toUpperCase() + '|' + g.field;
+        const expanded = S.wellSiteExpanded === rowKey;
+        const latest = g.sightings[0];
+        return {
+          key: rowKey,
+          well: g.well,
+          field: g.field || '—',
+          coords: latest.coords,
+          lastSeen: latest.arrival ? F.stamp(latest.arrival) : '—',
+          countLabel: g.sightings.length === 1 ? '1 job' : g.sightings.length + ' jobs',
+          expanded: expanded,
+          toggleLabel: expanded ? 'Hide history' : 'Show history',
+          toggle: () => this.setState({ wellSiteExpanded: expanded ? null : rowKey }),
+          history: g.sightings.map(s => ({
+            ticketNo: s.ticketNo || '(unnumbered)',
+            customer: s.customer, rig: s.rig || '—', tech: s.tech,
+            arrival: s.arrival ? F.stamp(s.arrival) : '—',
+            coords: s.coords,
+          })),
+        };
+      }),
 
       // ── Permissions ──────────────────────────────────────────────────────
       // One person at a time. A grid of every user against every capability would be
