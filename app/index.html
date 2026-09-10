@@ -12074,6 +12074,20 @@ class Component extends DCLogic {
         confirm: () => {
           const to = (S.handoverTo || '').trim();
           if (!to || !t) return;
+          // 2026-09-10, pre-purge audit: this dialog is opened from two different buttons
+          // (the technician's own canHandOver, the office's mgrCanHandOver) and its own
+          // confirm never re-checked either — a render a beat stale (the ticket settled,
+          // was closed, or moved out of 'logging' between the button showing and Confirm
+          // being pressed) queued a doomed upsert_ticket. Re-checked here with the same
+          // rule the button that opened it used, and refused with a toast instead.
+          const stillAllowed = S.role === 'tech'
+            ? (t.status === 'logging' && holderOf(t) === myName)
+            : (!readOnly && !this.settled(t) && t.status !== 'cancelled');
+          if (!stillAllowed) {
+            this.setState({ dialog: null, handoverTo: '' });
+            this.toast('handover-stale', 'This job has moved on since you opened this — nothing was handed over.', 'warn');
+            return;
+          }
           const from = holderOf(t);
           if (to === from) { this.setState({ dialog: null, handoverTo: '' }); return; }
           const toEmail = ((D.users || []).find(u => u.name === to) || {}).email || '';
@@ -12224,7 +12238,18 @@ class Component extends DCLogic {
       reopenTech: {
         title: 'Reopen for corrections?', body: 'The ticket goes back to logging. Arrival, Start Job and existing line stamps are kept exactly as recorded.',
         okLabel: 'Reopen', cancelLabel: 'Cancel', hasCancel: true,
-        confirm: () => { this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null }); },
+        confirm: () => {
+          // 2026-09-10, pre-purge audit: this can only be opened via askJobDone's own gate
+          // (settled/officeClosed/cancelled all refuse before the dialog ever shows), but
+          // the office can act on the ticket in the time the dialog sits open — re-checks
+          // the same condition at Confirm instead of trusting that render never went stale.
+          if (!t || this.settled(t) || t.officeClosed || t.status === 'cancelled') {
+            this.setState({ dialog: null });
+            this.toast('reopentech-stale', 'This job has moved on since you opened this — nothing was reopened.', 'warn');
+            return;
+          }
+          this.patchTicket({ status: 'logging' }); this.log('Reopened on device for corrections.', 'lifecycle'); this.setState({ dialog: null });
+        },
       },
       // ── Unwinding a ticket ────────────────────────────────────────────────
       //
@@ -12239,7 +12264,15 @@ class Component extends DCLogic {
         needsReason: true, reasonHint: 'Why was the job called off? — recorded in the audit trail',
         okBg: 'var(--danger)', okFg: 'var(--on-danger)',
         confirm: () => {
-          if (!t) { this.setState({ dialog: null }); return; }
+          // 2026-09-10, pre-purge audit: re-checks canCancel(t), the exact rule the button
+          // that opened this used — a stale render (the office closed it, it left
+          // 'logging', the permission was withdrawn) between opening this and pressing
+          // Confirm otherwise queued a header write the database would refuse.
+          if (!t || !this.canCancel(t)) {
+            this.setState({ dialog: null, reasonText: '' });
+            this.toast('cancel-stale', 'This job is no longer one that can be cancelled — nothing changed.', 'warn');
+            return;
+          }
           const why = (S.reasonText || '').trim();
           const me = (S.session || {}).name || '';
           this.patchTicket({
@@ -12258,7 +12291,13 @@ class Component extends DCLogic {
         needsReason: true, reasonHint: 'Why is this ticket being withdrawn? — recorded in the audit trail',
         okBg: 'var(--danger)', okFg: 'var(--on-danger)',
         confirm: () => {
-          if (!t) { this.setState({ dialog: null }); return; }
+          // 2026-09-10, pre-purge audit: re-checks canWithdraw(t) — see cancelJob's own
+          // comment just above for why.
+          if (!t || !this.canWithdraw(t)) {
+            this.setState({ dialog: null, reasonText: '' });
+            this.toast('withdraw-stale', 'This ticket is no longer one that can be withdrawn — nothing changed.', 'warn');
+            return;
+          }
           const why = (S.reasonText || '').trim();
           const me = (S.session || {}).name || '';
           // Logged before the withdrawal lands, so the line is written while the ticket is
@@ -12278,7 +12317,13 @@ class Component extends DCLogic {
         body: 'It returns to the lists at the status it held when it was withdrawn, and the restore is recorded like everything else.',
         okLabel: 'Restore it', cancelLabel: 'Leave it withdrawn', hasCancel: true,
         confirm: () => {
-          if (!t) { this.setState({ dialog: null }); return; }
+          // 2026-09-10, pre-purge audit: re-checks canRestore(t) — same reasoning as
+          // cancelJob/withdrawTicket just above.
+          if (!t || !this.canRestore(t)) {
+            this.setState({ dialog: null });
+            this.toast('restore-stale', 'This ticket is no longer one that can be restored — nothing changed.', 'warn');
+            return;
+          }
           const me = (S.session || {}).name || '';
           this.patchTicket({ deletedAt: '', deletedBy: '', deleteReason: '', synced: false });
           this.log('Ticket restored by ' + (me || 'the office') + '.', 'lifecycle');
@@ -12443,6 +12488,16 @@ class Component extends DCLogic {
         confirm: () => {
           const r = (S.reasonText || '').trim();
           if (!r) return;
+          // 2026-09-10, pre-purge audit: this button is offered on `cur.isApproved`
+          // (settled(t)) alone — no readOnly check anywhere in the chain, so a stale
+          // render left open on the Observer's own read-only copy of this screen, or a
+          // ticket the office had since moved further along, could reach here. Re-checked
+          // against the same facts the button itself is shown on.
+          if (!t || readOnly || !this.settled(t)) {
+            this.setState({ dialog: null, reasonText: '' });
+            this.toast('reopen-stale', 'This ticket can no longer be reopened from here — nothing changed.', 'warn');
+            return;
+          }
           this.patchTicket({ status: 'done' });
           // Was hardcoded to the seeded ops manager's name, so the trail credited him
           // for a reopen whoever actually did it.
@@ -13804,16 +13859,22 @@ class Component extends DCLogic {
       assetsEditable: !readOnly && !!t && t.status === 'logging',
       assetRows: !t ? [] : (t.assets || []).map((a, ai) => ({
         item: a.item || '', qty: a.qty === undefined ? '' : a.qty, note: a.note || '',
-        onItem: e => { const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].item = v; }); },
-        onQty: e => { const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].qty = v; }); },
-        onNote: e => { const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].note = v; }); },
+        // 2026-09-10, pre-purge audit: these handlers checked nothing of their own —
+        // held up only by the assetsEditable binding keeping the row's inputs off-screen.
+        // Re-evaluates that same condition inline (it's a bindings-object property, not a
+        // variable in scope here) so a stale render can no longer sneak a write past a
+        // closed/non-logging job.
+        onItem: e => { if (readOnly || !t || t.status !== 'logging') return; const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].item = v; }); },
+        onQty: e => { if (readOnly || !t || t.status !== 'logging') return; const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].qty = v; }); },
+        onNote: e => { if (readOnly || !t || t.status !== 'logging') return; const v = e.target.value; this.mutate(d => { d.tickets.find(x => x.id === t.id).assets[ai].note = v; }); },
         remove: () => {
+          if (readOnly || !t || t.status !== 'logging') { this.toast('asset-edit-stale', 'This job is closed — allocated tools can no longer be changed.', 'warn'); return; }
           this.log('Allocated asset removed: ' + (a.item || '(blank)') + '.', 'edit');
           this.mutate(d => { d.tickets.find(x => x.id === t.id).assets.splice(ai, 1); });
         },
       })),
       addAssetRow: () => {
-        if (!t) return;
+        if (readOnly || !t || t.status !== 'logging') { this.toast('asset-edit-stale', 'This job is closed — allocated tools can no longer be changed.', 'warn'); return; }
         this.mutate(d => {
           const x = d.tickets.find(y => y.id === t.id);
           (x.assets = x.assets || []).push({ item: '', qty: '', note: '' });
@@ -13843,7 +13904,10 @@ class Component extends DCLogic {
         ? ('Answered by ' + (t.assetCheck.by || 'the technician') + ' · ' + F.stamp(t.assetCheck.at))
         : '',
 
-      mgrCanHandOver: !readOnly && !!t && !this.settled(t),
+      // 2026-09-10, pre-purge audit: cancelled joins settled — a called-off job has
+      // nothing left to hand over, and enforce_ticket_update_rules() already refuses a
+      // technician's own reopen of one; reassigning it made no more sense.
+      mgrCanHandOver: !readOnly && !!t && !this.settled(t) && t.status !== 'cancelled',
       // Closing on the technician's behalf needs everything closing normally would
       // produce. It is not a way to tidy the inbox — the closed sheet is the document.
       mgrCanClose: !readOnly && !!t && t.status === 'logging' && this.hasPermission('ticket.close_any'),
@@ -14643,7 +14707,18 @@ class Component extends DCLogic {
             // out which two; the words are already written on the checklist.
             : 'Needs ' + approveBlockers.join(' and '))),
       approve: () => {
-        if (readOnly || !canApprove || !t || this.settled(t)) return;
+        // 2026-09-10, pre-purge audit: this already correctly refused — readOnly,
+        // !canApprove and settled(t) all already gate the button itself — but silently,
+        // with nothing shown if a stale render ever let the press through anyway.
+        if (readOnly || !canApprove || !t || this.settled(t)) {
+          if (t) {
+            this.toast('approve-stale', this.settled(t)
+              ? 'This ticket is already approved.'
+              : (readOnly ? 'Observer accounts are read-only — nothing was approved.'
+                : 'Needs ' + approveBlockers.join(' and ') + ' before it can be approved.'), 'warn');
+          }
+          return;
+        }
         const who = (S.session && S.session.name) || 'Ops Manager';
         const when = iso(new Date());
         const total = money(this.ticketTotal(t), this.ticketCurrency(t));
@@ -14866,7 +14941,15 @@ class Component extends DCLogic {
       permExceptionCount: permOverrideCount,
       permExceptionLabel: permOverrideCount === 1 ? '1 exception to their role' : permOverrideCount + ' exceptions to their role',
       permClearAll: () => {
+        // 2026-09-10, pre-purge audit: held up only by the sibling button's own
+        // `disabled="{{ permNoExceptions }}"` — nothing here checked
+        // user.manage_permissions itself the way every per-capability toggle already
+        // does (permCannotEdit, just below).
         if (!permTarget) return;
+        if (!this.hasPermission('user.manage_permissions')) {
+          this.toast('perm-clear-refused', 'Your account cannot change permissions.', 'warn');
+          return;
+        }
         this.setPermissionOverride(permTarget, null, null);
       },
       // Named for what it disables, because that is what the attribute means. Reading
