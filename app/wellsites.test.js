@@ -5,6 +5,12 @@
 // from each in-progress ticket to create this (well-sites trail)... allow a search box so
 // a search can be used to quickly find the desired well or field including all its related
 // wells and so on."
+//
+// 2026-09-11, widened: "Also allow technicians also to see the well sites history and if a
+// certain well doesn't have its arrival location captured mark it as 'Location Not
+// Captured' contact {input name of technician who holds the ticket} for information." —
+// every role now sees the tile, and a well nobody ever captured a fix for is shown rather
+// than silently dropped, naming who to ask.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
@@ -30,7 +36,10 @@ async function boot(b, email) {
 // Four tickets: two on the same well (BG-214 / bg-214, different case, different field
 // text, different arrival dates — the later one should win on both counts), one more well
 // sharing the winning field (BG-220, so a field search must surface it too), and one with
-// location sharing off entirely (must never appear anywhere).
+// location sharing off entirely — which must now appear as "Location Not Captured" rather
+// than being dropped. The seed's own ticket t1 also carries well BG-214 (no fix of its
+// own) — a real, pre-existing sighting the trail is expected to fold in as a third job on
+// that well, not a fixture to work around.
 const seedWells = (p) => p.evaluate(() => {
   window.__mkApp.mutate(d => {
     const base = JSON.parse(JSON.stringify(d.tickets.find(t => t.id === 't1')));
@@ -52,23 +61,22 @@ const seedWells = (p) => p.evaluate(() => {
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
 
-  // ── The tile: ops/admin/observer, not the technician ────────────────────────
-  for (const [email, role, expect] of [
-    ['omar@makaman.ly', 'ops_manager', true],
-    ['lateri@makaman.ly', 'admin', true],
-    ['founder@makaman.ly', 'observer', true],
-    ['yousef@makaman.ly', 'technician', false],
+  // ── The tile: every role, technician included ────────────────────────────────
+  for (const [email, role] of [
+    ['omar@makaman.ly', 'ops_manager'],
+    ['lateri@makaman.ly', 'admin'],
+    ['founder@makaman.ly', 'observer'],
+    ['yousef@makaman.ly', 'technician'],
   ]) {
     const { ctx, p } = await boot(b, email);
     await p.getByRole('button', { name: /^Account$/i }).last().click();
     await p.waitForTimeout(400);
     const has = await p.getByRole('button', { name: /Well Sites/i }).count();
-    check(role + ' ' + (expect ? 'sees' : 'does not see') + ' the Well Sites tile',
-      (has > 0) === expect, 'count=' + has);
+    check(role + ' sees the Well Sites tile', has === 1, 'count=' + has);
     await ctx.close();
   }
 
-  // ── Grouping, the search box, and the per-well history ──────────────────────
+  // ── Grouping, the search box, the per-well history, and Location Not Captured ──
   {
     const { ctx, p } = await boot(b, 'omar@makaman.ly');
     await seedWells(p);
@@ -79,15 +87,26 @@ const seedWells = (p) => p.evaluate(() => {
     await p.waitForTimeout(600);
 
     const bg214Row = () => p.locator('.mk-wellsite-row').filter({ hasText: /bg-214/i });
+    const ng1Row = () => p.locator('.mk-wellsite-row').filter({ hasText: /NG-1/ });
     let body = (await p.innerText('body')).toLowerCase();
-    check('a well with no location shared never appears', !body.includes('ng-1'));
+
+    check('a well with no location shared now appears rather than being dropped',
+      await ng1Row().count() === 1);
+    const ng1Text = await ng1Row().innerText();
+    check('it is marked Location Not Captured', /Location Not Captured/i.test(ng1Text), ng1Text);
+    check('and names who to contact — the holder of that ticket',
+      /Contact Yousef Al-Harbi for information\./i.test(ng1Text), ng1Text);
+
     check('two tickets on the same well (different case) collapse into one row',
       await bg214Row().count() === 1);
-    check('that row reports both jobs', await bg214Row().innerText().then(t => /2 jobs/i.test(t)));
+    check('that row counts every job on the well, including the seed\'s own ticket',
+      await bg214Row().innerText().then(t => /3 jobs/i.test(t)));
     check('the field shown is the MOST RECENT ticket\'s — the earlier one never surfaces',
       !body.includes('old sector name') && (await bg214Row().innerText()).toLowerCase().includes('burgan north'));
     check('the headline location is the most recent arrival, not the first',
       (await bg214Row().innerText()).includes('29.110000, 47.910000'));
+    check('a well that DOES have a captured fix carries no contact line',
+      !/contact .* for information/i.test(await bg214Row().innerText()));
 
     // Field search: every well that field holds survives.
     await p.locator('input[placeholder*="Burgan"]').fill('Burgan North');
@@ -117,8 +136,24 @@ const seedWells = (p) => p.evaluate(() => {
     await bg214Row().getByRole('button', { name: /Show history/i }).click();
     await p.waitForTimeout(400);
     const history = await bg214Row().innerText();
-    check('and once asked, both of that well\'s jobs are in it, oldest arrival visible too',
+    check('and once asked, every one of that well\'s jobs is in it, oldest arrival visible too',
       /9001/.test(history) && /9002/.test(history));
+    await ctx.close();
+  }
+
+  // ── The technician's own copy reaches the same trail ─────────────────────────
+  {
+    const { ctx, p } = await boot(b, 'yousef@makaman.ly');
+    await seedWells(p);
+    await p.waitForTimeout(300);
+    await p.getByRole('button', { name: /^Account$/i }).last().click();
+    await p.waitForTimeout(400);
+    await p.getByRole('button', { name: /Well Sites/i }).first().click();
+    await p.waitForTimeout(600);
+    const body = (await p.innerText('body')).toLowerCase();
+    check('a technician sees the same trail the office does', body.includes('bg-214') && body.includes('bg-220'));
+    check('the technician screen still replaces the tech shell — same "one door" discipline as every other role',
+      await p.evaluate(() => window.__mkApp.renderVals().showAdminPage) === true);
     await ctx.close();
   }
 
@@ -151,17 +186,6 @@ const seedWells = (p) => p.evaluate(() => {
     await p.waitForTimeout(400);
     check('going back reaches Observer View again, not a blank page',
       await p.evaluate(() => window.__mkApp.renderVals().showFounderPage));
-    await ctx.close();
-  }
-
-  // ── A technician cannot reach the screen even by forcing the state directly ──
-  {
-    const { ctx, p } = await boot(b, 'yousef@makaman.ly');
-    const reached = await p.evaluate(() => {
-      window.__mkApp.setState({ adminTab: 'wellsites', roleTab: 'tickets' });
-      return window.__mkApp.renderVals().showAdminPage;
-    });
-    check('forcing the state directly still refuses the technician the screen', !reached);
     await ctx.close();
   }
 

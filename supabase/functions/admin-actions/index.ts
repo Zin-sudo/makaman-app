@@ -262,8 +262,14 @@ Deno.serve(async (req) => {
     // audit foreign keys are NO ACTION and would refuse for anyone who has worked,
     // and ticket_crew is CASCADE and would erase who was on a job. The row stays;
     // only the ability to sign in changes.
+    //
+    // 2026-09-11, owner's request: "allow the ops to adopt the disable / reset password
+    // same as the admin." isStaff (ops_manager or admin), not isAdmin — matching
+    // migration 0076's widened user.disable default_roles. This is the check that
+    // actually decides it; the client's own hasPermission('user.disable') only decides
+    // whether the button is drawn (CLAUDE.md: "hiding a button is not a check").
     if (action === 'set_user_status') {
-      if (!isAdmin) return json({ error: 'Only Admin can disable or restore an account.' }, 403)
+      if (!isStaff) return json({ error: 'Only Ops Manager or Admin can disable or restore an account.' }, 403)
       const userId = body.userId as string
       const status = body.status as string
       if (!userId || !['active', 'disabled'].includes(status)) {
@@ -302,11 +308,13 @@ Deno.serve(async (req) => {
     //
     // For the case the reset mail cannot cover: a technician whose company address does
     // not reach him at a wellhead, or who cannot get into the mailbox at all. The office
-    // sets one and tells him. Admin only, and never for the master Admin account — that
-    // one is recovered by mail or not at all, because an account that can be given a new
-    // password by anybody holding this endpoint is an account with no owner.
+    // sets one and tells him. 2026-09-11, owner's request: Ops Manager or Admin now,
+    // matching set_user_status above and migration 0076's widened user.disable — but
+    // never for the master Admin account regardless of who is asking, because an
+    // account that can be given a new password by anybody holding this endpoint is an
+    // account with no owner; that one is recovered by mail or not at all.
     if (action === 'set_password') {
-      if (!isAdmin) return json({ error: 'Only Admin can set another account\'s password.' }, 403)
+      if (!isStaff) return json({ error: 'Only Ops Manager or Admin can set another account\'s password.' }, 403)
       const userId = body.userId as string
       const password = body.password as string
       if (!userId || typeof password !== 'string' || password.length < 8) {

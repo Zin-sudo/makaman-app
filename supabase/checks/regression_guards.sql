@@ -437,6 +437,44 @@ begin
   end;
 
   -------------------------------------------------------------------------------------
+  -- Guard 9 (2026-09-11, migration 0075): a Chrome "mobile device simulator" extension
+  -- mirrored one technician's actions into four genuinely independent copies of the app at
+  -- once, each running createTicket() in its own memory — four real ticket rows, same
+  -- technician/customer/field/well/rig, all status='logging', all created within 2.3
+  -- seconds of each other (ticket 1885's own live example, technician_id
+  -- 4b7958ce-a880-4d0c-a478-b1c585648b10). The client now guards this with its own
+  -- localStorage-based check (claimTicketCreate, app/index.html), but that cannot see a
+  -- request that never goes through this app's own UI. Only Postgres can prove the
+  -- database-level backstop is actually wired up: the offline demo Playwright suite has
+  -- no unique-technician/customer/field/well/rig trigger to violate, since the whole point
+  -- of this bug is that it happened in the ONE place that trigger cannot be exercised
+  -- from — the live database itself.
+  -------------------------------------------------------------------------------------
+  begin
+    insert into public.tickets (id, technician_id, customer, field_name, well_no, rig_name, status)
+      values ('cccccccc-0000-4000-8000-00000000c001', tech_id, 'GUARD9-CUST', 'GUARD9-FIELD', 'GUARD9-WELL', 'GUARD9-RIG', 'logging');
+    begin
+      insert into public.tickets (id, technician_id, customer, field_name, well_no, rig_name, status)
+        values ('cccccccc-0000-4000-8000-00000000c002', tech_id, 'GUARD9-CUST', 'GUARD9-FIELD', 'GUARD9-WELL', 'GUARD9-RIG', 'logging');
+      failures := failures || E'\n  [tickets duplicate-open guard] a second ticket with the identical technician/customer/field/well/rig, still status=logging, was accepted moments after the first — prevent_duplicate_ticket_open() (migration 0075) is missing or has regressed. This is the exact live shape of ticket 1885''s four-way duplicate.';
+    exception when unique_violation then
+      null; -- expected: the trigger refused it
+    end;
+
+    -- A genuinely different well by the same technician, moments later, must NOT be
+    -- blocked — the guard is scoped to identical content, not to "this technician opened
+    -- something recently."
+    begin
+      insert into public.tickets (id, technician_id, customer, field_name, well_no, rig_name, status)
+        values ('cccccccc-0000-4000-8000-00000000c003', tech_id, 'GUARD9-CUST', 'GUARD9-FIELD', 'GUARD9-WELL-OTHER', 'GUARD9-RIG', 'logging');
+    exception when others then
+      failures := failures || format(E'\n  [tickets duplicate-open guard] a genuinely different well for the same technician was refused too (%s) — the guard is over-scoped and would block a technician''s second, unrelated job.', sqlerrm);
+    end;
+  exception when others then
+    failures := failures || format(E'\n  [tickets duplicate-open guard] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
   if failures <> '' then
     raise exception E'REGRESSION GUARD FAILURES:%', failures;
   else

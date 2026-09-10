@@ -2230,25 +2230,35 @@
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
                         <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
-                      <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
-                        <div style="display:flex;gap:6px;align-items:center">
+                      <!-- 2026-09-11, owner's request: "allow the ops to adopt the disable
+                           / reset password same as the admin." These three used to sit
+                           entirely inside showPromote's own block (user.change_role,
+                           admin-only) — so widening user.disable's default_roles alone
+                           (migration 0076) would have granted Ops Manager the capability
+                           without ever surfacing a button, the exact "a permission that
+                           unlocks a capability has to unlock what USES it, not two separate
+                           edits" gap this project has already hit more than once. Each
+                           control now renders on its own condition; the role dropdown is
+                           the only one still gated on showPromote. -->
+                      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                        <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
                           <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
                             <option value="tech">Technician</option>
                             <option value="mgr">Ops Manager</option>
                             <option value="admin">Admin</option>
                             <option value="founder">Observer</option>
                           </select>
-                          <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
-                          </sc-if>
-                          <sc-if value="{{ u.canSetPassword }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.setPassword }}" title="Give this account a new password and tell them what it is" style="padding:5px 8px;font-size:11px;color:var(--ink-dim);background:none;border:1px solid rgba(var(--ink-rgb),0.3);cursor:pointer">Set password</button>
-                          </sc-if>
-                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.remove }}" title="Delete this account for good — only possible if they have never done any work" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.4);cursor:pointer">Delete</button>
-                          </sc-if>
-                        </div>
-                      </sc-if>
+                        </sc-if>
+                        <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
+                        </sc-if>
+                        <sc-if value="{{ u.canSetPassword }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ u.setPassword }}" title="Give this account a new password and tell them what it is" style="padding:5px 8px;font-size:11px;color:var(--ink-dim);background:none;border:1px solid rgba(var(--ink-rgb),0.3);cursor:pointer">Set password</button>
+                        </sc-if>
+                        <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ u.remove }}" title="Delete this account for good — only possible if they have never done any work" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.4);cursor:pointer">Delete</button>
+                        </sc-if>
+                      </div>
                     </td>
                   </tr>
                 </sc-for>
@@ -3091,25 +3101,35 @@
                       <sc-if value="{{ u.isPending }}" hint-placeholder-val="{{ false }}">
                         <button onClick="{{ u.approve }}" style="padding:5px 11px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:var(--accent);color:var(--on-accent);border:1px solid var(--accent)">Approve → Technician</button>
                       </sc-if>
-                      <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
-                        <div style="display:flex;gap:6px;align-items:center">
+                      <!-- 2026-09-11, owner's request: "allow the ops to adopt the disable
+                           / reset password same as the admin." These three used to sit
+                           entirely inside showPromote's own block (user.change_role,
+                           admin-only) — so widening user.disable's default_roles alone
+                           (migration 0076) would have granted Ops Manager the capability
+                           without ever surfacing a button, the exact "a permission that
+                           unlocks a capability has to unlock what USES it, not two separate
+                           edits" gap this project has already hit more than once. Each
+                           control now renders on its own condition; the role dropdown is
+                           the only one still gated on showPromote. -->
+                      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                        <sc-if value="{{ u.showPromote }}" hint-placeholder-val="{{ false }}">
                           <select value="{{ u.roleKeySafe }}" onChange="{{ u.promote }}" disabled="{{ u.promoteDisabled }}" style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.25);color:var(--ink)">
                             <option value="tech">Technician</option>
                             <option value="mgr">Ops Manager</option>
                             <option value="admin">Admin</option>
                             <option value="founder">Observer</option>
                           </select>
-                          <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
-                          </sc-if>
-                          <sc-if value="{{ u.canSetPassword }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.setPassword }}" title="Give this account a new password and tell them what it is" style="padding:5px 8px;font-size:11px;color:var(--ink-dim);background:none;border:1px solid rgba(var(--ink-rgb),0.3);cursor:pointer">Set password</button>
-                          </sc-if>
-                          <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
-                            <button onClick="{{ u.remove }}" title="Delete this account for good — only possible if they have never done any work" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.4);cursor:pointer">Delete</button>
-                          </sc-if>
-                        </div>
-                      </sc-if>
+                        </sc-if>
+                        <sc-if value="{{ u.canDisable }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ u.disable }}" title="Withdraw or restore access — the account is kept" style="padding:5px 8px;font-size:11px;color:{{ u.disableTone }};background:none;border:1px solid rgba({{ u.disableToneRgb }},0.35);cursor:pointer">{{ u.disableLabel }}</button>
+                        </sc-if>
+                        <sc-if value="{{ u.canSetPassword }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ u.setPassword }}" title="Give this account a new password and tell them what it is" style="padding:5px 8px;font-size:11px;color:var(--ink-dim);background:none;border:1px solid rgba(var(--ink-rgb),0.3);cursor:pointer">Set password</button>
+                        </sc-if>
+                        <sc-if value="{{ u.canDelete }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ u.remove }}" title="Delete this account for good — only possible if they have never done any work" style="padding:5px 8px;font-size:11px;color:var(--danger);background:none;border:1px solid rgba(var(--danger-rgb),0.4);cursor:pointer">Delete</button>
+                        </sc-if>
+                      </div>
                     </td>
                   </tr>
                 </sc-for>
@@ -3304,7 +3324,10 @@
                 </div>
                 <div style="min-width:170px">
                   <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Arrival location</div>
-                  <div style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink-dim)">{{ w.coords }}</div>
+                  <div style="font-size:13px;font-variant-numeric:tabular-nums;color:{{ w.coordsColor }}">{{ w.coords }}</div>
+                  <sc-if value="{{ w.needsContact }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size:11px;color:var(--warning-ink);margin-top:2px">{{ w.contactLine }}</div>
+                  </sc-if>
                 </div>
                 <div style="min-width:120px">
                   <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-faint)">Last seen</div>
@@ -3331,7 +3354,7 @@
                           <td data-label="Ticket No." class="mk-td-pad6">{{ h.ticketNo }}</td>
                           <td data-label="Customer" class="mk-td-pad6">{{ h.customer }}</td>
                           <td data-label="Rig" class="mk-td-pad6">{{ h.rig }}</td>
-                          <td data-label="Technician" class="mk-td-pad6">{{ h.tech }}</td>
+                          <td data-label="Technician" class="mk-td-pad6">{{ h.holder }}</td>
                           <td data-label="Arrival" class="mk-td-pad6">{{ h.arrival }}</td>
                           <td data-label="Coordinates" class="mk-td-pad6" style="font-variant-numeric:tabular-nums">{{ h.coords }}</td>
                         </tr>
@@ -4279,9 +4302,16 @@ const PERMISSION_DEFAULTS = (function () {
         'pricelist.view', 'pricelist.edit', 'pricelist.delete',
         // Seeing every ticket's activity and seeing the edit trail are different
         // capabilities: the Observer holds the first and not the second.
-        'activity.view_edits', 'user.act_as_technician']],
+        'activity.view_edits', 'user.act_as_technician',
+        // 2026-09-11, owner's request: "allow the ops to adopt the disable / reset
+        // password same as the admin." Registered here and in migration 0076 — same
+        // belt-and-braces reasoning as ticket.cancel_own and location.edit above.
+        // canDelete (app/index.html's Team-screen row builder) reads a direct
+        // S.role === 'admin' check instead of this key, so widening it here does not
+        // also hand ops_manager the ability to delete an account.
+        'user.disable']],
     [['admin'],
-      ['numbering.override', 'numbering.manage_series', 'user.change_role', 'user.disable',
+      ['numbering.override', 'numbering.manage_series', 'user.change_role',
         'user.manage_permissions', 'jobtype.manage', 'paperwork_email.manage']],
   ];
   const out = {};
@@ -4494,6 +4524,75 @@ function syncDiscardedAdd(id) {
       localStorage.setItem(syncDiscardKey(), JSON.stringify(list.slice(-500)));
     }
   } catch (e) { /* quota — the loop this exists to stop is worse than losing this record */ }
+}
+
+// ── Guarding against the same job being created twice at once ──────────────────
+//
+// 2026-09-11, owner's report: a Chrome "mobile device simulator" extension mirrored one
+// technician's actions into several genuinely independent copies of this app at once — same
+// origin, same signed-in account, so all of them shared this device's localStorage, but
+// each ran createTicket() in its own memory with its own generated id and its own
+// millisecond-precise clock read. Every copy reached the server: four real ticket rows,
+// same customer, field, well and rig, one carrying the whole job log four times over, one
+// approved and three stranded in-progress. Traced live (ticket 1885): four creates 2.3
+// seconds apart, then every log line after the first landing on the surviving one FOUR
+// times each, seconds apart. "It should not be allowed to submit the same actions... from
+// multiple previews... this is a breach door."
+//
+// The fix cannot lean on in-memory state — the whole bug is that memory was NOT shared
+// between the copies — so it uses the one thing that genuinely is: this account's own
+// localStorage, the same account-scoped-key pattern the outbox and error log already use
+// (see acctKey). Before a ticket is created, its content is checked against a short list of
+// what this account has JUST created, written here BEFORE the ticket itself so a sibling
+// copy reading it moments later — even one that shares no byte of in-memory state — sees
+// it. Content only, never the clock: two genuinely different jobs at the same well hours
+// apart must still both go through; what this refuses is two "creates" of the exact same
+// job within the window below. Read-modify-write here is not atomic against a truly
+// simultaneous second caller — no primitive in localStorage offers that — but the real
+// failure this guards against unfolded over whole seconds between each copy, not the same
+// millisecond, so the ordinary turn-taking of separate JS event loops is enough in
+// practice; the database's own tickets_ticket_number_key is still the backstop for an
+// exact tie this cannot catch.
+const DUP_TICKET_CREATE_K = 'makaman.recentTicketCreate.v1';
+const DUP_TICKET_CREATE_MS = (typeof window !== 'undefined' && window.__DUP_TICKET_CREATE_TEST_MS) || 3 * 60 * 1000;
+function recentTicketCreateKey() { return acctKey(DUP_TICKET_CREATE_K); }
+function ticketCreateFingerprint(dr) {
+  return [dr.tech, dr.customer, dr.field, dr.well, dr.rig]
+    .map(s => String(s || '').trim().toLowerCase()).join('|');
+}
+// True and claims the fingerprint when this is genuinely new; false — refuse the create —
+// when a matching one was claimed inside the window.
+function claimTicketCreate(dr) {
+  const key = recentTicketCreateKey();
+  const fp = ticketCreateFingerprint(dr);
+  const now = Date.now();
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { list = []; }
+  list = (Array.isArray(list) ? list : []).filter(x => x && (now - x.at) < DUP_TICKET_CREATE_MS);
+  const dup = list.some(x => x.fp === fp);
+  if (!dup) {
+    list.push({ fp: fp, at: now });
+    try { localStorage.setItem(key, JSON.stringify(list.slice(-50))); } catch (e) { /* best effort */ }
+  }
+  return !dup;
+}
+// The same mirrored-input extension duplicated every log line written after the ticket
+// itself — the same text landing on the same ticket several times in the space of a
+// keystroke's worth of real time. Guarding creation alone would have stopped the four
+// separate tickets but not this: a single technician action still has to reduce to a
+// single log line even when whatever fired the click did it more than once. Checked
+// in-memory (against this ticket's own last line, already loaded) rather than through
+// localStorage: unlike the four-copy race above, this is squarely the common one-tab
+// double-submit case too (a slow network making a real double-tap look like nothing
+// happened), and the ticket's own event list is exactly what both cases need compared
+// against.
+const DUP_LOG_LINE_MS = (typeof window !== 'undefined' && window.__DUP_LOG_LINE_TEST_MS) || 5000;
+function isDuplicateLogLine(ticket, text) {
+  const events = (ticket && ticket.events) || [];
+  const last = events[events.length - 1];
+  if (!last || last.text !== text) return false;
+  const age = Date.now() - new Date(last.ts).getTime();
+  return !isNaN(age) && age >= 0 && age < DUP_LOG_LINE_MS;
 }
 
 // ── The error log ────────────────────────────────────────────────────────────
@@ -5846,7 +5945,19 @@ function outboxDrain() {
         // first — trading one bug for another. A structurally-impossible refusal earns its
         // own terminal check by name (see LOCKED and MK_STALE above); a bare "RLS" one does
         // not get to assume it is one just because a single occurrence once was.
-        const terminal = (err && err.mkTerminal) || errorKind(err) === 'LINK';
+        //
+        // A unique-constraint violation ('DUP') belongs in this same bucket as a foreign
+        // key, for the identical reason: the payload conflicts with a row that already
+        // exists, unchanged, and retrying the SAME payload cannot make that row go away.
+        // 2026-09-11, owner's report: a mobile-device-simulator extension duplicated one
+        // ticket into four (see claimTicketCreate's own comment) and the office's error
+        // log recorded the resulting tickets_ticket_number_key conflict SEVENTEEN times
+        // over three minutes — the exact "one problem written down as sixteen" shape LINK
+        // was already fixed for, just for a different constraint. Every unique constraint
+        // in this schema (ticket numbers, client names, job-type names, price-list item
+        // numbers, asset-question keys) names something a human has to change, not
+        // something that resolves itself by waiting.
+        const terminal = (err && err.mkTerminal) || errorKind(err) === 'LINK' || errorKind(err) === 'DUP';
         if (!terminal && q[n].tries < OUTBOX_TRIES) {
           // Still queued, so it will be tried again — and anything about the same job has
           // to wait behind it, or a log line could be written before the job it belongs to.
@@ -9383,6 +9494,9 @@ class Component extends DCLogic {
   // 2026-09-10, owner's request: "Create a trail of well locations... a history of all
   // well[s], saved by Well No. first, Field second, [and the] Arrival location of that well
   // when the technician clicked Open Ticket and began filling that specific job log."
+  // 2026-09-11, widened: "allow technicians also to see the well sites history, and if a
+  // certain well doesn't have its arrival location captured mark it as 'Location Not
+  // Captured' contact {name of technician who holds the ticket} for information."
   //
   // The source is t.geo.open — the SAME opening fix geoPinOpen writes once per ticket and
   // never overwrites (see its own comment: "written once and never overwritten — it is the
@@ -9397,14 +9511,21 @@ class Component extends DCLogic {
   // name read off the MOST RECENT ticket to touch it: a well's field is occasionally
   // corrected on a later job, and the trail should carry the correction forward rather
   // than freezing on whatever the very first ticket happened to say.
+  //
+  // A well no longer needs a captured fix to appear at all — it used to be silently
+  // dropped, which hid exactly the jobs most worth surfacing: one still being logged right
+  // now, whose location nobody can look up because sharing was off or the GPS prompt was
+  // never answered. The headline location prefers the MOST RECENT sighting that actually
+  // has one (an older technician's real fix still stands even if today's visit has none),
+  // and falls back to "Location Not Captured" — with who to ask — only when NOT ONE
+  // sighting of this well ever captured a fix.
   wellSitesTrail() {
     const D = this.state.data || {};
     const groups = {};
     (D.tickets || []).forEach(t => {
       const well = (t.well || '').trim();
-      const fix = (t.geo || {}).open;
-      const coords = geoText(fix);
-      if (!well || !coords) return;
+      if (!well) return;
+      const coords = geoText((t.geo || {}).open);
       const key = well.toUpperCase();
       if (!groups[key]) groups[key] = { well: well, field: '', fieldAt: '', sightings: [] };
       const g = groups[key];
@@ -9413,13 +9534,20 @@ class Component extends DCLogic {
       }
       g.sightings.push({
         ticketNo: t.ticketNo || '', customer: t.customer || '—', rig: t.rig || '',
-        tech: holderOf(t) || t.tech || '—', arrival: t.arrival || '', coords: coords,
+        holder: holderOf(t) || t.tech || '—', arrival: t.arrival || '', coords: coords,
       });
     });
     return Object.keys(groups).map(k => {
       const g = groups[k];
       g.sightings.sort((a, b) => (b.arrival || '').localeCompare(a.arrival || ''));
-      return { well: g.well, field: g.field, sightings: g.sightings };
+      const captured = g.sightings.find(s => s.coords);
+      return {
+        well: g.well, field: g.field, sightings: g.sightings,
+        // The headline: whichever sighting actually has a fix, most recent first — never
+        // the raw latest sighting, which might simply be a visit with sharing off.
+        headline: captured || g.sightings[0],
+        hasLocation: !!captured,
+      };
     }).sort((a, b) => (a.field || '').localeCompare(b.field || '') || a.well.localeCompare(b.well));
   }
   // Going the other way is never gated on a capability. Acting as a technician drops
@@ -13173,12 +13301,15 @@ class Component extends DCLogic {
         && (S.role === 'admin' || S.adminTab === 'check' || S.adminTab === 'reports'
             || (S.adminTab === 'price' && this.hasPermission('pricelist.view'))
             || (S.adminTab === 'paperwork' && this.hasPermission('paperwork_email.manage'))
-            // Well Sites: the tile above only ever offers this to mgr/admin/founder, but
-            // the screen itself re-checks the same set here — the lesson this whole
-            // condition already exists to enforce ("a permission that unlocks a TILE has
-            // to unlock the SCREEN the tile leads to as the same edit, not two") applies
-            // just as much to a role check as to a capability one.
-            || (S.adminTab === 'wellsites' && (S.role === 'mgr' || S.role === 'founder'))),
+            // Well Sites: the tile above offers this to every role — mgr/admin/founder
+            // from the start (2026-09-10), technician added 2026-09-11 ("allow
+            // technicians also to see the well sites history") — but the screen itself
+            // re-checks the same set here — the lesson this whole condition already
+            // exists to enforce ("a permission that unlocks a TILE has to unlock the
+            // SCREEN the tile leads to as the same edit, not two") applies just as much
+            // to a role check as to a capability one. admin is already covered by the
+            // first clause above.
+            || (S.adminTab === 'wellsites' && (S.role === 'mgr' || S.role === 'founder' || S.role === 'tech'))),
       // 2026-09-10, found while wiring Well Sites onto the Observer's own Account tab:
       // this never excluded an open admin subpage, so Reports or Self-check (both already
       // reachable by the founder role before this) rendered ON TOP of Observer View rather
@@ -13460,13 +13591,14 @@ class Component extends DCLogic {
           mine.push(settings);
           return mine;
         }
-        // The Observer's own account tab, per the same request: everyone else falls
-        // through to this shared tail (paperworkTile is always null for a technician,
-        // since paperwork_email.manage is never granted to that role).
+        // The Observer's own account tab, per the same request.
         if (S.role === 'founder') {
           return [wellSitesTile, paperworkTile, reports, selfCheck, settings].filter(Boolean);
         }
-        return [paperworkTile, reports, selfCheck, settings].filter(Boolean);
+        // 2026-09-11, owner's request: "allow technicians also to see the well sites
+        // history" — paperworkTile is always null here regardless, since
+        // paperwork_email.manage is never granted to the technician role.
+        return [wellSitesTile, paperworkTile, reports, selfCheck, settings].filter(Boolean);
       })(),
       // The signed-in user's own record, for the technician's Account tab. Identity
       // rather than statistics: their numbers belong on Tickets, where the tickets are.
@@ -13968,6 +14100,17 @@ class Component extends DCLogic {
       createOpacity: (S.draft && S.draft.tech && S.draft.customer && S.draft.field && S.draft.well && S.draft.rig) ? 1 : 0.45,
       createTicket: () => {
         const dr = S.draft; if (!dr) return;
+        // 2026-09-11, owner's report: see claimTicketCreate's own comment — the guard
+        // against the same job being opened twice at once by two genuinely independent
+        // copies of this app (a mobile-device-simulator extension mirroring one
+        // technician's actions into several of them). Refused here, before anything about
+        // the ticket exists, rather than after.
+        if (!claimTicketCreate(dr)) {
+          this.toast('dupticket', 'A ticket for ' + dr.customer + ' at ' + dr.well
+            + ' was just started moments ago — not creating a second one. Check My Job Tickets; it should already be there.', 'warn');
+          this.setState({ techScreen: 'list', draft: null });
+          return;
+        }
         // A real uuid, because tickets.id is a uuid column.
         //
         // This was 'k' + Date.now(). The demo store did not care, so every test passed
@@ -14140,6 +14283,14 @@ class Component extends DCLogic {
           this.toast('log', (this.settled(t) || t.officeClosed || t.status === 'cancelled')
             ? 'This ticket is closed. Log lines can no longer be added here.'
             : holderOf(t) + ' holds this job. Only they can add to the log.', 'warn');
+          return;
+        }
+        // 2026-09-11, owner's report: see isDuplicateLogLine's own comment — the same
+        // mirrored-input extension that opened four tickets at once also submitted every
+        // log line after the first four times over, into the same ticket, seconds apart.
+        if (isDuplicateLogLine(t, text)) {
+          this.toast('logdup', 'That line is already the last one logged on this job — not added again.', 'warn');
+          this.setState({ newEventText: '' });
           return;
         }
         const now = iso(new Date());
@@ -15269,26 +15420,37 @@ class Component extends DCLogic {
       wellSiteEmpty: wellSitesOpen && wellSiteGroups.length === 0,
       wellSiteEmptyText: wellSiteQuery
         ? 'No well or field matches "' + (S.wellSiteQuery || '').trim() + '".'
-        : 'No well locations recorded yet — one appears here the first time a technician opens a job ticket for it with location sharing on.',
+        : 'No wells recorded yet — one appears here the first time a technician opens a job ticket for it.',
       wellSiteRows: wellSiteGroups.map(g => {
         const rowKey = g.well.toUpperCase() + '|' + g.field;
         const expanded = S.wellSiteExpanded === rowKey;
-        const latest = g.sightings[0];
+        const headline = g.headline;
         return {
           key: rowKey,
           well: g.well,
           field: g.field || '—',
-          coords: latest.coords,
-          lastSeen: latest.arrival ? F.stamp(latest.arrival) : '—',
+          coords: g.hasLocation ? headline.coords : 'Location Not Captured',
+          coordsColor: g.hasLocation ? 'var(--ink-dim)' : 'var(--warning-ink)',
+          hasLocation: g.hasLocation,
+          // 2026-09-11, owner's request: "if a certain well doesn't have its arrival
+          // location captured mark it as 'Location Not Captured' contact {name of
+          // technician who holds the ticket} for information." Named from the same
+          // headline sighting the coords line already reads, so the two never disagree
+          // about which visit is being talked about. A precomputed boolean, not the
+          // string itself, gates the markup — sc-if on a non-empty string is not a
+          // pattern used anywhere else in this file.
+          needsContact: !g.hasLocation,
+          contactLine: g.hasLocation ? '' : 'Contact ' + headline.holder + ' for information.',
+          lastSeen: headline.arrival ? F.stamp(headline.arrival) : '—',
           countLabel: g.sightings.length === 1 ? '1 job' : g.sightings.length + ' jobs',
           expanded: expanded,
           toggleLabel: expanded ? 'Hide history' : 'Show history',
           toggle: () => this.setState({ wellSiteExpanded: expanded ? null : rowKey }),
           history: g.sightings.map(s => ({
             ticketNo: s.ticketNo || '(unnumbered)',
-            customer: s.customer, rig: s.rig || '—', tech: s.tech,
+            customer: s.customer, rig: s.rig || '—', holder: s.holder,
             arrival: s.arrival ? F.stamp(s.arrival) : '—',
-            coords: s.coords,
+            coords: s.coords || 'Location Not Captured',
           })),
         };
       }),
@@ -15546,12 +15708,16 @@ class Component extends DCLogic {
             // it. Reading the real one back is what puts the two of them back in step.
             .catch(err => this.refresh().then(() => this.toast('promote:' + u.email, err.message, 'warn')));
         },
-        // Admin can delete anyone — including other admins — except the one seeded
-        // "master" admin account (lateri@makaman.ly), which is permanently undeletable
-        // by design, not merely by convention.
+        // 2026-09-11, owner's request: Ops Manager now carries user.disable too
+        // (migration 0076), so this reads true for both office roles — "same as the
+        // admin," as asked, for disable/restore and reset password specifically.
         // The master Admin is never disableable, and nobody may lock themselves out.
         // Both are re-checked inside admin-actions — hiding a button is not a check.
+        // Excludes a pending signup (nothing to disable yet — Approve/reject is the
+        // control for that row) the same way showPromote always implicitly did before
+        // this control moved out from under it.
         canDisable: this.hasPermission('user.disable')
+          && u.status !== 'pending'
           && u.email !== MASTER_ADMIN_EMAIL
           && u.email !== ((S.session || {}).email || ''),
         isDisabled: u.status === 'disabled',
@@ -15566,7 +15732,19 @@ class Component extends DCLogic {
         // a test login. The function refuses anybody who has worked and says what they
         // hold instead, because the record of who did the job is the one thing this app
         // exists to keep. Same two exemptions as Disable, re-checked server-side.
-        canDelete: this.hasPermission('user.disable')
+        //
+        // 2026-09-11, owner's request: "allow the ops to adopt the disable / reset
+        // password same as the admin" — disable and reset password only, not delete.
+        // Delete used to read the same user.disable capability disable/reset password
+        // do, which would have silently widened to ops_manager too the moment
+        // migration 0076 granted them that capability for the other two. A direct role
+        // check here (unchanged from what user.disable resolved to before this
+        // request) keeps delete exactly as admin-only as it always was, independent of
+        // whatever the other two capabilities grant going forward. admin-actions'
+        // delete_user still re-checks isAdmin itself regardless — hiding a button is
+        // not a check.
+        canDelete: S.role === 'admin'
+          && u.status !== 'pending'
           && u.email !== MASTER_ADMIN_EMAIL
           && u.email !== ((S.session || {}).email || ''),
         remove: () => this.setState({
@@ -15575,7 +15753,7 @@ class Component extends DCLogic {
         // Setting somebody's password, for when the reset mail cannot reach them — a
         // technician whose company address does not arrive at a wellhead, or who cannot
         // get into the mailbox at all.
-        canSetPassword: this.hasPermission('user.disable') && u.email !== MASTER_ADMIN_EMAIL,
+        canSetPassword: this.hasPermission('user.disable') && u.status !== 'pending' && u.email !== MASTER_ADMIN_EMAIL,
         setPassword: () => this.setState({
           dialog: 'setUserPassword', targetUserId: u.id, targetUserEmail: u.email,
           targetUserName: u.name, pwNew: '', pwConfirm: '', pwError: '',
