@@ -68,7 +68,11 @@ def scan(zip_name):
     """Returns (sheets, with_coords, collisions) for one per-ticket zip."""
     z = zipfile.ZipFile(TMP + '/' + zip_name)
     sheets = withc = coll = 0
+    # 2026-09-10: the zip now also carries the editable workbook (a third, non-PDF file)
+    # alongside the originals and copies — only the two PDFs are geometry-checkable here.
     for n in z.namelist():
+        if not n.endswith('.pdf'):
+            continue
         d = pymupdf.open(stream=z.read(n), filetype='pdf')
         for pi, pg in enumerate(d):
             ws = pg.get_text('words')
@@ -91,8 +95,9 @@ def scan(zip_name):
 
 
 names = zipfile.ZipFile(TMP + '/ticket.zip').namelist()
-check('the zip holds an originals PDF and a copies PDF',
-      len(names) == 2 and any('ORIGINAL' in n for n in names) and any('COPY' in n for n in names),
+check('the zip holds an originals PDF, a copies PDF, and the editable workbook',
+      len(names) == 3 and any('ORIGINAL' in n for n in names) and any('COPY' in n for n in names)
+      and any(n.endswith('.xlsx') for n in names),
       ', '.join(names))
 
 sheets, withc, coll = scan('ticket.zip')

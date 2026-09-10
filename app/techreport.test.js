@@ -91,8 +91,9 @@ async function signIn(ctx, email, fresh) {
     const zip = await window.JSZip.loadAsync(bin);
     return Object.keys(zip.files);
   }, fs.readFileSync(f).toString('base64'));
-  check('with originals and copies, ready to sign', names.length === 2
-    && names.some(n => /ORIGINAL/.test(n)) && names.some(n => /COPY/.test(n)), names.join(' , '));
+  check('with originals, copies, and the editable workbook, ready to sign', names.length === 3
+    && names.some(n => /ORIGINAL/.test(n)) && names.some(n => /COPY/.test(n))
+    && names.some(n => /\.xlsx$/.test(n)), names.join(' , '));
 
   // offline refusal, so nobody prints a version the office has since amended
   await ctx.setOffline(true);

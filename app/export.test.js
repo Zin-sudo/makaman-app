@@ -1,5 +1,10 @@
 // Real files or nothing. These assertions open the downloaded bytes: a ZIP must contain
 // two PDFs, and a PDF must start with %PDF and carry the ticket's own data.
+//
+// 2026-09-10, owner's request, PS: "One pdf... originals. One pdf... copies. One excel
+// file: with four sheets inside for the same 4 pages for editing if necessary." — the zip
+// now carries a third file, the same editable workbook fillWorkbook() already builds
+// standalone, generated fresh in-browser alongside the two PDFs and never stored anywhere.
 const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
@@ -103,12 +108,33 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
     }
     return { names, heads };
   }, fs.readFileSync(zipPath).toString('base64'));
-  check('it holds exactly two files', inspect.names.length === 2, inspect.names.join(' , '));
-  check('one originals, one copies',
-    inspect.names.some(n => /ORIGINAL\.pdf$/.test(n)) && inspect.names.some(n => /COPY\.pdf$/.test(n)),
+  check('it holds exactly three files', inspect.names.length === 3, inspect.names.join(' , '));
+  check('originals, copies, and one editable workbook',
+    inspect.names.some(n => /ORIGINAL\.pdf$/.test(n)) && inspect.names.some(n => /COPY\.pdf$/.test(n))
+      && inspect.names.some(n => /\.xlsx$/.test(n)),
     inspect.names.join(' , '));
-  check('both are real PDFs', Object.values(inspect.heads).every(h => h === '%PDF-'),
+  const pdfNames = inspect.names.filter(n => /\.pdf$/.test(n));
+  const xlsxName = inspect.names.find(n => /\.xlsx$/.test(n));
+  check('both PDFs are real PDFs', pdfNames.every(n => inspect.heads[n] === '%PDF-'),
     JSON.stringify(inspect.heads));
+  check('the workbook is a real xlsx (a zip of its own, PK header)',
+    !!xlsxName && inspect.heads[xlsxName].slice(0, 2) === 'PK', JSON.stringify(inspect.heads));
+
+  // the workbook itself carries the same four sheets fillWorkbook() has always built —
+  // the PS's third bullet ("four sheets inside for the same 4 pages for editing").
+  const sheetNames = await p.evaluate(async (b64) => {
+    const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const outer = await window.JSZip.loadAsync(bin);
+    const xn = Object.keys(outer.files).find(n => /\.xlsx$/.test(n));
+    const wbBuf = await outer.files[xn].async('uint8array');
+    const inner = await window.JSZip.loadAsync(wbBuf);
+    const wbXml = await inner.file('xl/workbook.xml').async('string');
+    return Array.from(wbXml.matchAll(/<sheet[^>]*name="([^"]*)"/g)).map(m => m[1]);
+  }, fs.readFileSync(zipPath).toString('base64'));
+  check('the bundled workbook has all four sheets',
+    JSON.stringify(sheetNames) === JSON.stringify(
+      ['Service Ticket (Original)', 'Service Ticket (Copy)', 'Job Log (Original)', 'Job Log (Copy)']),
+    sheetNames.join(' , '));
 
   // ── the overview bundle ──────────────────────────────────────────────────
   const dl2 = p.waitForEvent('download', { timeout: 30000 });

@@ -1441,6 +1441,17 @@
                         <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-faint)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
                       </sc-if>
                       <span class="mk-hint-end">{{ t.syncLabel }}</span>
+                      <!-- 2026-09-10, owner's request, with a screenshot marking this exact
+                           spot: once this technician's own ticket is approved and waiting on
+                           the signed paperwork, the same zip the report tab builds is one tap
+                           away right here — no need to open the ticket first. Gone again the
+                           moment both signed documents are back and the ticket reaches
+                           sent_finance (t.showZip, computed alongside statusChip's own
+                           Collect Signature/Stamp condition). stopPropagation so the tap
+                           downloads the zip instead of also opening the ticket underneath. -->
+                      <sc-if value="{{ t.showZip }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ t.zip }}" title="Download originals, copies, and the editable workbook" style="padding:3px 9px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                      </sc-if>
                     </div>
                     <div style="display:flex;align-items:center;gap:11px">
                       <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
@@ -11410,16 +11421,26 @@ class Component extends DCLogic {
         svcPages: itemPages.length, logPages: eventPages.length }));
   }
 
-  // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF and
-  // the two COPY sheets in another, zipped together. Two files rather than four because
-  // that is how they are signed — an original set and a copy set.
+  // One ticket, as the office would hand it over: the two ORIGINAL sheets in one PDF, the
+  // two COPY sheets in another, and the same four pages as an editable workbook — zipped
+  // together, generated fresh every time this is called and never written anywhere. 2026-
+  // 09-10, owner's request: "One pdf... original service ticket... original Job Log. One
+  // pdf... copy service ticket... copy Job Log. One excel file: with four sheets inside for
+  // the same 4 pages for editing if necessary... generative not storage oriented... the
+  // files aren't really always sitting on the app as extra weight." All three are built
+  // in-browser (jsPDF, the xlsx-template patch in fillWorkbook, then JSZip) from data
+  // already on the device — nothing here reads from or writes to Supabase storage, and the
+  // zip exists only in memory until saveBlob hands it to the browser's own download.
   exportTicketZip(ticket) {
-    return this.loadExporters().then(() => {
-      const SH = this.buildSheets(ticket);
+    return this.loadExporters().then(() => Promise.all([
+      Promise.resolve(this.buildSheets(ticket)),
+      this.fillWorkbook(ticket),
+    ])).then(([SH, wb]) => {
       const no = (ticket.ticketNo || 'unnumbered').replace(/[^\w.-]+/g, '-');
       const zip = new window.JSZip();
       zip.file(no + '-ORIGINAL.pdf', this.pdfFromPages(SH.svcOriginal.concat(SH.logOriginal)).output('blob'));
       zip.file(no + '-COPY.pdf', this.pdfFromPages(SH.svcCopy.concat(SH.logCopy)).output('blob'));
+      zip.file(no + '.xlsx', wb.blob);
       return zip.generateAsync({ type: 'blob' }).then(blob => {
         this.saveBlob(blob, 'Makaman-' + no + '.zip');
         // 2026-09-10, owner's report: this used to advance the ticket to sent_client — a
@@ -11432,7 +11453,7 @@ class Component extends DCLogic {
         // client's copy left the building — it just no longer moves the ticket's status.
         // Only both signed documents coming back does that (see attachFile).
         const who = (this.state.session && this.state.session.name) || 'Someone';
-        this.logOn(ticket.id, who + ' downloaded the final sheets to send to the client.', 'lifecycle');
+        this.logOn(ticket.id, who + ' downloaded the final sheets (originals, copies, and the editable workbook) to send to the client.', 'lifecycle');
         return no;
       });
     });
@@ -13765,6 +13786,19 @@ class Component extends DCLogic {
       myMoreLabel: myPage.moreLabel,
       myTickets: myPage.rows.map(x => Object.assign(this.ticketView(x), {
         open: () => this.setState({ activeId: x.id, techScreen: 'log' }),
+        // 2026-09-10, owner's request, with a screenshot: once the holding technician's own
+        // ticket is approved and waiting on the signed paperwork, offer the same zip the
+        // report tab already builds right on the tile — no need to open the ticket first.
+        // Same condition statusChip() already uses for "Collect Signature/Stamp"; once
+        // both signed documents are back and the ticket reaches sent_finance this reads
+        // false again and the button is gone, same as the chip it rides alongside.
+        showZip: x.status === 'approved' && holderOf(x) === myName && this.signedDocsMissing(x).length > 0,
+        zip: (e) => {
+          if (e && e.stopPropagation) e.stopPropagation();
+          this.runLatest('zip:' + x.id, () => this.exportTicketZip(x)
+            .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in another, and an editable workbook.', 'ok'))
+            .catch(() => this.toast('zip-fail', 'Could not build that download on this device.', 'warn')));
+        },
       })),
       startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: myName, customer: '', field: '', well: '', rig: '' } }),
       backToList: () => this.setState({ techScreen: 'list', draft: null }),
@@ -15487,7 +15521,7 @@ class Component extends DCLogic {
           // Keyed per ticket: hammering one row cannot stack, and two different rows are
           // still allowed to run independently.
           this.runLatest('zip:' + x.id, () => this.exportTicketZip(x)
-            .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in the other.', 'ok'))
+            .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in another, and an editable workbook.', 'ok'))
             .catch(() => this.toast('zip-fail', 'Could not build that download on this device.', 'warn')));
         },
       })),
