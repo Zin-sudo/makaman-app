@@ -2430,8 +2430,15 @@
                        a standing mode, and only offered to ops_manager/admin holding
                        numbering.override_floor (migration 0072). -->
                   <sc-if value="{{ showFloorOverride }}" hint-placeholder-val="{{ false }}">
-                    <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:var(--ink-dim);cursor:pointer">
-                      <input type="checkbox" checked="{{ floorOverrideChecked }}" onChange="{{ toggleFloorOverride }}">
+                    <!-- 2026-09-11: this rendered at Chromium's native 13x13, a real tap
+                         target under the app's own 36px floor (a11y.test.js), confirmed
+                         present before this fix too — not caused by anything else this
+                         session touched. Sized up rather than left native; the label text
+                         already made the whole row clickable, but the input itself is what
+                         a11y.test.js measures, and what a gloved thumb actually has to land
+                         on precisely if it aims for the box rather than the words. -->
+                    <label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--ink-dim);cursor:pointer">
+                      <input type="checkbox" checked="{{ floorOverrideChecked }}" onChange="{{ toggleFloorOverride }}" style="width:36px;height:36px;flex:none;accent-color:var(--accent);cursor:pointer">
                       Override — allow a number below the series floor
                     </label>
                   </sc-if>
@@ -3651,7 +3658,10 @@
       <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px">
         <div>
           <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:34px;margin:0">Observer View</h2>
-          <div style="font-size:13px;color:var(--ink-faint)">Read-only. Approved jobs only — nothing here can be edited.</div>
+          <!-- 2026-09-11: "Approved jobs only" stopped being true the moment founderRows
+               widened to LIVE (any status) — left uncorrected until the status filter
+               below made the mismatch impossible to miss. -->
+          <div style="font-size:13px;color:var(--ink-faint)">Read-only. Every ticket, any status — nothing here can be edited.</div>
         </div>
         <span style="margin-left:auto;font-size:11px;padding:4px 10px;background:var(--accent-wash);color:var(--accent-ink);letter-spacing:0.05em">OBSERVER</span>
       </div>
@@ -3676,7 +3686,13 @@
                 <div class="mk-live-head">
                   <div style="min-width:0">
                     <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px;line-height:1.2">{{ lt.customer }}</div>
-                    <div style="font-size:12px;color:var(--ink-faint);line-height:1.35">{{ lt.tech }} · {{ lt.locLine }}</div>
+                    <!-- 2026-09-11, owner's report: showed lt.tech — whoever originally
+                         raised the job — so a handover left the field showing the name of
+                         someone no longer even on it. holder (holderOf(t): t.holder if a
+                         handover has happened, t.tech otherwise) is the same field every
+                         other screen already uses for "who has this now" (Well Sites'
+                         h.holder, the office Inbox's crewLabel). -->
+                    <div style="font-size:12px;color:var(--ink-faint);line-height:1.35">{{ lt.holder }} · {{ lt.locLine }}</div>
                   </div>
                   <div class="mk-live-presence"><span style="width:7px;height:7px;flex:none;border-radius:50%;background:{{ lt.presenceDot }}"></span>{{ lt.presenceLabel }}</div>
                 </div>
@@ -3695,6 +3711,13 @@
 
       <!-- The report controls moved to Account: producing a report is something you
            do with your account, not part of reading the work. -->
+      <!-- Same status filter as tech/mgr's own Ticket Inbox (2026-09-11, owner's request)
+           — identical pill row; see founderStatusOptions. -->
+      <div class="mk-statusfilter" style="display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px">
+        <sc-for list="{{ founderStatusOptions }}" as="o" hint-placeholder-count="5">
+          <button onClick="{{ o.pick }}" style="flex:none;white-space:nowrap;min-height:36px;padding:0 14px;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;border:1px solid rgba(var(--ink-rgb),0.22);background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button>
+        </sc-for>
+      </div>
       <div style="border:1px solid rgba(var(--ink-rgb),0.16);overflow-x:auto">
         <table class="mk-stack" style="width:100%;border-collapse:collapse;font-size:14px">
           <thead>
@@ -12237,6 +12260,12 @@ class Component extends DCLogic {
     // screen's filter choice into the other's.
     const mgrStatusFilter = S.mgrStatusFilter || '';
     const matchesMgrStatus = (x) => !mgrStatusFilter || techStatusBucket(x) === mgrStatusFilter;
+    // 2026-09-11, owner's request: "allow observer to filter per Status same as the other
+    // users." Same four buckets, same pill row as tech/mgr — its own state for the same
+    // reason mgrStatusFilter has its own (a founder can also swap into Work as
+    // Technician and back; each screen's choice must stay its own).
+    const founderStatusFilter = S.founderStatusFilter || '';
+    const matchesFounderStatus = (x) => !founderStatusFilter || techStatusBucket(x) === founderStatusFilter;
     const pageOf = (rows) => {
       const shown = Math.min(rows.length, S.ticketLimit || TICKET_PAGE);
       return {
@@ -14231,6 +14260,19 @@ class Component extends DCLogic {
         fg: mgrStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
         pick: () => this.setState({ mgrStatusFilter: key, ticketLimit: TICKET_PAGE }),
       })),
+      // Same filter, adopted onto the Observer's own list (2026-09-11, owner's request:
+      // "allow observer to filter per Status same as the other users") — same buckets,
+      // same pill row, its own state (see matchesFounderStatus). No ticketLimit/founderCount
+      // reset on pick: this list has no "Load more" — founderCount is the Report-size
+      // slider's own row cap (Account tab), and resetting it here would quietly change
+      // that unrelated setting every time the Observer switched a status filter.
+      founderStatusOptions: [['', 'All'], ['progress', 'In Progress'], ['review', 'Awaiting Review'],
+        ['approved', 'Approved'], ['cancelled', 'Cancelled']].map(([key, label]) => ({
+        key, label,
+        bg: founderStatusFilter === key ? 'var(--accent)' : 'transparent',
+        fg: founderStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
+        pick: () => this.setState({ founderStatusFilter: key }),
+      })),
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
       myHasMore: myPage.hasMore,
       myMoreLabel: myPage.moreLabel,
@@ -16113,7 +16155,14 @@ class Component extends DCLogic {
       // CLAUDE.md's own standing rule already grant them the read. Widened to LIVE — the
       // company-wide activity rule's "any status", withdrawn aside (that stays its own
       // separate list, same as the office's own Inbox keeps it apart from live work).
-      founderRows: LIVE.slice().sort((a, b) => lastActivityAt(b) - lastActivityAt(a))
+      // 2026-09-11, owner's request: filtered by status like every other role's list, and
+      // — since the filter now makes "the order was always most-recent-first" worth being
+      // deliberate about rather than incidental — explicitly still real-recency sort with
+      // no banding, filter on or off. bandedTickets() (mgr/tech Inbox) groups by lifecycle
+      // stage first because THOSE lists are worked from, in priority order; the Observer
+      // never acts on a ticket beyond a note, so recency alone — same as it already was —
+      // is the one sort that keeps meaning "All" or any single status.
+      founderRows: LIVE.filter(matchesFounderStatus).slice().sort((a, b) => lastActivityAt(b) - lastActivityAt(a))
         .slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
           // Opens the same screen a technician who does not hold this ticket would see —
           // never the office's own review screen — see founderPeek's own comment.

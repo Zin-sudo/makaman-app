@@ -32,7 +32,14 @@ declare
   tech_id uuid := '56ca31ce-19b6-49e0-93dd-8d748108e014';   -- techtest2@makaman.ly
   tech_other uuid := '0de7e9f4-7a5d-4f77-8dcf-bae73eca6925'; -- tech3@makaman.ly
   founder_id uuid := 'c80de7fe-e187-47b6-bb4f-a1e99825f66c'; -- ahmed@makaman.ly, role=founder
-  logging_ticket uuid := 'ac19bb92-b3a9-470b-a215-38c79f59da8a'; -- a real ticket, status='logging', held by tech_id
+  -- 2026-09-11: the original fixture ticket (ac19bb92…, held by tech_id) progressed to
+  -- 'done' since this guard was written — expected drift for "a real ticket already in
+  -- this state" rather than a staged one (see the guard's own comment on why staging
+  -- would itself be a write this guard should not depend on succeeding). Replaced with
+  -- another real example and its own holder, found live at the same moment; whoever next
+  -- finds THIS one stale should do the same rather than let the guard go permanently red.
+  logging_ticket uuid := '51c70333-3ba0-4f81-9302-4b2ccc40f35f';
+  logging_ticket_holder uuid := 'ef5a965c-d0e8-4d15-99be-8c96d7091535';
   n_check boolean;
 begin
   -------------------------------------------------------------------------------------
@@ -159,11 +166,11 @@ begin
   -- would itself be a write this guard should not depend on succeeding.
   -------------------------------------------------------------------------------------
   begin
-    if not exists (select 1 from public.tickets where id = logging_ticket and holder_id = tech_id and status = 'logging') then
-      failures := failures || format(E'\n  [ticket_assets RLS] guard fixture stale: ticket %s is no longer status=logging held by %s — pick a fresh real example and update this guard.', logging_ticket, tech_id);
+    if not exists (select 1 from public.tickets where id = logging_ticket and holder_id = logging_ticket_holder and status = 'logging') then
+      failures := failures || format(E'\n  [ticket_assets RLS] guard fixture stale: ticket %s is no longer status=logging held by %s — pick a fresh real example and update this guard.', logging_ticket, logging_ticket_holder);
     else
       execute 'set local role authenticated';
-      execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+      execute format('set local "request.jwt.claims" = %L', json_build_object('sub', logging_ticket_holder, 'role', 'authenticated')::text);
 
       begin
         insert into public.ticket_assets (id, ticket_id, item, qty, note, sort_order)
@@ -472,6 +479,46 @@ begin
     end;
   exception when others then
     failures := failures || format(E'\n  [tickets duplicate-open guard] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 10 (2026-09-11, migration 0078): the Observer's "Approved value" total (client
+  -- code: app/index.html's totalByCurrency over settled(x), SETTLED_STATES = ['approved',
+  -- 'sent_finance']) silently undercounted against ops/admin's own figure — a live
+  -- example, reported with the actual numbers: Ali (founder) saw $8,000 / 0 LYD where
+  -- Awhida (ops_manager) saw $11,253.00 / 12,500.000 LYD on the same data. Root cause:
+  -- ticket_items_select_founder (migration 0001) only ever allowed founder to read a
+  -- ticket's priced lines while that ticket's own status = 'approved' — is_staff() has no
+  -- such limit, so once a ticket moved on to 'sent_finance' its lines vanished from the
+  -- founder's read alone, dropping the whole ticket's value out of their total while it
+  -- stayed in everyone else's. Confirmed live before the fix: exactly the missing $3,253
+  -- USD and 12,500 LYD sat on 'sent_finance' tickets. Proves both halves: founder CAN now
+  -- read a sent_finance ticket's items (the fix), and still CANNOT read one still in an
+  -- earlier stage like 'logging' (the boundary CLAUDE.md's own activity-visibility rule
+  -- keeps pricing office-only beyond this one established Approved-value carve-out).
+  -------------------------------------------------------------------------------------
+  begin
+    insert into public.tickets (id, technician_id, customer, field_name, well_no, rig_name, status) values
+      ('dddddddd-0000-4000-8000-00000000d001', tech_id, 'GUARD10-CUST', 'GUARD10-FIELD', 'GUARD10-WELL-A', 'GUARD10-RIG', 'sent_finance'),
+      ('dddddddd-0000-4000-8000-00000000d002', tech_id, 'GUARD10-CUST', 'GUARD10-FIELD', 'GUARD10-WELL-B', 'GUARD10-RIG', 'logging');
+    insert into public.ticket_items (id, ticket_id, item_number, description, uom, qty, unit_cost) values
+      (gen_random_uuid(), 'dddddddd-0000-4000-8000-00000000d001', 'MKN-G10A', 'GUARD10-ITEM-SENT-FINANCE', 'ea', '1', 1),
+      (gen_random_uuid(), 'dddddddd-0000-4000-8000-00000000d002', 'MKN-G10B', 'GUARD10-ITEM-LOGGING', 'ea', '1', 1);
+
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', founder_id, 'role', 'authenticated')::text);
+    select exists(select 1 from public.ticket_items where description = 'GUARD10-ITEM-SENT-FINANCE') into n_check;
+    if not n_check then
+      failures := failures || E'\n  [ticket_items RLS] the Observer (founder) cannot read a sent_finance ticket''s priced items — ticket_items_select_founder (migration 0078) is missing or has regressed back to approved-only. This is the exact live cause of the undercounted Approved value.';
+    end if;
+    select exists(select 1 from public.ticket_items where description = 'GUARD10-ITEM-LOGGING') into n_check;
+    if n_check then
+      failures := failures || E'\n  [ticket_items RLS] the Observer (founder) can read a ''logging''-status ticket''s priced items — ticket_items_select_founder has widened past approved+sent_finance, breaking the office-only-pricing boundary migration 0069 deliberately left in place.';
+    end if;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [migration 0078 · founder Approved-value reads] guard itself errored: %s', sqlerrm);
   end;
 
   -------------------------------------------------------------------------------------

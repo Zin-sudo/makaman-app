@@ -64,6 +64,27 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   check('and the presence badge itself is never cut off either',
     row.presenceWidth > 100, row.presenceWidth);
 
+  // 2026-09-11, owner's report: "even though Abobaker Awhida handed over the job his
+  // name still shows as the holder on the Live Activity." The row printed lt.tech —
+  // whoever originally raised the job — which a handover never changes; holderOf(t)
+  // (t.holder once a handover has set it, t.tech otherwise) is the field every other
+  // screen already uses for "who has this now" (Well Sites, the office Inbox).
+  await p.evaluate(() => {
+    window.__mkApp.mutate(d => {
+      const t = d.tickets.find(x => x.status === 'logging');
+      t.holder = 'Abobaker Awhida';
+    });
+  });
+  await p.waitForTimeout(500);
+  const nameLine = await p.evaluate(() => {
+    const r = document.querySelector('.mk-live-row');
+    return r.querySelector('.mk-live-head').firstElementChild.lastElementChild.textContent;
+  });
+  check('the current holder\'s name shows, not whoever originally raised the job',
+    /Abobaker Awhida/.test(nameLine), nameLine);
+  check('and the original raiser\'s name is gone from this line',
+    !/Yousef Al-Harbi/.test(nameLine), nameLine);
+
   await b.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

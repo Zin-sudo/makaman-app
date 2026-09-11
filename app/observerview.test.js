@@ -164,6 +164,88 @@ async function signIn(ctx, email) {
     await ctx.close();
   }
 
+  // ── Status filter on the Observer's own list, same pill row as tech/mgr (2026-09-11,
+  // owner's request: "allow observer to filter per Status same as the other users") ──
+  {
+    const ctx = await b.newContext({ viewport: { width: 1300, height: 950 } });
+    const p = await signIn(ctx, 'founder@makaman.ly');
+    const rows = () => p.locator('table.mk-stack tbody tr');
+
+    check('the pill row itself is on screen, same shape as tech/mgr\'s own',
+      await p.getByRole('button', { name: 'In Progress' }).count() === 1);
+
+    check('unfiltered ("All"), every seeded status is present at once',
+      await rows().filter({ hasText: 'Northern Gulf' }).count() === 1  // t3, logging
+      && await rows().filter({ hasText: 'Al-Dhafra' }).count() === 1    // t2, done
+      && await rows().filter({ hasText: 'Kuwait' }).count() === 1);     // t1, approved
+
+    await p.getByRole('button', { name: 'In Progress', exact: true }).click();
+    await p.waitForTimeout(300);
+    check('"In Progress" narrows to the logging ticket alone',
+      await rows().count() === 1 && await rows().filter({ hasText: 'Northern Gulf' }).count() === 1);
+
+    await p.getByRole('button', { name: 'Awaiting Review', exact: true }).click();
+    await p.waitForTimeout(300);
+    check('"Awaiting Review" narrows to the done ticket alone',
+      await rows().count() === 1 && await rows().filter({ hasText: 'Al-Dhafra' }).count() === 1);
+
+    await p.getByRole('button', { name: 'Approved', exact: true }).click();
+    await p.waitForTimeout(300);
+    check('"Approved" narrows to the approved ticket alone',
+      await rows().count() === 1 && await rows().filter({ hasText: 'Kuwait' }).count() === 1);
+
+    // Cancelled isn't in the default seed within reach of this list — mutate one so the
+    // bucket has something real to prove against, same technique the rest of this file
+    // already uses for status transitions.
+    await p.evaluate(() => {
+      window.__mkApp.mutate(d => { d.tickets.find(t => t.id === 't2').status = 'cancelled'; });
+    });
+    await p.waitForTimeout(300);
+    await p.getByRole('button', { name: 'Cancelled', exact: true }).click();
+    await p.waitForTimeout(300);
+    check('"Cancelled" narrows to the now-cancelled ticket alone',
+      await rows().count() === 1 && await rows().filter({ hasText: 'Al-Dhafra' }).count() === 1);
+
+    await p.getByRole('button', { name: 'All', exact: true }).click();
+    await p.waitForTimeout(300);
+    check('back on "All", every status is visible again, filter genuinely cleared',
+      await rows().filter({ hasText: 'Northern Gulf' }).count() === 1
+      && await rows().filter({ hasText: 'Al-Dhafra' }).count() === 1
+      && await rows().filter({ hasText: 'Kuwait' }).count() === 1);
+    await ctx.close();
+  }
+
+  // ── Unfiltered, the list is always most-recent-first — not banded by lifecycle stage
+  // the way the office's own Inbox is (2026-09-11, owner's request: "always show the
+  // most recent first when a filter is not used") ──
+  {
+    const ctx = await b.newContext({ viewport: { width: 1300, height: 950 } });
+    const p = await signIn(ctx, 'founder@makaman.ly');
+    const rows = () => p.locator('table.mk-stack tbody tr');
+
+    // t1 (Kuwait, approved) sorts ahead of t3 (Northern Gulf, still logging) in the raw
+    // seed order, but a banded sort (like the office's own Inbox) would always put a
+    // still-open job above a settled one regardless of recency. Touch t1 with a stamp
+    // comfortably in the future — the seed's own ago(days, h, m) sets a fixed HOUR:MINUTE
+    // on that calendar day rather than an offset from the instant the suite happens to
+    // run, so a plain `new Date()` "now" can itself land earlier than t3's own seeded
+    // event times depending what time of day this runs; a stamp a year out sidesteps that
+    // entirely — then confirm t1 leads the list even though t3 is the one still open,
+    // proving this is real recency, not band-then-recency, with no filter selected.
+    await p.evaluate(() => {
+      window.__mkApp.mutate(d => {
+        const t = d.tickets.find(x => x.id === 't1');
+        const future = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
+        t.audit = (t.audit || []).concat([{ ts: future, text: 'GUARD-RECENCY touch', kind: 'lifecycle', by: 'Test' }]);
+      });
+    });
+    await p.waitForTimeout(300);
+    const first = await rows().first().innerText();
+    check('the just-touched settled ticket leads the unfiltered list, ahead of the still-open one',
+      /Kuwait/.test(first), first.slice(0, 60));
+    await ctx.close();
+  }
+
   console.log(`\n  ${pass} passed, ${fail} failed`);
   await b.close();
   process.exit(fail ? 1 : 0);
