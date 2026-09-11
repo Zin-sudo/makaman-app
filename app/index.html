@@ -446,7 +446,19 @@
      hard 230px who-column, which on a phone added up to more than the card was wide and
      pushed the badge outside it. It now rides with the who block, and min-width:0 lets
      both blocks actually shrink — without it a flex child refuses to go below its
-     content width, which is what makes long field names blow a row open. */
+     content width, which is what makes long field names blow a row open.
+     2026-09-11, owner's report: a long presence label ("Last heard 10 Sept 2026 ·
+     22:28") was pushing the client name out of alignment. .mk-live-presence is
+     flex:none/white-space:nowrap on purpose (a timestamp must never itself wrap), so
+     sharing one 240px row left the name — routinely 20-30+ characters of customer,
+     technician and location — squeezed into whatever the badge did not need, which for
+     a "Last heard" label was well under half the box. auto-wrap (letting the row decide
+     per-ticket whether to share a line) turned out not to help here: with the name's own
+     min-width:0 letting it shrink freely, a flex row never NEEDS to wrap, so it never
+     did — the two kept splitting one line even when neither had enough room. A fixed
+     column stack is the fix that actually holds at every length: the name always gets
+     the full 240px on its own line, and the badge always gets the full 240px on the
+     line below it — nothing is ever divided between them. */
   .mk-live-row {
     display:flex; gap:12px; align-items:flex-start;
     padding:10px 12px; border:1px solid rgba(var(--ink-rgb),0.1);
@@ -454,7 +466,7 @@
   }
   .mk-live-head {
     width:240px; flex:none; min-width:0;
-    display:flex; gap:10px; align-items:flex-start; justify-content:space-between;
+    display:flex; flex-direction:column; gap:4px; align-items:flex-start;
   }
   .mk-live-presence {
     display:flex; align-items:center; gap:4px; flex:none;
@@ -1835,6 +1847,40 @@
                   </sc-if>
                 </div>
               </sc-if>
+
+              <!-- 2026-09-11: this ticket's own stage/tool-custody trail, on the
+                   technician's own screen for the first time — reviewlog.test.js's own
+                   history explains why it has to be here rather than nowhere. It used to
+                   live only on the office's own review screen (curAudit, same binding,
+                   unchanged), which the Observer reached through mgrScreen === 'review'.
+                   Routing the Observer through this screen instead (founderPeek) took
+                   that away silently unless it moved here too — and CLAUDE.md's own
+                   standing rule already requires a technician to read this exact history
+                   on their own ticket, which nothing on this screen had ever actually
+                   given them before now. curAuditDeep (activity.view_edits) is mgr/admin
+                   only, so both a real technician and the Observer get the identical
+                   narrowed view here — job stages and tool custody, never the office's
+                   own edit trail — the same filter, computed once, that already gates it
+                   on the review screen. -->
+              <div class="mk-panel-pad">
+                <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent-deep);margin-bottom:2px">Audit trail</div>
+                <div class="mk-hint-mb">{{ curAuditScope }}</div>
+                <sc-if value="{{ curAuditEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:14px 0;text-align:center;font-size:12px;color:var(--ink-faint)">Nothing recorded on this ticket yet.</div>
+                </sc-if>
+                <div class="mk-col-gap10">
+                  <sc-for list="{{ curAudit }}" as="a" hint-placeholder-count="3">
+                    <div style="font-size:12px;line-height:1.45;padding-bottom:9px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px">
+                        <span style="padding:1px 7px;font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;background:{{ a.kindBg }};color:{{ a.kindFg }}">{{ a.kindLabel }}</span>
+                        <span style="color:var(--ink-faint)">{{ a.stamp }}</span>
+                      </div>
+                      <div>{{ a.text }}</div>
+                      <div style="color:var(--ink-faint);margin-top:2px">{{ a.by }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
             </sc-if>
 
             </sc-if>
@@ -3654,6 +3700,13 @@
           <thead>
             <tr>
               <th class="mk-th-11">Ticket No.</th>
+              <!-- 2026-09-11, owner's request: this table used to be approved tickets
+                   only, where a status column would have said the same word on every
+                   row. Widened to every status (founderRows, see its own comment), so a
+                   glance at the list is the only way left to tell a job still in the
+                   field from one already paid — the same chip every other ticket tile in
+                   the app already uses, not a new one. -->
+              <th class="mk-th-11">Status</th>
               <th class="mk-th-11">Customer</th>
               <th class="mk-th-11">Well</th>
               <th class="mk-th-11">Job type</th>
@@ -3665,6 +3718,7 @@
             <sc-for list="{{ founderRows }}" as="t" hint-placeholder-count="3">
               <tr onClick="{{ t.open }}" class="mk-clickable">
                 <td data-label="Ticket No." style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:16px">{{ t.noLabel }}</td>
+                <td data-label="Status" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08)"><span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span></td>
                 <td data-label="Customer" class="mk-td-pad11">{{ t.customer }}</td>
                 <td data-label="Well" class="mk-td-pad11">{{ t.well }}</td>
                 <td data-label="Job type" style="padding:11px 12px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim);font-size:13px">{{ t.jobType }}</td>
@@ -4635,6 +4689,22 @@ function isDuplicateLogLine(ticket, text) {
   if (!last || last.text !== text) return false;
   const age = Date.now() - new Date(last.ts).getTime();
   return !isNaN(age) && age >= 0 && age < DUP_LOG_LINE_MS;
+}
+// 2026-09-11, owner's request: "make sure spam is forbidden with a time interval for
+// all roles when it comes to notes" — the same shape of guard as isDuplicateLogLine
+// just above, for the one other free-text composer every role can reach (a technician
+// on their own job, the office on any job, and now the Observer up to sent_finance).
+// Matched by author as well as text: two different people raising the identical
+// sentence moments apart is a coincidence worth keeping, not a double-submit — the
+// mirrored-input class of bug this guards against is one person's own input landing
+// twice, same as the log-line guard's own reasoning.
+const DUP_NOTE_MS = (typeof window !== 'undefined' && window.__DUP_NOTE_TEST_MS) || 5000;
+function isDuplicateNote(ticket, text, who) {
+  const notes = (ticket && ticket.notes) || [];
+  const last = notes[notes.length - 1];
+  if (!last || last.body !== text || last.by !== who) return false;
+  const age = Date.now() - new Date(last.at).getTime();
+  return !isNaN(age) && age >= 0 && age < DUP_NOTE_MS;
 }
 
 // ── The error log ────────────────────────────────────────────────────────────
@@ -7450,6 +7520,13 @@ class Component extends DCLogic {
     super(props);
     this.state = Object.assign({
       role: 'tech', techScreen: 'list', mgrScreen: 'inbox', adminTab: null, permUser: null,
+      // 2026-09-11, owner's request: the Observer opening a ticket should see it as a
+      // technician who does not hold it would — not the office's own review screen.
+      // Reuses the technician's own screens (showTechShell) rather than a second copy of
+      // them; this flag is what tells showTechShell/showFounderPage which of the two is
+      // showing, since the Observer's real role stays 'founder' the whole time — nothing
+      // here is a role swap. See founderRows' own `open` and backToList.
+      founderPeek: false,
       // See reviewContent: the ticket as it was found, so leaving can offer to put it back.
       reviewSnap: null, reviewSaving: false, serverBusy: false,
       priceDelete: null,
@@ -10151,6 +10228,15 @@ class Component extends DCLogic {
       return;
     }
     const who = (this.state.session && this.state.session.name) || '';
+    // 2026-09-11, owner's request: see isDuplicateNote's own comment — the same
+    // mirrored-input/double-tap class of guard this session already built for ticket
+    // creation and job-log lines, for the one composer every role (tech, office, and
+    // now the Observer) can reach.
+    if (isDuplicateNote(t, text, who)) {
+      this.toast('note-dup', 'That note was just added a moment ago — not adding it twice.', 'warn');
+      this.setState({ noteDraft: '' });
+      return;
+    }
     const id = uuid();
     this.mutate((d) => {
       const t = d.tickets.find((x) => x.id === ticketId);
@@ -10627,6 +10713,15 @@ class Component extends DCLogic {
     if (!t) return false;
     if (!this.hasPermission('note.add')) return false;
     const role = this.state.actingAs ? 'tech' : this.state.role;
+    // 2026-09-11, owner's request, narrowing the 2026-09-10 rule below for the Observer
+    // specifically: "don't allow them to edit any ticket, except adding notes on the
+    // tickets still before the stage 'sent to finance'." Named exactly — approved but
+    // not yet sent to finance still qualifies (this.settled(t) would wrongly exclude
+    // it, since SETTLED_STATES already includes 'approved'); cancelled and office-closed
+    // are deliberately NOT part of this cutoff, since the owner named one stage and not
+    // those. Once a job has actually reached finance, catching a problem before it goes
+    // out — the entire reason the Observer flags anything — has already passed.
+    if (role === 'founder') return t.status !== 'sent_finance';
     if (role !== 'tech') return true;
     // 2026-09-10, owner's request, after a note on a closed ticket queued, was refused
     // ("Ticket already approved and can no longer be edited" — enforce_ticket_update_
@@ -10636,9 +10731,8 @@ class Component extends DCLogic {
     // for them to note. Same "closed" techSealed already locks header edits against, just
     // below in render, plus cancelled (which techSealed does not cover — a cancelled job
     // was never approved or office-closed, but it is exactly as done). Office (is_staff())
-    // and the Observer are deliberately exempt — CLAUDE.md's own standing rule says the
-    // Observer "may only add notes, on any ticket," unconditionally, and the office may
-    // reasonably want to note a fully paperworked job as easily as an open one.
+    // is exempt: the office may reasonably want to note a fully paperworked job as easily
+    // as an open one.
     if (this.settled(t) || t.status === 'cancelled' || !!t.officeClosed) return false;
     const me = this.state.session || {};
     return inCrew(t, me.name, me.email);
@@ -13314,7 +13408,19 @@ class Component extends DCLogic {
       // 58px) — kept mounted regardless, so an open Self-check or Reports rendered as an
       // empty full-screen box above the real (shared, showAdminPage) content sitting right
       // after it: the gap the owner reported from a technician's own phone (2026-09-03).
-      showTechShell: S.role === 'tech' && !S.adminTab,
+      // 2026-09-11, owner's request: "for their view when they enter the ticket, give
+      // them the view of technicians not the view of ops... as if they're a technicians
+      // accessing a ticket they don't hold." The Observer's real role stays 'founder' —
+      // founderPeek is what actually switches the screen, so nothing here can be
+      // mistaken for (or accidentally trigger) the real "work as technician" role swap,
+      // which is a different capability (user.act_as_technician) the Observer does not
+      // have. Every field/button this screen already disables for a technician viewing
+      // a ticket they do not hold (locked, readOnly, rowLockedForViewer) already reads
+      // true for the Observer too — readOnly is `!ticket.log && !ticket.edit_closed`,
+      // neither of which founder ever holds — so this is the same screen, not a copy of
+      // it with new rules layered on.
+      showTechShell: (S.role === 'tech' && !S.adminTab)
+        || (S.role === 'founder' && S.founderPeek && S.roleTab === 'tickets' && !S.adminTab),
       // While swapped the corner must not read plainly "Technician" — that is the one
       // reading which would make the swap invisible, and an invisible swap is how
       // somebody forgets they are in it and wonders where their approve button went.
@@ -13334,8 +13440,10 @@ class Component extends DCLogic {
       // showTechShell above — the same admin-subpage exclusion this binding uses.)
       // Tickets means the work, for every office role. The Admin's toolbox is a
       // thing you open from Account, not the meaning of a tab on the bottom bar.
-      showMgrPage: ((S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab)
-        || (S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen === 'review'),
+      // 2026-09-11: founder no longer reaches this screen at all — opening a ticket now
+      // goes through showTechShell/founderPeek instead (see its own comment), so the
+      // Observer reads a job the same way a technician who does not hold it would.
+      showMgrPage: (S.role === 'mgr' || S.role === 'admin') && S.roleTab === 'tickets' && !S.adminTab,
       // The Admin tools page is Admin's, with exceptions. The price lists, which the
       // ops manager reaches through the same screen. The self-check, which belongs to
       // everybody: it exists so that whoever hits a problem can run it and send the
@@ -13372,7 +13480,7 @@ class Component extends DCLogic {
       // than replacing it — both screens' headings stacked on the same page. Every other
       // role's equivalent "main tab" flag already excludes !!S.adminTab for exactly this
       // reason (see showDeskNav's own comment); this one just never got the same guard.
-      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && S.mgrScreen !== 'review' && !S.adminTab,
+      showFounderPage: S.role === 'founder' && S.roleTab === 'tickets' && !S.founderPeek && !S.adminTab,
       // Activity/Sync/Account are written once for the office roles and once, styled
       // for a phone card, inside the technician frame.
       deskTabs: S.role !== 'tech' && S.roleTab !== 'tickets',
@@ -14143,7 +14251,12 @@ class Component extends DCLogic {
         },
       })),
       startNew: () => this.setState({ techScreen: 'new', draft: { arrival: iso(new Date()), tech: myName, customer: '', field: '', well: '', rig: '' } }),
-      backToList: () => this.setState({ techScreen: 'list', draft: null }),
+      // 2026-09-11: the Observer's own way back to Observer View, not to a technician's
+      // list they were never on — this is the only exit from founderPeek, so it has to
+      // know which of the two it is closing rather than always landing on 'list'.
+      backToList: () => this.setState(S.founderPeek
+        ? { founderPeek: false, techScreen: null, activeId: null }
+        : { techScreen: 'list', draft: null }),
       draftArrival: S.draft ? F.stamp(S.draft.arrival) : F.stamp(iso(new Date())),
       d: S.draft || { tech: '', customer: '', field: '', well: '', rig: '' },
       // Field markers on the new-ticket form, and the pin used by the position panel
@@ -15334,10 +15447,12 @@ class Component extends DCLogic {
       goPrint: () => this.setState({ mgrScreen: 'print' }),
       // This ticket's log, newest first.
       //
-      // Gated the same way the Activity tab is, and for the same reason: the Observer can
-      // reach this screen (showMgrPage lets them in at mgrScreen === 'review'), so an
-      // ungated trail here handed them the edit history the Activity tab had just been
-      // taught to withhold. One capability, both places — see B-15.5.
+      // Gated the same way the Activity tab is, and for the same reason: this screen is
+      // staff's own review copy of the ticket (mgr/admin only, since 2026-09-11 — the
+      // Observer opens a ticket through the technician's own screen instead, see
+      // founderPeek, which never renders a raw audit trail at all), and an ungated trail
+      // here would still hand staff the same edit history the Activity tab was taught to
+      // withhold from everyone but staff. One capability, both places — see B-15.5.
       //
       // Every entry already carried who made it; only the Activity tab was showing it.
       // "Ticket approved" without a name is the half of the record that does not settle
@@ -15911,9 +16026,25 @@ class Component extends DCLogic {
         const code = S.purgeCode || '';
         if (!/^\d{6}$/.test(code)) { this.setState({ purgeError: 'Enter the 6-digit code that was emailed to you.' }); return; }
         this.runBusy('purge:go', 'Deleting every ticket', () => adminAction('purge_test_tickets', { code: code, confirm: 'DELETE ALL TICKETS' }), { toastOnError: false })
-          .then((r) => this.setState({
-            purgeStep: 4, purgeError: '', purgeResult: r, purgeConfirmText: '', purgePassword: '', purgeCode: '',
-          }))
+          .then((r) => {
+            this.setState({
+              purgeStep: 4, purgeError: '', purgeResult: r, purgeConfirmText: '', purgePassword: '', purgeCode: '',
+            });
+            // 2026-09-11, owner's report: withdrawn tickets kept appearing to "survive" a
+            // purge. They never did, server-side — purge_test_tickets deletes every row
+            // unconditionally (deleted_at included, confirmed by reading the Edge
+            // Function itself), so nothing here needed to change to REMOVE them. What was
+            // missing was telling THIS DEVICE the purge had happened at all: nothing
+            // called refresh() afterward, so the local `tickets` array — built from
+            // whatever this device last hydrated, before the button was even pressed —
+            // stayed exactly as it was and kept rendering rows the server had already
+            // erased. refresh() re-hydrates the whole store the same way login/reconnect/
+            // Force Refresh already do, and refreshCore's own
+            // `Object.assign(seed(), data)` REPLACES the local ticket list outright
+            // rather than merging into it — so a purged row, withdrawn or not, has
+            // nowhere left to be shown from once this lands.
+            this.refresh();
+          })
           .catch((err) => this.setState({ purgeError: err.message || 'The purge was refused.' }));
       },
       purgeDeletedCount: (S.purgeResult || {}).deletedCount,
@@ -15972,11 +16103,21 @@ class Component extends DCLogic {
           .catch(() => this.toast('bundle-fail', 'Could not build the overview on this device.', 'warn')));
       },
       // 2026-09-10, owner's request: "all lists... always show the most recently active
-      // at the top" — approved-only here, so no banding, just real recency in place of
-      // the old reverse()-as-recency proxy.
-      founderRows: approved.slice().sort((a, b) => lastActivityAt(b) - lastActivityAt(a))
+      // at the top" — so no banding, just real recency in place of the old
+      // reverse()-as-recency proxy.
+      //
+      // 2026-09-11, owner's request: "I want them to be able to access the in-progress
+      // tickets to view." This used to read `approved` — every ticket the office had
+      // finished with, and nothing still open, which left the Observer with no way to
+      // open a job still being logged even though RLS (tickets_select_founder) and
+      // CLAUDE.md's own standing rule already grant them the read. Widened to LIVE — the
+      // company-wide activity rule's "any status", withdrawn aside (that stays its own
+      // separate list, same as the office's own Inbox keeps it apart from live work).
+      founderRows: LIVE.slice().sort((a, b) => lastActivityAt(b) - lastActivityAt(a))
         .slice(0, S.founderCount).map(x => Object.assign(this.ticketView(x), {
-          open: () => this.openReview(x.id),
+          // Opens the same screen a technician who does not hold this ticket would see —
+          // never the office's own review screen — see founderPeek's own comment.
+          open: () => this.setState({ founderPeek: true, techScreen: 'log', activeId: x.id }),
         })),
 
       // Live activity — the only view in the app that shows tickets still being logged

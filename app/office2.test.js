@@ -103,14 +103,22 @@ const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^'
   await p.reload({ waitUntil: 'networkidle' });
   await p.waitForTimeout(900);
   // The Observer's own Tickets tab is a separate screen (founderRows), not the ops
-  // Inbox — its rows were never the "bog boxes" this change fixed, and its <tr onClick>
-  // already opened review before this change, so this selector stays untouched.
+  // Inbox — its rows were never the "bog boxes" this change fixed, so this selector
+  // stays untouched. What clicking a row does next changed on 2026-09-11: it now opens
+  // the same screen a technician who does not hold this ticket would see (founderPeek),
+  // not the office's own review screen — see observerview.test.js for that screen's own
+  // full coverage. "Device position" is an office-only diagnostic panel on the review
+  // screen (never shown to a technician looking at their own ticket either), so the
+  // Observer reading this exact same screen no longer sees it — that is by design, not
+  // a regression, and is exactly why this file's own two checks below changed.
   check('the Observer can open a ticket at all', await p.locator('tr', { hasText: '9001' }).count() > 0);
   await p.locator('tr', { hasText: '9001' }).first().click();
   await p.waitForTimeout(900);
   body = await p.innerText('body');
-  check('and reaches the coordinates from there', /Device position/i.test(body) && /32\.887209/.test(body));
-  check('but cannot approve anything', /Read-only — Observer/i.test(body));
+  check('and reaches the ticket\'s own location from there',
+    /Zelten/i.test(body) && /ZT-9/.test(body) && /SOC-4/.test(body));
+  check('but cannot approve anything — reading exactly as a non-holding technician would',
+    /only they can add to the log/i.test(body));
   // The Observer may not change the ticket. They MAY raise a note on it — flagging
   // something for the office is the whole reason the role opens a ticket at all — so the
   // notes composer is enabled and everything else is not. Counting enabled inputs and

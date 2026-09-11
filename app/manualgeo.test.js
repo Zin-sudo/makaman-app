@@ -84,14 +84,29 @@ async function open(ctx, email) {
   }
 
   // ── An office role WITHOUT the capability sees read-only text, not an input ─────────
-  // Observer/founder can already see the position panel (geo.test.js covers that) but
-  // location.edit's default_roles is ['ops_manager', 'admin'] only — founder is real
-  // "office can view, cannot correct" case, not a mocked-out permission.
+  // Ops Manager/Admin without location.edit is the real "office can view, cannot
+  // correct" case (default_roles is ['ops_manager', 'admin'] only) — checked against
+  // omar@makaman.ly directly rather than mocking a permission override, same reasoning
+  // this file's other cases already use.
+  //
+  // 2026-09-11: this used to also check founder@makaman.ly here, on the theory that the
+  // Observer read this same "Device position" panel on the office's own review screen.
+  // They no longer do — founderPeek routes the Observer through the technician's own
+  // ticket screen instead (see index.html's own founderPeek comment and
+  // observerview.test.js), which never showed this staff-only diagnostic panel to
+  // ANYONE, technician or Observer, before or after. Losing it is exactly what "give
+  // them the view of technicians" means, not a capability regression — geo.test.js
+  // itself no longer drives the Observer through app.openReview() for the same reason.
   {
     const ctx = await b.newContext();
-    const p = await open(ctx, 'founder@makaman.ly');
+    const p = await open(ctx, 'omar@makaman.ly');
     await p.evaluate(() => {
       const app = window.__mkApp;
+      // Ops Manager holds location.edit by default (PERMISSION_DEFAULTS: ['mgr',
+      // 'admin']) — the real "office can view, cannot correct" account only exists as a
+      // per-person override, same mechanism permissionsimulation.test.js already uses.
+      const me = (app.state.data.users || []).find(u => u.email === (app.state.session || {}).email);
+      app.setPermissionOverride(me, 'location.edit', false);
       app.mutate((d) => {
         const t = d.tickets.find(x => x.id === 't1');
         t.geo = { open: { lat: 27.5, lon: 18.5, ts: new Date().toISOString() } };

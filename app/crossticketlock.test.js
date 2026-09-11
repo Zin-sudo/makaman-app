@@ -287,7 +287,13 @@ const check = (n, ok, x) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS'
     await i4.nth(0).fill(email); await i4.nth(1).fill('makaman2026');
     await p4.getByRole('button', { name: /log in/i }).click();
     await p4.waitForTimeout(1200);
-    await p4.evaluate(() => window.__mkApp.setState({ activeId: 't1', mgrScreen: 'review', techScreen: 'log', roleTab: 'tickets' }));
+    // 2026-09-11: the Observer no longer reaches a ticket through mgrScreen === 'review'
+    // at all — founderPeek routes them through the technician's own screen instead (see
+    // index.html's own founderPeek comment), so only staff still uses the office path.
+    const isFounder = email === 'founder@makaman.ly';
+    await p4.evaluate((founder) => window.__mkApp.setState(founder
+      ? { activeId: 't1', founderPeek: true, techScreen: 'log', roleTab: 'tickets' }
+      : { activeId: 't1', mgrScreen: 'review', roleTab: 'tickets' }), isFounder);
     await p4.waitForTimeout(400);
     check(label + ' still sees the note box on the same closed ticket',
       await p4.getByPlaceholder(/Raise a note on this job/i).count() === 1);

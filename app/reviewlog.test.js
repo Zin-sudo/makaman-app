@@ -37,7 +37,13 @@ const login = async (p, email) => {
 // app's own state rather than through localStorage. The store is not written until the
 // first mutation, so injecting into localStorage before one happens writes into nothing;
 // window.__mkApp is the handle the other suites already use for exactly this reason.
-const seedAudit = (p) => p.evaluate(() => {
+//
+// 2026-09-11: navigation to the ticket forked by role. Staff still reaches it through
+// the office's own review screen (mgrScreen: 'review', unchanged). The Observer no
+// longer does — founderPeek routes them through the technician's own screen instead
+// (see index.html's own founderPeek comment) — so seeding the OLD navigation for
+// founder would land on nothing, not prove a leak was fixed.
+const seedAudit = (p, forFounder) => p.evaluate((forFounder) => {
   const app = window.__mkApp;
   const t = (app.state.data.tickets || []).find(x => x.status !== 'logging')
     || (app.state.data.tickets || [])[0];
@@ -49,9 +55,10 @@ const seedAudit = (p) => p.evaluate(() => {
       { ts: '2026-08-20T09:00:00.000Z', text: 'Mileage changed from 100 to 120.', kind: 'edit', by: 'Omar Al-Saleh' },
     ];
   });
-  app.setState({ activeId: t.id, mgrScreen: 'review', roleTab: 'tickets' });
+  if (forFounder) app.setState({ activeId: t.id, founderPeek: true, techScreen: 'log', roleTab: 'tickets' });
+  else app.setState({ activeId: t.id, mgrScreen: 'review', roleTab: 'tickets' });
   return t.id;
-});
+}, !!forFounder);
 
 // The panel, located by its own DOM node rather than by searching body text. The page
 // says "written to the audit trail" in prose further up, so a text search finds that
@@ -89,7 +96,7 @@ const panel = (p) => p.evaluate(() => {
     const ctx = await b.newContext();
     const p = await open(ctx);
     await login(p, 'founder@makaman.ly');
-    await seedAudit(p);
+    await seedAudit(p, true);
     await p.waitForTimeout(900);
     const text = await panel(p);
 

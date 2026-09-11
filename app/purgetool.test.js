@@ -165,22 +165,46 @@ DB.profiles.push({ id: ADMIN, email: 'lateri@makaman.ly', full_name: 'Later Admi
   check('and stays on the code step', await p.getByPlaceholder('000000').count() === 1);
 
   // Correct code: the confirm phrase is sent alongside it, and the count is shown back.
+  // window.__db.tickets cleared here, not after the click, and IN-PAGE rather than on
+  // the Node-side DB object: STUB() bakes a one-time JSON snapshot into window.__db when
+  // the route is registered (cloudstub.js's own `window.__db = ${JSON.stringify(db)}`),
+  // so the Node `DB` variable and the page's fake server are two disconnected copies
+  // from that point on — mutating DB here would silently do nothing to what the page's
+  // own hydrate() actually reads. Cleared before the click (not after) because the real
+  // DELETE runs server-side before the Edge Function's response ever reaches the
+  // client, so by the time purgeGo()'s own success handler runs, the server is already
+  // at 0 rows — the same order of events a live purge actually has.
   await p.evaluate(() => {
     window.__functionCalls = [];
     window.__invokeFunction = (name, b) => {
       if (name === 'admin-actions' && b.action === 'purge_test_tickets') return { data: { ok: true, deletedCount: 42 }, error: null };
       return { data: null, error: { message: 'unexpected call: ' + name + ' ' + b.action } };
     };
+    window.__db.tickets = [];
   });
   await p.getByPlaceholder('000000').fill('123456');
   await p.getByRole('button', { name: /Delete every ticket/i }).click();
-  await p.waitForTimeout(500);
+  await p.waitForTimeout(1200); // room for refresh()'s own round trip through the stub
   body = await p.innerText('body');
   check('success names how many tickets were actually deleted', /\b42\b.*permanently deleted/i.test(body));
   const finalCall = await p.evaluate(() => (window.__functionCalls || []).slice(-1)[0]);
   check('the confirm phrase and code both travelled with the delete request',
     finalCall && finalCall.body.confirm === 'DELETE ALL TICKETS' && finalCall.body.code === '123456',
     JSON.stringify(finalCall));
+
+  // 2026-09-11, owner's report: withdrawn tickets kept appearing to "survive" a purge.
+  // The real Edge Function (verified separately, live) deletes every row unconditionally
+  // — deleted_at included, nothing spared — so there was never a scope gap in the
+  // delete itself. What was missing is proven here, without ever reloading the page:
+  // purge_test_tickets above ran and this device's own local `tickets` still holds the
+  // one seeded ticket from before the button was pressed, exactly the shape of the
+  // owner's report. If purgeGo() calls refresh() on success, the very next hydrate — the
+  // same one login/reconnect/Force Refresh already use — replaces that local array with
+  // the server's now-actually-empty one (simulated here by clearing DB.tickets to match
+  // what the real delete just did), and the survivor has nowhere left to be shown from.
+  const afterRefreshFix = await p.evaluate(() => window.__mkApp.state.data.tickets.length);
+  check('purging tells THIS DEVICE too — the local list is re-hydrated, not left stale',
+    afterRefreshFix === 0, afterRefreshFix);
 
   await p.getByRole('button', { name: /^Done$/ }).click();
   await p.waitForTimeout(300);
