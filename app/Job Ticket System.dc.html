@@ -1389,7 +1389,7 @@
             <!-- technician: ticket list -->
             <sc-if value="{{ techList }}" hint-placeholder-val="{{ true }}">
               <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
-                <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">My Job Tickets</h2>
+                <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:27px;margin:0;letter-spacing:-0.015em">Ticket Inbox</h2>
               </div>
               <div style="font-size:12px;color:var(--ink-faint);margin-bottom:14px">{{ techName }} · {{ myCount }}</div>
               <div class="mk-tech-actions">
@@ -1432,7 +1432,7 @@
               <div class="mk-card-grid mk-col-gap10">
                 <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="3">
                   <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px">
                       <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                       <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
                         <span style="font-size:10px;padding:3px 8px;letter-spacing:0.05em;background:var(--hue-indigo-wash);color:var(--hue-indigo)">CO-OP</span>
@@ -1448,9 +1448,26 @@
                            moment both signed documents are back and the ticket reaches
                            sent_finance (t.showZip, computed alongside statusChip's own
                            Collect Signature/Stamp condition). stopPropagation so the tap
-                           downloads the zip instead of also opening the ticket underneath. -->
+                           downloads the zip instead of also opening the ticket underneath.
+                           2026-09-11, owner's report: the button's own text was wrapping
+                           letter-by-letter ("Z"/"I"/"P" stacked vertically) whenever this
+                           row ran out of horizontal room next to the status chip and
+                           timestamp — a three-letter button quietly becoming three lines
+                           tall, which stretched this one tile past its neighbours in the
+                           grid. white-space:nowrap keeps the word itself always one
+                           horizontal line; flex:none stops it from being squeezed narrower
+                           than that line in the first place. flex-wrap on the row above is
+                           the release valve if the row genuinely has no room left: the
+                           whole button drops to its own new line as one horizontal unit,
+                           never a stack of letters. Caught by the full suite the same day:
+                           a11y.test.js flagged this exact button at 33px wide — a11y's own
+                           36px tap-target floor (UX-PRINCIPLES.md's "operated in nitrile
+                           gloves" reach rule), a genuine reach regression the a11y sweep
+                           had simply never exercised this list at before. padding/min-width
+                           widened to clear 36 in both directions without changing the text
+                           or the letter-wrap fix above. -->
                       <sc-if value="{{ t.showZip }}" hint-placeholder-val="{{ false }}">
-                        <button onClick="{{ t.zip }}" title="Download originals, copies, and the editable workbook" style="padding:3px 9px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink)">ZIP</button>
+                        <button onClick="{{ t.zip }}" title="Download originals, copies, and the editable workbook" style="padding:3px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink);white-space:nowrap;flex:none;min-width:36px">ZIP</button>
                       </sc-if>
                     </div>
                     <div style="display:flex;align-items:center;gap:11px">
@@ -2073,8 +2090,9 @@
             </button>
           </sc-for>
         </div>
-        <!-- The same status filter "My Job Tickets" has, adopted here (2026-09-10,
-             owner's request) — identical pill row, same reasoning: a horizontally-
+        <!-- The same status filter the technician's own Ticket Inbox has (called "My Job
+             Tickets" until 2026-09-11, when the owner asked for one shared name), adopted
+             here (2026-09-10, owner's request) — identical pill row, same reasoning: a horizontally-
              scrolling row rather than an mk-seg, since "Awaiting Review" alone is
              wider than a fifth of even a desktop column at this font size. -->
         <div class="mk-statusfilter" style="display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px">
@@ -2092,7 +2110,7 @@
         <div class="mk-card-grid mk-col-gap10">
           <sc-for list="{{ inboxRows }}" as="t" hint-placeholder-count="4">
             <div onClick="{{ t.open }}" class="mk-ticket-card" style="position:relative;padding:12px;border-left-color:{{ t.edge }};cursor:pointer;background:transparent">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px">
                 <span style="font-size:11px;padding:3px 9px;background:{{ t.chipBg }};color:{{ t.chipFg }};letter-spacing:0.04em">{{ t.statusLabel }}</span>
                 <sc-if value="{{ t.coop }}" hint-placeholder-val="{{ false }}">
                   <span style="font-size:10px;padding:3px 8px;letter-spacing:0.05em;background:var(--hue-indigo-wash);color:var(--hue-indigo)">CO-OP</span>
@@ -2101,6 +2119,18 @@
                   <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-faint)"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.presenceDot }}"></span>{{ t.presenceLabel }}</span>
                 </sc-if>
                 <span class="mk-hint-end">{{ t.noLabel }}</span>
+                <!-- 2026-09-11, owner's request: "i want the ops and admins to see the
+                     button the same way the ticket holder does. for all the 'collect'
+                     tickets." Same exportTicketZip the technician's own tile and the
+                     Reports tab both already use, same showZip condition minus the
+                     holder restriction — any Collect Signature/Stamp ticket, not only
+                     one this account happens to hold. white-space:nowrap/flex:none for
+                     the same reason as the technician's own copy of this button: without
+                     them the word wraps letter-by-letter under space pressure and blows
+                     the tile taller than its neighbours. -->
+                <sc-if value="{{ t.showZip }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ t.zip }}" title="Download originals, copies, and the editable workbook" style="padding:3px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.03em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid var(--accent);color:var(--accent-ink);white-space:nowrap;flex:none;min-width:36px">ZIP</button>
+                </sc-if>
               </div>
               <div style="display:flex;align-items:center;gap:11px">
                 <div class="mk-icon-chip" style="background:{{ t.tileBg }};color:{{ t.tileFg }}">{{ t.tileIcon }}</div>
@@ -2109,9 +2139,20 @@
                   <div style="font-size:13px;color:var(--ink-dim)">{{ t.locLine }}</div>
                 </div>
               </div>
-              <div style="display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(var(--ink-rgb),0.08);font-size:11px;color:var(--ink-faint)">
+              <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(var(--ink-rgb),0.08);font-size:11px;color:var(--ink-faint)">
                 <span>{{ t.crewLabel }}</span>
                 <span>{{ t.eventCount }} log lines</span>
+                <!-- 2026-09-11, owner's request: "give all the ticket tiles a ticket (ID
+                     for internal PWA use)... same unique ID dedicated for each ticket
+                     whether it was open or closed or withdrawn... so i can always refer
+                     to the ticket ID to signal a problem or fix something or force
+                     delete something with terminal." The ticket's own real id (t.id,
+                     already carried by ticketView on every row) — never reassigned,
+                     never reused, unaffected by whatever the customer-facing ticket
+                     NUMBER is doing (blank, forced, disputed, or the exact kind of
+                     confusion 1885's own duplicate-ticket incident this session caused).
+                     Monospace and faint so it reads as a reference, not a headline. -->
+                <span class="mk-hint-end" style="font-family:monospace;opacity:0.55" title="Internal ticket ID">{{ t.id }}</span>
               </div>
             </div>
           </sc-for>
@@ -2135,6 +2176,7 @@
                   <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ w.noLabel }} · {{ w.customer }}</div>
                   <div style="font-size:12px;color:var(--ink-faint);margin-top:2px">{{ w.who }}</div>
                   <div style="font-size:12px;color:var(--ink);margin-top:4px;overflow-wrap:anywhere">{{ w.why }}</div>
+                  <div style="font-family:monospace;font-size:11px;opacity:0.55;margin-top:4px" title="Internal ticket ID">{{ w.id }}</div>
                 </div>
                 <button onClick="{{ w.open }}" style="flex:none;padding:6px 13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:transparent;border:1px solid rgba(var(--ink-rgb),0.3);color:var(--ink)">Open</button>
               </div>
@@ -12068,11 +12110,13 @@ class Component extends DCLogic {
     // exactly what downloads — the slider cannot mean one thing in the table and another
     // in the file.
     // A ticket list grows without bound, and a year of jobs is a long scroll on a phone.
-    // Ten at a time, with the rest a press away — the search is there so nobody has to
-    // scroll at all when they already know the number. Matching goes wider than the
-    // ticket number because someone hunting a job often remembers the well before the
-    // number, and a wider match costs nothing.
-    const TICKET_PAGE = 10;
+    // Twelve at a time (owner's request, 2026-09-11, raised from ten), with the rest a
+    // press away — the search is there so nobody has to scroll at all when they already
+    // know the number. Matching goes wider than the ticket number because someone
+    // hunting a job often remembers the well before the number, and a wider match costs
+    // nothing. Every reset below reads this constant rather than repeating the number,
+    // so the page size and the "load N more" wording can never drift apart again.
+    const TICKET_PAGE = 12;
     const ticketQuery = (S.ticketQuery || '').trim().toLowerCase();
     const matchesQuery = (x) => {
       if (!ticketQuery) return true;
@@ -12093,8 +12137,8 @@ class Component extends DCLogic {
     };
     const techStatusFilter = S.techStatusFilter || '';
     const matchesTechStatus = (x) => !techStatusFilter || techStatusBucket(x) === techStatusFilter;
-    // 2026-09-10, owner's request: the same status filter "My Job Tickets" already has,
-    // adopted onto the office's own Inbox — its own state so switching between the two
+    // 2026-09-10, owner's request: the same status filter the technician's own Ticket
+    // Inbox already has, adopted onto the office's own Inbox — its own state so switching between the two
     // screens (an admin/founder can work as a technician and back) never carries one
     // screen's filter choice into the other's.
     const mgrStatusFilter = S.mgrStatusFilter || '';
@@ -12216,13 +12260,25 @@ class Component extends DCLogic {
     // "Has the office ever received this?", not "is it up to date right now".
     //
     // The filter used to be `x.synced` alone, which was fine while a synced ticket only
-    // ever went un-synced by being edited in the field. It stopped being fine when the
-    // ticket started moving after approval: downloading the final sheets marks the row
-    // unsynced so the change travels, and the ticket promptly disappeared out of the
-    // office's own inbox — the one screen that most needed to show it had moved. A ticket
-    // the office has a copy of belongs in the inbox whether or not the latest local
-    // change has been pushed back yet.
-    const everReached = (x) => x.synced || !!x.syncedAt;
+    // ever went un-synced by being edited in the field. It stopped being fine once a
+    // ticket could move again after approval (a signed document coming back, which still
+    // marks the row unsynced so that status change travels) — a ticket mid-flight on a
+    // LATER edit could vanish from the one screen that most needed to show it moved.
+    //
+    // 2026-09-11, owner's report, live: ticket 1885 — approved, sitting right in front of
+    // Awhida's own Ticket Inbox hydrate — read as invisible under the Approved filter and
+    // only surfaced through the Collect Signature/Stamp tile's own separate query
+    // (awaitingDocs, which never checked this at all). Its own `synced`/`synced_at`
+    // columns were stuck false/null — a straggler from the exact four-way duplicate this
+    // session already found and fixed the root cause of (see claimTicketCreate) — and
+    // neither of the two checks above can ever become true for a row nothing will ever
+    // resend. `x.synced`/`x.syncedAt` are this ROW's own bookkeeping from whichever
+    // device last wrote it — meaningful for a technician's still-open 'logging' job,
+    // meaningless once the ticket has moved past its very first status at all: nothing
+    // gets a ticket out of 'logging' without a write the server already accepted (an
+    // approval, a hand-over, a cancellation), so a status past 'logging' is its own
+    // proof of having reached the server, regardless of what a stale sync bit says.
+    const everReached = (x) => x.synced || !!x.syncedAt || x.status !== 'logging';
     // A cancelled job is final once it has sat that way for ARCHIVE_DAYS — office can
     // still withdraw it (enforce_ticket_update_rules already restricts that to staff),
     // but it drops out of the ordinary Inbox view so it stops competing with real work.
@@ -13916,7 +13972,7 @@ class Component extends DCLogic {
       // A filter, not a second list. The tickets are already on this screen; showing them
       // again above it was the bug. Tapping narrows what is below to exactly those jobs,
       // and tapping again puts everything back — so the way out is the way in.
-      toggleAwaitingFilter: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
+      toggleAwaitingFilter: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: TICKET_PAGE }),
       awaitingFilterAction: S.awaitingFilter ? 'Show all' : 'Show these',
       // Matches the office's own Collect Signature/Stamp tile (mgrStats) — same
       // reasoning as its own comment: no rgba(var(--hue-indigo-rgb),…) exists, only the
@@ -14056,7 +14112,7 @@ class Component extends DCLogic {
         key, label,
         bg: techStatusFilter === key ? 'var(--accent)' : 'transparent',
         fg: techStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
-        pick: () => this.setState({ techStatusFilter: key, ticketLimit: 10 }),
+        pick: () => this.setState({ techStatusFilter: key, ticketLimit: TICKET_PAGE }),
       })),
       // The same filter, adopted onto the office's own Inbox (2026-09-10, owner's
       // request) — same buckets, same pill row, its own state (see matchesMgrStatus).
@@ -14065,7 +14121,7 @@ class Component extends DCLogic {
         key, label,
         bg: mgrStatusFilter === key ? 'var(--accent)' : 'transparent',
         fg: mgrStatusFilter === key ? 'var(--on-accent)' : 'var(--ink)',
-        pick: () => this.setState({ mgrStatusFilter: key, ticketLimit: 10 }),
+        pick: () => this.setState({ mgrStatusFilter: key, ticketLimit: TICKET_PAGE }),
       })),
       techList: S.techScreen === 'list', techNew: S.techScreen === 'new', techLog: S.techScreen === 'log',
       myHasMore: myPage.hasMore,
@@ -14107,7 +14163,7 @@ class Component extends DCLogic {
         // the ticket exists, rather than after.
         if (!claimTicketCreate(dr)) {
           this.toast('dupticket', 'A ticket for ' + dr.customer + ' at ' + dr.well
-            + ' was just started moments ago — not creating a second one. Check My Job Tickets; it should already be there.', 'warn');
+            + ' was just started moments ago — not creating a second one. Check the Ticket Inbox; it should already be there.', 'warn');
           this.setState({ techScreen: 'list', draft: null });
           return;
         }
@@ -14674,7 +14730,7 @@ class Component extends DCLogic {
         bg: S.awaitingFilter ? 'var(--hue-indigo-wash)' : 'transparent',
         cursor: 'pointer',
         action: S.awaitingFilter ? 'Show all' : 'Show these',
-        pick: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: 10 }),
+        pick: () => this.setState({ awaitingFilter: !S.awaitingFilter, ticketLimit: TICKET_PAGE }),
       }] : []).concat(archivedCancelled.length ? [{
         // 2026-09-09, owner's request: a cancelled job "stays for a couple of days to
         // allow withdrawal then gets archived." Archived means out of the ordinary
@@ -14685,7 +14741,7 @@ class Component extends DCLogic {
         bg: S.showArchived ? 'rgba(var(--ink-rgb),0.1)' : 'transparent',
         cursor: 'pointer',
         action: S.showArchived ? 'Hide these' : 'Show these',
-        pick: () => this.setState({ showArchived: !S.showArchived, ticketLimit: 10 }),
+        pick: () => this.setState({ showArchived: !S.showArchived, ticketLimit: TICKET_PAGE }),
       }] : []),
       inboxRows: inboxPage.rows.map(x => Object.assign(this.ticketView(x), {
         actionLabel: this.settled(x) ? 'View' : 'Review',
@@ -14693,6 +14749,18 @@ class Component extends DCLogic {
         // 2026-09-10, owner's request: the whole tile opens review now, the same as a
         // technician's own ticket card — not only a small button inside it.
         open: () => this.openReview(x.id),
+        // 2026-09-11, owner's request: "i want the ops and admins to see the button the
+        // same way the ticket holder does. for all the 'collect' tickets." Same
+        // condition as the technician's own tile (statusChip's own Collect Signature/
+        // Stamp test), minus holderOf(x) === myName — the office is not the holder of
+        // any ticket, and should see this for every ticket at that stage, not none.
+        showZip: x.status === 'approved' && this.signedDocsMissing(x).length > 0,
+        zip: (e) => {
+          if (e && e.stopPropagation) e.stopPropagation();
+          this.runLatest('zip:' + x.id, () => this.exportTicketZip(x)
+            .then(no => this.toast('zip-' + no, 'Ticket ' + no + ' downloaded as a zip — originals in one PDF, copies in another, and an editable workbook.', 'ok'))
+            .catch(() => this.toast('zip-fail', 'Could not build that download on this device.', 'warn')));
+        },
       })),
       // Withdrawn tickets, kept where the office can find them and put them back. Not in
       // the table above: they are not work, and folding them in would make "awaiting
@@ -14708,11 +14776,11 @@ class Component extends DCLogic {
       inboxHasMore: inboxPage.hasMore,
       inboxMoreLabel: inboxPage.moreLabel,
       inboxCountLabel: inboxPage.countLabel,
-      loadMoreTickets: () => this.setState({ ticketLimit: (S.ticketLimit || 10) + 10 }),
+      loadMoreTickets: () => this.setState({ ticketLimit: (S.ticketLimit || TICKET_PAGE) + TICKET_PAGE }),
       ticketQuery: S.ticketQuery || '',
       // Any new search starts from the top of the list again, otherwise a narrowed
       // result would still be capped by however far the previous one had been expanded.
-      setTicketQuery: e => this.setState({ ticketQuery: e.target.value, ticketLimit: 10 }),
+      setTicketQuery: e => this.setState({ ticketQuery: e.target.value, ticketLimit: TICKET_PAGE }),
       // Built from the technicians who actually have tickets rather than from the
       // user list, so the filter never offers a name that would return nothing.
       techFilterValue: S.techFilter || '',

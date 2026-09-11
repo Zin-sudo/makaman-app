@@ -1,4 +1,4 @@
-// A year of jobs is a long scroll on a phone. Ten at a time, the rest a press away, and
+// A year of jobs is a long scroll on a phone. Twelve at a time, the rest a press away, and
 // a search so nobody scrolls at all when they already know the number.
 const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
@@ -60,13 +60,13 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   // The Inbox's table became simple ticket tiles, same style as a technician's own
   // list (2026-09-10) — count tiles, not table rows.
   const rows = () => p.locator('.mk-ticket-card').count();
-  check('the inbox opens with ten, not everything', await rows() === 10, String(await rows()));
+  check('the inbox opens with twelve, not everything', await rows() === 12, String(await rows()));
   check('and says how many there are', /2[0-9] tickets/.test(await p.innerText('body')),
     (await p.innerText('body')).split('\n').find(l => /tickets$/.test(l.trim())) || '');
 
-  await p.getByRole('button', { name: /Load 10 more/i }).click();
+  await p.getByRole('button', { name: /Load 12 more/i }).click();
   await p.waitForTimeout(500);
-  check('load more adds ten', await rows() === 20, String(await rows()));
+  check('load more adds twelve', await rows() === 24, String(await rows()));
   await p.getByRole('button', { name: /Load \d+ more/i }).click();
   await p.waitForTimeout(500);
   const all = await rows();
@@ -84,7 +84,7 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   // search resets the paging rather than staying expanded
   await box.fill('');
   await p.waitForTimeout(500);
-  check('clearing the search returns to ten', await rows() === 10, String(await rows()));
+  check('clearing the search returns to twelve', await rows() === 12, String(await rows()));
 
   // wider than the number, because people remember the well
   await box.fill('WELL-12');
@@ -111,16 +111,16 @@ const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'P
   await t2.getByRole('button', { name: /log in/i }).click();
   await t2.waitForTimeout(1000);
   const cards = () => t2.locator('.mk-ticket-card').count();
-  check('the technician list also opens with ten', await cards() === 10, String(await cards()));
+  check('the technician list also opens with twelve', await cards() === 12, String(await cards()));
   const tbox = t2.getByPlaceholder(/Search ticket no/i).first();
   await tbox.fill('7011');
   await t2.waitForTimeout(500);
   check('and searches the same way', await cards() === 1, String(await cards()));
   await tbox.fill('');
   await t2.waitForTimeout(500);
-  await t2.getByRole('button', { name: /Load 10 more/i }).click();
+  await t2.getByRole('button', { name: /Load 12 more/i }).click();
   await t2.waitForTimeout(500);
-  check('and pages the same way', await cards() === 20, String(await cards()));
+  check('and pages the same way', await cards() === 24, String(await cards()));
   await t2.close();
 
   console.log(`\n${pass} passed, ${fail} failed`);

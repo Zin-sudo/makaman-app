@@ -72,11 +72,14 @@ const login = async (p, email) => {
       /AS TECHNICIAN/i.test(after.role) && /OPS MANAGER/i.test(after.role), 'corner: ' + after.role);
     check('a way back is offered', /back to ops manager/i.test(after.text));
     // "Awaiting review" alone stopped being a safe proxy for "the office Inbox is
-    // showing" once My Job Tickets grew its own status filter with an "Awaiting Review"
-    // pill (2026-09-09) — that pill is CORRECTLY present once swapped into the
-    // technician shell. "Ticket Inbox" is the office screen's own page heading and
+    // showing" once the technician's own list grew a status filter with an "Awaiting
+    // Review" pill (2026-09-09) — that pill is CORRECTLY present once swapped into the
+    // technician shell. "Ticket Inbox" stopped being a safe proxy too, 2026-09-11:
+    // the technician's own screen (previously "My Job Tickets") was renamed to the same
+    // "Ticket Inbox" title so the owner can refer to either screen by one name. The
+    // office Inbox's own subtitle line — "Uploaded from the field" — is unique to it and
     // appears nowhere in the technician shell.
-    check('the office inbox is gone', !/Ticket Inbox/i.test(after.text));
+    check('the office inbox is gone', !/Uploaded from the field/i.test(after.text));
 
     // The capability check that matters: approving is an ops-manager act and must be
     // unavailable while swapped.

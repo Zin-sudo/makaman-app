@@ -31,6 +31,7 @@ async function boot(ctx, email) {
   return p;
 }
 const card = (p, needle) => p.locator('.mk-ticket-card', { hasText: needle });
+const tab = async (p, n) => { await p.getByRole('button', { name: new RegExp('^' + n + '$', 'i') }).last().click(); await p.waitForTimeout(500); };
 
 (async () => {
   fs.rmSync(DL, { recursive: true, force: true }); fs.mkdirSync(DL, { recursive: true });
@@ -119,6 +120,50 @@ const card = (p, needle) => p.locator('.mk-ticket-card', { hasText: needle });
     check('the ticket still shows on the co-op member\'s own list',
       await card(p, 'Kuwait Oil Group').count() === 1);
     check('but the zip button is his colleague\'s to use, not this device\'s',
+      await card(p, 'Kuwait Oil Group').getByRole('button', { name: /^ZIP$/ }).count() === 0);
+    await ctx.close();
+  }
+
+  // ── 2026-09-11, owner's request: "i want the ops and admins to see the button the
+  // same way the ticket holder does. for all the 'collect' tickets." Ticket t1 (Kuwait
+  // Oil Group) is held by Yousef, not by either office account below — the whole point
+  // of the ask is that the office does not need to hold a ticket to reach its zip. ──
+  {
+    const ctx = await b.newContext({ acceptDownloads: true });
+    const p = await boot(ctx, 'omar@makaman.ly');
+    await tab(p, 'Tickets');
+    check('ops sees the Collect Signature/Stamp ticket in the Inbox, unheld',
+      await card(p, 'Kuwait Oil Group').locator('text=COLLECT SIGNATURE/STAMP').count() > 0);
+    check('and gets the same ZIP button the holder gets, with no need to open the ticket',
+      await card(p, 'Kuwait Oil Group').getByRole('button', { name: /^ZIP$/ }).count() === 1);
+    const dl = p.waitForEvent('download', { timeout: 30000 });
+    await card(p, 'Kuwait Oil Group').getByRole('button', { name: /^ZIP$/ }).click();
+    const d = await dl;
+    check('and tapping it actually downloads the bundle, same as the technician\'s own tile',
+      d.suggestedFilename().length > 0);
+    await ctx.close();
+  }
+  {
+    const ctx = await b.newContext({ acceptDownloads: true });
+    const p = await boot(ctx, 'lateri@makaman.ly');
+    await tab(p, 'Tickets');
+    check('admin gets the same ZIP button on the Inbox tile too',
+      await card(p, 'Kuwait Oil Group').getByRole('button', { name: /^ZIP$/ }).count() === 1);
+    // Once it reaches finance the button leaves the office's own copy of the tile too —
+    // same lifecycle boundary as the technician's, since both read showZip off the same
+    // status/signedDocsMissing shape.
+    await p.evaluate(() => {
+      window.__mkApp.mutate(d => {
+        const t = d.tickets.find(x => x.id === 't1');
+        t.status = 'sent_finance';
+        t.attachments = [
+          { id: 'a1', docKind: 'service_ticket', filename: 'svc.pdf' },
+          { id: 'a2', docKind: 'job_log', filename: 'log.pdf' },
+        ];
+      });
+    });
+    await p.waitForTimeout(500);
+    check('and disappears from the office Inbox tile once finance has both documents',
       await card(p, 'Kuwait Oil Group').getByRole('button', { name: /^ZIP$/ }).count() === 0);
     await ctx.close();
   }
