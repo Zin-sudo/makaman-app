@@ -180,11 +180,17 @@ const reasonBox = (p) => p.locator('textarea[placeholder*="recorded in the audit
     const inbox = await text(p);
     check('it is gone from the inbox table',
       !/Al-Dhafra Energy[\s\S]{0,200}Review/i.test(inbox));
-    // But not into thin air.
+    // But not into thin air — one summary row on the inbox itself (2026-09-16: no longer
+    // the full list stacked underneath it), leading to its own page for the detail.
     check('and listed as withdrawn, where it can be found',
       /withdrawn ticket/i.test(inbox));
+    await p.getByRole('button', { name: /withdrawn ticket/i }).first().click();
+    await p.waitForTimeout(500);
+    const withdrawnPage = await text(p);
     check('the withdrawn entry says who and why',
-      /Omar Al-Saleh/.test(inbox) && /wrong customer/i.test(inbox));
+      /Omar Al-Saleh/.test(withdrawnPage) && /wrong customer/i.test(withdrawnPage));
+    await p.getByRole('button', { name: /‹ Inbox/ }).click();
+    await p.waitForTimeout(400);
 
     // Restore.
     await openOffice(p, 't2');

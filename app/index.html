@@ -1259,14 +1259,21 @@
   </sc-if>
 
   <!-- ══ SETTINGS (overlay, any role) ══ -->
+  <!-- 2026-09-16, owner's report: this used to sit at inset:0 — full viewport, z-index 50
+       — which paints over both the real appbar above (sticky, z-index 30) and, for a
+       technician, the phone shell's own in-flow bottom nav underneath it, since a fixed
+       overlay covers whatever is spatially behind it regardless of DOM order once its own
+       z-index wins. Settings is a secondary page, not a takeover: it now starts below the
+       real appbar (58px, the same offset the notifications panel already uses) so that bar
+       — logo, bell, name — stays visible and usable, and carries its own bottom nav footer
+       built from the same shared `navTabs` the technician and office bars already use
+       (see showDeskNav below), so a nav tab is reachable without closing Settings first.
+       The old internal logo/wordmark header is dropped along with it — redundant now that
+       the real appbar is showing above. -->
   <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
-    <div style="position:fixed;inset:0;background:var(--ground);z-index:50;overflow-y:auto">
-      <div style="max-width:480px;margin:0 auto;padding:26px 22px 60px">
+    <div style="position:fixed;top:58px;left:0;right:0;bottom:0;background:var(--ground);z-index:50;overflow-y:auto">
+      <div style="max-width:480px;margin:0 auto;padding:26px 22px 90px">
         <button onClick="{{ closeSettings }}" class="back-btn">‹ Close</button>
-        <div class="mk-wordmark" style="height:32px;justify-content:center;margin:8px 0 20px">
-          <img src="uploads/makaman-logo-mark.png" alt="">
-          <span style="font-size:22px"><span class="mk-wm-1">Makaman</span> <span class="mk-wm-2">Libya</span></span>
-        </div>
         <h2 style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:28px;margin:0 0 24px">Settings</h2>
 
         <div style="margin-bottom:28px">
@@ -1362,6 +1369,18 @@
         <div style="text-align:center;font-size:10px;letter-spacing:0.08em;color:var(--ink-faint);margin:2px 0 10px">BUILD {{ buildStamp }}</div>
         <button onClick="{{ doLogout }}" style="width:100%;padding:13px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;background:var(--danger);color:var(--on-danger);border:1px solid var(--danger)">Log out</button>
       </div>
+    </div>
+    <!-- Same shared navTabs the technician's in-page bar and the office's showDeskNav
+         both render — Settings gets its own fixed copy so the bar survives being covered
+         by the overlay above, for every role, without needing Settings to know which shell
+         it was opened from. -->
+    <div style="position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;border-top:1px solid rgba(var(--ink-rgb),0.14);background:var(--surface);padding-bottom:env(safe-area-inset-bottom)">
+      <sc-for list="{{ navTabs }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.pick }}" class="{{ n.cls }}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 0 11px;cursor:pointer;background:transparent;border:0;color:{{ n.color }}">
+          {{ n.glyph }}
+          <span style="font-size:10px;letter-spacing:0.03em;font-weight:{{ n.weight }}">{{ n.label }}</span>
+        </button>
+      </sc-for>
     </div>
   </sc-if>
 
@@ -2210,12 +2229,32 @@
           </sc-if>
         </div>
 
-        <!-- Withdrawn tickets, below the work rather than inside it. Deliberately not
-             hidden behind a filter: a list of removed things that nobody can see is how
-             a removal becomes a disappearance. -->
+        <!-- 2026-09-16, owner's report: this used to be the full withdrawn-tickets list,
+             stacked under the working inbox — every withdrawn ticket rendered in full,
+             piling up under each other the same way the awaiting-paperwork backlog once
+             did (see the "Applied here so far" table in UX-PRINCIPLES.md: an unbounded
+             list of rows became one count that led somewhere). Withdrawn tickets get the
+             same treatment: one row here, the list itself moved to its own page
+             (goWithdrawn / mgrWithdrawn below) — reachable, not piled into a screen whose
+             job is the working inbox. -->
         <sc-if value="{{ hasWithdrawn }}" hint-placeholder-val="{{ false }}">
-          <div style="margin-top:28px;border:1px solid rgba(var(--ink-rgb),0.16)">
-            <div style="padding:10px 14px;border-bottom:1px solid rgba(var(--ink-rgb),0.12);font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)">{{ withdrawnHeading }}</div>
+          <button onClick="{{ goWithdrawn }}" style="width:100%;display:flex;align-items:center;gap:12px;margin-top:28px;padding:13px 14px;text-align:left;cursor:pointer;background:var(--surface);border:1px solid rgba(var(--ink-rgb),0.16);color:var(--ink)">
+            <div class="mk-flex1">
+              <div style="font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:15px">{{ withdrawnHeading }}</div>
+              <div style="font-size:12px;color:var(--ink-faint);margin-top:2px">Removed from the working list — kept here, and can still be opened or restored.</div>
+            </div>
+            <span style="flex:none;color:var(--ink-faint)">{{ withdrawnChevron }}</span>
+          </button>
+        </sc-if>
+      </sc-if>
+
+      <!-- ══ WITHDRAWN TICKETS (its own page, not stacked under the inbox) ══ -->
+      <sc-if value="{{ mgrWithdrawn }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ backToInbox }}" class="back-btn">‹ Inbox</button>
+        <h2 class="mk-page-title">Withdrawn Tickets</h2>
+        <div class="mk-muted-mb20">Removed from the working inbox, not deleted. Open one to see why, or to restore it.</div>
+        <sc-if value="{{ hasWithdrawn }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid rgba(var(--ink-rgb),0.16)">
             <sc-for list="{{ withdrawnRows }}" as="w" hint-placeholder-count="2">
               <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-top:1px solid rgba(var(--ink-rgb),0.08)">
                 <div class="mk-flex1">
@@ -2228,6 +2267,9 @@
               </div>
             </sc-for>
           </div>
+        </sc-if>
+        <sc-if value="{{ withdrawnEmptyNow }}" hint-placeholder-val="{{ false }}">
+          <div class="mk-note" style="padding:14px;font-size:13px;color:var(--ink-faint)">Nothing withdrawn right now — the last one still here was restored.</div>
         </sc-if>
       </sc-if>
 
@@ -9442,11 +9484,15 @@ class Component extends DCLogic {
   // Fetching the master workbook. A link that expires, minted for the person asking —
   // never a permanent URL, because the object is every approved job's totals and a URL
   // that never dies is a URL that eventually leaks (B-12.4).
+  //
+  // 2026-09-11: the real company workbook lives in its own bucket, 'master' — not
+  // 'exports', which the old generic-report placeholder used and which (migration 0080)
+  // turns out to have never actually carried a read policy at all.
   downloadMaster() {
     const c = sb();
     const m = (this.state.data || {}).masterExport;
     if (!c || !m || !m.path) { this.toast('master', 'No master file has been built yet.', 'warn'); return; }
-    c.storage.from('exports').createSignedUrl(m.path, 60)
+    c.storage.from('master').createSignedUrl(m.path, 60)
       .then(r => {
         if (r.error || !r.data) throw r.error || new Error('Could not get a link.');
         // Opened rather than fetched: the browser handles the download, and nothing about
@@ -13564,7 +13610,10 @@ class Component extends DCLogic {
           // open when the tab was left. roleTab and mgrScreen/techScreen are separate,
           // so without this a manager who wandered off the print preview came back to
           // the print preview rather than the inbox.
-          pick: () => this.leaveReview(() => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null })),
+          // 2026-09-16: also closes Settings, since Settings now carries its own copy of
+          // this same bar (see the SETTINGS overlay above) — tapping a destination while
+          // Settings is open should land there, not leave Settings covering it.
+          pick: () => this.leaveReview(() => this.setState({ roleTab: x.key, mgrScreen: 'inbox', techScreen: 'list', adminTab: null, showSettings: false })),
         };
       }),
 
@@ -13650,7 +13699,17 @@ class Component extends DCLogic {
           const lastAt = stamps.length ? Math.max.apply(null, stamps) : null;
           const open = mine.filter(x => x.status === 'logging');
           const closed = mine.filter(x => x.status !== 'logging');
-          const pending = mine.filter(x => x.status !== 'logging' && !x.synced).length;
+          // 2026-09-16, owner's report: this counted `!x.synced` — a ticket's own stale
+          // sync bit, meaningful only while the ticket itself is still 'logging' (see
+          // everReached()'s own comment: nothing moves a ticket past 'logging' without a
+          // write the server already accepted, so a device that closed the job, handed it
+          // off, or simply never flips this flag back can sit here reading "not uploaded"
+          // forever on a ticket whose paperwork is actually complete). "Not uploaded" is
+          // about the signed paperwork specifically — the same settled()+
+          // signedDocsMissing() pair awaitingDocs() already uses, so this cannot disagree
+          // with the Awaiting-paperwork tile or the Collect Signature/Stamp chip about the
+          // same ticket.
+          const pending = mine.filter(x => this.settled(x) && this.signedDocsMissing(x).length).length;
           // Two coordinates, not one blended "whichever is newest" — 2026-09-04, owner's
           // request, after an earlier pass put both under every open job and put a
           // third, redundant reading here too. Well location is the opening fix, taken
@@ -14859,6 +14918,11 @@ class Component extends DCLogic {
       mgrInbox: S.mgrScreen === 'inbox', mgrReview: S.mgrScreen === 'review', mgrPrint: S.mgrScreen === 'print',
       mgrTeam: S.mgrScreen === 'team',
       goTeam: () => this.setState({ mgrScreen: 'team' }),
+      // 2026-09-16, owner's report: withdrawn tickets used to render as a full list
+      // stacked under the working inbox. Same fix as the awaiting-paperwork backlog
+      // (UX-PRINCIPLES.md #1/#5) — one row here, the list itself on its own page.
+      mgrWithdrawn: S.mgrScreen === 'withdrawn',
+      goWithdrawn: () => this.setState({ mgrScreen: 'withdrawn' }),
       awaitingCount: awaiting.length,
       // Four figures and, when there is one, a fifth that does something.
       //
@@ -14928,6 +14992,12 @@ class Component extends DCLogic {
       hasWithdrawn: withdrawnAll.length > 0,
       withdrawnHeading: withdrawnAll.length === 1
         ? '1 withdrawn ticket' : withdrawnAll.length + ' withdrawn tickets',
+      withdrawnChevron: icon('chevron', 16),
+      // The withdrawn page's own entry point (hasWithdrawn) already hides it once nothing
+      // is withdrawn, but a restore performed while the page itself is open can bring the
+      // count to zero without a navigation happening — this is the on-page empty state for
+      // exactly that moment, not a duplicate of the inbox's own entry condition.
+      withdrawnEmptyNow: withdrawnAll.length === 0,
       inboxHasMore: inboxPage.hasMore,
       inboxMoreLabel: inboxPage.moreLabel,
       inboxCountLabel: inboxPage.countLabel,
@@ -15245,10 +15315,18 @@ class Component extends DCLogic {
       // treats a hydrated map as final, so a key with no row behind it is simply false
       // for everyone and the control would never have appeared.
       customerEditable: !!t && !locked && this.hasPermission('ticket.edit_closed'),
-      customerNote: (t && (t.items || []).length)
+      // 2026-09-11, owner's report: this read only "does the ticket have any charged
+      // lines at all", so a ticket that was ALWAYS priced against its one and only
+      // customer — no switch ever made — showed "priced from the old list — check them"
+      // regardless, forever, for no reason a person reading it could act on (ticket 1886,
+      // three ordinary Waha lines, customer never touched). The warning only means
+      // something once a customer switch has actually happened — pickReviewCustomer's own
+      // audit entry ("Customer changed by …") is the one durable record of that, so that
+      // is what this checks now instead of just counting lines.
+      customerNote: (t && (t.items || []).length && (t.audit || []).some(a => /^Customer changed by /.test(a.text || '')))
         ? (t.items || []).length + ' charged line(s) were priced from the old list — check them.'
         : 'Sets which price list the charged lines come from.',
-      customerNoteTone: (t && (t.items || []).length) ? 'var(--warning-ink)' : 'var(--ink-faint)',
+      customerNoteTone: (t && (t.items || []).length && (t.audit || []).some(a => /^Customer changed by /.test(a.text || ''))) ? 'var(--warning-ink)' : 'var(--ink-faint)',
       pickReviewCustomer: (e) => {
         const to = e.target.value;
         const from = (t || {}).customer || '';

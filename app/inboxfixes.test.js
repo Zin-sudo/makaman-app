@@ -163,6 +163,10 @@ const card = (p, needle) => p.locator('.mk-ticket-card', { hasText: needle });
       const d = JSON.parse(localStorage.getItem('makaman.jobtickets.v2'));
       return (d.tickets.find(x => x.id === 't2') || {}).id;
     });
+    // 2026-09-16: the withdrawn list itself moved to its own page (no longer stacked
+    // under the inbox) — reached through the one summary row the inbox now shows.
+    await p.getByRole('button', { name: /withdrawn ticket/i }).first().click();
+    await p.waitForTimeout(500);
     const body = await p.innerText('body');
     check('the withdrawn row prints that ticket\'s own raw id too',
       !!id2 && body.indexOf(id2) !== -1, id2);

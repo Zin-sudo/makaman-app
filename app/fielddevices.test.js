@@ -118,6 +118,35 @@ const tab = async (p, name) => {
     rows.every(r => r.marker === '⛑️'), JSON.stringify(rows));
   await p4.close();
 
+  // 2026-09-16, owner's report: a technician's tile read "1 not uploaded" for a job whose
+  // paperwork — both signed documents — was already there. The count was reading the
+  // ticket's own stale `synced` bit (meaningful only while a job is still 'logging'), not
+  // whether the signed paperwork itself had actually arrived.
+  {
+    const p5 = await signIn(browser, 'omar@makaman.ly');
+    await p5.evaluate(() => window.__mkApp.mutate(d => {
+      const t = d.tickets.find(x => x.id === 't1'); // approved, held by Yousef Al-Harbi
+      t.synced = false; // the stale bit on its own used to be enough to trip "not uploaded"
+      t.attachments = [
+        { id: 'a1', docKind: 'service_ticket', url: 'x', uploadedAt: new Date().toISOString() },
+        { id: 'a2', docKind: 'job_log', url: 'y', uploadedAt: new Date().toISOString() },
+      ];
+    }));
+    body = await tab(p5, 'Sync');
+    check('both signed documents present, but synced=false: does NOT read "not uploaded"',
+      !/not uploaded/i.test(body), body.match(/\d+ not uploaded/i));
+
+    await p5.evaluate(() => window.__mkApp.mutate(d => {
+      const t = d.tickets.find(x => x.id === 't1');
+      t.attachments = t.attachments.filter(a => a.docKind !== 'job_log'); // one real gap now
+    }));
+    await p5.waitForTimeout(300);
+    body = await tab(p5, 'Sync');
+    check('one of the two signed documents genuinely missing: reads "1 not uploaded"',
+      /1 not uploaded/i.test(body), body.match(/\d+ not uploaded/i));
+    await p5.close();
+  }
+
   await browser.close();
   console.log(`\n  ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

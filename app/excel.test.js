@@ -8,6 +8,7 @@ const { chromium } = require('playwright-core');
 const URL = 'http://localhost:8934/index.html';
 let pass = 0, fail = 0;
 const check = (n, ok, extra) => { ok ? pass++ : fail++; console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${n}${extra ? '   ' + extra : ''}`); };
+const { makeDB, STUB, assertStubParses } = require('./cloudstub.js');
 
 async function open(ctx) {
   const p = await ctx.newPage();
@@ -93,6 +94,54 @@ const login = async (p, email) => {
       /Last build failed: /.test(src));
     check('freshness comes from the run record, not from a guess',
       /export_runs/.test(src) && /masterExport/.test(src));
+    await ctx.close();
+  }
+
+  // ── Download signs against the bucket the real workbook actually lives in ──
+  //
+  // 2026-09-11: the real company workbook (Special Tools/Fishing/Drilling) was seeded
+  // into its own bucket, 'master' — not 'exports', the placeholder generic-report bucket
+  // downloadMaster() was still pointed at, which (a live check found) had never carried a
+  // read policy of its own at all. Caught here by reading which bucket the click actually
+  // signs against (cloudstub.js's own window.__signed, the one place a real
+  // storage.createSignedUrl call would land), not by reading the source text — 'local'
+  // demo mode never reaches sb() at all, so this needs the cloud stub the other checks
+  // in this file don't.
+  {
+    const DB = makeDB();
+    assertStubParses(DB);
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 }, serviceWorkers: 'block' });
+    const p = await ctx.newPage();
+    p.on('pageerror', e => console.log('  PAGEERROR:', e.message));
+    await p.route('**/vendor/supabase.umd.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: STUB(DB) }));
+    await p.addInitScript(() => {
+      window.MAKAMAN_CONFIG = { authMode: 'cloud', supabaseUrl: 'https://stub.test', supabaseKey: 'stub' };
+    });
+    await p.goto(URL, { waitUntil: 'networkidle' });
+    await p.waitForTimeout(300);
+    await p.evaluate(() => localStorage.clear());
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.waitForTimeout(700);
+    const i = p.locator('input');
+    await i.nth(0).fill('omar@makaman.ly'); await i.nth(1).fill('whatever');
+    await p.getByRole('button', { name: /log in/i }).click();
+    await p.waitForTimeout(1500);
+
+    await p.evaluate(() => {
+      const app = window.__mkApp;
+      app.setState({ data: Object.assign({}, app.state.data, {
+        masterExport: { status: 'ok', path: 'Master File.xlsm', at: new Date().toISOString(), rows: 2 },
+      }) });
+    });
+    await p.getByText('Account', { exact: true }).first().click();
+    await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^Reports/i }).first().click();
+    await p.waitForTimeout(500);
+    await p.getByRole('button', { name: /^download$/i }).click();
+    await p.waitForTimeout(300);
+    const signed = await p.evaluate(() => (window.__signed || []).slice(-1)[0]);
+    check('the download link is signed against the "master" bucket, where the real file lives',
+      !!signed && signed.bucket === 'master', JSON.stringify(signed));
     await ctx.close();
   }
 
