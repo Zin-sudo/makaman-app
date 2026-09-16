@@ -40,6 +40,9 @@ declare
   -- finds THIS one stale should do the same rather than let the guard go permanently red.
   logging_ticket uuid := '51c70333-3ba0-4f81-9302-4b2ccc40f35f';
   logging_ticket_holder uuid := 'ef5a965c-d0e8-4d15-99be-8c96d7091535';
+  -- Same person as logging_ticket_holder above (Lateri@makaman.ly, role=admin) — reused
+  -- under its own name here for a plain staff-read check (Guard 11), not a ticket holder.
+  admin_id uuid := 'ef5a965c-d0e8-4d15-99be-8c96d7091535';
   n_check boolean;
 begin
   -------------------------------------------------------------------------------------
@@ -321,12 +324,15 @@ begin
 
   begin
     for expected in
+      -- 2026-09-16: Waha/Zueitina both picked up a "(WOC)"/"(ZOC)" suffix on their client
+      -- name since this guard was written — counts unchanged (681/886), renamed only.
+      -- Updated here rather than left red, same as Guard 4's own precedent for fixture drift.
       select * from (values
-        ('Waha Oil Company', 681),
+        ('Waha Oil Company (WOC)', 681),
         ('AGOCO', 245),
         ('Harouge Oil Operations (HOO)', 424),
         ('Sirte Oil Company (SOC)', 372),
-        ('Zueitina Oil Company', 886)
+        ('Zueitina Oil Company (ZOC)', 886)
       ) as x(client_name, expected_count)
     loop
       select count(*) into n_before
@@ -519,6 +525,80 @@ begin
   exception when others then
     execute 'reset role';
     failures := failures || format(E'\n  [migration 0078 · founder Approved-value reads] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 11 (2026-09-16, migrations 0079/0080): the real Master File workbook lives in
+  -- its own 'master' storage bucket, and master_export_log records what has already been
+  -- appended to it — neither existed before this pass, and both are exactly the class of
+  -- fact a Playwright test cannot see (no real storage.objects RLS, no real
+  -- master_export_log table, behind the offline demo seed/cloudstub.js). Two things must
+  -- both hold: only staff/founder may ever read a row of either (export_runs' own read
+  -- audience, CLAUDE.md's activity-visibility rule), and master_export_log itself has NO
+  -- write door open to any signed-in account, staff included — same reasoning as
+  -- purge_confirmation_codes (Guard 8): only the master-export Edge Function's
+  -- service-role key may ever write it. Also the live cause of a real incident: the
+  -- 'master' bucket carried zero storage.objects policies at all until migration 0080,
+  -- so downloadMaster() could never actually mint a signed URL for a real
+  -- ops_manager/admin/founder session — only for calls made with the service-role key.
+  -------------------------------------------------------------------------------------
+  begin
+    insert into public.master_export_log (ticket_id, sheet, row_number)
+      values (logging_ticket, 'st', 999999);
+
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+    select exists(select 1 from public.master_export_log where row_number = 999999) into n_check;
+    if n_check then
+      failures := failures || E'\n  [master_export_log RLS] a technician can read master_export_log — master_export_log_select_staff (migration 0079) is missing or has widened past staff/founder.';
+    end if;
+    begin
+      insert into public.master_export_log (ticket_id, sheet, row_number) values (logging_ticket, 'st', 999998);
+      failures := failures || E'\n  [master_export_log RLS] a technician can INSERT into master_export_log — this table must have no write policy for any signed-in account, only the master-export Edge Function''s service-role key.';
+    exception when insufficient_privilege or others then
+      null; -- expected: no write policy exists for anyone
+    end;
+    execute 'reset role';
+
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', admin_id, 'role', 'authenticated')::text);
+    select exists(select 1 from public.master_export_log where row_number = 999999) into n_check;
+    if not n_check then
+      failures := failures || E'\n  [master_export_log RLS] a staff account cannot read master_export_log at all — master_export_log_select_staff (migration 0079) is missing.';
+    end if;
+    begin
+      insert into public.master_export_log (ticket_id, sheet, row_number) values (logging_ticket, 'st', 999997);
+      failures := failures || E'\n  [master_export_log RLS] a staff account can INSERT into master_export_log — only the master-export Edge Function''s service-role key should ever write this table; even staff must be refused a direct write.';
+    exception when insufficient_privilege or others then
+      null; -- expected: no write policy exists for anyone
+    end;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [master_export_log RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  begin
+    insert into storage.objects (bucket_id, name) values ('master', 'GUARD11-PROBE.bin');
+
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+    select exists(select 1 from storage.objects where bucket_id = 'master' and name = 'GUARD11-PROBE.bin') into n_check;
+    if n_check then
+      failures := failures || E'\n  [master bucket RLS] a technician can read an object in the ''master'' storage bucket — master_bucket_select_staff (migration 0080) is missing or has widened past staff/founder. The real company workbook must never be reachable by a plain technician session.';
+    end if;
+    execute 'reset role';
+
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', admin_id, 'role', 'authenticated')::text);
+    select exists(select 1 from storage.objects where bucket_id = 'master' and name = 'GUARD11-PROBE.bin') into n_check;
+    if not n_check then
+      failures := failures || E'\n  [master bucket RLS] a staff account cannot read the ''master'' storage bucket at all — master_bucket_select_staff (migration 0080) is missing or has narrowed. This is the exact live gap that made downloadMaster() silently unable to ever mint a signed URL for a real ops_manager/admin/founder session.';
+    end if;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [master bucket RLS] guard itself errored: %s', sqlerrm);
   end;
 
   -------------------------------------------------------------------------------------
