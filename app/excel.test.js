@@ -85,7 +85,7 @@ const login = async (p, email) => {
 
     check('the file is fetched by a signed link, never a public URL',
       /createSignedUrl\('?\w*'?/.test(src) && !/getPublicUrl/.test(src));
-    check('the link is short-lived', /createSignedUrl\(m\.path, 60\)/.test(src));
+    check('the link is short-lived', /createSignedUrl\(m\.path, 60, \{ download: true \}\)/.test(src));
     check('a rebuild goes through the Edge Function',
       /functions\.invoke\('master-export'/.test(src));
     check('the tile is gated on a capability',
@@ -142,6 +142,12 @@ const login = async (p, email) => {
     const signed = await p.evaluate(() => (window.__signed || []).slice(-1)[0]);
     check('the download link is signed against the "master" bucket, where the real file lives',
       !!signed && signed.bucket === 'master', JSON.stringify(signed));
+    // 2026-09-16, owner's report: opening the plain signed link left an iPhone's Safari
+    // spinning forever — it tries to preview a macro-enabled .xlsm via QuickLook instead
+    // of downloading it, and never finishes for one this size. download: true makes
+    // Storage answer with Content-Disposition: attachment, which is the actual fix.
+    check('the link is minted with download:true so the browser saves it rather than tries to preview it',
+      !!signed && signed.download === true, JSON.stringify(signed));
     await ctx.close();
   }
 

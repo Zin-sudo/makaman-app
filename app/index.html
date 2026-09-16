@@ -9492,7 +9492,13 @@ class Component extends DCLogic {
     const c = sb();
     const m = (this.state.data || {}).masterExport;
     if (!c || !m || !m.path) { this.toast('master', 'No master file has been built yet.', 'warn'); return; }
-    c.storage.from('master').createSignedUrl(m.path, 60)
+    // 2026-09-16, owner's report: opening the plain signed URL on an iPhone left Safari
+    // spinning forever on a blank tab — iOS tries to render a macro-enabled workbook
+    // (.xlsm) inline via QuickLook instead of downloading it, and QuickLook has no real
+    // preview for one this size/complexity, so it never finishes. `download: true` makes
+    // Storage answer with Content-Disposition: attachment, which is what actually tells
+    // Safari (and every other browser) to save the file rather than try to open it.
+    c.storage.from('master').createSignedUrl(m.path, 60, { download: true })
       .then(r => {
         if (r.error || !r.data) throw r.error || new Error('Could not get a link.');
         // Opened rather than fetched: the browser handles the download, and nothing about

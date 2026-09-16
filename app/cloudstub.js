@@ -458,8 +458,8 @@ window.supabase = {
               paths.forEach(function (x) { window.__removed.push({ bucket: bucket, path: x }); });
               return Promise.resolve({ data: [], error: null });
             },
-            createSignedUrl: function (path, ttl) {
-              window.__signed.push({ bucket: bucket, path: path, ttl: ttl });
+            createSignedUrl: function (path, ttl, options) {
+              window.__signed.push({ bucket: bucket, path: path, ttl: ttl, download: (options || {}).download });
               return Promise.resolve({ data: { signedUrl: 'https://stub.test/object/sign/' + path + '?token=abc' }, error: null });
             },
           };
