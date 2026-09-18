@@ -890,6 +890,19 @@
   .mk-td-pad8 { padding:8px 6px; border-bottom:1px solid rgba(var(--ink-rgb),0.08); }
   .mk-td-pad11 { padding:11px 12px; border-bottom:1px solid rgba(var(--ink-rgb),0.08); }
   .mk-table-plain { width:100%; border-collapse:collapse; font-size:13px; }
+  /* Users & roles (Team and Users & Customers screens): width:100% alone let this table
+     compress to whatever a 1fr grid column handed it — .mk-2col > * { min-width: 0 } sees
+     to that, and mk-page's own 1420px cap means even a wide desk window never hands this
+     panel more than ~670px — so six columns (Name, Role, Base, Sync, Last position,
+     actions) squeezed down, wrapping the Sync dot+text into a clogged stack instead of
+     ever triggering the wrapper's own overflow-x:auto. Measured unconstrained: the five
+     data columns need ~670px to stay on one line each; the actions cell (a role select
+     plus up to four buttons) wants ~320px more on its own, but it is already
+     `flex-wrap`-by-design and wrapping onto its own second line there is fine — that was
+     never the reported problem. 900px gives the data columns their room and leaves the
+     actions cell enough to rarely need that wrap; the wrapper scrolls horizontally past
+     this floor instead of ever squashing the data columns into it again. */
+  .mk-table-roles { min-width: 900px; }
 
   /* Form field labels, and the inputs at the sizes actually used. */
   .mk-field-label { display:block; font-size:12px; margin-bottom:5px; color:var(--ink-dim); }
@@ -2327,7 +2340,7 @@
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
             <div class="mk-accent-heading">Users &amp; roles</div>
-            <table class="mk-table-plain">
+            <table class="mk-table-plain mk-table-roles">
               <thead>
                 <tr>
                   <th class="mk-th-10">Name</th>
@@ -2349,8 +2362,8 @@
                     </td>
                     <td class="mk-td-pad8"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ u.base }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px">
-                      <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px;white-space:nowrap">
+                      <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }};flex:none"></span>{{ u.lastSync }}
                     </td>
                     <td class="mk-td-pad8">
                       <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ u.posDim }};overflow-wrap:anywhere">{{ u.posText }}</div>
@@ -3205,7 +3218,7 @@
         <div class="mk-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">
           <div style="border:1px solid rgba(var(--ink-rgb),0.16);padding:16px;overflow-x:auto">
             <div class="mk-accent-heading">Users &amp; roles</div>
-            <table class="mk-table-plain">
+            <table class="mk-table-plain mk-table-roles">
               <thead>
                 <tr>
                   <th class="mk-th-10">Name</th>
@@ -3227,8 +3240,8 @@
                     </td>
                     <td class="mk-td-pad8"><span style="font-size:11px;padding:3px 9px;background:{{ u.roleBg }};color:{{ u.roleFg }}">{{ u.role }}</span></td>
                     <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-dim)">{{ u.base }}</td>
-                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px">
-                      <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }}"></span>{{ u.lastSync }}
+                    <td style="padding:8px 6px;border-bottom:1px solid rgba(var(--ink-rgb),0.08);color:var(--ink-faint);display:flex;align-items:center;gap:5px;white-space:nowrap">
+                      <span style="width:8px;height:8px;border-radius:50%;background:{{ u.syncDot }};flex:none"></span>{{ u.lastSync }}
                     </td>
                     <td class="mk-td-pad8">
                       <div style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ u.posDim }};overflow-wrap:anywhere">{{ u.posText }}</div>
