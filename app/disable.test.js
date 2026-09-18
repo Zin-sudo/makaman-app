@@ -132,15 +132,44 @@ const openUsers = async (p) => {
     check('and says plainly that accounts are never deleted',
       /accounts are never deleted/i.test(dialog));
 
-    await p.evaluate(() => {
+    // The strict fixed-ancestor check below never actually matches — the modal button's
+    // immediate closest('div') is its own button-row flex wrapper, not the outer
+    // position:fixed dialog shell — so every click here (like the final confirming click
+    // below) depends on the fallback: the modal's own Disable is the last Disable-labeled
+    // button in the document, after the row's own inline one.
+    const clickModalDisable = () => p.evaluate(() => {
       const btn = Array.from(document.querySelectorAll('button')).find(x => /^disable$/i.test(x.textContent.trim())
         && x.closest('div') && getComputedStyle(x.closest('div')).position === 'fixed');
-      if (btn) btn.click();
-      else {
-        const any = Array.from(document.querySelectorAll('button')).filter(x => /^disable$/i.test(x.textContent.trim()));
-        if (any.length) any[any.length - 1].click();
-      }
+      if (btn) { btn.click(); return; }
+      const any = Array.from(document.querySelectorAll('button')).filter(x => /^disable$/i.test(x.textContent.trim()));
+      if (any.length) any[any.length - 1].click();
     });
+
+    // 2026-09-18, owner's request: disabling now asks the acting admin/ops manager to
+    // re-enter their own password before it goes through — without it, confirm is
+    // refused client-side and the dialog stays open.
+    await clickModalDisable();
+    await p.waitForTimeout(300);
+    const noPasswordText = await p.evaluate(() => document.body.innerText);
+    check('confirming with no password typed is refused, inline, dialog still open',
+      /Enter your password to confirm/i.test(noPasswordText)
+      && await p.locator('input[type="password"]').last().isVisible());
+
+    // A wrong password is refused too, not just a blank one — and the account is
+    // untouched, not disabled on a failed check.
+    await p.locator('input[type="password"]').last().fill('not-the-real-password');
+    await clickModalDisable();
+    await p.waitForTimeout(600);
+    const wrongPasswordText = await p.evaluate(() => document.body.innerText);
+    const stillActive = await p.evaluate(() => {
+      const u = (window.__mkApp.state.data.users || []).find(x => x.email === 'yousef@makaman.ly');
+      return u ? u.status : null;
+    });
+    check('a wrong password is refused, inline, and the account stays untouched',
+      /incorrect/i.test(wrongPasswordText) && stillActive === 'active', 'status: ' + stillActive);
+
+    await p.locator('input[type="password"]').last().fill('makaman2026');
+    await clickModalDisable();
     await p.waitForTimeout(800);
 
     const after = await p.evaluate(() => {

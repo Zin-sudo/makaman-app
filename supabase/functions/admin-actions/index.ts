@@ -115,6 +115,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Re-verifies a password against Auth right now, for anything that needs to know who is
+// actually at the keyboard rather than just that a JWT is real — a stolen or still-open
+// browser tab already carries a valid session, so the ordinary auth check above proves
+// nothing about that. Done with a throwaway ANON_KEY client rather than the service-role
+// one: the anon client asks GoTrue "is this the real password", the service-role client
+// could only ever answer "does this user exist," which is not the question.
+//
+// Scope MUST be 'local' on the sign-out: the default is 'global', which revokes every
+// active session for this user_id server-side — including the caller's own live browser
+// session, mid-action, every single time. That shipped live once already (purge tool,
+// 2026-09-18) and killed the admin's own session on every attempt; 'local' only clears
+// this throwaway client's own (already unpersisted) session.
+async function verifyOwnPassword(email: string, password: string): Promise<boolean> {
+  const stepUp = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const { error } = await stepUp.auth.signInWithPassword({ email, password })
+  await stepUp.auth.signOut({ scope: 'local' }).catch(() => {})
+  return !error
+}
+
 Deno.serve(async (req) => {
   // The preflight answers before anything else is touched — no client, no auth, no
   // database. A browser sends one of these ahead of every cross-origin POST, so it is
@@ -282,6 +303,19 @@ Deno.serve(async (req) => {
         return json({ error: 'You cannot disable your own account.' }, 400)
       }
 
+      // Withdrawing access is the direction that needs the step-up check — owner's
+      // request, 2026-09-18. Restoring is not: it hands nothing back that a session
+      // hijack could use for anything the ordinary JWT check above didn't already allow.
+      if (status === 'disabled') {
+        const password = body.password as string
+        if (typeof password !== 'string' || !password) {
+          return json({ error: 'Your password is required to disable an account.' }, 400)
+        }
+        if (!(await verifyOwnPassword(caller.email, password))) {
+          return json({ error: 'That password is incorrect.' }, 401)
+        }
+      }
+
       const { data: target, error: targetErr } = await admin
         .from('profiles').select('email, status').eq('id', userId).single()
       if (targetErr || !target) return json({ error: 'That account does not exist.' }, 404)
@@ -349,6 +383,17 @@ Deno.serve(async (req) => {
       if (!userId) return json({ error: 'userId is required.' }, 400)
       if (userId === callerId) return json({ error: 'You cannot delete your own account.' }, 400)
 
+      // Step-up check, owner's request 2026-09-18 — deleting is the one action here that
+      // cannot be undone by a Restore button, so it gets the same re-verification the
+      // purge tool does.
+      const password = body.password as string
+      if (typeof password !== 'string' || !password) {
+        return json({ error: 'Your password is required to delete an account.' }, 400)
+      }
+      if (!(await verifyOwnPassword(caller.email, password))) {
+        return json({ error: 'That password is incorrect.' }, 401)
+      }
+
       const { data: target, error: targetErr } = await admin
         .from('profiles').select('email, full_name').eq('id', userId).single()
       if (targetErr || !target) return json({ error: 'That account does not exist.' }, 404)
@@ -396,40 +441,18 @@ Deno.serve(async (req) => {
     }
 
     // Step 1 of 2 for the purge tool: re-verify the admin's own password right now, and if
-    // it's correct, email a one-time code to their own registered address.
-    //
-    // "Right now" is the whole point — a stolen or still-open browser tab already carries a
-    // valid session, so the ordinary auth check above (which only proves the JWT is real)
-    // proves nothing about who is at the keyboard this second. Re-running the actual
-    // sign-in against Auth is what a step-up check means, so it is done with a throwaway
-    // anon client rather than the service-role one already open above — the ANON_KEY client
-    // asks GoTrue "is this the real password", the SERVICE_ROLE client could only ever
-    // answer "does this user exist," which is not the question.
+    // it's correct, email a one-time code to their own registered address. See
+    // verifyOwnPassword() above for why this re-runs the actual sign-in rather than
+    // trusting the JWT that already got the caller past the check at the top of this file.
     if (action === 'request_purge_code') {
       if (!isAdmin) return json({ error: 'Only Admin can prepare a purge.' }, 403)
       const password = body.password as string
       if (typeof password !== 'string' || !password) {
         return json({ error: 'Your current password is required.' }, 400)
       }
-
-      const stepUp = createClient(SUPABASE_URL, ANON_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      })
-      const { error: signInErr } = await stepUp.auth.signInWithPassword({
-        email: caller.email, password,
-      })
-      // The session this just minted is never used for anything and never reaches the
-      // client — signed straight back out so it doesn't sit as a live refresh token nobody
-      // asked for. Scope MUST be 'local': signOut()'s default scope is 'global', which
-      // revokes every active session for this user_id server-side — including the admin's
-      // own live browser session that is mid-purge-flow right now. That bug was confirmed
-      // live (igutjfezxkdncrcpvnqx auth_logs, 2026-09-18): a login+logout pair from this
-      // throwaway client immediately followed by "Session not found" 403 on the admin's own
-      // GET /user, every single attempt. 'local' only clears this stepUp client's own
-      // (already unpersisted) session and leaves every other session, including the caller's
-      // real one, untouched.
-      await stepUp.auth.signOut({ scope: 'local' }).catch(() => {})
-      if (signInErr) return json({ error: 'That password is incorrect.' }, 401)
+      if (!(await verifyOwnPassword(caller.email, password))) {
+        return json({ error: 'That password is incorrect.' }, 401)
+      }
 
       // A random 6-digit code — crypto.getRandomValues, not Math.random, for the same
       // reason the numbering claim never trusts a client-supplied number: this one has to

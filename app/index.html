@@ -4043,6 +4043,12 @@
             <div style="font-size:13px;color:var(--danger)">{{ pwError }}</div>
           </sc-if>
         </sc-if>
+        <sc-if value="{{ dialog.needsSelfPassword }}" hint-placeholder-val="{{ false }}">
+          <input type="password" autocomplete="current-password" value="{{ confirmPassword }}" onChange="{{ f.confirmPassword }}" placeholder="Your password" class="mk-input-42">
+          <sc-if value="{{ confirmPasswordError }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:13px;color:var(--danger)">{{ confirmPasswordError }}</div>
+          </sc-if>
+        </sc-if>
         <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:6px">
           <sc-if value="{{ dialog.hasThird }}" hint-placeholder-val="{{ false }}">
             <button onClick="{{ dialog.third }}" style="margin-right:auto;padding:9px 16px;font-family:'Barlow Condensed','Noto Sans Arabic',sans-serif;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--danger);border:1px solid var(--danger)">{{ dialog.thirdLabel }}</button>
@@ -7649,6 +7655,10 @@ class Component extends DCLogic {
       session: null, authScreen: RECOVERY_LINK ? 'recover' : 'login', authEmail: '', authPassword: '',
       authFullName: '', authConfirm: '', authError: '', signupDone: false, forgotDone: false,
       pwNew: '', pwConfirm: '', pwError: '', pwBusy: false, pwDone: false,
+      // The step-up re-check for disabling or deleting an account, owner's request
+      // 2026-09-18 — separate from pwNew/pwConfirm above, which are for setting SOMEONE
+      // ELSE a new password, not re-proving who is doing the disabling or deleting.
+      confirmPassword: '', confirmPasswordError: '',
       newTechName: '', newTechEmail: '', newTechPassword: '', newTechError: '', newTechDone: false,
       editDraft: {}, dragStartIndex: undefined, dragOverIndex: undefined,
       disableUserEmail: null, disableUserName: null, disableUserRestore: false,
@@ -13197,19 +13207,31 @@ class Component extends DCLogic {
           + 'what they hold. Use Disable for anyone who has worked.',
         okLabel: 'Delete the account', cancelLabel: 'Keep it', hasCancel: true,
         okBg: 'var(--danger)', okFg: 'var(--on-danger)',
+        // Owner's request, 2026-09-18: re-prove it's really you before an account is
+        // gone for good. Kept open on a wrong password or a server refusal rather than
+        // closed-then-toasted like the rest of this dialog's errors — UX-PRINCIPLES.md:
+        // state the requirement, preserve the person's work through an error. Losing
+        // which account was selected over a mistyped password would be exactly that.
+        needsSelfPassword: true,
         confirm: () => {
           const id = S.targetUserId, email = S.targetUserEmail, name = S.targetUserName;
-          this.setState({ dialog: null });
+          const password = S.confirmPassword || '';
+          if (!password) { this.setState({ confirmPasswordError: 'Enter your password to confirm.' }); return; }
+          const finish = () => this.setState({ dialog: null, confirmPassword: '', confirmPasswordError: '' });
           if (!USE_CLOUD) {
+            const me = (D.users || []).find(x => (x.email || '').toLowerCase() === ((S.session || {}).email || '').toLowerCase());
+            const expected = (me && me.password) || DEMO_PASSWORD;
+            if (password !== expected) { this.setState({ confirmPasswordError: 'That password is incorrect.' }); return; }
+            finish();
             this.mutate(d => { d.users = (d.users || []).filter(x => x.email !== email); });
             this.toast('delete:' + email, (name || email) + ' deleted.', 'ok');
             return;
           }
-          if (!id) { this.toast('delete:' + email, 'That account has not reached the server yet.', 'warn'); return; }
-          adminAction('delete_user', { userId: id })
-            .then(() => this.refresh())
+          if (!id) { finish(); this.toast('delete:' + email, 'That account has not reached the server yet.', 'warn'); return; }
+          adminAction('delete_user', { userId: id, password: password })
+            .then(() => { finish(); return this.refresh(); })
             .then(() => this.toast('delete:' + email, (name || email) + ' deleted.', 'ok'))
-            .catch(err => this.toast('delete:' + email, err.message, 'warn'));
+            .catch(err => this.setState({ confirmPasswordError: err.message }));
         },
       },
       // Giving somebody a password. Same local rules as changing your own — the length
@@ -13248,27 +13270,46 @@ class Component extends DCLogic {
           : (S.disableUserName || 'This user') + ' will no longer be able to sign in, and any session they have open ends. Their name stays on every ticket and audit entry they touched, and you can restore the account later.\n\nAccounts are never deleted: the tickets and the audit trail reference them, and removing the row would either be refused or would erase who worked the job.',
         okLabel: S.disableUserRestore ? 'Restore' : 'Disable',
         cancelLabel: 'Cancel', hasCancel: true,
+        // Owner's request, 2026-09-18: re-prove it's really you before withdrawing
+        // someone's access. Only for the withdrawing direction — restoring hands nothing
+        // back a session hijack could use for anything the ordinary sign-in didn't
+        // already allow, so asking for a password there would just be friction with no
+        // security behind it.
+        needsSelfPassword: !S.disableUserRestore,
         confirm: () => {
           const email = S.disableUserEmail;
           const who = S.disableUserName || 'That account';
           const restore = !!S.disableUserRestore;
           const target = (D.users || []).find(x => x.email === email);
-          this.setState({ dialog: null, disableUserEmail: null, disableUserName: null, disableUserRestore: false });
-          if (!target) return;
+          const password = S.confirmPassword || '';
+          if (!restore && !password) { this.setState({ confirmPasswordError: 'Enter your password to confirm.' }); return; }
+          const finish = () => this.setState({ dialog: null, disableUserEmail: null, disableUserName: null, disableUserRestore: false, confirmPassword: '', confirmPasswordError: '' });
+          if (!target) { finish(); return; }
 
           if (!USE_CLOUD) {
+            if (!restore) {
+              const me = (D.users || []).find(x => (x.email || '').toLowerCase() === ((S.session || {}).email || '').toLowerCase());
+              const expected = (me && me.password) || DEMO_PASSWORD;
+              if (password !== expected) { this.setState({ confirmPasswordError: 'That password is incorrect.' }); return; }
+            }
+            finish();
             this.mutate(d => {
               const x = (d.users || []).find(y => y.email === email);
               if (x) x.status = restore ? 'active' : 'disabled';
             });
             return;
           }
-          if (!target.id) { this.toast('disable:' + email, 'That account has not reached the server yet.', 'warn'); return; }
-          adminAction('set_user_status', { userId: target.id, status: restore ? 'active' : 'disabled' })
-            .then(() => this.refresh())
+          if (!target.id) { finish(); this.toast('disable:' + email, 'That account has not reached the server yet.', 'warn'); return; }
+          const payload = { userId: target.id, status: restore ? 'active' : 'disabled' };
+          if (!restore) payload.password = password;
+          adminAction('set_user_status', payload)
+            .then(() => { finish(); return this.refresh(); })
             .then(() => this.toast('disable:' + email,
               restore ? who + ' can sign in again.' : who + ' can no longer sign in. Their work is untouched.', 'ok'))
-            .catch(err => this.refresh().then(() => this.toast('disable:' + email, err.message, 'warn')));
+            .catch(err => {
+              if (restore) { finish(); this.refresh().then(() => this.toast('disable:' + email, err.message, 'warn')); }
+              else { this.setState({ confirmPasswordError: err.message }); this.refresh(); }
+            });
         },
       },
       reset: {
@@ -13452,6 +13493,8 @@ class Component extends DCLogic {
       pwNew: S.pwNew || '',
       pwConfirm: S.pwConfirm || '',
       pwError: S.pwError || '',
+      confirmPassword: S.confirmPassword || '',
+      confirmPasswordError: S.confirmPasswordError || '',
       pwBusy: !!S.pwBusy,
       pwBusyDim: S.pwBusy ? 0.6 : 1,
       pwDone: !!S.pwDone,
@@ -16048,7 +16091,7 @@ class Component extends DCLogic {
         disableToneRgb: u.status === 'disabled' ? 'var(--success-rgb)' : 'var(--danger-rgb)',
         disable: () => this.setState({
           dialog: 'disableUser', disableUserEmail: u.email, disableUserName: u.name,
-          disableUserRestore: u.status === 'disabled',
+          disableUserRestore: u.status === 'disabled', confirmPassword: '', confirmPasswordError: '',
         }),
         // Deleting an account, for the ones that were never used — a typo, a duplicate,
         // a test login. The function refuses anybody who has worked and says what they
@@ -16071,6 +16114,7 @@ class Component extends DCLogic {
           && u.email !== ((S.session || {}).email || ''),
         remove: () => this.setState({
           dialog: 'deleteUser', targetUserId: u.id, targetUserEmail: u.email, targetUserName: u.name,
+          confirmPassword: '', confirmPasswordError: '',
         }),
         // Setting somebody's password, for when the reset mail cannot reach them — a
         // technician whose company address does not arrive at a wellhead, or who cannot
@@ -16353,6 +16397,7 @@ class Component extends DCLogic {
         authConfirm: e => this.setState({ authConfirm: e.target.value, authError: '' }),
         pwNew: e => this.setState({ pwNew: e.target.value, pwError: '', pwDone: false }),
         pwConfirm: e => this.setState({ pwConfirm: e.target.value, pwError: '', pwDone: false }),
+        confirmPassword: e => this.setState({ confirmPassword: e.target.value, confirmPasswordError: '' }),
         newTechName: e => this.setState({ newTechName: e.target.value, newTechError: '', newTechDone: false }),
         newTechEmail: e => this.setState({ newTechEmail: e.target.value, newTechError: '', newTechDone: false }),
         newTechPassword: e => this.setState({ newTechPassword: e.target.value, newTechError: '', newTechDone: false }),
