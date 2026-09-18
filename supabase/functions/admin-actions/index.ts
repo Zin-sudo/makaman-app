@@ -420,8 +420,15 @@ Deno.serve(async (req) => {
       })
       // The session this just minted is never used for anything and never reaches the
       // client — signed straight back out so it doesn't sit as a live refresh token nobody
-      // asked for.
-      await stepUp.auth.signOut().catch(() => {})
+      // asked for. Scope MUST be 'local': signOut()'s default scope is 'global', which
+      // revokes every active session for this user_id server-side — including the admin's
+      // own live browser session that is mid-purge-flow right now. That bug was confirmed
+      // live (igutjfezxkdncrcpvnqx auth_logs, 2026-09-18): a login+logout pair from this
+      // throwaway client immediately followed by "Session not found" 403 on the admin's own
+      // GET /user, every single attempt. 'local' only clears this stepUp client's own
+      // (already unpersisted) session and leaves every other session, including the caller's
+      // real one, untouched.
+      await stepUp.auth.signOut({ scope: 'local' }).catch(() => {})
       if (signInErr) return json({ error: 'That password is incorrect.' }, 401)
 
       // A random 6-digit code — crypto.getRandomValues, not Math.random, for the same
