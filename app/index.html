@@ -9697,15 +9697,36 @@ class Component extends DCLogic {
   fieldDeviceAccounts() {
     const D = this.state.data || {};
     const real = this.activeTechnicians();
-    const seen = {};
-    real.forEach(u => { seen[u.id] = true; });
+    const realIds = {};
+    real.forEach(u => { realIds[u.id] = true; });
     const presence = D.presence || {};
-    const swapped = (D.users || []).filter(u => !seen[u.id] && u.status === 'active' && presence[u.id] === 'tech');
-    return real.concat(swapped).map(u => Object.assign({}, u, {
+    const swapped = (D.users || []).filter(u => !realIds[u.id] && u.status === 'active' && presence[u.id] === 'tech');
+
+    // Owner's request, 2026-09-18: "Allow ops and admins to also show on field devices
+    // even when not using technician view." Before this, an Ops Manager or Admin only
+    // ever appeared here while swapped into a technician view (the block above) —
+    // otherwise, no matter how recently they had the app open, they were simply absent.
+    // Online is read the same way (presenceSeen + PRESENCE_ONLINE_MS) the Team screen's
+    // own Sync column and the card below already read it, rather than inventing a second
+    // notion of "recent." Real technicians and anyone already swapped in are excluded so
+    // nobody appears twice.
+    const already = {};
+    real.forEach(u => { already[u.id] = true; });
+    swapped.forEach(u => { already[u.id] = true; });
+    const presenceSeen = D.presenceSeen || {};
+    const now = Date.now();
+    const staffOnline = (D.users || []).filter(u => {
+      if (already[u.id] || u.status !== 'active') return false;
+      if (!['mgr', 'admin'].includes(u.roleKey)) return false;
+      const seenAt = presenceSeen[u.id];
+      return !!seenAt && (now - new Date(seenAt).getTime()) < PRESENCE_ONLINE_MS;
+    });
+
+    return real.concat(swapped, staffOnline).map(u => Object.assign({}, u, {
       // Blank for a real technician — their own name is the whole story. For anyone
       // else, their real role in parentheses, so the office can tell a technician from
       // an admin standing in at a glance rather than being quietly misled.
-      roleTag: seen[u.id] ? '' : ' (' + u.role + ')',
+      roleTag: realIds[u.id] ? '' : ' (' + u.role + ')',
     }));
   }
   // 2026-09-10, owner's request: "Create a trail of well locations... a history of all
