@@ -9280,6 +9280,22 @@ class Component extends DCLogic {
     const S = this.state;
     const t = (S.data.tickets || []).find((x) => x.id === S.activeId);
     if (!t) return Promise.resolve();
+    // Owner's request, 2026-09-19: "the ticket should not accept a refused number unless
+    // the override is checked." Before this, numberIssue()'s refusal only ever blocked
+    // Approve — Save happily went through with a number the app itself had just called
+    // REFUSED in red text, because the write-through design (every keystroke lands in
+    // the store, on purpose — see reviewContent's own comment) means the value was
+    // already sitting in `t.ticketNo` regardless of validity. That is still right for
+    // typing (a phone dying mid-sentence must not lose the keystroke); it was never
+    // right for the deliberate act of Save — the point at which the office is telling
+    // the server "this is correct now." Checked here, not just on the button's disabled
+    // state, so every path to a save (the button, and Save & leave from the unsaved-
+    // changes dialog) is refused the same way, not just the one a person happens to click.
+    const issue = this.numberIssue(t);
+    if (issue.bad) {
+      this.toast('saved', issue.msg || 'That ticket number is refused — check the override, or use a different number, before saving.', 'warn');
+      return Promise.reject(new Error(issue.msg || 'Ticket number refused.'));
+    }
     this.setState({ reviewSnap: { id: t.id, content: this.reviewContent(t), at: iso(new Date()) } });
     // The individual field changes are already in the trail, written on blur. One line
     // for the save itself would be a second entry saying nothing the first four did not.
@@ -12832,7 +12848,10 @@ class Component extends DCLogic {
         confirm: () => {
           const go = this.pendingLeave; this.pendingLeave = null;
           this.setState({ dialog: null });
-          this.saveReview().then(() => { if (go) go(); });
+          // A refused, un-overridden number is not left silently unhandled here: saveReview()
+          // itself already toasts why, and `go` simply never runs — same as any other Save
+          // failure, the person stays on the ticket instead of leaving as if it went through.
+          this.saveReview().then(() => { if (go) go(); }).catch(() => {});
         },
         third: () => {
           const go = this.pendingLeave; this.pendingLeave = null;
@@ -13172,7 +13191,7 @@ class Component extends DCLogic {
         title: (() => 'This ticket is still open by ' + (t ? (holderOf(t) || 'the technician') : 'the technician') + '.')(),
         body: 'Are you sure you wish to save these changes? The technician is still logging this job — your edit lands alongside whatever they add next, it does not replace it.',
         okLabel: 'Save changes', cancelLabel: 'Cancel', hasCancel: true,
-        confirm: () => { this.setState({ dialog: null }); this.saveReview(); },
+        confirm: () => { this.setState({ dialog: null }); this.saveReview().catch(() => {}); },
       },
       // The end of the flow says what happened AND what happens next.
       //
@@ -15149,19 +15168,27 @@ class Component extends DCLogic {
       // colour.
       showReviewSave: reviewCanEdit,
       reviewSaveLabel: reviewSaving ? 'Saving…' : 'Save changes',
-      reviewSaveOff: !reviewDirty || reviewSaving,
-      reviewSaveCursor: (!reviewDirty || reviewSaving) ? 'default' : 'pointer',
-      reviewSaveBg: reviewDirty ? 'var(--accent)' : 'transparent',
-      reviewSaveFg: reviewDirty ? 'var(--on-accent)' : 'var(--ink-faint)',
-      reviewSaveBorder: reviewDirty ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.22)',
-      reviewSaveDim: reviewSaving ? 0.6 : 1,
-      reviewSaveNote: reviewDirty
+      // Owner's request, 2026-09-19: a refused ticket number (below a series' declared
+      // floor, no override checked) must not be accepted by Save either, the same way it
+      // already blocks Approve — see saveReview()'s own comment for why this is checked
+      // there too, not only here: the button's disabled state is the visible half, the
+      // method itself is the half that actually matters.
+      reviewSaveOff: !reviewDirty || reviewSaving || issue.bad,
+      reviewSaveCursor: (!reviewDirty || reviewSaving || issue.bad) ? 'default' : 'pointer',
+      reviewSaveBg: (reviewDirty && !issue.bad) ? 'var(--accent)' : 'transparent',
+      reviewSaveFg: (reviewDirty && !issue.bad) ? 'var(--on-accent)' : 'var(--ink-faint)',
+      reviewSaveBorder: (reviewDirty && !issue.bad) ? 'var(--accent)' : 'rgba(var(--ink-rgb),0.22)',
+      reviewSaveDim: (reviewSaving || issue.bad) ? 0.6 : 1,
+      reviewSaveNote: issue.bad
+        ? 'Fix the refused ticket number — or check the override for a declared exception — before saving.'
+        : reviewDirty
         ? 'Unsaved changes on this ticket.'
         : 'Everything on this ticket is saved.',
-      reviewSaveNoteFg: reviewDirty ? 'var(--warning-ink)' : 'var(--ink-faint)',
+      reviewSaveNoteFg: (reviewDirty || issue.bad) ? 'var(--warning-ink)' : 'var(--ink-faint)',
       saveReview: () => {
+        if (issue.bad) return;
         if (t && t.status === 'logging' && holderOf(t)) { this.setState({ dialog: 'officeSaveOpen' }); return; }
-        this.saveReview();
+        this.saveReview().catch(() => {});
       },
 
       // ── Office-raised tickets ──────────────────────────────────────────────
