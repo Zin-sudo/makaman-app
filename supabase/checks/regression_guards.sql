@@ -608,18 +608,30 @@ begin
   end;
 
   -------------------------------------------------------------------------------------
-  -- Guard 12 (2026-09-19, migration 0081): numbering.override_floor (migration 0072)
-  -- explicitly grants ops_manager the override-floor capability — "an admin option that
-  -- can also be used by the ops... for special cases," in the owner's own words — and
-  -- the client shows the override checkbox and "Take next from series" buttons to
-  -- ops_manager accordingly. But ticket_numbering_write_admin restricted every write on
-  -- this table to admin alone, so the moment an Ops Manager actually used either control,
-  -- the client's own advance-the-counter upsert was refused outright by RLS. Proven live,
-  -- 2026-09-19 (awhida@makaman.ly): "new row violates row-level security policy for
-  -- table ticket_numbering", MK-SYNC-RLS. Split by cmd rather than reopened wholesale:
-  -- UPDATE is the only operation the client ever performs here (advancing next_number/
-  -- floor on a row that already exists); there is no control anywhere in the app for
-  -- creating or deleting a series, so INSERT/DELETE must stay admin-only.
+  -- Guard 12 (2026-09-19, migrations 0081 + client fix 2026-09-19b): numbering.override_
+  -- floor (migration 0072) explicitly grants ops_manager the override-floor capability —
+  -- "an admin option that can also be used by the ops... for special cases," in the
+  -- owner's own words — and the client shows the override checkbox and "Take next from
+  -- series" buttons to ops_manager accordingly. But ticket_numbering_write_admin
+  -- restricted every write on this table to admin alone, so the moment an Ops Manager
+  -- actually used either control, the client's own advance-the-counter write was refused
+  -- outright by RLS. Proven live, 2026-09-19 (awhida@makaman.ly): "new row violates
+  -- row-level security policy for table ticket_numbering", MK-SYNC-RLS.
+  --
+  -- Splitting the policy by cmd (this migration) was necessary but NOT sufficient —
+  -- proven live a second time, same day, after 0081 had already shipped: the client sent
+  -- a plain UPDATE straight through, but it built the request as a Supabase `.upsert()`,
+  -- which PostgREST always compiles to `INSERT ... ON CONFLICT (id) DO UPDATE`. Postgres
+  -- requires the caller to satisfy the INSERT policy's WITH CHECK for that statement to
+  -- run AT ALL, even when every row conflicts and only the UPDATE branch ever executes —
+  -- so an admin-only INSERT policy refuses the whole upsert regardless of how permissive
+  -- the UPDATE policy is. The real fix was in the client (outboxDiff in app/index.html):
+  -- ticket_numbering now sends action:'update' (a real PATCH-by-id, no ON CONFLICT),
+  -- the same shape numbering_claim already used for the identical reason. The
+  -- ON CONFLICT probe below is what actually caught this — Guard 12's first draft only
+  -- ever tested a plain UPDATE directly and passed, which is exactly why it missed this;
+  -- a regression guard that does not exercise the real write shape proves nothing about it.
+  --
   -- UPDATE/DELETE under RLS do NOT raise insufficient_privilege when a row is invisible
   -- to the policy's USING clause — they simply affect zero rows and return normally, the
   -- same way any no-match WHERE clause does. Only INSERT's WITH CHECK genuinely raises on
@@ -637,6 +649,21 @@ begin
       end if;
     exception when insufficient_privilege or others then
       failures := failures || format(E'\n  [ticket_numbering RLS] an Ops Manager cannot UPDATE ticket_numbering (%s) — same gap as above, raised as an error instead of silently matching zero rows.', sqlerrm);
+    end;
+    begin
+      -- The actual shape a Supabase-js `.upsert()` sends — PostgREST always compiles it to
+      -- INSERT ... ON CONFLICT (id) DO UPDATE, even against an existing row where only the
+      -- UPDATE branch will ever run. Postgres still demands the INSERT policy's WITH CHECK
+      -- pass for the statement to run at all. This MUST keep failing for ops_manager: if it
+      -- ever starts passing, ticket_numbering_insert_admin has been loosened, which is not
+      -- how this table should be fixed — the client sends action:'update' (a real PATCH,
+      -- no ON CONFLICT) specifically so it never depends on this ever being allowed.
+      insert into public.ticket_numbering (id, prefix, label, next_number, floor)
+        values (numbering_row, 'Special Tools', 'GUARD12-ON-CONFLICT-PROBE', 1, 0)
+        on conflict (id) do update set next_number = excluded.next_number;
+      failures := failures || E'\n  [ticket_numbering RLS] an Ops Manager''s INSERT...ON CONFLICT(id) DO UPDATE on ticket_numbering succeeded — this is the exact live gotcha (2026-09-19) where a Supabase .upsert() call was refused outright because it requires the admin-only INSERT policy''s WITH CHECK even though every row conflicted and only the UPDATE branch ran. If this now passes, ticket_numbering_insert_admin has been loosened for ops_manager; do not "fix" the client by reverting to upsert() for this table — it must keep sending a plain update() by id (see outboxDiff in app/index.html).';
+    exception when insufficient_privilege or others then
+      null; -- expected: INSERT stays admin-only, so ON CONFLICT DO UPDATE is refused too — this is the trap the client fix exists to sidestep.
     end;
     begin
       insert into public.ticket_numbering (prefix, label, next_number, floor)

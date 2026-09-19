@@ -6789,8 +6789,22 @@ function diffOps(before, after) {
     (after.series || []).forEach((s) => {
       const was = (before.series || []).find((x) => x.id === s.id);
       if (was && same(was, s)) return;
-      ops.push({ key: 'ticket_numbering:' + s.id, table: 'ticket_numbering', action: 'upsert', row: {
-        id: s.id, prefix: s.prefix || '', label: s.label || '', next_number: s.last, floor: s.floor } });
+      // `update`, not `upsert` — same reasoning, same fix shape, as numbering_claim just
+      // above: the row is seeded and singular per prefix, no client ever creates one, and
+      // asking to create it is what made an admin-only INSERT policy the gate here too.
+      // Confirmed live, 2026-09-19 (awhida@makaman.ly, role ops_manager): PostgREST's
+      // upsert always compiles to `INSERT ... ON CONFLICT (id) DO UPDATE`, and Postgres
+      // requires the caller to satisfy the INSERT policy's WITH CHECK for that statement
+      // to run AT ALL — even when every single row conflicts and only the UPDATE branch
+      // ever actually executes. migration 0081 widened ticket_numbering's UPDATE policy
+      // to is_staff() and that alone did nothing: the client kept sending an upsert, so
+      // Postgres kept demanding INSERT (admin-only) first and refused the whole request
+      // with a 403, repeatedly, series after series after series. A plain update only
+      // ever checks the UPDATE policy, so it sidesteps the INSERT requirement entirely,
+      // and matches what this table's only real write ever is: advancing a row that
+      // already exists.
+      ops.push({ key: 'ticket_numbering:' + s.id, table: 'ticket_numbering', action: 'update', id: s.id, row: {
+        prefix: s.prefix || '', label: s.label || '', next_number: s.last, floor: s.floor } });
     });
   }
   if (!same(before.assetQuestions, after.assetQuestions)) {
