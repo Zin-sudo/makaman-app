@@ -13363,7 +13363,18 @@ class Component extends DCLogic {
           this.subscribeRealtime();
         })
         .catch(err => {
-          logError('auth', err, { doing: 'sign in', email: email });
+          // Owner's request, 2026-09-19: a wrong password or a mistyped email is not a
+          // bug report — it is the single most ordinary thing that happens at a login
+          // screen, and logging one every time trained the error log to fill up with
+          // entries nobody at the office needed to see. signInCloud/signInLocal both
+          // throw this exact sentence, and only this sentence, for that one case (never
+          // reused for a network failure, a clock/JWT problem, or anything else) — so it
+          // is the one message this catch can recognize with certainty and skip. Anything
+          // else (a dead connection, a pending-approval account, a genuinely unexpected
+          // error) still gets logged exactly as before.
+          if (err.message !== 'Email or password is not correct.') {
+            logError('auth', err, { doing: 'sign in', email: email });
+          }
           this.setState({ authError: err.message || 'Could not sign you in.', authBusy: false });
         }));
     };

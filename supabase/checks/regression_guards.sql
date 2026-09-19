@@ -43,7 +43,13 @@ declare
   -- Same person as logging_ticket_holder above (Lateri@makaman.ly, role=admin) — reused
   -- under its own name here for a plain staff-read check (Guard 11), not a ticket holder.
   admin_id uuid := 'ef5a965c-d0e8-4d15-99be-8c96d7091535';
+  -- awhida@makaman.ly, role=ops_manager — the account that actually hit Guard 12's bug
+  -- live, 2026-09-19.
+  ops_id uuid := '4b7958ce-a880-4d0c-a478-b1c585648b10';
+  -- The 'Special Tools' series — the exact row from that live incident.
+  numbering_row uuid := '8a852114-76ab-4d2e-bd2e-4655274f4d06';
   n_check boolean;
+  n_rows int;
 begin
   -------------------------------------------------------------------------------------
   -- Guard 1 (2026-09-09, b31e739): pageAll()'s ORDER_KEY map in app/index.html must
@@ -599,6 +605,85 @@ begin
   exception when others then
     execute 'reset role';
     failures := failures || format(E'\n  [master bucket RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  -------------------------------------------------------------------------------------
+  -- Guard 12 (2026-09-19, migration 0081): numbering.override_floor (migration 0072)
+  -- explicitly grants ops_manager the override-floor capability — "an admin option that
+  -- can also be used by the ops... for special cases," in the owner's own words — and
+  -- the client shows the override checkbox and "Take next from series" buttons to
+  -- ops_manager accordingly. But ticket_numbering_write_admin restricted every write on
+  -- this table to admin alone, so the moment an Ops Manager actually used either control,
+  -- the client's own advance-the-counter upsert was refused outright by RLS. Proven live,
+  -- 2026-09-19 (awhida@makaman.ly): "new row violates row-level security policy for
+  -- table ticket_numbering", MK-SYNC-RLS. Split by cmd rather than reopened wholesale:
+  -- UPDATE is the only operation the client ever performs here (advancing next_number/
+  -- floor on a row that already exists); there is no control anywhere in the app for
+  -- creating or deleting a series, so INSERT/DELETE must stay admin-only.
+  -- UPDATE/DELETE under RLS do NOT raise insufficient_privilege when a row is invisible
+  -- to the policy's USING clause — they simply affect zero rows and return normally, the
+  -- same way any no-match WHERE clause does. Only INSERT's WITH CHECK genuinely raises on
+  -- violation. So the negative cases below must check GET DIAGNOSTICS ... ROW_COUNT, not
+  -- "did an exception happen" — checking only for an exception is a false pass that would
+  -- never actually catch an over-wide policy.
+  begin
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', ops_id, 'role', 'authenticated')::text);
+    begin
+      update public.ticket_numbering set next_number = next_number where id = numbering_row;
+      get diagnostics n_rows = row_count;
+      if n_rows = 0 then
+        failures := failures || E'\n  [ticket_numbering RLS] an Ops Manager''s UPDATE on ticket_numbering matched zero rows — this is the exact live gap that refused the override-floor and take-next-from-series controls migration 0072 explicitly granted ops_manager. ticket_numbering_update_staff must exist and read is_staff().';
+      end if;
+    exception when insufficient_privilege or others then
+      failures := failures || format(E'\n  [ticket_numbering RLS] an Ops Manager cannot UPDATE ticket_numbering (%s) — same gap as above, raised as an error instead of silently matching zero rows.', sqlerrm);
+    end;
+    begin
+      insert into public.ticket_numbering (prefix, label, next_number, floor)
+        values ('GUARD12-PROBE', 'Guard 12 probe', 1, 0);
+      failures := failures || E'\n  [ticket_numbering RLS] an Ops Manager can INSERT a new series into ticket_numbering — no control in the app creates one; this must stay admin-only (ticket_numbering_insert_admin).';
+    exception when insufficient_privilege or others then
+      null; -- expected: no insert policy for ops_manager
+    end;
+    begin
+      delete from public.ticket_numbering where id = numbering_row;
+      get diagnostics n_rows = row_count;
+      if n_rows > 0 then
+        failures := failures || E'\n  [ticket_numbering RLS] an Ops Manager''s DELETE on ticket_numbering matched and removed a row — no control in the app deletes one; this must stay admin-only (ticket_numbering_delete_admin).';
+      end if;
+    exception when insufficient_privilege or others then
+      null; -- expected: no delete policy for ops_manager
+    end;
+    execute 'reset role';
+
+    -- A plain technician must still be refused entirely — only staff (ops_manager or
+    -- admin), never a field account, may touch this table at all.
+    execute 'set local role authenticated';
+    execute format('set local "request.jwt.claims" = %L', json_build_object('sub', tech_id, 'role', 'authenticated')::text);
+    begin
+      update public.ticket_numbering set floor = floor where id = numbering_row;
+      get diagnostics n_rows = row_count;
+      if n_rows > 0 then
+        failures := failures || E'\n  [ticket_numbering RLS] a plain technician''s UPDATE on ticket_numbering matched a row — ticket_numbering_update_staff must read is_staff(), not simply ''authenticated''.';
+      end if;
+    exception when insufficient_privilege or others then
+      null; -- expected: technicians are not staff
+    end;
+    execute 'reset role';
+  exception when others then
+    execute 'reset role';
+    failures := failures || format(E'\n  [ticket_numbering RLS] guard itself errored: %s', sqlerrm);
+  end;
+
+  -- Confirm the numbering_row fixture itself is still the row the incident named, so a
+  -- future drift (the series renamed, re-seeded, or its id changed) fails loudly here
+  -- rather than letting every check above pass vacuously against the wrong row.
+  begin
+    if not exists (select 1 from public.ticket_numbering where id = numbering_row and label = 'Special Tools') then
+      failures := failures || format(E'\n  [ticket_numbering RLS] guard fixture stale: %s is no longer the ''Special Tools'' series — pick a fresh real row and update this guard.', numbering_row);
+    end if;
+  exception when others then
+    failures := failures || format(E'\n  [ticket_numbering RLS] fixture-check guard itself errored: %s', sqlerrm);
   end;
 
   -------------------------------------------------------------------------------------
