@@ -1263,6 +1263,11 @@
         <button onClick="{{ n.open }}" style="width:100%;display:flex;gap:10px;padding:11px 14px;text-align:start;cursor:pointer;background:transparent;border:0;border-bottom:1px solid rgba(var(--ink-rgb),0.08)">
           <span style="width:3px;flex:none;background:{{ n.edge }}"></span>
           <span class="mk-flex1">
+            <!-- Same convention the Activity tab already uses: every row leads with who
+                 did it, blank for the price-list feed which has no single actor to name. -->
+            <sc-if value="{{ n.by }}" hint-placeholder-val="{{ true }}">
+              <span style="display:block;font-size:12px;font-weight:600;color:var(--ink-strong)">{{ n.by }}</span>
+            </sc-if>
             <span style="display:block;font-size:13px;line-height:1.4;color:var(--ink-strong)">{{ n.text }}</span>
             <span style="display:block;font-size:11px;color:var(--ink-faint);margin-top:3px">{{ n.where }} · {{ n.stamp }}</span>
           </span>
@@ -14172,7 +14177,7 @@ class Component extends DCLogic {
       notifyHeading: unread.length === 0 ? 'Up to date'
         : unread.length === 1 ? '1 unread' : unread.length + ' unread',
       notifyRows: unread.slice(0, 40).map((a) => ({
-        text: a.text, where: a.where, stamp: a.stamp, edge: a.edge,
+        by: a.by, text: a.text, where: a.where, stamp: a.stamp, edge: a.edge,
         open: () => { this.setState({ showNotifications: false }); a.open(); },
       })),
       showNotifications: !!S.showNotifications,
@@ -14522,11 +14527,38 @@ class Component extends DCLogic {
       cur: view,
       onTicketNoFocus: commitTicketNo.focus,
       onTicketNoBlur: (ev) => {
+        // Read before commitTicketNo.blur deletes its own copy of it — same editBefore
+        // slot, same key shape (fieldCommit's own 'tf:'+id+':'+key), just read here too so
+        // the release check below knows what the number USED to be.
+        const before = t ? (this.editBefore || {})['tf:' + t.id + ':ticketNo'] : undefined;
         commitTicketNo.blur(ev);
+        const v = (ev.target.value || '').trim();
+
+        // Owner's report, 2026-09-19: taking 1884 from a series is announced ("Ticket No.
+        // 1884 taken from the Special Tools series") but changing a ticket away from a
+        // number it once held said nothing — the series' own `last` never walked back
+        // down either, so the number was not actually freed for the next person to take,
+        // not just unannounced. reseatSeries() (built for the "unfamiliar number,
+        // discard" path) is the general answer: recompute a series' last-used number from
+        // what tickets actually carry right now. Only logged when it genuinely moved —
+        // releasing a number that was not the series' current high point changes nothing
+        // to announce.
+        const oldNo = (before || '').trim();
+        if (t && oldNo && oldNo !== v) {
+          const oldSeries = seriesForNumber(oldNo, D.series);
+          if (oldSeries) {
+            const lastBefore = oldSeries.last;
+            this.mutate(d => this.reseatSeries(d, oldSeries.id));
+            const reseated = seriesForNumber(oldNo, this.state.data.series);
+            if (reseated && reseated.last < lastBefore) {
+              this.logOn(t.id, 'Ticket No. ' + oldNo + ' released back to the ' + oldSeries.label + ' series.', 'lifecycle');
+            }
+          }
+        }
+
         // A number belonging to no series is allowed — but it is worth one deliberate
         // confirmation, because an invented number reaches a client's invoice and there
         // is no series counter that would ever have produced it.
-        const v = (ev.target.value || '').trim();
         if (!v || !t) return;
         // Typing a number onto a running job is the same forced act as taking one from a
         // series, so it leaves the same record. On blur rather than onChange, or it
@@ -15318,6 +15350,16 @@ class Component extends DCLogic {
           const x = d.tickets.find((y) => y.id === t.id);
           if (x) x.numberFloorOverride = next;
         });
+        // noteFloorOverride's other call site is the ticket-number field's own blur —
+        // fine for "type the number, then check the box," but the owner's report,
+        // 2026-09-19, was the other order: the number was typed and refused first (no
+        // override yet, so nothing to log), and only the checkbox was touched after —
+        // the number field never blurred again, so the override note never fired even
+        // though the override genuinely took effect. Checking here too covers that
+        // order without duplicating anything: noteFloorOverride already refuses to log
+        // twice for the same ticket/number, and does nothing at all when the current
+        // number is not actually below a series' floor.
+        if (next) noteFloorOverride(Object.assign({}, t, { numberFloorOverride: true }), (t.ticketNo || '').trim());
       },
       // Forced approval: the technician never closed this himself, the office did. Worth
       // saying at the moment of approval rather than only in the trail, because it is the

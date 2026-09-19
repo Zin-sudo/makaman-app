@@ -102,6 +102,19 @@ const bell = (p) => p.locator('.mk-appbar .mk-bell').first();
     check('the panel opens and heads with the same number',
       shown.heading === n.unread + ' unread', JSON.stringify(shown.heading));
     check('and lists that many entries', shown.rows === n.unread, shown.rows + ' rows');
+
+    // 2026-09-19, owner's request: the notification dropdown should name who did it, the
+    // same as the Activity tab already does — before this it showed only the text/where/
+    // stamp, dropping `by` entirely even though activityEntries() already carries it.
+    const panelText = await p.evaluate(() => {
+      const anchor = Array.from(document.querySelectorAll('button'))
+        .find(x => /MARK ALL READ/i.test(x.textContent || ''));
+      let panel = anchor;
+      while (panel && getComputedStyle(panel).position !== 'fixed') panel = panel.parentElement;
+      return panel ? panel.innerText : '';
+    });
+    check('the notification panel names who did it, same as the Activity tab',
+      /Someone Else/.test(panelText), panelText.slice(0, 200));
     await ctx.close();
   }
 
